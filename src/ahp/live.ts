@@ -969,6 +969,49 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
 
     customizations: async (uri) => customizations(bag(await snapshotOf(uri)).customizations),
 
+    /**
+     * Asked as `completions`, which is what the protocol has for this.
+     *
+     * The root channel, because there is no session: a host that serves it
+     * answers with what its harness offers, and one that does not refuses -
+     * which is a slash menu with the client's own commands in it, not a
+     * failure worth reporting.
+     *
+     * A leading slash and nothing after it, so the answer is the whole list.
+     * The menu filters what was typed itself, the same way it does on an open
+     * session, rather than asking again per keystroke.
+     */
+    harnessCommands: async () => {
+      try {
+        const result = await client.request('completions', {
+          channel: ROOT,
+          kind: 'userMessage',
+          text: '/',
+          offset: 1,
+        });
+        return list(result.items).map((raw): Customization => {
+          const item = bag(raw);
+          const attachment = bag(item.attachment);
+          // `insertText` is what would be typed - `/name` or `/name ` - and
+          // the name is what a menu row is. The label is the same thing with
+          // the slash still on it.
+          const name = (str(item.insertText) ?? str(attachment.label) ?? '')
+            .replace(/^\//, '')
+            .trim();
+          return {
+            id: `command:${name}`,
+            kind: 'prompt',
+            name,
+            uri: name,
+            enabled: true,
+            userInvocable: true,
+            ...(plain(attachment.modelRepresentation) ? { description: plain(attachment.modelRepresentation) as string } : {}),
+          };
+        }).filter((command) => command.name !== '');
+      }
+      catch { return []; }
+    },
+
     setCustomizationEnabled: (uri, id, enabled) => {
       try {
         // Session scope. The other two are a decision about every session on

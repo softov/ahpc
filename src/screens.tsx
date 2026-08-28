@@ -300,6 +300,23 @@ export const SessionsScreen: (props: Record<string, never>) => RenderOutput =
  * is what it calls it, and the schema is the authority on both - so a chip
  * reads as a sentence about what will happen rather than as a config value.
  */
+/**
+ * What a slash offers with no session open.
+ *
+ * Asked once and filtered locally as the draft is typed, the same way the
+ * chat screen filters a session's own list - a request per keystroke would
+ * ask the host the same question forty times to narrow one menu.
+ */
+function useHarnessCommands(): Customization[] {
+  const controller = useRequiredService(CONTROLLER);
+  const [items, setItems] = useState<Customization[]>([]);
+  useEffect(() => {
+    void controller.harnessCommands().then(setItems)
+      .catch((error: unknown) => controller.report(error));
+  }, []);
+  return items;
+}
+
 function useComposerOptions(): ComposerOption[] {
   const unicode = useCapabilities().unicode;
   const controller = useRequiredService(CONTROLLER);
@@ -607,6 +624,7 @@ export const NewSessionScreen: (props: Record<string, never>) => RenderOutput =
     const history = useStoreValue<string[]>(HISTORY, []) ?? [];
     const [recall, setRecall] = useState(history.length);
     const options = useComposerOptions();
+    const harnessSkills = useHarnessCommands();
 
     return (
       <Column flex={1} gap={1}>
@@ -629,15 +647,25 @@ export const NewSessionScreen: (props: Record<string, never>) => RenderOutput =
           onOption={(option, anchorId) => {
             if (option.commandId) openPicker(app, { commandId: option.commandId, anchorId });
           }}
-          // Ours only. There is no session yet, so there is nothing that has
-          // been handed a skill - and a menu that offered one would be
-          // offering something with nowhere to send it.
-          commands={slashCommands(app, [])}
+          // The harness's as well as ours. A skill chosen here completes the
+          // draft to `/name `, and the message that creates the session is
+          // then the one that invokes it - which is where somebody most often
+          // wants a skill, and the only place it used to be unreachable.
+          commands={slashCommands(app, harnessSkills)}
           onChange={(value: string) => app.store.set(DRAFT, value)}
           // Chosen here rather than sent. Without this the menu listed the
           // client's own commands and pressing enter on one created a session
           // whose first message was the literal text `/theme`.
           onCommand={(picked: SlashCommand) => {
+            // A skill is typed, not run - the same as on an open session.
+            // There is no "invoke this skill" in the protocol: a person
+            // invokes one by sending its name, and here that name is also
+            // what creates the session.
+            if (picked.kind === 'session') {
+              app.store.set(DRAFT, `/${picked.id} `);
+              app.focus.focus('chat.composer');
+              return;
+            }
             app.store.set(DRAFT, '');
             const command = app.commands.get(picked.id);
             if (command && argumentOf(command)) {

@@ -71,6 +71,8 @@ export interface Controller {
   config(uri: SessionUri): Promise<SessionConfig>;
   /** What the host handed this session: plugins, skills, MCP servers. */
   customizations(uri: SessionUri): Promise<Customization[]>;
+  /** What a slash offers before any session exists. */
+  harnessCommands(): Promise<Customization[]>;
   /** Turn one on or off. The host decides and tells everyone watching. */
   setCustomizationEnabled(uri: SessionUri, id: string, enabled: boolean): void;
   /** One file out of a changeset, fetched. Nothing calls it until a row opens. */
@@ -460,6 +462,7 @@ export function createController(
     detail: (uri) => host.detail(uri),
     config: (uri) => host.config(uri),
     customizations: (uri) => host.customizations(uri),
+    harnessCommands: () => host.harnessCommands(),
     setCustomizationEnabled: (uri, id, enabled) => host.setCustomizationEnabled(uri, id, enabled),
     content: (ref) => host.content(ref),
 

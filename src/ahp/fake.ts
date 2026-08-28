@@ -957,6 +957,12 @@ export function fakeHost(): FakeHost {
 
     customizations: async () => CUSTOMIZATIONS.map((entry) => ({ ...entry })),
 
+    // The scripted harness contributes the same things whether or not a
+    // session exists, which is what makes it a script.
+    harnessCommands: async () => CUSTOMIZATIONS
+      .filter((entry) => entry.kind === 'skill' || entry.kind === 'prompt')
+      .map((entry) => ({ ...entry })),
+
     setCustomizationEnabled: (uri, id, enabled) => {
       const found = CUSTOMIZATIONS.find((entry) => entry.id === id);
       if (!found) return;

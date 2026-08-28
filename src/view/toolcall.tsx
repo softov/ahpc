@@ -90,7 +90,12 @@ export const ToolCallRow: (props: ToolCallRowProps) => RenderOutput =
           // Indented to the row's own text, which starts one glyph and one gap
           // in - so what opened out of a row lines up under it.
           <Column padding={[0, 0, 0, 2]} gap={0}>
-            {call.intention ? <MarkdownView content={call.intention} quiet /> : null}
+            {/* Only when it says more than the row already does. A host
+                whose intention is the tool's own name, or the input verbatim,
+                is repeating the header and the block below it. */}
+            {call.intention && call.intention !== call.name && call.intention !== call.input
+              ? <MarkdownView content={call.intention} quiet />
+              : null}
             {call.input ? (
               // On its own lines, wrapped as written. This is where the JSON
               // goes: whole, and not sharing a row with the name.

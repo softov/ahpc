@@ -1706,3 +1706,47 @@ describe('blocks', () => {
       .toEqual(['header', 'prose', 'tool', 'prose']);
   });
 });
+
+/**
+ * A skill, before there is a session to run it in.
+ *
+ * The menu offered the client's own commands and nothing else here, on the
+ * reasoning that nothing had been handed a skill yet. The host knows what its
+ * harness contributes without having been asked to run anything, and choosing
+ * one fills the draft - so the message that creates the session is the one
+ * that invokes it, which is where somebody most often wants a skill.
+ */
+describe('the slash menu with nothing open', () => {
+  const typing = async (typed: string) => {
+    const m = await open();
+    m.t.focus('chat.composer');
+    for (let i = 0; i < 4; i++) await m.t.settle();
+    m.t.type(typed);
+    for (let i = 0; i < 6; i++) await m.t.settle();
+    return m;
+  };
+
+  it('offers what the harness contributes, not only what the client owns', async () => {
+    const m = await typing('/rev');
+    expect(m.t.hasText('/review')).toBe(true);
+    await m.t.unmount();
+  });
+
+  it('leaves out the ones the agent alone may invoke', async () => {
+    const m = await typing('/ver');
+    // `verify` is marked as the agent's own. Offering it offers something the
+    // host would refuse.
+    expect(m.t.hasText('/verify')).toBe(false);
+    await m.t.unmount();
+  });
+
+  it('types the skill rather than running it', async () => {
+    const m = await typing('/rev');
+    m.t.press('enter');
+    for (let i = 0; i < 6; i++) await m.t.settle();
+    // There is no "invoke this skill" in the protocol: a person invokes one by
+    // sending its name. The trailing space is because most take an argument.
+    expect(m.t.app.store.get(DRAFT)).toBe('/review ');
+    await m.t.unmount();
+  });
+});

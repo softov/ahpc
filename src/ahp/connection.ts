@@ -133,6 +133,21 @@ export interface HostConnection {
   customizations(uri: SessionUri): Promise<Customization[]>;
 
   /**
+   * What a slash offers before any session exists.
+   *
+   * Separate from `customizations` because that one takes a session, and on
+   * the new-session screen there is not one yet - which is exactly when
+   * somebody wants to open with a skill. The host knows what its harness
+   * contributes without having been asked to run anything, so this is a
+   * question it can answer, and the only one that can: a client cannot derive
+   * it from a catalogue of sessions it is not opening.
+   *
+   * Answering with nothing is a real answer, and the one to give for a
+   * harness nobody has signed into.
+   */
+  harnessCommands(): Promise<Customization[]>;
+
+  /**
    * Turn one on or off, by id.
    *
    * Fire-and-forget like the rest of the dispatches: the host decides, tells

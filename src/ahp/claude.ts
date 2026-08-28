@@ -998,6 +998,21 @@ export async function claudeHost(options: ClaudeHostOptions): Promise<HostConnec
      * for the same reason: two sessions in different directories are handed
      * different things.
      */
+    /**
+     * What a slash offers before any session exists.
+     *
+     * The harness is this process, and nothing has run - so the honest answer
+     * is what any session here would be handed, which nothing has been asked
+     * yet. Empty until one has: a probe started only to fill a menu would
+     * spawn a CLI for a keystroke.
+     */
+    harnessCommands: async (): Promise<Customization[]> => {
+      const any = [...handshakes.values()][0];
+      if (!any) return [];
+      return (list(any.skills).map((entry) => str(entry)).filter(Boolean) as string[])
+        .map((name) => ({ id: `skill:${name}`, kind: 'skill' as const, name, uri: name, enabled: true }));
+    },
+
     customizations: async (uri): Promise<Customization[]> => {
       const found: Customization[] = [];
       const seen = handshakes.get(uri);
