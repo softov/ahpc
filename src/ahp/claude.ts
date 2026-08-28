@@ -40,10 +40,10 @@ import { SessionFlag } from './types.js';
  * means.
  *
  * The SDK is an **optional** dependency, for the same reason the protocol
- * package is - the example has to run, and be checked, with nothing installed:
+ * package is - this client has to run, and be checked, with nothing installed:
  *
  * ```
- * pnpm --filter @textui/example-chat add @anthropic-ai/claude-agent-sdk
+ * npm install @anthropic-ai/claude-agent-sdk
  * ```
  *
  * Written against `@anthropic-ai/claude-agent-sdk` 0.3.250, from the package's
@@ -79,8 +79,8 @@ export interface ClaudeHostOptions {
 
 export class MissingAgentSdk extends Error {
   constructor() {
-    super('A Claude host needs @anthropic-ai/claude-agent-sdk. Install it in this example:\n'
-      + '  pnpm --filter @textui/example-chat add @anthropic-ai/claude-agent-sdk\n'
+    super('A Claude host needs @anthropic-ai/claude-agent-sdk. Install it:\n'
+      + '  npm install @anthropic-ai/claude-agent-sdk\n'
       + 'Or leave --claude off and drive the scripted one.');
     this.name = 'MissingAgentSdk';
   }

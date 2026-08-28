@@ -26,7 +26,7 @@ import type {
  * checked, with nothing installed:
  *
  * ```
- * pnpm --filter @textui/example-chat add @microsoft/agent-host-protocol
+ * npm install @microsoft/agent-host-protocol
  * ```
  *
  * Written against protocol 0.7.0, from the package's own `src/types/`. What it
@@ -113,8 +113,8 @@ interface Loaded {
 
 export class MissingProtocolPackage extends Error {
   constructor() {
-    super('A live host needs @microsoft/agent-host-protocol. Install it in this example:\n'
-      + '  pnpm --filter @textui/example-chat add @microsoft/agent-host-protocol\n'
+    super('A live host needs @microsoft/agent-host-protocol. Install it:\n'
+      + '  npm install @microsoft/agent-host-protocol\n'
       + 'Or leave --host off and drive the scripted one.');
     this.name = 'MissingProtocolPackage';
   }
@@ -564,7 +564,7 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
   client.connect();
 
   const hello = bag(await client.initialize({
-    clientId: options.clientId ?? `textui-chat-${randomUUID().slice(0, 8)}`,
+    clientId: options.clientId ?? `ahpc-${randomUUID().slice(0, 8)}`,
     protocolVersions: VERSIONS,
   }));
   for (const snapshot of list(hello.snapshots)) mirror.applySnapshot(snapshot);
