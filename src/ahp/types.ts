@@ -278,6 +278,36 @@ export interface Completion {
   description?: string;
 }
 
+/** One terminal the host is running, as the root channel lists it. */
+export interface TerminalRow {
+  /** Its channel URI. */
+  resource: string;
+  /** Display title. */
+  title: string;
+  /** The process's exit code, once it has one. Absent while it runs. */
+  exitCode?: number;
+}
+
+/** A terminal's own state, as its channel reports it. */
+export interface TerminalState {
+  /** Display title. */
+  title: string;
+  /** Everything written so far, flattened from the protocol's content parts. */
+  output: string;
+  /** Where it is running. */
+  cwd?: string;
+  /** The process's exit code, once it has one. */
+  exitCode?: number;
+  /**
+   * Whether a pseudoterminal is behind it.
+   *
+   * `false` means the output is plain text and carries no VT sequences - so a
+   * client neither has to parse them nor should expect anything that draws
+   * itself with cursor movement to look right.
+   */
+  isPty: boolean;
+}
+
 export interface Agent {
   provider: string;
   displayName: string;

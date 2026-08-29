@@ -8,6 +8,8 @@ import type {
 import { createBag, serviceKey } from '@textui/core';
 import { confirm } from '@textui/widgets';
 import type { HostConnection } from './ahp/connection.js';
+import type { Terminals } from './terminal.js';
+import { createTerminals } from './terminal.js';
 import type {
   Agent, Answer, Completion, ContentRef, Customization, FileContent, SessionConfig, SessionDetail,
   SessionUri, Turn,
@@ -16,7 +18,7 @@ import { SessionFlag } from './ahp/types.js';
 import { valueIcon } from './view/icons.js';
 import {
   ARCHIVED, CAN_ADD_CHAT, CHAT_URI, CHATS, CUSTOMIZATIONS, DRAFT, EXPANDED, FILTER, HAS_CHATS,
-  HOST, HOST_ERROR, INPUT, MODEL,
+  HOST, HOST_ERROR, INPUT, MODEL, OPEN_TERMINAL,
   OPEN, OPEN_FILE, PROVIDER, MARKDOWN, QUEUE, RUNNING, SCREEN, SELECTED, SETTINGS, SIDEBAR,
   SPLIT_AT, SPLIT_DEFAULT, TURNS, WORKSPACE,
   applyEvent, pendingInput, queue, sessions, turns, writeSessions, writeStatus,
@@ -72,6 +74,14 @@ export interface Controller {
   config(uri: SessionUri): Promise<SessionConfig>;
   /** What the host handed this session: plugins, skills, MCP servers. */
   customizations(uri: SessionUri): Promise<Customization[]>;
+  /**
+   * Terminals, as operations.
+   *
+   * Its own object because a terminal is not a session and shares nothing with
+   * one: it belongs to the host, outlives any turn, and what a screen needs
+   * from it is a different set of verbs.
+   */
+  readonly terminals: Terminals;
   /** What the host offers to complete what is being typed. */
   completions(channel: string, text: string, offset?: number): Promise<Completion[]>;
   /** Read a different chat in the session already open. */
@@ -318,6 +328,8 @@ export function createController(
     if (uri) app.store.set(CAN_ADD_CHAT, canAddChat(uri));
   }).catch(() => undefined);
 
+  const terminals = createTerminals(app, host, failed);
+
   const controller: Controller = {
     async refresh() {
       try {
@@ -335,6 +347,7 @@ export function createController(
      * what is waiting all belong to the chat, so keeping any of them across
      * the change would show one conversation's state under another's name.
      */
+    terminals,
     completions: (channel, text, offset) => host.completions({
       channel,
       text,
@@ -580,6 +593,9 @@ export function createController(
   };
 
   bag.add({ dispose: () => subscription?.close() });
+  // The terminal's subscription is the controller's, not a screen's - which is
+  // the point of the split, and means it has to be let go here.
+  bag.add({ dispose: () => { terminals.dispose(); } });
   // What the host says about sessions this client is not watching: one
   // appearing, one finishing, one starting to wait. Without it the catalogue
   // is only ever as fresh as the last time somebody navigated to it.
@@ -983,6 +999,44 @@ function commands(app: TextUIApp, controller: Controller): CommandDefinition[] {
         const chat = app.store.get<string>(CHAT_URI);
         if (chat) void controller.disposeChat(chat);
       },
+    },
+    /*
+     * A shell on the host machine.
+     *
+     * Not gated: a host that runs none answers an empty list and refuses to
+     * open one, and the screen says so - which is a better answer than a
+     * command that is missing for a reason nobody can see.
+     */
+    {
+      id: 'terminal.new',
+      title: 'Open a terminal',
+      category: 'Terminal',
+      description: 'Start a shell on the host, in a directory it serves',
+      slots: ['palette'],
+      run: () => {
+        const where = app.store.get<string>(WORKSPACE);
+        void controller.terminals.open(where ? { cwd: where } : {}).then(() => {
+          app.screens.push('terminal');
+          app.focus.focus('terminal.input');
+        });
+      },
+    },
+    {
+      id: 'terminal.close',
+      title: 'Close this terminal',
+      category: 'Terminal',
+      description: 'Kill the shell being read',
+      slots: ['palette'],
+      when: OPEN_TERMINAL,
+      run: () => void controller.terminals.close(),
+    },
+    {
+      id: 'go.terminal',
+      title: 'Terminals',
+      category: 'Go',
+      description: 'The shells running on the host',
+      slots: ['palette'],
+      run: () => { app.screens.push('terminal'); },
     },
     {
       id: 'compose.workspace',

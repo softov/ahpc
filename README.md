@@ -61,6 +61,12 @@ npm run dev -- --claude              # Claude Code, in this process
 skip the build here: Node strips types but does not understand JSX, and every
 screen is written in it.
 
+`ctrl+p` has **Open a terminal**: a shell on the host, in a directory it
+serves. `terminal.ts` owns which terminals exist, which is open and what
+happens when a line is sent; [`view/terminal.tsx`](src/view/terminal.tsx) only
+draws it - so leaving the screen does not lose the shell. Output is plain text
+rather than a VT stream, which the host says and the header repeats.
+
 `@` completes a path against the **host's** filesystem, asked of it on every
 keystroke that changes the fragment - which of its files match is a question
 only it can answer. A completion carries the range it replaces, so `@src/ho`

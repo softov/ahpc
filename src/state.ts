@@ -82,6 +82,12 @@ export const CHATS = '$/chat/conv/chats' as BindingPath;
  * reads the store, and a host that does not advertise `multipleChats` is one
  * where `createChat` MUST NOT be called - so the command is not offered.
  */
+/** The terminals the host is running. The host's list, not any session's. */
+export const TERMINALS = '$/chat/term/all' as BindingPath;
+/** Which of them is being read. */
+export const OPEN_TERMINAL = '$/chat/term/open' as BindingPath;
+/** Its state. Null while nothing has been read yet, which is not the same as empty. */
+export const TERMINAL = '$/chat/term/state' as BindingPath;
 export const CAN_ADD_CHAT = '$/chat/conv/canAddChat' as BindingPath;
 /** Whether the open session has more than one chat to move between. */
 export const HAS_CHATS = '$/chat/conv/hasChats' as BindingPath;

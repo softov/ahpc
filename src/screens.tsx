@@ -21,12 +21,14 @@ import {
 import {
   ARCHIVED, CHANGES, CUSTOMIZATIONS, DRAFT, EXPANDED, FILTER, FOCUS, HISTORY, HOST, INPUT,
   MODEL, OPEN, OPEN_FILE, CHAT_URI, PROVIDER, QUEUE, SELECTED, SESSIONS, SETTINGS, SIDEBAR,
-  CHATS, SPLIT_AT, SPLIT_DEFAULT, TURNS, WORKSPACE, openSession, visibleSessions, workspaceName,
+  CHATS, OPEN_TERMINAL, SPLIT_AT, SPLIT_DEFAULT, TERMINAL, TERMINALS, TURNS, WORKSPACE,
+  openSession, visibleSessions, workspaceName,
 } from './state.js';
 import type { HostState } from './state.js';
 import { toBlocks } from './blocks.js';
 import type {
   Agent, Changeset, Completion, ContentRef, Customization, FileContent, PendingInput, QueuedMessage,
+  TerminalRow, TerminalState,
   SessionConfig, SessionDetail, SessionSummary, SlashCommand, Turn,
 } from './ahp/types.js';
 import { decodeStatus } from './ahp/status.js';
@@ -38,6 +40,7 @@ import { settingIcon, valueIcon } from './view/icons.js';
 import { ChatHitl } from './view/hitl.js';
 import { ChangesList } from './view/changes.js';
 import { CustomizationList } from './view/customizations.js';
+import { TerminalView } from './view/terminal.js';
 import { FileDiff } from './view/filediff.js';
 import { diffLines } from './diff.js';
 import { ConnectionBadge, SessionList } from './view/sessions.js';
@@ -350,6 +353,59 @@ function usePathCompletions(draft: string, channel: string | null): Completion[]
   }, [asking, channel]);
   return asking === '' ? [] : found;
 }
+
+/**
+ * The terminal screen.
+ *
+ * Nothing is decided here: which terminals exist, which is open and what
+ * happens when a line is sent all live in `terminal.ts`, and this puts them on
+ * screen. Unmounting it therefore does not lose the shell, which is the
+ * reason for the split.
+ */
+export const TerminalScreen: (props: Record<string, never>) => RenderOutput =
+  defineComponent<Record<string, never>>('TerminalScreen', () => {
+    const app = useApp();
+    const controller = useRequiredService(CONTROLLER);
+    useFocusScope({ id: 'chat.terminal' });
+
+    const rows = useStoreValue<TerminalRow[]>(TERMINALS, []) ?? [];
+    const open = useStoreValue<string | null>(OPEN_TERMINAL, null) ?? null;
+    const state = useStoreValue<TerminalState | null>(TERMINAL, null);
+    const [draft, setDraft] = useState('');
+
+    // Asked for on arrival, and only then: a host with no terminals is the
+    // ordinary case, and a list polled behind a screen nobody is looking at is
+    // a request per second for an answer nobody reads.
+    useEffect(() => {
+      void controller.terminals.refresh().then(() => {
+        if (app.store.get<string>(OPEN_TERMINAL)) return;
+        const first = (app.store.get<TerminalRow[]>(TERMINALS) ?? [])[0];
+        if (first) controller.terminals.read(first.resource);
+      });
+    }, []);
+
+    if (rows.length === 0 && open === null) {
+      return (
+        <EmptyState
+          title="No terminals"
+          message="ctrl+p, then Open a terminal. The shell runs on the host, in a directory it serves."
+          flex={1}
+        />
+      );
+    }
+
+    return (
+      <TerminalView
+        rows={rows}
+        open={open}
+        state={state ?? null}
+        draft={draft}
+        onDraft={setDraft}
+        onSend={(line) => { controller.terminals.write(line); setDraft(''); }}
+        onSelect={(uri) => { controller.terminals.read(uri); }}
+      />
+    );
+  });
 
 function useHarnessCommands(): Customization[] {
   const controller = useRequiredService(CONTROLLER);

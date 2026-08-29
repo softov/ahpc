@@ -3,7 +3,7 @@ import type { HostConnection, HostEvent } from './connection.js';
 import type {
   Agent, Changeset, ChatInputRequest, ContentRef, Customization, FileContent, FileEdit,
   PendingInput, QueuedMessage, ResponsePart, SessionConfig, SessionDetail, SessionSummary,
-  SessionUri, ToolCall, Turn,
+  SessionUri, TerminalState, ToolCall, Turn,
 } from './types.js';
 import { SessionFlag } from './types.js';
 
@@ -81,6 +81,25 @@ const nextId = (prefix: string): string => `${prefix}${++counter}`;
 
 const AT = '2026-08-22T10:00:00.000Z';
 
+/** One scripted shell. */
+interface Shell {
+  title: string;
+  cwd: string;
+  /** Everything written so far. */
+  output: string;
+  /** Input not yet ending in a newline, which a shell has not seen either. */
+  pending: string;
+  exitCode?: number;
+  watchers: Set<(state: TerminalState) => void>;
+}
+
+/** What the scripted shell answers. Anything else is not found, as a shell says. */
+const SHELL: Record<string, string> = {
+  pwd: '/brb_main/src/brb_framework\n',
+  ls: 'Makefile  Makefile.linux  libbrb_core  compileLinux.sh\n',
+  whoami: 'softov\n',
+};
+
 /**
  * The scripted filesystem `@` completes against.
  *
@@ -121,6 +140,17 @@ export function fakeHost(): FakeHost {
    * conversation with nothing in it, which is what a second chat is.
    */
   const extra = new Map<string, { session: SessionUri; title: string; turns: Turn[]; watchers: Set<(event: HostEvent) => void> }>();
+  /** The scripted shells, by terminal URI. */
+  const shells = new Map<string, Shell>();
+  const shellState = (uri: string, held: Shell): TerminalState => ({
+    title: held.title,
+    output: held.output,
+    cwd: held.cwd,
+    ...(held.exitCode !== undefined ? { exitCode: held.exitCode } : {}),
+    // Pipes, like the daemon's. Said rather than left to be discovered by
+    // rendering something that draws itself with cursor movement.
+    isPty: false,
+  });
   const models = new Map<SessionUri, string>();
   /** `IsRead` and `IsArchived` only. Nothing about what the session is doing. */
   const flags = new Map<SessionUri, number>();
@@ -909,6 +939,63 @@ export function fakeHost(): FakeHost {
      * particular state on purpose, and a fixture that read this machine's
      * files would answer differently on every machine it ran on.
      */
+    /*
+     * A scripted shell.
+     *
+     * It answers three commands and says so for anything else, which is
+     * enough to check the one thing a terminal view has to get right:
+     * keystrokes go out, output comes back, and what is on screen is the
+     * accumulated stream rather than the last thing said.
+     */
+    terminals: async () => [...shells].map(([resource, held]) => ({
+      resource,
+      title: held.title,
+      ...(held.exitCode !== undefined ? { exitCode: held.exitCode } : {}),
+    })),
+
+    createTerminal: async (options) => {
+      const uri = `ahp-terminal:/${randomUUID()}`;
+      shells.set(uri, {
+        title: options?.name ?? 'sh',
+        cwd: options?.cwd ?? '/brb_main/src/brb_framework',
+        output: '',
+        pending: '',
+        watchers: new Set(),
+      });
+      return uri;
+    },
+
+    disposeTerminal: async (uri) => {
+      const held = shells.get(uri);
+      if (!held) return;
+      held.exitCode = 0;
+      for (const watcher of held.watchers) watcher(shellState(uri, held));
+      shells.delete(uri);
+    },
+
+    watchTerminal: (uri, observer) => {
+      const held = shells.get(uri);
+      if (!held) return { close: () => {} };
+      held.watchers.add(observer);
+      observer(shellState(uri, held));
+      return { close: () => { held.watchers.delete(observer); } };
+    },
+
+    writeTerminal: (uri, data) => {
+      const held = shells.get(uri);
+      if (!held) return;
+      held.pending += data;
+      // A line at a time, which is what a shell reading from a pipe does.
+      for (;;) {
+        const at = held.pending.indexOf('\n');
+        if (at === -1) break;
+        const line = held.pending.slice(0, at).trim();
+        held.pending = held.pending.slice(at + 1);
+        held.output += `$ ${line}\n${SHELL[line] ?? `sh: ${line}: not found\n`}`;
+      }
+      for (const watcher of held.watchers) watcher(shellState(uri, held));
+    },
+
     completions: async ({ text, offset }) => {
       const at = offset ?? text.length;
       const found = /(?:^|\s)@(\S*)$/.exec(text.slice(0, at));

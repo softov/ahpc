@@ -1027,6 +1027,21 @@ export async function claudeHost(options: ClaudeHostOptions): Promise<HostConnec
      * so an empty list is the true answer rather than a gap - the composer
      * offers no menu, which is what it did before any host served one.
      */
+    /*
+     * No terminals.
+     *
+     * This host is a CLI in this process and runs no shell of its own. Empty
+     * and a refusal are the true answers - a client offering to open one here
+     * would be offering something with nothing behind it.
+     */
+    terminals: async () => [],
+    createTerminal: async () => {
+      throw new Error('This host runs no terminals. Connect to an agent host with --host.');
+    },
+    disposeTerminal: async () => {},
+    watchTerminal: () => ({ close: () => {} }),
+    writeTerminal: () => {},
+
     completions: async () => [],
 
     createChat: async () => {

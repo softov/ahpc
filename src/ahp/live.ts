@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { HostConnection, HostEvent } from './connection.js';
 import type {
   Agent, Answer, Changeset, Completion, ConfigProperty, ContentRef, Customization, CustomizationKind,
+  TerminalRow, TerminalState,
   FileContent, FileEdit, McpState, PendingInput, QueuedMessage, Question, QuestionKind,
   ResponsePart, SessionConfig, SessionDetail, SessionSummary, SessionUri, ToolCall,
   ToolCallStatus, Turn,
@@ -98,7 +99,7 @@ interface Client {
 }
 
 interface Mirror {
-  readonly root: { agents?: unknown[] };
+  readonly root: { agents?: unknown[]; terminals?: unknown[] };
   applySnapshot(snapshot: unknown): void;
   apply(envelope: unknown): void;
 }
@@ -109,6 +110,7 @@ interface Loaded {
   connect(url: string): Promise<unknown>;
   chatReducer(state: unknown, action: unknown): unknown;
   sessionReducer(state: unknown, action: unknown): unknown;
+  terminalReducer(state: unknown, action: unknown): unknown;
 }
 
 export class MissingProtocolPackage extends Error {
@@ -133,6 +135,7 @@ async function load(): Promise<Loaded> {
       connect: (url) => transport.connect(url),
       chatReducer: core.chatReducer as unknown as Loaded['chatReducer'],
       sessionReducer: core.sessionReducer as unknown as Loaded['sessionReducer'],
+      terminalReducer: core.terminalReducer as unknown as Loaded['terminalReducer'],
     };
   } catch (error) {
     // Node says `ERR_MODULE_NOT_FOUND` for a missing package and a missing
@@ -742,6 +745,87 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
         ...(values && Object.keys(values).length > 0 ? { config: values } : {}),
       });
       return resource;
+    },
+
+    terminals: async () => list(mirror.root.terminals).map((raw): TerminalRow => {
+      const found = bag(raw);
+      return {
+        resource: str(found.resource) ?? '',
+        title: str(found.title) ?? 'Terminal',
+        ...(typeof found.exitCode === 'number' ? { exitCode: found.exitCode } : {}),
+      };
+    }).filter((row) => row.resource !== ''),
+
+    createTerminal: async (options) => {
+      // The client picks the URI, as it does for a session and a chat, so it
+      // can be watched without a round trip in between.
+      const uri = `ahp-terminal:/${randomUUID()}`;
+      await client.request('createTerminal', {
+        channel: uri,
+        claim: { kind: 'client', clientId: 'live' },
+        ...(options?.cwd ? { cwd: `file://${options.cwd}` } : {}),
+        ...(options?.name ? { name: options.name } : {}),
+      });
+      return uri;
+    },
+
+    disposeTerminal: async (uri) => {
+      await client.request('disposeTerminal', { channel: uri });
+    },
+
+    /**
+     * Watch one, and report its whole state each time it changes.
+     *
+     * The whole state rather than the delta, for the same reason the chat
+     * does: the reducer is the authority on what the terminal now contains,
+     * and a second hand-written path from action to screen is a second answer
+     * to the same question.
+     */
+    watchTerminal: (uri, observer) => {
+      let live = true;
+      let closer: (() => void) | undefined;
+      const shape = (state: Bag): TerminalState => ({
+        title: str(state.title) ?? 'Terminal',
+        // The protocol's typed parts, flattened: a command part carries its
+        // output and an unclassified one its value, and a reader wants the
+        // stream either way.
+        output: list(state.content)
+          .map((raw) => {
+            const part = bag(raw);
+            return str(part.type) === 'command' ? str(part.output) ?? '' : str(part.value) ?? '';
+          })
+          .join(''),
+        ...(str(state.cwd) ? { cwd: (str(state.cwd) as string).replace(/^file:\/\//, '') } : {}),
+        ...(typeof state.exitCode === 'number' ? { exitCode: state.exitCode } : {}),
+        isPty: state.isPty === true,
+      });
+
+      void (async () => {
+        try {
+          const opened = await client.subscribe(uri);
+          if (!live) { void opened.subscription.close(); return; }
+          closer = () => void opened.subscription.close();
+          let state = bag(opened.result.snapshot?.state);
+          observer(shape(state));
+          for await (const event of opened.subscription) {
+            if (event.type !== 'action') continue;
+            state = bag(ahp.terminalReducer(state, bag(event.params).action));
+            if (live) observer(shape(state));
+          }
+        }
+        catch (error) { options.onRefusal?.(uri, reason(error)); }
+      })();
+
+      return { close: () => { live = false; closer?.(); } };
+    },
+
+    writeTerminal: (uri, data) => {
+      try {
+        // Side-effect only: what comes back is `terminal/data`, once the shell
+        // has actually said something. Echoing here would print every
+        // keystroke twice on the client that typed it.
+        client.dispatch(uri, { type: 'terminal/input', data });
+      } catch (error) { options.onRefusal?.(uri, reason(error)); }
     },
 
     completions: async ({ channel, text, offset }) => {

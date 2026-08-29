@@ -12,8 +12,8 @@ import { SessionFlag } from '../src/ahp/types.js';
 import { CLIPBOARD_PATH, layoutMarkdown, wrapRuns } from '@textui/core';
 import { toBlocks } from '../src/blocks.js';
 import {
-  CHATS, CHAT_URI, DRAFT, HOST_ERROR, INPUT, OPEN, PROVIDER, QUEUE, SELECTED, SETTINGS, SIDEBAR,
-  TURNS, WORKSPACE,
+  CHATS, CHAT_URI, DRAFT, HOST_ERROR, INPUT, OPEN, OPEN_TERMINAL, PROVIDER, QUEUE, SELECTED,
+  SETTINGS, SIDEBAR, TURNS, WORKSPACE,
 } from '../src/state.js';
 import type { Turn } from '../src/ahp/types.js';
 import { PICKER, openPicker } from '../src/view/picker.js';
@@ -1947,6 +1947,97 @@ describe('completing an at-sign', () => {
     // An at-sign mid-word is an address, and a draft that has moved past it
     // is not completing anything.
     expect(m.t.hasText('@src/')).toBe(false);
+    await m.t.unmount();
+  });
+});
+
+/**
+ * A shell on the host, drawn here.
+ *
+ * The split is doop's: `terminal.ts` owns which terminals exist, which is
+ * open and what happens when a line is sent; the view only draws it. So these
+ * drive the controller and read the screen, which is the seam that matters.
+ */
+describe('a terminal', () => {
+  /**
+   * Settle until it says something, rather than a fixed number of times.
+   *
+   * `Feed` measures its entries *after* they are laid out and scrolls by
+   * summing those heights, so what it draws is one frame behind what it was
+   * given. On a running terminal that is invisible; in a test a fixed count
+   * races it, and the race is what makes a passing test fail every other run.
+   */
+  const until = async (m: Mounted, text: string): Promise<boolean> => {
+    for (let i = 0; i < 40; i++) {
+      await m.t.settle();
+      if (m.t.hasText(text)) return true;
+    }
+    return false;
+  };
+
+  const opened = async () => {
+    const m = await open();
+    const controller = m.t.app.services.require(CONTROLLER);
+    await controller.terminals.open();
+    m.t.app.screens.push('terminal');
+    for (let i = 0; i < 12; i++) await m.t.settle();
+    return m;
+  };
+
+  it('says what the shell said, and keeps what it said before', async () => {
+    const m = await opened();
+    const controller = m.t.app.services.require(CONTROLLER);
+    controller.terminals.write('pwd\n');
+    expect(await until(m, '/brb_main/src/brb_framework')).toBe(true);
+
+    controller.terminals.write('whoami\n');
+    expect(await until(m, 'softov')).toBe(true);
+    // The accumulated stream, not the last thing said: a terminal that
+    // replaced its contents on every command would be a status line.
+    expect(m.t.hasText('$ pwd')).toBe(true);
+    await m.t.unmount();
+  });
+
+  it('says it is plain text, rather than leaving it to be discovered', async () => {
+    const m = await opened();
+    // Pipes, not a pseudoterminal. Anything that draws itself with cursor
+    // movement will look wrong, and finding that out by rendering it is
+    // finding out too late.
+    expect(m.t.hasText('plain text')).toBe(true);
+    await m.t.unmount();
+  });
+
+  it('survives leaving the screen and coming back', async () => {
+    const m = await opened();
+    const controller = m.t.app.services.require(CONTROLLER);
+    controller.terminals.write('ls\n');
+    expect(await until(m, 'Makefile.linux')).toBe(true);
+
+    m.t.app.screens.push('sessions');
+    for (let i = 0; i < 8; i++) await m.t.settle();
+    m.t.app.screens.push('terminal');
+
+    // The subscription is the controller's, not the screen's. A view that
+    // held it would lose the shell every time it was unmounted.
+    expect(await until(m, 'Makefile.linux')).toBe(true);
+    await m.t.unmount();
+  });
+
+  it('closes one and says there are none', async () => {
+    const m = await opened();
+    const controller = m.t.app.services.require(CONTROLLER);
+    await controller.terminals.close();
+    for (let i = 0; i < 12; i++) await m.t.settle();
+    expect(m.t.app.store.get(OPEN_TERMINAL)).toBeFalsy();
+    expect(m.t.hasText('No terminals')).toBe(true);
+    await m.t.unmount();
+  });
+
+  it('says a host that runs none runs none', async () => {
+    const m = await open();
+    m.t.app.screens.push('terminal');
+    for (let i = 0; i < 12; i++) await m.t.settle();
+    expect(m.t.hasText('No terminals')).toBe(true);
     await m.t.unmount();
   });
 });

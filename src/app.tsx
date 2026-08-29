@@ -18,7 +18,7 @@ import {
 import type { HostState } from './state.js';
 import { decodeStatus } from './ahp/status.js';
 import {
-  ChangesScreen, ChatScreen, HostsScreen, McpScreen, NewSessionScreen, SessionsScreen,
+  ChangesScreen, ChatScreen, HostsScreen, McpScreen, NewSessionScreen, SessionsScreen, TerminalScreen,
   SettingsScreen, SkillsScreen,
 } from './screens.js';
 import { ChatBubble, ReasoningBlock, StreamingText } from './view/bubble.js';
@@ -313,6 +313,7 @@ export function registerChat(app: TextUIApp, options: ChatOptions = {}): Disposa
     ['SessionsScreen', SessionsScreen],
     ['ChatScreen', ChatScreen],
     ['NewSessionScreen', NewSessionScreen],
+    ['TerminalScreen', TerminalScreen],
     ['ChangesScreen', ChangesScreen],
     ['SettingsScreen', SettingsScreen],
     ['HostsScreen', HostsScreen],
@@ -344,6 +345,9 @@ export function registerChat(app: TextUIApp, options: ChatOptions = {}): Disposa
     { id: 'hosts', component: 'HostsScreen' },
     { id: 'skills', component: 'SkillsScreen' },
     { id: 'mcp', component: 'McpScreen' },
+    // Kept alive: a shell you scrolled back through and then left is a shell
+    // that should still be where you left it.
+    { id: 'terminal', component: 'TerminalScreen', keepAlive: true },
   ]) {
     bag.add(app.screens.register(screen));
   }

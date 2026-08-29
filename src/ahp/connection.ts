@@ -1,6 +1,6 @@
 import type {
   Agent, Answer, Changeset, Completion, ContentRef, Customization, FileContent, PendingInput, QueuedMessage,
-  SessionConfig, SessionDetail, SessionSummary, SessionUri, ToolCall, Turn,
+  SessionConfig, SessionDetail, SessionSummary, SessionUri, TerminalRow, TerminalState, ToolCall, Turn,
 } from './types.js';
 
 /**
@@ -86,6 +86,23 @@ export interface HostConnection {
    * `createChat` MUST NOT be called at all.
    */
   createChat(uri: SessionUri, first?: string): Promise<string>;
+
+  /**
+   * The terminals the host is running.
+   *
+   * The host's rather than a session's: one outlives the turn that opened it,
+   * several clients watch one, and the protocol lists them on the root
+   * channel - which is where something owned by no session belongs.
+   */
+  terminals(): Promise<TerminalRow[]>;
+  /** Open one. The URI is chosen here, so it can be watched without a round trip. */
+  createTerminal(options?: { cwd?: string; name?: string }): Promise<string>;
+  /** Kill it and let go. */
+  disposeTerminal(uri: string): Promise<void>;
+  /** Watch one: its state, and then everything that happens to it. */
+  watchTerminal(uri: string, observer: (state: TerminalState) => void): { close(): void };
+  /** Send input. Nothing comes back but what the shell says. */
+  writeTerminal(uri: string, data: string): void;
 
   /**
    * What the host offers to complete what is being typed.
