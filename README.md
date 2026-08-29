@@ -56,9 +56,10 @@ npm run dev -- --host ws://…         # a real one, over the wire
 npm run dev -- --claude              # Claude Code, in this process
 ```
 
-`npm run dev` is `bun src/main.tsx` - the source as it is, no build and
-nothing installed. There is no Node equivalent: Node strips types but does not
-understand JSX, and every screen here is written in it.
+`dev` builds and runs on Node, which is what this ships on. `dev:bun` is
+`bun src/main.tsx` - the source as it is, no build - and it is the only way to
+skip the build here: Node strips types but does not understand JSX, and every
+screen is written in it.
 
 [`fake.ts`](src/ahp/fake.ts) is a **script**, and it is not a lesser version of
 the other one - it is the only way to arrive at a *particular* state on
