@@ -2041,3 +2041,60 @@ describe('a terminal', () => {
     await m.t.unmount();
   });
 });
+
+/**
+ * Two things a terminal has to get right that a transcript does not.
+ *
+ * Both were found by using it rather than by reading it: the output flickered
+ * once per frame, and `ctrl+c` closed the application instead of stopping the
+ * command.
+ */
+describe('the terminal, in use', () => {
+  const opened = async () => {
+    const m = await open();
+    const controller = m.t.app.services.require(CONTROLLER);
+    await controller.terminals.open();
+    m.t.app.screens.push('terminal');
+    for (let i = 0; i < 12; i++) await m.t.settle();
+    return m;
+  };
+
+  it('draws the same thing on every frame', async () => {
+    const m = await opened();
+    m.t.app.services.require(CONTROLLER).terminals.write('whoami\n');
+    for (let i = 0; i < 12; i++) await m.t.settle();
+
+    // A `Row` holding a `Column` holding the `Feed` alternated between drawing
+    // its entries and not, once per frame. Sampled rather than checked once,
+    // because a single frame passes half the time either way.
+    const frames: boolean[] = [];
+    for (let i = 0; i < 20; i++) { await m.t.settle(); frames.push(m.t.hasText('softov')); }
+    expect(frames.every(Boolean)).toBe(true);
+    await m.t.unmount();
+  });
+
+  it('says nothing yet without flickering that either', async () => {
+    const m = await opened();
+    const frames: boolean[] = [];
+    for (let i = 0; i < 20; i++) { await m.t.settle(); frames.push(m.t.hasText('Nothing said yet')); }
+    // A feed of nothing is nothing, and a note about that is not a log line -
+    // so it is drawn outside the feed, which is also what stops it flickering.
+    expect(frames.every(Boolean)).toBe(true);
+    await m.t.unmount();
+  });
+
+  it('gives ctrl+c to the shell rather than to the application', async () => {
+    const m = await opened();
+    m.t.focus('terminal.input');
+    for (let i = 0; i < 6; i++) await m.t.settle();
+    m.t.press('ctrl+c');
+    for (let i = 0; i < 8; i++) await m.t.settle();
+
+    // Still here. Interrupting a command is the shell's job, and this closed
+    // the whole application instead.
+    expect(m.t.app.screens.current()?.id).toBe('terminal');
+    // And the hint says so, rather than promising to quit.
+    expect(m.t.hasText('interrupt')).toBe(true);
+    await m.t.unmount();
+  });
+});

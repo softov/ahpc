@@ -1022,6 +1022,18 @@ function commands(app: TextUIApp, controller: Controller): CommandDefinition[] {
       },
     },
     {
+      id: 'terminal.interrupt',
+      title: 'Interrupt',
+      category: 'Terminal',
+      description: 'Send ctrl+c to the shell',
+      slots: ['palette'],
+      when: OPEN_TERMINAL,
+      // `\u0003` is what a terminal sends for ctrl+c, and the shell is what
+      // decides what to do with it - which is the point: stopping a command
+      // is the shell's job, not this client's.
+      run: () => { controller.terminals.write('\u0003'); },
+    },
+    {
       id: 'terminal.close',
       title: 'Close this terminal',
       category: 'Terminal',
@@ -1351,6 +1363,16 @@ function keys(): {
     // declines to run - so a `when` that lives only on the command swallows
     // `ctrl+c` and it never reaches the one below that closes the application.
     { keys: 'ctrl+c', commandId: 'chat.stop', when: `${SCREEN} == 'chat' && ${RUNNING}` },
+    /*
+     * On the terminal screen, `ctrl+c` belongs to the shell.
+     *
+     * It is how a person stops a command, and it reached the binding below
+     * instead - so interrupting a `ping` closed the whole application. The
+     * clause is on the binding for the same reason as the one above: a
+     * binding that matches has handled the key, and a `when` only on the
+     * command swallows it without passing it on.
+     */
+    { keys: 'ctrl+c', commandId: 'terminal.interrupt', when: `${SCREEN} == 'terminal' && ${OPEN_TERMINAL}` },
     { keys: 'ctrl+n', commandId: 'session.new' },
     { keys: 'ctrl+r', commandId: 'session.refresh' },
     { keys: 'ctrl+t', commandId: 'view.theme' },

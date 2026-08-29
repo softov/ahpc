@@ -197,6 +197,23 @@ const Hints = defineComponent<BoxProps>('ChatHints', (props) => {
     );
   }
 
+  // On the terminal, `ctrl+c` is the shell's - it is how a command is
+  // stopped, and saying "quit" there is how somebody closes the application
+  // trying to interrupt a `ping`.
+  if (screen === 'terminal') {
+    return (
+      <KeyHints
+        {...props}
+        hints={[
+          { keys: 'enter', label: 'run' },
+          { keys: 'ctrl+c', label: 'interrupt' },
+          { keys: 'esc', label: 'back' },
+          { keys: 'ctrl+p', label: 'commands' },
+        ]}
+      />
+    );
+  }
+
   // The three list screens. `tab move` is a form's answer and these are
   // lists: what moves is the cursor, and enter is what a row is for.
   if (screen === 'changes' || screen === 'skills' || screen === 'mcp') {

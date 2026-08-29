@@ -133,7 +133,7 @@ function parse(argv: string[]): Options {
     settled: false,
     screen: 'sessions',
     theme: 'paper',
-    shell: 'paper',
+    shell: 'workbench',
     approve: false,
     answer: false,
     claude: false,
