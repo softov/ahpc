@@ -781,6 +781,8 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
       const closers: (() => void)[] = [];
       let session: Bag = {};
       let chat: Bag = {};
+      /** What was last reported, so an unchanged list is not re-sent. */
+      let contributed = '';
 
       const emit = (): void => {
         if (!live) return;
@@ -825,6 +827,16 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
         for await (const event of opened.subscription) {
           if (event.type !== 'action') continue;
           session = bag(ahp.sessionReducer(session, bag(event.params).action));
+          // Separate from the snapshot below, which is the chat: these are the
+          // session's, they change for reasons that have nothing to do with a
+          // turn, and a panel that only re-read when it was opened showed a
+          // switch that had been answered as though it had not.
+          const items = customizations(session.customizations);
+          const now = JSON.stringify(items);
+          if (now !== contributed) {
+            contributed = now;
+            if (live) observer({ type: 'customizations', items });
+          }
           emit();
         }
       })().catch((error: unknown) => {

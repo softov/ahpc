@@ -191,6 +191,11 @@ export function applyEvent(store: ReactiveStore, event: HostEvent, model: Turn[]
     case 'inputResolved':
       store.set(INPUT, null);
       return model;
+    case 'customizations':
+      // The host's list, replacing whatever this client last read. It is the
+      // authority: a switch is answered there, and a server signs in there.
+      store.set(CUSTOMIZATIONS, event.items);
+      return model;
     case 'status':
       writeStatus(store, event.status);
       return model;

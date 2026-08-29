@@ -207,6 +207,15 @@ export type HostEvent =
   | { type: 'turnComplete'; turn: Turn }
   /** The whole queue, as the host now has it. */
   | { type: 'queued'; messages: QueuedMessage[] }
+  /**
+   * The session's skills, prompts and MCP servers, as the host now has them.
+   *
+   * Sent when the session channel says they changed - a server signing in, a
+   * switch answered, a plugin arriving late. Without it the panel shows what
+   * was true when it was opened, so a toggle that worked looked like one that
+   * did nothing.
+   */
+  | { type: 'customizations'; items: Customization[] }
   | { type: 'status'; status: number }
   | { type: 'changes'; changes: Changeset }
   /**
