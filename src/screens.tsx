@@ -21,7 +21,7 @@ import {
 import {
   ARCHIVED, CHANGES, CUSTOMIZATIONS, DRAFT, EXPANDED, FILTER, FOCUS, HISTORY, HOST, INPUT,
   MODEL, OPEN, OPEN_FILE, CHAT_URI, PROVIDER, QUEUE, SELECTED, SESSIONS, SETTINGS, SIDEBAR,
-  SPLIT_AT, SPLIT_DEFAULT, TURNS, WORKSPACE, openSession, visibleSessions, workspaceName,
+  CHATS, SPLIT_AT, SPLIT_DEFAULT, TURNS, WORKSPACE, openSession, visibleSessions, workspaceName,
 } from './state.js';
 import type { HostState } from './state.js';
 import { toBlocks } from './blocks.js';
@@ -104,6 +104,12 @@ function describe(session: SessionSummary, detail: SessionDetail | null): Detail
     // worse than one you cannot see at all: it looks like the whole thing.
     { id: 'session', label: 'Session', value: session.resource },
     { id: 'chat', label: 'Chat', value: detail?.chat ?? '', absent: 'no chat yet' },
+    // Only when there is more than one. A session with a single chat is a
+    // session where the two are the same thing, and a row saying "1 of 1" is
+    // a row that tells nobody anything.
+    ...((detail?.chats.length ?? 0) > 1
+      ? [{ id: 'chats', label: 'Chats', value: String(detail?.chats.length ?? 0) }]
+      : []),
     // What the host said when it would not answer. `-32001 No agent for
     // session` is a live catalogue listing something whose agent has exited:
     // the row is real, and everything on the session channel is not there.
@@ -482,6 +488,9 @@ export const ChatScreen: (props: Record<string, never>) => RenderOutput =
     // place a skill is reached from and this is the screen it is reached on.
     // The store is shared, so a session already looked at costs nothing.
     const { items: skills } = useCustomizations();
+    // Which conversation is being read, when there is more than one to read.
+    const chats = useStoreValue<{ resource: string; title: string }[]>(CHATS, []) ?? [];
+    const reading = chats.findIndex((entry) => entry.resource === chat);
     // The same answers the chips are showing, with the question beside each -
     // read off one source rather than asked for a second time.
     const settingRows = options
@@ -490,7 +499,7 @@ export const ChatScreen: (props: Record<string, never>) => RenderOutput =
 
     // What the caption is made of, as one value that can be compared. The
     // parts are rebuilt every render and the caption they describe is not.
-    const headSignature = JSON.stringify([session, model, chat, settingRows]);
+    const headSignature = JSON.stringify([session, model, chat, settingRows, chats.length, reading]);
     const head = useMemo(() => (
       <Column padding={[0, 0, 1, 0]}>
         {session ? (
@@ -498,7 +507,12 @@ export const ChatScreen: (props: Record<string, never>) => RenderOutput =
             session={session}
             {...(model ? { model } : {})}
             {...(chat ? { chat } : {})}
-            settings={settingRows}
+            settings={chats.length > 1
+              // Where a session holds several, which one is being read is the
+              // first thing somebody needs from the header - a transcript
+              // that changed under the same title is otherwise unexplained.
+              ? [{ label: 'Chat', value: `${String(reading + 1)} of ${String(chats.length)}` }, ...settingRows]
+              : settingRows}
           />
         ) : null}
         <Divider dim />

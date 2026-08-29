@@ -1013,6 +1013,20 @@ export async function claudeHost(options: ClaudeHostOptions): Promise<HostConnec
         .map((name) => ({ id: `skill:${name}`, kind: 'skill' as const, name, uri: name, enabled: true }));
     },
 
+    /*
+     * One conversation, and it says so.
+     *
+     * The in-process host is one CLI per session, and the two were never
+     * separated here - so it advertises no `multipleChats` and refuses rather
+     * than opening something that would share the first chat's agent.
+     */
+    createChat: async () => {
+      throw new Error('This host holds one chat per session. Start another session instead.');
+    },
+    disposeChat: async () => {
+      throw new Error('This host holds one chat per session. Dispose the session instead.');
+    },
+
     customizations: async (uri): Promise<Customization[]> => {
       const found: Customization[] = [];
       const seen = handshakes.get(uri);

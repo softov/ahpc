@@ -67,6 +67,24 @@ export const MODEL = '$/chat/compose/model' as BindingPath;
  * for something that does not change.
  */
 export const CHAT_URI = '$/chat/conv/chat' as BindingPath;
+/**
+ * The open session's chats.
+ *
+ * A session is a container: it holds chats, and which of them is being read
+ * is `CHAT_URI`. One chat is the ordinary case and the row that shows this is
+ * hidden then - a list of one is a list nobody needs.
+ */
+export const CHATS = '$/chat/conv/chats' as BindingPath;
+/**
+ * Whether the open session's agent can hold another chat.
+ *
+ * A path rather than a check, because that is what gates a command: `when`
+ * reads the store, and a host that does not advertise `multipleChats` is one
+ * where `createChat` MUST NOT be called - so the command is not offered.
+ */
+export const CAN_ADD_CHAT = '$/chat/conv/canAddChat' as BindingPath;
+/** Whether the open session has more than one chat to move between. */
+export const HAS_CHATS = '$/chat/conv/hasChats' as BindingPath;
 export const WORKSPACE = '$/chat/compose/workspace' as BindingPath;
 /**
  * Everything else the host asks about, keyed by the host's own keys.
@@ -190,6 +208,11 @@ export function applyEvent(store: ReactiveStore, event: HostEvent, model: Turn[]
       return model;
     case 'inputResolved':
       store.set(INPUT, null);
+      return model;
+    case 'chats':
+      store.set(CHATS, event.items);
+      // Switching and closing need somewhere to go, which one chat is not.
+      store.set(HAS_CHATS, event.items.length > 1);
       return model;
     case 'customizations':
       // The host's list, replacing whatever this client last read. It is the

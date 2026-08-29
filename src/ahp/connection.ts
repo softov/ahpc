@@ -73,7 +73,21 @@ export interface HostConnection {
    * on a channel already being drained must not unsubscribe it - that is
    * channel-wide, and silently kills the stream everything else is reading.
    */
-  subscribe(uri: SessionUri, observer: (event: HostEvent) => void): { close(): void };
+  subscribe(uri: SessionUri, observer: (event: HostEvent) => void, chat?: string): { close(): void };
+
+  /**
+   * Open a second conversation in the same session.
+   *
+   * A chat belongs to a session, and a session may hold several - the session
+   * is a container, not the conversation. The URI is chosen here, as a
+   * session's is, so it can be subscribed to without a round trip in between.
+   *
+   * Only where the agent advertises it: a host that does not is one where
+   * `createChat` MUST NOT be called at all.
+   */
+  createChat(uri: SessionUri, first?: string): Promise<string>;
+  /** Close one. The last chat in a session is the session; dispose that instead. */
+  disposeChat(chat: string): Promise<void>;
 
   /**
    * The catalogue moved: a session appeared, finished, or is now waiting.
@@ -207,6 +221,14 @@ export type HostEvent =
   | { type: 'turnComplete'; turn: Turn }
   /** The whole queue, as the host now has it. */
   | { type: 'queued'; messages: QueuedMessage[] }
+  /**
+   * The session's chats, as the host now has them.
+   *
+   * A session is a container and its chats come and go on their own - one
+   * opened from another client, one closed - so this is separate from the
+   * chat snapshot, which is about the conversation being watched.
+   */
+  | { type: 'chats'; items: { resource: string; title: string }[]; defaultChat: string }
   /**
    * The session's skills, prompts and MCP servers, as the host now has them.
    *

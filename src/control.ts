@@ -15,7 +15,8 @@ import type {
 import { SessionFlag } from './ahp/types.js';
 import { valueIcon } from './view/icons.js';
 import {
-  ARCHIVED, CHAT_URI, CUSTOMIZATIONS, DRAFT, EXPANDED, FILTER, HOST, HOST_ERROR, INPUT, MODEL,
+  ARCHIVED, CAN_ADD_CHAT, CHAT_URI, CHATS, CUSTOMIZATIONS, DRAFT, EXPANDED, FILTER, HAS_CHATS,
+  HOST, HOST_ERROR, INPUT, MODEL,
   OPEN, OPEN_FILE, PROVIDER, MARKDOWN, QUEUE, RUNNING, SCREEN, SELECTED, SETTINGS, SIDEBAR,
   SPLIT_AT, SPLIT_DEFAULT, TURNS, WORKSPACE,
   applyEvent, pendingInput, queue, sessions, turns, writeSessions, writeStatus,
@@ -71,6 +72,12 @@ export interface Controller {
   config(uri: SessionUri): Promise<SessionConfig>;
   /** What the host handed this session: plugins, skills, MCP servers. */
   customizations(uri: SessionUri): Promise<Customization[]>;
+  /** Read a different chat in the session already open. */
+  openChat(chat: string): void;
+  /** Open another chat in it, and read that. */
+  createChat(first?: string): Promise<void>;
+  /** Close one, and read whatever is left. */
+  disposeChat(chat: string): Promise<void>;
   /** What a slash offers before any session exists. */
   harnessCommands(): Promise<Customization[]>;
   /** Turn one on or off. The host decides and tells everyone watching. */
@@ -283,6 +290,32 @@ export function createController(
     } catch (error) { failed(error); }
   };
 
+  /**
+   * What each provider says it can do, by provider id.
+   *
+   * Asked once at boot rather than when a palette happens to open: the chat
+   * commands are gated on it, and a gate that answers "no" until somebody
+   * opens an unrelated picker is a command missing for no visible reason.
+   */
+  const capable = new Map<string, boolean>();
+  /**
+   * Whether one session's agent can hold another chat.
+   *
+   * Read from the row's own provider rather than the composer's: a client can
+   * have several hosts' sessions in one list, and only some of their agents
+   * can hold more than one.
+   */
+  const canAddChat = (uri: SessionUri): boolean => {
+    const found = sessions(app.store).find((row) => row.resource === uri)?.provider;
+    return found !== undefined && capable.get(found) === true;
+  };
+  void host.agents().then((found) => {
+    for (const entry of found) capable.set(entry.provider, entry.multipleChats === true);
+    // A session may already be open by the time this lands.
+    const uri = app.store.get<SessionUri>(OPEN);
+    if (uri) app.store.set(CAN_ADD_CHAT, canAddChat(uri));
+  }).catch(() => undefined);
+
   const controller: Controller = {
     async refresh() {
       try {
@@ -292,6 +325,50 @@ export function createController(
     },
 
     report: failed,
+
+    /**
+     * Read a different chat in the session already open.
+     *
+     * A whole re-subscribe rather than a swap: the transcript, the queue and
+     * what is waiting all belong to the chat, so keeping any of them across
+     * the change would show one conversation's state under another's name.
+     */
+    openChat(chat) {
+      const uri = app.store.get<SessionUri>(OPEN);
+      if (!uri || app.store.get<string>(CHAT_URI) === chat) return;
+      subscription?.close();
+      model = [];
+      app.store.set(TURNS, []);
+      app.store.set(INPUT, null);
+      app.store.set(QUEUE, []);
+      app.store.set(CHAT_URI, chat);
+      subscription = host.subscribe(uri, (event) => {
+        model = applyEvent(app.store, event, model);
+        if (event.type === 'status') refreshSoon();
+      }, chat);
+    },
+
+    async createChat(first) {
+      const uri = app.store.get<SessionUri>(OPEN);
+      if (!uri) return;
+      try {
+        const chat = await host.createChat(uri, first);
+        controller.openChat(chat);
+      } catch (error) { failed(error); }
+    },
+
+    async disposeChat(chat) {
+      try {
+        await host.disposeChat(chat);
+      } catch (error) { failed(error); return; }
+      // Whatever is left. The host moves its own default; this client only
+      // has to stop reading a chat that is gone.
+      const left = (app.store.get<{ resource: string }[]>(CHATS) ?? [])
+        .map((entry) => entry.resource)
+        .filter((resource) => resource !== chat);
+      const next = left[0];
+      if (next) controller.openChat(next);
+    },
 
     open(uri) {
       // Closing drops this consumer only. Unsubscribing the channel to shed a
@@ -309,6 +386,9 @@ export function createController(
       // different ones. An empty list would say "the host gave it none",
       // which is an answer, and this is "nobody has asked yet".
       app.store.set(CUSTOMIZATIONS, null);
+      app.store.set(CHATS, []);
+      app.store.set(HAS_CHATS, false);
+      app.store.set(CAN_ADD_CHAT, canAddChat(uri));
       app.store.set(OPEN_FILE, null);
       subscription = host.subscribe(uri, (event) => {
         model = applyEvent(app.store, event, model);
@@ -345,6 +425,9 @@ export function createController(
       app.store.set(TURNS, []);
       app.store.set(INPUT, null);
       app.store.set(CUSTOMIZATIONS, null);
+      app.store.set(CHATS, []);
+      app.store.set(HAS_CHATS, false);
+      app.store.set(CAN_ADD_CHAT, false);
       app.store.set(OPEN_FILE, null);
       // Idle, because nothing is open. A status that outlived the conversation
       // it described is a header saying "running" over an empty screen.
@@ -563,6 +646,13 @@ function commands(app: TextUIApp, controller: Controller): CommandDefinition[] {
    */
   const known: Catalogue = { agents: [] };
 
+  /*
+   * Asked once at boot, not only when a palette opens one of the pickers.
+   *
+   * The chat commands are gated on what the agent says it can do, and a gate
+   * that answers "no" until somebody happens to open an unrelated picker is a
+   * command that is missing for no reason anybody can see.
+   */
   const provider = (): string => app.store.get<string>(PROVIDER) ?? 'claude';
   const agent = (): Agent | undefined => known.agents.find((found) => found.provider === provider());
 
@@ -831,6 +921,59 @@ function commands(app: TextUIApp, controller: Controller): CommandDefinition[] {
         // is what rides on the next `chat/turnStarted`.
         const chosen = agent()?.models.find((model) => model.id === String(args.id));
         if (chosen) app.store.set(MODEL, chosen.id);
+      },
+    },
+    /*
+     * A session holds chats, and these are how a person moves between them.
+     *
+     * Gated on the agent advertising `multipleChats`: a host that does not is
+     * one where `createChat` MUST NOT be called, so the command is not
+     * offered rather than offered and refused.
+     */
+    {
+      id: 'chat.new',
+      title: 'New chat here',
+      category: 'Session',
+      description: 'Open another conversation in this session',
+      slots: ['palette'],
+      when: CAN_ADD_CHAT,
+      run: () => void controller.createChat(),
+    },
+    {
+      id: 'chat.switch',
+      title: 'Chat',
+      category: 'Session',
+      description: 'Read a different conversation in this session',
+      slots: ['palette'],
+      when: HAS_CHATS,
+      args: [{
+        name: 'chat',
+        type: 'string' as const,
+        required: true,
+        description: 'Which conversation to read',
+        get default(): string | undefined {
+          return app.store.get<string>(CHAT_URI) ?? undefined;
+        },
+        choices: () => (app.store.get<{ resource: string; title: string }[]>(CHATS) ?? [])
+          .map((entry, index) => ({
+            value: entry.resource,
+            // The title, and its place in the session: two chats begun from
+            // the same first message are two rows reading the same thing.
+            label: `${String(index + 1)}. ${entry.title}`,
+          })),
+      }],
+      run: (args: Record<string, unknown>) => { controller.openChat(String(args.chat)); },
+    },
+    {
+      id: 'chat.close',
+      title: 'Close this chat',
+      category: 'Session',
+      description: 'Dispose the conversation being read',
+      slots: ['palette'],
+      when: HAS_CHATS,
+      run: () => {
+        const chat = app.store.get<string>(CHAT_URI);
+        if (chat) void controller.disposeChat(chat);
       },
     },
     {

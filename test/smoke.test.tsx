@@ -12,7 +12,8 @@ import { SessionFlag } from '../src/ahp/types.js';
 import { CLIPBOARD_PATH, layoutMarkdown, wrapRuns } from '@textui/core';
 import { toBlocks } from '../src/blocks.js';
 import {
-  DRAFT, HOST_ERROR, INPUT, OPEN, PROVIDER, QUEUE, SELECTED, SETTINGS, SIDEBAR, TURNS, WORKSPACE,
+  CHATS, CHAT_URI, DRAFT, HOST_ERROR, INPUT, OPEN, PROVIDER, QUEUE, SELECTED, SETTINGS, SIDEBAR,
+  TURNS, WORKSPACE,
 } from '../src/state.js';
 import type { Turn } from '../src/ahp/types.js';
 import { PICKER, openPicker } from '../src/view/picker.js';
@@ -1792,5 +1793,108 @@ describe('the workspace a client offers', () => {
     const t = await mounted();
     expect(t.app.store.get(WORKSPACE)).toBe(process.cwd());
     await t.unmount();
+  });
+});
+
+/**
+ * A session holds chats, which is the protocol's shape and was not this
+ * client's: it read the session's default chat and had no way to reach
+ * another, so a host that could hold several was one it could only see one of.
+ */
+describe('more than one chat in a session', () => {
+  /** A session whose agent advertises it. `IDLE` is a `copilotcli` one, which does not. */
+  const open2 = async () => {
+    const m = await open();
+    m.t.app.services.require(CONTROLLER).open(SEEDED);
+    m.t.app.screens.push('chat');
+    for (let i = 0; i < 8; i++) await m.t.settle();
+    return m;
+  };
+
+  it('does not offer it where the agent does not say it can', async () => {
+    // `IDLE` is a `copilotcli` session, and that agent advertises no
+    // `multipleChats` - which the protocol says means `createChat` MUST NOT
+    // be called at all, so the command is absent rather than present and
+    // refused.
+    const m = await idle();
+    m.t.press('ctrl+p');
+    for (let i = 0; i < 6; i++) await m.t.settle();
+    m.t.type('new chat');
+    for (let i = 0; i < 6; i++) await m.t.settle();
+    expect(m.t.hasText('New chat here')).toBe(false);
+    await m.t.unmount();
+  });
+
+  it('offers to open another where the agent says it can', async () => {
+    const m = await open2();
+    m.t.press('ctrl+p');
+    for (let i = 0; i < 6; i++) await m.t.settle();
+    m.t.type('new chat');
+    for (let i = 0; i < 6; i++) await m.t.settle();
+    expect(m.t.hasText('New chat here')).toBe(true);
+    await m.t.unmount();
+  });
+
+  it('opens one, reads it, and says which of the two it is', async () => {
+    const m = await open2();
+    const controller = m.t.app.services.require(CONTROLLER);
+    await controller.createChat();
+    for (let i = 0; i < 8; i++) await m.t.settle();
+
+    // The header says which conversation is on screen. Without it a
+    // transcript that changed under the same title is unexplained.
+    expect(m.t.hasText('2 of 2')).toBe(true);
+    // And it is a conversation of its own, not the first one again.
+    expect(turnsIn(m)).toBe(0);
+    await m.t.unmount();
+  });
+
+  it('goes back to the first, with its turns still there', async () => {
+    const m = await open2();
+    const controller = m.t.app.services.require(CONTROLLER);
+    const before = turnsIn(m);
+    expect(before).toBeGreaterThan(0);
+
+    await controller.createChat();
+    for (let i = 0; i < 8; i++) await m.t.settle();
+    expect(turnsIn(m)).toBe(0);
+
+    const chats = m.t.app.store.get<{ resource: string }[]>(CHATS) ?? [];
+    controller.openChat(chats[0]?.resource ?? '');
+    for (let i = 0; i < 8; i++) await m.t.settle();
+    // A whole re-subscribe, so what comes back is that chat's own state
+    // rather than the other's left behind under a new name. Asserted on the
+    // state and not the header: a transcript this long has scrolled the head
+    // off the top, which is the layout doing its job.
+    expect(turnsIn(m)).toBe(before);
+    expect(m.t.app.store.get(CHAT_URI)).toBe(chats[0]?.resource);
+    await m.t.unmount();
+  });
+
+  it('closes one and reads what is left', async () => {
+    const m = await open2();
+    const controller = m.t.app.services.require(CONTROLLER);
+    await controller.createChat();
+    for (let i = 0; i < 8; i++) await m.t.settle();
+
+    const opened = m.t.app.store.get<string>(CHAT_URI) ?? '';
+    await controller.disposeChat(opened);
+    for (let i = 0; i < 8; i++) await m.t.settle();
+
+    expect((m.t.app.store.get<{ resource: string }[]>(CHATS) ?? []).length).toBe(1);
+    expect(m.t.app.store.get<string>(CHAT_URI)).not.toBe(opened);
+    await m.t.unmount();
+  });
+
+  it('will not close the only one', async () => {
+    const m = await open2();
+    const controller = m.t.app.services.require(CONTROLLER);
+    const only = m.t.app.store.get<string>(CHAT_URI) ?? '';
+    await controller.disposeChat(only);
+    for (let i = 0; i < 6; i++) await m.t.settle();
+    // The last chat in a session is the session. Said, rather than a close
+    // that silently does not take.
+    expect(m.t.hasText('only chat')).toBe(true);
+    await m.t.unmount();
   });
 });

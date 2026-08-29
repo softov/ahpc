@@ -263,6 +263,13 @@ export interface Agent {
   description?: string;
   /** `displayName` is the protocol's `name`. The id is what rides on a turn. */
   models: { id: string; displayName: string }[];
+  /**
+   * Whether this agent can hold more than one chat in a session.
+   *
+   * A gate, not a hint: a host that does not advertise it is one where
+   * `createChat` MUST NOT be called, so the command is not offered either.
+   */
+  multipleChats?: boolean;
 }
 
 /**

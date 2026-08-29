@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { HostConnection, HostEvent } from './connection.js';
 import type {
   Agent, Changeset, ChatInputRequest, ContentRef, Customization, FileContent, FileEdit,
@@ -97,6 +98,15 @@ export function fakeHost(): FakeHost {
   const configs = new Map<SessionUri, Record<string, string>>();
   const observers = new Map<SessionUri, Set<(event: HostEvent) => void>>();
   const chats = new Map<SessionUri, string>();
+  /**
+   * Chats opened after the session was, by chat URI.
+   *
+   * The session's own maps above are the *default* chat's - that is what
+   * every script sets up, and a session that has only ever had one is a
+   * session where the two are the same thing. A second chat is its own
+   * conversation with nothing in it, which is what a second chat is.
+   */
+  const extra = new Map<string, { session: SessionUri; title: string; turns: Turn[]; watchers: Set<(event: HostEvent) => void> }>();
   const models = new Map<SessionUri, string>();
   /** `IsRead` and `IsArchived` only. Nothing about what the session is doing. */
   const flags = new Map<SessionUri, number>();
@@ -107,6 +117,15 @@ export function fakeHost(): FakeHost {
 
   const emit = (uri: SessionUri, event: HostEvent): void => {
     for (const observer of observers.get(uri) ?? []) observer(event);
+  };
+
+  /** A session's chats: its own, and any opened since. */
+  const chatsOf = (uri: SessionUri): { resource: string; title: string }[] => {
+    const own = chats.get(uri);
+    return [
+      ...(own ? [{ resource: own, title: summaries.get(uri)?.title ?? 'Chat' }] : []),
+      ...[...extra].filter(([, held]) => held.session === uri).map(([resource, held]) => ({ resource, title: held.title })),
+    ];
   };
 
   /**
@@ -804,6 +823,11 @@ export function fakeHost(): FakeHost {
         provider: 'claude',
         displayName: 'Claude Code',
         description: 'Anthropic, in the editor',
+        // The scripted harness holds several chats, so the commands that need
+        // it are offered. A host that does not advertise this is one where
+        // `createChat` MUST NOT be called at all - and the second agent below
+        // deliberately does not, so the gate itself is scripted too.
+        multipleChats: true,
         models: [
           { id: 'claude-opus-5', displayName: 'Opus 5' },
           { id: 'claude-sonnet-5', displayName: 'Sonnet 5' },
@@ -863,7 +887,36 @@ export function fakeHost(): FakeHost {
       return { close: () => { catalogue.delete(observer); } };
     },
 
-    subscribe: (uri, observer) => {
+    createChat: async (uri, first) => {
+      const chat = `ahp-chat:/${randomUUID()}`;
+      extra.set(chat, { session: uri, title: 'Chat', turns: [], watchers: new Set() });
+      emit(uri, { type: 'chats', items: chatsOf(uri), defaultChat: chats.get(uri) ?? '' });
+      if (first) {
+        const held = extra.get(chat);
+        held?.turns.push({ id: `${chat}:said`, role: 'user', message: first, parts: [], state: 'complete', at: AT });
+      }
+      return chat;
+    },
+
+    disposeChat: async (chat) => {
+      const held = extra.get(chat);
+      if (!held) {
+        // The session's own chat is the session. Saying so beats a silent
+        // no-op, which reads as a close that did not take.
+        throw new Error('That is the only chat in this session; dispose the session instead');
+      }
+      extra.delete(chat);
+      emit(held.session, { type: 'chats', items: chatsOf(held.session), defaultChat: chats.get(held.session) ?? '' });
+    },
+
+    subscribe: (uri, observer, wanted) => {
+      const held = wanted === undefined ? undefined : extra.get(wanted);
+      if (held) {
+        held.watchers.add(observer);
+        observer({ type: 'snapshot', turns: held.turns, status: SessionFlag.Idle, queued: [] });
+        observer({ type: 'chats', items: chatsOf(uri), defaultChat: chats.get(uri) ?? '' });
+        return { close: () => { held.watchers.delete(observer); } };
+      }
       let set = observers.get(uri);
       if (!set) { set = new Set(); observers.set(uri, set); }
       set.add(observer);
@@ -875,6 +928,7 @@ export function fakeHost(): FakeHost {
         status: statusOf(uri),
         queued: queues.get(uri) ?? [],
       });
+      observer({ type: 'chats', items: chatsOf(uri), defaultChat: chats.get(uri) ?? '' });
       const changes = changesets.get(uri);
       if (changes) observer({ type: 'changes', changes });
       // Closing drops this consumer. It does not unsubscribe the channel -
@@ -986,7 +1040,7 @@ export function fakeHost(): FakeHost {
       return {
         resource: uri,
         chat,
-        chats: chat ? [{ resource: chat, title: summaries.get(uri)?.title ?? 'Chat' }] : [],
+        chats: chatsOf(uri),
         lifecycle: summaries.has(uri) ? 'ready' : 'creating',
         config: {
           properties: CONFIG,

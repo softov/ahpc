@@ -701,6 +701,8 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
         // reading `displayName` here (the *agent's* field) meant every model
         // fell through to its id, and a host's ids are things like
         // `claude-sonnet-4-5-20250929`.
+        // A gate, not a hint. Absent means `createChat` must not be called.
+        ...(bag(agent.capabilities).multipleChats !== undefined ? { multipleChats: true } : {}),
         models: list(agent.models).map((raw) => {
           const model = bag(raw);
           return {
@@ -742,6 +744,22 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
       return resource;
     },
 
+    createChat: async (uri, first) => {
+      // The client picks the URI, as it does for a session, so it can be
+      // subscribed to without a round trip in between.
+      const chat = `ahp-chat:/${randomUUID()}`;
+      await client.request('createChat', {
+        channel: uri,
+        chat,
+        ...(first ? { initialMessage: { text: first, origin: { kind: 'user' } } } : {}),
+      });
+      return chat;
+    },
+
+    disposeChat: async (chat) => {
+      await client.request('disposeChat', { channel: chat });
+    },
+
     disposeSession: async (uri) => {
       await client.request('disposeSession', { channel: uri });
       chats.delete(uri);
@@ -776,13 +794,26 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
       return { close: () => { catalogue.delete(observer); } };
     },
 
-    subscribe: (uri, observer) => {
+    subscribe: (uri, observer, wanted) => {
       let live = true;
       const closers: (() => void)[] = [];
       let session: Bag = {};
       let chat: Bag = {};
       /** What was last reported, so an unchanged list is not re-sent. */
       let contributed = '';
+      let listed = '';
+
+      /** The session's chats, when that has changed. */
+      const chatsChanged = (): void => {
+        const items = list(session.chats).map((raw) => ({
+          resource: str(bag(raw).resource) ?? '',
+          title: str(bag(raw).title) ?? 'Chat',
+        })).filter((entry) => entry.resource !== '');
+        const now = JSON.stringify(items);
+        if (now === listed) return;
+        listed = now;
+        if (live) observer({ type: 'chats', items, defaultChat: str(session.defaultChat) ?? '' });
+      };
 
       const emit = (): void => {
         if (!live) return;
@@ -807,7 +838,10 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
         closers.push(() => void opened.subscription.close());
         session = bag(opened.result.snapshot?.state);
 
-        const chatUri = str(session.defaultChat);
+        chatsChanged();
+        // The one that was asked for, or the session's own. A client watching
+        // a second chat is watching that chat, not the session's first.
+        const chatUri = wanted ?? str(session.defaultChat);
         if (chatUri) {
           chats.set(uri, chatUri);
           const talking = await client.subscribe(chatUri);
@@ -837,6 +871,7 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
             contributed = now;
             if (live) observer({ type: 'customizations', items });
           }
+          chatsChanged();
           emit();
         }
       })().catch((error: unknown) => {

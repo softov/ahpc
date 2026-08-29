@@ -61,6 +61,12 @@ npm run dev -- --claude              # Claude Code, in this process
 skip the build here: Node strips types but does not understand JSX, and every
 screen is written in it.
 
+A session is a *container*: it holds chats, and a host whose agent advertises
+`multipleChats` can hold several. `ctrl+p` has **New chat here**, **Chat** and
+**Close this chat** where that is true, and nothing where it is not - a host
+that does not advertise it is one where `createChat` must not be called at
+all, so the commands are absent rather than present and refused.
+
 [`fake.ts`](src/ahp/fake.ts) is a **script**, and it is not a lesser version of
 the other one - it is the only way to arrive at a *particular* state on
 purpose. Five seeded sessions, one of them blocked on a confirmation, one
