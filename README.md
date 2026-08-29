@@ -47,13 +47,18 @@ reduced it, and somebody else may be answering the same question in an editor
 on another machine while you look at it.
 
 `src/ahp/` is the protocol as a client reads it, and `HostConnection` is the
-seam. There are two implementations of it, and nothing above either can tell
-which is answering:
+seam. There are three implementations of it, and nothing above any of them can
+tell which is answering:
 
+```bash
+npm run dev                          # the scripted host
+npm run dev -- --host ws://…         # a real one, over the wire
+npm run dev -- --claude              # Claude Code, in this process
 ```
-pnpm --filter @textui/example-chat dev                      # the scripted host
-pnpm --filter @textui/example-chat dev -- --host ws://…     # a real one
-```
+
+`npm run dev` is `bun src/main.tsx` - the source as it is, no build and
+nothing installed. There is no Node equivalent: Node strips types but does not
+understand JSX, and every screen here is written in it.
 
 [`fake.ts`](src/ahp/fake.ts) is a **script**, and it is not a lesser version of
 the other one - it is the only way to arrive at a *particular* state on
