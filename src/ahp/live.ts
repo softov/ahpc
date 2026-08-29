@@ -698,6 +698,56 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
     url: options.url,
     state: () => state,
 
+    /*
+     * The host's filesystem, read-only.
+     *
+     * Present because a live host may serve it. A host that does not answers
+     * `-32601`, which arrives here as a rejected request - the caller says so
+     * rather than drawing an empty directory, which would read as a directory
+     * that is empty.
+     */
+    resourceList: async (uri) => {
+      const result = bag(await client.request('resourceList', { channel: ROOT, uri }));
+      const parent = uri.replace(/\/+$/, '');
+      return list(result.entries).map((raw) => {
+        const entry = bag(raw);
+        return {
+          // Derived when the host sends only a name, which is what the
+          // protocol's own listing carries. A row whose URI cannot be handed
+          // straight back for a read is a listing you have to assemble paths
+          // out of by hand.
+          uri: str(entry.uri) ?? `${parent}/${str(entry.name) ?? ''}`,
+          name: str(entry.name) ?? '',
+          kind: str(entry.kind) ?? str(entry.type) ?? 'file',
+          ...(typeof entry.size === 'number' ? { size: entry.size } : {}),
+        };
+      }).filter((entry) => entry.name !== '');
+    },
+
+    resourceRead: async (uri) => {
+      const result = bag(await client.request('resourceRead', { channel: ROOT, uri }));
+      return {
+        data: str(result.data) ?? '',
+        // Assumed only when the host says nothing, and utf-8 is the assumption
+        // that shows a mistake rather than hiding one.
+        encoding: str(result.encoding) ?? 'utf-8',
+        ...(str(result.contentType) ? { contentType: str(result.contentType) as string } : {}),
+      };
+    },
+
+    /*
+     * Raw, and deliberately unvalidated.
+     *
+     * Everything else here names the action it sends, because a control that
+     * builds a malformed one is a bug. This is the opposite: what it is for is
+     * sending actions this client has no control for, so the host is the only
+     * thing that can say whether one is right - and it says so by refusing.
+     */
+    dispatch: (uri, action, chat) => {
+      if (chat) dispatch(uri, action);
+      else client.dispatch(uri, action);
+    },
+
     listSessions: async () => {
       const result = await client.request('listSessions', { channel: ROOT, limit: 100 });
       // Asking again is what a refresh is for. A refusal is remembered so that

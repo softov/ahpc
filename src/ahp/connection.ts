@@ -1,6 +1,7 @@
 import type {
   Agent, Answer, Changeset, Completion, ContentRef, Customization, FileContent, PendingInput, QueuedMessage,
-  SessionConfig, SessionDetail, SessionSummary, SessionUri, TerminalRow, TerminalState, ToolCall, Turn,
+  ResourceEntry, SessionConfig, SessionDetail, SessionSummary, SessionUri, TerminalRow, TerminalState,
+  ToolCall, Turn,
 } from './types.js';
 
 /**
@@ -117,6 +118,34 @@ export interface HostConnection {
    * composer offers no menu, which is what it did before either was served.
    */
   completions(options: { channel: string; text: string; offset?: number }): Promise<Completion[]>;
+
+  /**
+   * Send one action verbatim, without this client knowing what it means.
+   *
+   * The escape hatch, and optional because only a real host has one: the
+   * protocol has far more client-dispatchable actions than a chat client has
+   * controls for, and a way to send an arbitrary one is what makes the rest of
+   * them testable at all. `chat` targets the chat channel rather than the
+   * session's.
+   */
+  dispatch?(uri: SessionUri, action: Record<string, unknown>, chat?: boolean): void;
+
+  /**
+   * One directory of the host's filesystem, as far as it lets this client see.
+   *
+   * Optional, because a host may serve none: `createHost` takes its filesystem
+   * as a port, and one given none answers `-32601`. Absent here means the same
+   * thing a layer up - there is nothing to browse, rather than nothing there.
+   */
+  resourceList?(uri: string): Promise<ResourceEntry[]>;
+  /**
+   * One file's bytes, by `file://` URI on the *host's* machine.
+   *
+   * `encoding` is reported rather than assumed, because a host serves whatever
+   * is on its disk: a caller that treated every answer as text would print a
+   * PNG to a terminal.
+   */
+  resourceRead?(uri: string): Promise<{ data: string; encoding: string; contentType?: string }>;
   /** Close one. The last chat in a session is the session; dispose that instead. */
   disposeChat(chat: string): Promise<void>;
 

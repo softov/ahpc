@@ -432,3 +432,17 @@ export interface SlashCommand {
   /** Where a session command came from: the plugin or directory. */
   from?: string;
 }
+
+/**
+ * One entry of a directory the host serves.
+ *
+ * AHP's own shape, kept to its own names: `uri` is a `file://` URI on the
+ * *host's* machine, never on this one.
+ */
+export interface ResourceEntry {
+  uri: string;
+  name: string;
+  /** `file`, `directory`, or whatever else the host distinguishes. */
+  kind: string;
+  size?: number;
+}
