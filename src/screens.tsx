@@ -26,7 +26,7 @@ import {
 import type { HostState } from './state.js';
 import { toBlocks } from './blocks.js';
 import type {
-  Agent, Changeset, ContentRef, Customization, FileContent, PendingInput, QueuedMessage,
+  Agent, Changeset, Completion, ContentRef, Customization, FileContent, PendingInput, QueuedMessage,
   SessionConfig, SessionDetail, SessionSummary, SlashCommand, Turn,
 } from './ahp/types.js';
 import { decodeStatus } from './ahp/status.js';
@@ -313,6 +313,44 @@ export const SessionsScreen: (props: Record<string, never>) => RenderOutput =
  * chat screen filters a session's own list - a request per keystroke would
  * ask the host the same question forty times to narrow one menu.
  */
+/**
+ * What the host offers to complete the word the caret is in.
+ *
+ * Asked of the host on every change to the draft, because that is whose
+ * question it is - a path is a path on *its* filesystem, and which of them
+ * match what has been typed changes with every keystroke. Only when there is
+ * something to complete: a draft with no at-sign in its last word asks
+ * nothing, which is most keystrokes.
+ *
+ * Latest wins. Two answers can be in flight after two quick keystrokes, and
+ * the older one arriving second would put the wrong list under the caret.
+ */
+/**
+ * The draft with a completion's range replaced by its text.
+ *
+ * The range and not an append: what is being completed is a fragment, so
+ * `@src/ho` becomes `@src/host.ts` by replacing from the at-sign. Appending
+ * would produce `@src/ho@src/host.ts`.
+ */
+function splice(draft: string, path: Completion): string {
+  return `${draft.slice(0, path.rangeStart)}${path.insertText}${draft.slice(path.rangeEnd)}`;
+}
+
+function usePathCompletions(draft: string, channel: string | null): Completion[] {
+  const controller = useRequiredService(CONTROLLER);
+  const [found, setFound] = useState<Completion[]>([]);
+  const asking = /(?:^|\s)@\S*$/.test(draft) ? draft : '';
+  useEffect(() => {
+    if (asking === '' || !channel) { setFound([]); return; }
+    let mine = true;
+    void controller.completions(channel, asking)
+      .then((items) => { if (mine) setFound(items); })
+      .catch(() => { if (mine) setFound([]); });
+    return () => { mine = false; };
+  }, [asking, channel]);
+  return asking === '' ? [] : found;
+}
+
 function useHarnessCommands(): Customization[] {
   const controller = useRequiredService(CONTROLLER);
   const [items, setItems] = useState<Customization[]>([]);
@@ -488,6 +526,7 @@ export const ChatScreen: (props: Record<string, never>) => RenderOutput =
     // place a skill is reached from and this is the screen it is reached on.
     // The store is shared, so a session already looked at costs nothing.
     const { items: skills } = useCustomizations();
+    const paths = usePathCompletions(draft, useStoreValue<string | null>(CHAT_URI, null) ?? null);
     // Which conversation is being read, when there is more than one to read.
     const chats = useStoreValue<{ resource: string; title: string }[]>(CHATS, []) ?? [];
     const reading = chats.findIndex((entry) => entry.resource === chat);
@@ -580,6 +619,8 @@ export const ChatScreen: (props: Record<string, never>) => RenderOutput =
             if (option.commandId) openPicker(app, { commandId: option.commandId, anchorId });
           }}
           commands={slashCommands(app, skills)}
+          paths={paths}
+          onPath={(path) => app.store.set(DRAFT, splice(draft, path))}
           onChange={(value: string) => app.store.set(DRAFT, value)}
           onCommand={(picked: SlashCommand) => {
             /*
@@ -639,6 +680,7 @@ export const NewSessionScreen: (props: Record<string, never>) => RenderOutput =
     const [recall, setRecall] = useState(history.length);
     const options = useComposerOptions();
     const harnessSkills = useHarnessCommands();
+    const newPaths = usePathCompletions(draft, 'ahp-root://');
 
     return (
       <Column flex={1} gap={1}>
@@ -666,6 +708,10 @@ export const NewSessionScreen: (props: Record<string, never>) => RenderOutput =
           // then the one that invokes it - which is where somebody most often
           // wants a skill, and the only place it used to be unreachable.
           commands={slashCommands(app, harnessSkills)}
+          // The root channel, since there is no session yet: a host answers
+          // for its own default directory, which is where this one would go.
+          paths={newPaths}
+          onPath={(path) => app.store.set(DRAFT, splice(draft, path))}
           onChange={(value: string) => app.store.set(DRAFT, value)}
           // Chosen here rather than sent. Without this the menu listed the
           // client's own commands and pressing enter on one created a session

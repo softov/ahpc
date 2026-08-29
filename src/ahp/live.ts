@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { HostConnection, HostEvent } from './connection.js';
 import type {
-  Agent, Answer, Changeset, ConfigProperty, ContentRef, Customization, CustomizationKind,
+  Agent, Answer, Changeset, Completion, ConfigProperty, ContentRef, Customization, CustomizationKind,
   FileContent, FileEdit, McpState, PendingInput, QueuedMessage, Question, QuestionKind,
   ResponsePart, SessionConfig, SessionDetail, SessionSummary, SessionUri, ToolCall,
   ToolCallStatus, Turn,
@@ -742,6 +742,36 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
         ...(values && Object.keys(values).length > 0 ? { config: values } : {}),
       });
       return resource;
+    },
+
+    completions: async ({ channel, text, offset }) => {
+      try {
+        const result = await client.request('completions', {
+          channel,
+          kind: 'userMessage',
+          text,
+          offset: offset ?? text.length,
+        });
+        return list(result.items).map((raw): Completion => {
+          const item = bag(raw);
+          const attachment = bag(item.attachment);
+          const insertText = str(item.insertText) ?? '';
+          return {
+            insertText,
+            // A host that answered without a range means "replace what I was
+            // asked about", and the whole draft is the safe reading of that.
+            rangeStart: typeof item.rangeStart === 'number' ? item.rangeStart : 0,
+            rangeEnd: typeof item.rangeEnd === 'number' ? item.rangeEnd : text.length,
+            label: str(attachment.label) ?? insertText,
+            ...(plain(attachment.modelRepresentation)
+              ? { description: plain(attachment.modelRepresentation) as string }
+              : {}),
+          };
+        }).filter((item) => item.insertText !== '');
+      }
+      // A host that does not serve them is one whose composer offers no menu,
+      // which is what every host did before either was served.
+      catch { return []; }
     },
 
     createChat: async (uri, first) => {

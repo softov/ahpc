@@ -2,7 +2,7 @@ import type { BoxProps, RenderOutput } from '@textui/core';
 import { defineComponent, useState, useTheme } from '@textui/core';
 import type { ListItem } from '@textui/widgets';
 import { Column, Divider, List, TextArea } from '@textui/widgets';
-import type { SlashCommand } from '../ahp/types.js';
+import type { Completion, SlashCommand } from '../ahp/types.js';
 import { ComposerBar } from './controls.js';
 import type { ComposerOption } from './controls.js';
 
@@ -54,6 +54,16 @@ export interface ChatComposerProps extends BoxProps {
    * command the host offers but did not list still reaches it.
    */
   onCommand?(command: SlashCommand): void;
+  /**
+   * What the host offers to complete the word the caret is in.
+   *
+   * Fetched rather than filtered: a path is a path on the *host's*
+   * filesystem, so which of them match what has been typed is a question only
+   * it can answer, and the answer changes with every keystroke.
+   */
+  paths?: Completion[];
+  /** One of `paths` was chosen. The range it replaces is on the completion. */
+  onPath?(path: Completion): void;
   autoFocus?: boolean;
   focusId?: string;
 }
@@ -62,7 +72,7 @@ export const ChatComposer: (props: ChatComposerProps) => RenderOutput =
   defineComponent<ChatComposerProps>('ChatComposer', (props) => {
     const {
       value, onChange, onSubmit, onCancel, onHistory, onLeave, running, queued = 0,
-      options = [], onOption, placeholder, commands = [], onCommand, autoFocus,
+      options = [], onOption, placeholder, commands = [], onCommand, paths = [], onPath, autoFocus,
       focusId = 'chat.composer', ...rest
     } = props;
     const theme = useTheme();
@@ -78,14 +88,29 @@ export const ChatComposer: (props: ChatComposerProps) => RenderOutput =
       .sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'session' ? -1 : 1))
       .slice(0, 6);
     const byId = new Map(found.map((command) => [command.id, command]));
-    const matches: ListItem[] = found.map((command) => ({
-      id: command.id,
-      label: `/${command.id}`,
-      ...(command.description ? { description: command.description } : {}),
-      // Where it came from, when something did: two plugins can contribute a
-      // `/review`, and the title alone does not say which this is.
-      meta: command.from ?? command.title,
-    }));
+    /*
+     * One menu, and whichever list is live fills it.
+     *
+     * The two cannot both be: a slash menu is a draft that *starts* with a
+     * slash, and a path menu is a word the caret is in that starts with an
+     * at-sign. Two menus would be two boxes above one field.
+     */
+    const offered: ListItem[] = found.length > 0
+      ? found.map((command) => ({
+        id: command.id,
+        label: `/${command.id}`,
+        ...(command.description ? { description: command.description } : {}),
+        // Where it came from, when something did: two plugins can contribute
+        // a `/review`, and the title alone does not say which this is.
+        meta: command.from ?? command.title,
+      }))
+      : paths.slice(0, 6).map((path) => ({
+        id: path.insertText,
+        label: path.insertText,
+        ...(path.description ? { description: path.description } : {}),
+      }));
+    const byInsert = new Map(paths.map((path) => [path.insertText, path]));
+    const matches = offered;
 
     // Which completion is under the cursor. Clamped rather than reset, so a
     // list that shrinks as more is typed keeps a valid row instead of
@@ -125,7 +150,9 @@ export const ChatComposer: (props: ChatComposerProps) => RenderOutput =
               // highlighted row to lead.
               onSelect={(id: string) => {
                 const command = byId.get(id);
-                if (command) onCommand?.(command);
+                if (command) { onCommand?.(command); return; }
+                const path = byInsert.get(id);
+                if (path) onPath?.(path);
               }}
               emptyMessage="no command"
             />
@@ -142,6 +169,11 @@ export const ChatComposer: (props: ChatComposerProps) => RenderOutput =
             onSubmit={(next: string) => {
               const command = chosen ? byId.get(chosen.id) : undefined;
               if (command && onCommand) { onCommand(command); return; }
+              // A highlighted path completes rather than sends: enter on a
+              // menu row means "that one", and a draft half-way through a
+              // path is not a message anybody meant to send.
+              const path = chosen ? byInsert.get(chosen.id) : undefined;
+              if (path && onPath) { onPath(path); return; }
               onSubmit(next);
             }}
             {...(onCancel ? { onCancel } : {})}

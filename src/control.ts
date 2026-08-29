@@ -9,7 +9,7 @@ import { createBag, serviceKey } from '@textui/core';
 import { confirm } from '@textui/widgets';
 import type { HostConnection } from './ahp/connection.js';
 import type {
-  Agent, Answer, ContentRef, Customization, FileContent, SessionConfig, SessionDetail,
+  Agent, Answer, Completion, ContentRef, Customization, FileContent, SessionConfig, SessionDetail,
   SessionUri, Turn,
 } from './ahp/types.js';
 import { SessionFlag } from './ahp/types.js';
@@ -72,6 +72,8 @@ export interface Controller {
   config(uri: SessionUri): Promise<SessionConfig>;
   /** What the host handed this session: plugins, skills, MCP servers. */
   customizations(uri: SessionUri): Promise<Customization[]>;
+  /** What the host offers to complete what is being typed. */
+  completions(channel: string, text: string, offset?: number): Promise<Completion[]>;
   /** Read a different chat in the session already open. */
   openChat(chat: string): void;
   /** Open another chat in it, and read that. */
@@ -333,6 +335,12 @@ export function createController(
      * what is waiting all belong to the chat, so keeping any of them across
      * the change would show one conversation's state under another's name.
      */
+    completions: (channel, text, offset) => host.completions({
+      channel,
+      text,
+      ...(offset !== undefined ? { offset } : {}),
+    }),
+
     openChat(chat) {
       const uri = app.store.get<SessionUri>(OPEN);
       if (!uri || app.store.get<string>(CHAT_URI) === chat) return;

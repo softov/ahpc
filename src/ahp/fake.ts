@@ -81,6 +81,20 @@ const nextId = (prefix: string): string => `${prefix}${++counter}`;
 
 const AT = '2026-08-22T10:00:00.000Z';
 
+/**
+ * The scripted filesystem `@` completes against.
+ *
+ * Keyed by the directory as it is typed, values ending in `/` being
+ * directories - which is what keeps the next keystroke inside one rather than
+ * starting again.
+ */
+const FILES: Record<string, string[]> = {
+  '': ['src/', 'test/', 'README.md', 'package.json'],
+  'src/': ['app.tsx', 'control.ts', 'state.ts', 'ahp/'],
+  'src/ahp/': ['fake.ts', 'live.ts', 'types.ts'],
+  'test/': ['smoke.test.tsx'],
+};
+
 export function fakeHost(): FakeHost {
   const summaries = new Map<SessionUri, SessionSummary>();
   const turns = new Map<SessionUri, Turn[]>();
@@ -885,6 +899,34 @@ export function fakeHost(): FakeHost {
     onSessions: (observer) => {
       catalogue.add(observer);
       return { close: () => { catalogue.delete(observer); } };
+    },
+
+    /**
+     * A scripted filesystem, for the one thing a menu of paths has to get
+     * right: replacing the fragment rather than appending to it.
+     *
+     * Not a real directory. The point of the script is arriving at a
+     * particular state on purpose, and a fixture that read this machine's
+     * files would answer differently on every machine it ran on.
+     */
+    completions: async ({ text, offset }) => {
+      const at = offset ?? text.length;
+      const found = /(?:^|\s)@(\S*)$/.exec(text.slice(0, at));
+      if (!found) return [];
+      const typed = found[1] ?? '';
+      const start = at - typed.length - 1;
+      const cut = typed.lastIndexOf('/');
+      const inside = cut === -1 ? '' : typed.slice(0, cut + 1);
+      const prefix = cut === -1 ? typed : typed.slice(cut + 1);
+      const here = FILES[inside] ?? [];
+      return here
+        .filter((name) => name.toLowerCase().startsWith(prefix.toLowerCase()))
+        .map((name) => ({
+          insertText: `@${inside}${name}`,
+          rangeStart: start,
+          rangeEnd: at,
+          label: `${inside}${name}`,
+        }));
     },
 
     createChat: async (uri, first) => {

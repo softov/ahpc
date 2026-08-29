@@ -1,5 +1,5 @@
 import type {
-  Agent, Answer, Changeset, ContentRef, Customization, FileContent, PendingInput, QueuedMessage,
+  Agent, Answer, Changeset, Completion, ContentRef, Customization, FileContent, PendingInput, QueuedMessage,
   SessionConfig, SessionDetail, SessionSummary, SessionUri, ToolCall, Turn,
 } from './types.js';
 
@@ -86,6 +86,20 @@ export interface HostConnection {
    * `createChat` MUST NOT be called at all.
    */
   createChat(uri: SessionUri, first?: string): Promise<string>;
+
+  /**
+   * What the host offers to complete what is being typed.
+   *
+   * The host's question, not this client's: a path is a path on *its*
+   * filesystem, and a skill is one it contributed. Asked with the whole draft
+   * and where the caret is, because what is being completed depends on the
+   * word the caret is in - an at-sign mid-word is an address and a slash
+   * mid-sentence is a path.
+   *
+   * Nothing is a real answer: a host that completes neither is one whose
+   * composer offers no menu, which is what it did before either was served.
+   */
+  completions(options: { channel: string; text: string; offset?: number }): Promise<Completion[]>;
   /** Close one. The last chat in a session is the session; dispose that instead. */
   disposeChat(chat: string): Promise<void>;
 

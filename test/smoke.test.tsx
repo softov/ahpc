@@ -1898,3 +1898,55 @@ describe('more than one chat in a session', () => {
     await m.t.unmount();
   });
 });
+
+/**
+ * A path, completed by the host.
+ *
+ * `@` is a trigger character the host advertises and the composer could not
+ * reach: it filtered its own list of commands and had nowhere to put an
+ * answer that has to be *asked for*, since a path is a path on the host's
+ * filesystem and only it knows which ones match.
+ */
+describe('completing an at-sign', () => {
+  const typing = async (typed: string) => {
+    const m = await open();
+    m.t.focus('chat.composer');
+    for (let i = 0; i < 4; i++) await m.t.settle();
+    m.t.type(typed);
+    for (let i = 0; i < 10; i++) await m.t.settle();
+    return m;
+  };
+
+  it('offers what the host says is there', async () => {
+    const m = await typing('look at @sr');
+    expect(m.t.hasText('@src/')).toBe(true);
+    await m.t.unmount();
+  });
+
+  it('replaces the fragment rather than appending to it', async () => {
+    const m = await typing('look at @sr');
+    m.t.press('enter');
+    for (let i = 0; i < 6; i++) await m.t.settle();
+    // Appending would leave `look at @sr@src/`, which is what a completion
+    // that only knew its text and not its range produces.
+    expect(m.t.app.store.get(DRAFT)).toBe('look at @src/');
+    await m.t.unmount();
+  });
+
+  it('goes into a directory rather than starting again', async () => {
+    const m = await typing('@src/ah');
+    expect(m.t.hasText('src/ahp/')).toBe(true);
+    m.t.press('enter');
+    for (let i = 0; i < 6; i++) await m.t.settle();
+    expect(m.t.app.store.get(DRAFT)).toBe('@src/ahp/');
+    await m.t.unmount();
+  });
+
+  it('asks nothing for a draft with no at-sign in its last word', async () => {
+    const m = await typing('mail me@example.com and ');
+    // An at-sign mid-word is an address, and a draft that has moved past it
+    // is not completing anything.
+    expect(m.t.hasText('@src/')).toBe(false);
+    await m.t.unmount();
+  });
+});

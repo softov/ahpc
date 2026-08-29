@@ -61,6 +61,11 @@ npm run dev -- --claude              # Claude Code, in this process
 skip the build here: Node strips types but does not understand JSX, and every
 screen is written in it.
 
+`@` completes a path against the **host's** filesystem, asked of it on every
+keystroke that changes the fragment - which of its files match is a question
+only it can answer. A completion carries the range it replaces, so `@src/ho`
+becomes `@src/host.ts` rather than `@src/ho@src/host.ts`.
+
 A session is a *container*: it holds chats, and a host whose agent advertises
 `multipleChats` can hold several. `ctrl+p` has **New chat here**, **Chat** and
 **Close this chat** where that is true, and nothing where it is not - a host

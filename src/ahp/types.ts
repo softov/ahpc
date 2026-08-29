@@ -257,6 +257,27 @@ export interface Changeset {
  * yet, and inventing a field for it would be describing a protocol that does
  * not exist.
  */
+/**
+ * One thing the host offers to complete what is being typed.
+ *
+ * Carries the range it replaces rather than only the text, because what is
+ * being completed is a *fragment*: `@src/ho` becomes `@src/host.ts` by
+ * replacing from the at-sign, and a client that appended would produce
+ * `@src/ho@src/host.ts`.
+ */
+export interface Completion {
+  /** What to put in the draft. */
+  insertText: string;
+  /** Where the replaced fragment starts, as an offset into the draft. */
+  rangeStart: number;
+  /** Where it ends. */
+  rangeEnd: number;
+  /** What a person reads in the menu. */
+  label: string;
+  /** One line under it, when the host said something worth reading. */
+  description?: string;
+}
+
 export interface Agent {
   provider: string;
   displayName: string;

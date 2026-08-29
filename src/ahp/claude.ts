@@ -1020,6 +1020,15 @@ export async function claudeHost(options: ClaudeHostOptions): Promise<HostConnec
      * separated here - so it advertises no `multipleChats` and refuses rather
      * than opening something that would share the first chat's agent.
      */
+    /*
+     * Nothing to complete.
+     *
+     * This host serves no filesystem and contributes no commands of its own,
+     * so an empty list is the true answer rather than a gap - the composer
+     * offers no menu, which is what it did before any host served one.
+     */
+    completions: async () => [],
+
     createChat: async () => {
       throw new Error('This host holds one chat per session. Start another session instead.');
     },
