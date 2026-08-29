@@ -367,6 +367,20 @@ function summary(value: unknown): SessionSummary {
     modifiedAt: str(found.modifiedAt) ?? str(found.createdAt) ?? '',
     workingDirectories: list(found.workingDirectories).filter((dir): dir is string => typeof dir === 'string'),
     ...(str(found.activity) ? { activity: str(found.activity) as string } : {}),
+    // Both only when the host said them: a project with an empty name would
+    // draw a blank where the directory used to be, which is worse than the
+    // fallback it replaced.
+    ...(str(bag(found.project).displayName)
+      ? {
+        project: {
+          uri: str(bag(found.project).uri) ?? '',
+          displayName: str(bag(found.project).displayName) as string,
+        },
+      }
+      : {}),
+    ...(found._meta && typeof found._meta === 'object'
+      ? { _meta: found._meta as Record<string, unknown> }
+      : {}),
     ...(found.changes
       ? {
         changes: {

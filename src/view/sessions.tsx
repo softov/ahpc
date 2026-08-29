@@ -4,7 +4,7 @@ import type { ListItem, ListItemState } from '@textui/widgets';
 import { Badge, Column, List, Marquee, Row } from '@textui/widgets';
 import type { SessionSummary } from '../ahp/types.js';
 import { decodeStatus } from '../ahp/status.js';
-import { workspaceName } from '../state.js';
+import { branchName, projectName } from '../state.js';
 
 /**
  * The catalogue.
@@ -57,7 +57,11 @@ export const SessionList: (props: SessionListProps) => RenderOutput =
         // session channel. A model per row would be a subscription per row.
         description: [
           session.provider,
-          workspaceName(session.workingDirectories[0]),
+          // The project, then the branch it is on - a catalogue spanning
+          // several repositories is read by which one each row is in, and a
+          // list of them all on `main` is a list that needs opening to tell
+          // apart.
+          [projectName(session), branchName(session)].filter(Boolean).join(' '),
           changes?.files
             ? `${changes.files} files  +${changes.additions ?? 0} -${changes.deletions ?? 0}`
             : '',

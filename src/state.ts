@@ -315,3 +315,28 @@ export function workspaceName(uri: string | undefined): string {
   if (!uri) return 'no workspace';
   return uri.replace(/^file:\/\//, '').split('/').filter(Boolean).pop() ?? '/';
 }
+
+/**
+ * What to call the project a session is in.
+ *
+ * The host's own name when it gives one, and the last segment of the working
+ * directory when it does not - which is the same answer for most hosts and the
+ * right one for a host that names projects itself.
+ */
+export function projectName(session: SessionSummary): string {
+  return session.project?.displayName || workspaceName(session.workingDirectories[0]);
+}
+
+/**
+ * The branch a session's directory is on, if its host says.
+ *
+ * `_meta` is an open map and `git` is the protocol's well-known key in it, so
+ * every step down is checked: a host may put anything here, including a `git`
+ * that is not an object.
+ */
+export function branchName(session: SessionSummary): string | undefined {
+  const git = session._meta?.git;
+  if (typeof git !== 'object' || git === null) return undefined;
+  const branch = (git as { branch?: unknown }).branch;
+  return typeof branch === 'string' && branch !== '' ? branch : undefined;
+}

@@ -18,7 +18,7 @@ import { Badge, Column, Divider, EmptyState, Panel, RadioGroup, Row, SearchBox, 
 import {
   CHAT_SCOPE, CONTROLLER, MCP_SCOPE, SESSIONS_SCOPE, SKILLS_SCOPE, settingCommand,
 } from './control.js';
-import {
+import { branchName,
   ARCHIVED, CHANGES, CUSTOMIZATIONS, DRAFT, EXPANDED, FILTER, FOCUS, HISTORY, HOST, INPUT,
   MODEL, OPEN, OPEN_FILE, CHAT_URI, PROVIDER, QUEUE, SELECTED, SESSIONS, SETTINGS, SIDEBAR,
   CHATS, OPEN_TERMINAL, SPLIT_AT, SPLIT_DEFAULT, TERMINAL, TERMINALS, TURNS, WORKSPACE,
@@ -103,6 +103,7 @@ function describe(session: SessionSummary, detail: SessionDetail | null): Detail
         value: setting(property.key),
       })),
     { id: 'workspace', label: 'Workspace', value: session.workingDirectories.map((dir) => dir.replace(/^file:\/\//, '')).join(', '), absent: 'the host\'s own directory' },
+    { id: 'branch', label: 'Branch', value: branchName(session) ?? '', absent: 'not a repository, or the host does not say' },
     // The identifiers, in full and copyable. A URI you can read half of is
     // worse than one you cannot see at all: it looks like the whole thing.
     { id: 'session', label: 'Session', value: session.resource },

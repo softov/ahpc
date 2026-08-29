@@ -1036,7 +1036,7 @@ describe('what a session actually is', () => {
     // Down to the row that holds the session URI. Which is the point of it
     // being walkable: the identifier is what gets pasted into a shell, and it
     // is exactly what does not fit on one line of a 40-column pane.
-    for (let i = 0; i < 8; i++) { t.press('down'); await t.settle(); }
+    for (let i = 0; i < 9; i++) { t.press('down'); await t.settle(); }
     t.press('enter');
     for (let i = 0; i < 4; i++) await t.settle();
 
