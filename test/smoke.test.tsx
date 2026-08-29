@@ -1750,3 +1750,47 @@ describe('the slash menu with nothing open', () => {
     await m.t.unmount();
   });
 });
+
+/**
+ * Where a new session works, against a host that is not this machine.
+ *
+ * `--path` names a directory on the **host**, and the client defaulted it to
+ * its own `process.cwd()` - a path that exists here and, against `--host`,
+ * very likely not there. Worse, it did so *after* the flag had been read, so
+ * the flag was overwritten by a guess and the composer showed a directory the
+ * agent was not in.
+ */
+describe('the workspace a client offers', () => {
+  const mounted = async (workspace?: string) => {
+    const host = fakeHost();
+    const t = await renderApp({
+      ...SIZES[0] as { width: number; height: number },
+      shell: 'workbench',
+      theme: 'workbench',
+      onBoot: (app) => { registerChat(app, { host, ...(workspace === undefined ? {} : { workspace }) }); },
+    });
+    for (let i = 0; i < 8; i++) await t.settle();
+    return t;
+  };
+
+  it('offers the one it was given', async () => {
+    const t = await mounted('/work/api');
+    expect(t.app.store.get(WORKSPACE)).toBe('/work/api');
+    await t.unmount();
+  });
+
+  it('offers none when told there is none, rather than one of its own', async () => {
+    // Empty is an answer: the host decides. Falling back to this process's
+    // directory here is how `--path` came to be ignored.
+    const t = await mounted('');
+    expect(t.app.store.get(WORKSPACE)).toBe('');
+    expect(t.hasText('no workspace')).toBe(true);
+    await t.unmount();
+  });
+
+  it('falls back to this directory only when nobody said', async () => {
+    const t = await mounted();
+    expect(t.app.store.get(WORKSPACE)).toBe(process.cwd());
+    await t.unmount();
+  });
+});

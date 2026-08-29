@@ -270,9 +270,10 @@ export interface ChatOptions {
   /**
    * Where a new session works, before anybody chooses otherwise.
    *
-   * The directory this was started in, which is the only defensible guess: a
-   * session created with no workspace runs in the host's own directory, and an
-   * editor's agents window never shows it.
+   * A path on the **host**, which is not this machine unless the host happens
+   * to be. Pass an empty string to say there is none and let the host decide;
+   * left out entirely it is the directory this process started in, which is
+   * the defensible guess only for a host that is this process.
    */
   workspace?: string;
   /**

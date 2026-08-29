@@ -11,7 +11,7 @@ import { fakeHost } from './ahp/fake.js';
 import { MissingProtocolPackage, liveHost } from './ahp/live.js';
 import { MissingAgentSdk, claudeHost } from './ahp/claude.js';
 import type { HostConnection } from './ahp/connection.js';
-import { HOST_ERROR, WORKSPACE } from './state.js';
+import { HOST_ERROR } from './state.js';
 
 /**
  * The entry point.
@@ -95,7 +95,8 @@ The host
   (none of these)       The scripted host, which needs nothing installed
 
 Where the agent works
-  --path <dir>          A path on the host, not on this machine.
+  --path <dir>          A path on the host, not on this machine. The host
+                        has to serve it, and says so if it does not.
                         With --claude the host is this machine, so it
                         defaults to the current directory. With --host it
                         defaults to nothing - the host decides.
@@ -235,6 +236,18 @@ async function connect(options: Options): Promise<HostConnection & { pump?(): bo
   }
 }
 
+/**
+ * Where a new session works, as this client can honestly answer it.
+ *
+ * `--path` when it was given, and it is a path on the **host**. Otherwise the
+ * directory this was started in - but only for the hosts that *are* this
+ * machine. Against `--host` the filesystem is somewhere else entirely, so a
+ * path from here is one the host has never heard of, and the honest answer is
+ * none at all: the host decides, which is what `--help` has always said.
+ */
+const workspaceFor = (options: Options): string =>
+  options.path ?? (options.host ? '' : process.cwd());
+
 /** One frame, to stdout. The same application, against a terminal that is a size. */
 async function still(options: Options): Promise<void> {
   const host = await connect(options);
@@ -245,7 +258,7 @@ async function still(options: Options): Promise<void> {
     capabilities: overrides(options),
     theme: options.theme,
     shell: options.shell,
-    onBoot: (booted) => { registerChat(booted, { host }); },
+    onBoot: (booted) => { registerChat(booted, { host, workspace: workspaceFor(options) }); },
 
     // A still of a turn mid-flight is what `--pump` is for: run a fixed number
     // of scripted words rather than all of them, and the caret is wherever the
@@ -253,7 +266,6 @@ async function still(options: Options): Promise<void> {
     // can do without being answered, which is how the confirmation is reached.
     before: (app) => {
       const controller = app.services.require(CONTROLLER);
-      if (options.path) app.store.set(WORKSPACE, options.path);
       if (options.session) {
         controller.open(options.session);
         if (options.screen !== 'sessions') app.screens.push(options.screen);
@@ -320,7 +332,7 @@ async function main(): Promise<void> {
     shell: options.shell,
     session: { managed: true, altScreen: true, mouse: true, title: 'assistant' },
     onBoot: (booted) => {
-      registerChat(booted, { host });
+      registerChat(booted, { host, workspace: workspaceFor(options) });
       booted.commands.register({
         id: 'app.quit',
         title: 'Quit',
@@ -343,10 +355,6 @@ async function main(): Promise<void> {
 
   app.services.provide(WRITER_KEY, createWriter(terminal.capabilities()));
   sink.report = (message) => app.store.set(HOST_ERROR, message);
-  // One flag, one store path - the same one `compose.workspace` writes, so
-  // what `--path` seeds and what the palette sets are the same answer and
-  // both hosts read it from the same place.
-  if (options.path) app.store.set(WORKSPACE, options.path);
   await app.start();
 
   /**
