@@ -3,6 +3,7 @@ import { defineComponent, useTheme } from '@textui/core';
 import { Column, KeyValue, Row } from '@textui/widgets';
 import type { SessionSummary } from '../ahp/types.js';
 import { decodeStatus } from '../ahp/status.js';
+import { branchName } from '../state.js';
 
 /**
  * What this conversation *is*, at the top of it.
@@ -61,6 +62,9 @@ export const ChatSessionHead: (props: ChatSessionHeadProps) => RenderOutput =
       { label: 'Harness', value: [session.provider, model].filter(Boolean).join(`  ${theme.glyphs.separator}  `) },
       ...settings.filter((setting) => setting.value).map((setting) => ({ ...setting })),
       { label: 'Workspace', value: session.workingDirectories.map((dir) => dir.replace(/^file:\/\//, '')).join(', ') },
+      // Only when the host says one. A blank branch row reads as a detached
+      // head rather than as a host that does not report branches.
+      ...(branchName(session) ? [{ label: 'Branch', value: branchName(session) as string }] : []),
       {
         label: 'Started',
         value: started && updated && updated !== started

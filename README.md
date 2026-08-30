@@ -36,6 +36,36 @@ need that the catalog does not have?** The answer is at the bottom, and it is
 shorter than it looks - two components are genuinely missing, one is missing
 and needed by everything, and the rest is composition.
 
+## Without the screen
+
+`ahpc` is two front ends over one client. A first argument that names a command
+runs it and exits; anything else opens the screen, which is what it always did.
+
+```bash
+export AHPC_HOST=ws://127.0.0.1:9187
+
+ahpc session list                       # the catalogue, with project and branch
+ahpc prompt <uri> 'what changed here?'  # streams the answer to stdout
+ahpc exec 'summarise this repo'         # a session, one turn, and dispose it
+ahpc watch <uri> --until input          # BLOCK until something wants a person
+ahpc confirm <uri> <toolCallId>         # then approve it, and let the turn run on
+ahpc session list --json | jq '.[0]'
+```
+
+`ahpc help` lists all of them: sessions, turns, approvals, chats, harness,
+changes, files, terminals.
+
+Two things it is not. It is not a second client - `src/ahp/` holds no
+renderer, so the CLI drives the same `HostConnection` the screen does and
+there is one place a host is spoken to. And it is not a wrapper around the
+commands a screen happens to have: `ahpc dispatch <uri> <type> --field k=v`
+sends any client-dispatchable action verbatim, which is what makes the parts
+of the protocol this client has no control for testable at all.
+
+Output is written for a person and `--json` is the same answer for a program.
+An empty list says so in a sentence, because an empty table is
+indistinguishable from a table that failed to draw.
+
 ## What it talks to
 
 [AHP](https://microsoft.github.io/agent-host-protocol/), the Agent Host

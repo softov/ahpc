@@ -42,6 +42,23 @@ export interface SessionSummary {
   activity?: string;
   /** The footprint, so a list can show it without subscribing to a changeset. */
   changes?: { files?: number; additions?: number; deletions?: number };
+  /**
+   * The project this session is in, as the *host* names it.
+   *
+   * Not the same as the last segment of `workingDirectories[0]`, which is what
+   * this client falls back to: a host may call a project something its
+   * directory is not called, and it is the authority on its own names.
+   */
+  project?: { uri: string; displayName: string };
+  /**
+   * Provider-specific metadata, opaque but for the keys a client knows.
+   *
+   * `git.branch` is the one read here - it is the protocol's well-known key
+   * and what the reference host puts there. Anything else is carried and
+   * ignored rather than dropped, because the next reader of this row may know
+   * a key this one does not.
+   */
+  _meta?: Record<string, unknown>;
 }
 
 /**
@@ -414,4 +431,18 @@ export interface SlashCommand {
   description?: string;
   /** Where a session command came from: the plugin or directory. */
   from?: string;
+}
+
+/**
+ * One entry of a directory the host serves.
+ *
+ * AHP's own shape, kept to its own names: `uri` is a `file://` URI on the
+ * *host's* machine, never on this one.
+ */
+export interface ResourceEntry {
+  uri: string;
+  name: string;
+  /** `file`, `directory`, or whatever else the host distinguishes. */
+  kind: string;
+  size?: number;
 }
