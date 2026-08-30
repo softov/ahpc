@@ -298,6 +298,10 @@ export async function cli(argv: string[]): Promise<number> {
     return 0;
   }
   finally {
+    // Sent, then hung up. A command that dispatches one action and exits is
+    // the only caller that can close a connection faster than its own
+    // dispatch leaves it.
+    await host.flush?.();
     await host.close?.();
   }
 }
@@ -613,18 +617,23 @@ async function turns(host: HostConnection, command: string, args: Args, wants: b
         /*
          * Whether the state it arrived in counts.
          *
-         * `idle` is a condition and the other two are events. "Block until it
-         * is quiet" is satisfied by a session that is quiet already, so the
-         * opening snapshot answers it; "block until a turn ends" or "until
-         * something wants a person" is about what happens *next*, and
-         * answering those from the opening snapshot would report the past.
+         * Two of these are *conditions* and one is an event. A session that is
+         * already quiet satisfies "block until it is quiet", and one that is
+         * already waiting on a person satisfies "block until something wants
+         * a person" - a pending input is not the past, it is still pending,
+         * and skipping it means a script hangs on exactly the approval it was
+         * started to give.
+         *
+         * `turn` is the event: a finished turn in the opening snapshot is
+         * history, and returning it would answer about the turn before this
+         * one.
          */
         const opening = first;
         first = false;
         if (stop === 'idle') return event.active === undefined && event.input === undefined;
+        if (stop === 'input') return event.input !== undefined;
         if (opening) return false;
-        if (stop === 'turn') return event.active === undefined && event.turns.length > 0;
-        return event.input !== undefined;
+        return event.active === undefined && event.turns.length > 0;
       };
       const event = await until(host, uri, reached, {
         timeoutSeconds: Number(args.value('--timeout') ?? 900),

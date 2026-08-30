@@ -261,6 +261,15 @@ export interface HostConnection {
    * the seam rather than only on the implementations that need it: the caller
    * cannot know which kind it was handed.
    */
+  /**
+   * Wait for what has been dispatched to have actually left.
+   *
+   * For a caller that sends one thing and exits. Everything here is
+   * fire-and-forget, and one of those is still asynchronous on the way out -
+   * closing the connection in the same breath closes it first, and the
+   * dispatch is never sent at all.
+   */
+  flush?(): Promise<void>;
   close?(): void | Promise<void>;
 }
 

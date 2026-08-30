@@ -682,8 +682,20 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
    * so a rejection here has nowhere to go but `unhandledRejection`, which ends
    * the process. What a caller gets instead is the refusal, reported.
    */
+  /**
+   * Dispatches that have not reached the socket yet.
+   *
+   * A dispatch is fire-and-forget by design - the host reduces it and says so,
+   * and nothing here waits for a turn it did not start. But it is *async*
+   * before it is sent, because the chat a session dispatches to has to be
+   * looked up, so a caller that hangs up immediately afterwards hangs up
+   * first. A screen never does that; a command that sends one thing and exits
+   * does it every time.
+   */
+  const inFlight = new Set<Promise<void>>();
+
   const dispatch = (uri: SessionUri, action: unknown): void => {
-    void (async () => {
+    const sending = (async () => {
       const chat = await chatOf(uri);
       if (!chat) {
         options.onRefusal?.(uri, refused.get(uri) ?? 'this session has no chat to speak to');
@@ -691,6 +703,8 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
       }
       client.dispatch(chat, action);
     })().catch((error: unknown) => options.onRefusal?.(uri, reason(error)));
+    inFlight.add(sending);
+    void sending.finally(() => inFlight.delete(sending));
   };
 
   return {
@@ -1287,6 +1301,9 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
         client.dispatch(uri, { type: 'session/configChanged', config: { [key]: value } });
       } catch (error) { options.onRefusal?.(uri, reason(error)); }
     },
+
+    /** Everything already sent, actually sent. */
+    flush: async () => { await Promise.allSettled([...inFlight]); },
 
     close: async () => {
       // Set, not announced. `onState` means something happened *to* the
