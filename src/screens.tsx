@@ -16,10 +16,11 @@ import {
 } from '@textui/core';
 import { Badge, Column, Divider, EmptyState, Panel, RadioGroup, Row, SearchBox, argumentOf } from '@textui/widgets';
 import {
-  CHAT_SCOPE, CONTROLLER, MCP_SCOPE, SESSIONS_SCOPE, SKILLS_SCOPE, settingCommand,
+  CHANGES_SCOPE, CHAT_SCOPE, CONTROLLER, MCP_SCOPE, SESSIONS_SCOPE, SKILLS_SCOPE, settingCommand,
 } from './control.js';
 import { branchName,
   ARCHIVED, CHANGES, CUSTOMIZATIONS, DRAFT, EXPANDED, FILTER, FOCUS, HISTORY, HOST, INPUT,
+  CHANGE_AT, CHANGE_ROW, CHANGE_SCOPES,
   MODEL, OPEN, OPEN_FILE, CHAT_URI, PROVIDER, QUEUE, SELECTED, SESSIONS, SETTINGS, SIDEBAR,
   CHATS, OPEN_TERMINAL, SPLIT_AT, SPLIT_DEFAULT, TERMINAL, TERMINALS, TURNS, WORKSPACE,
   openSession, visibleSessions, workspaceName,
@@ -27,7 +28,7 @@ import { branchName,
 import type { HostState } from './state.js';
 import { toBlocks } from './blocks.js';
 import type {
-  Agent, Changeset, Completion, ContentRef, Customization, FileContent, PendingInput, QueuedMessage,
+  Agent, Changeset, ChangesetScope, Completion, ContentRef, Customization, FileContent, PendingInput, QueuedMessage,
   TerminalRow, TerminalState,
   SessionConfig, SessionDetail, SessionSummary, SlashCommand, Turn,
 } from './ahp/types.js';
@@ -849,6 +850,69 @@ export const ChangesScreen: (props: Record<string, never>) => RenderOutput =
     const open = useStoreValue<string | null>(OPEN_FILE, null) ?? null;
     const session = openSession(app.store);
     const file = changes.files.find((found) => found.uri === open) ?? null;
+    // Letters mean things here, so the scope is on while this screen is.
+    useFocusScope({ id: CHANGES_SCOPE });
+
+    /*
+     * Which changesets this session offers, and which of them is on screen.
+     *
+     * Asked of the host rather than assumed: a session advertises what it
+     * advertises, and a client that offered the four the protocol names would
+     * have three that are refused. Nothing is chosen here at first - an empty
+     * `CHANGE_AT` means whichever the host would pick, which is what this
+     * screen did before there was any way to ask for another.
+     */
+    const scopes = useStoreValue<ChangesetScope[]>(CHANGE_SCOPES, []) ?? [];
+    const at = useStoreValue<string>(CHANGE_AT, '') ?? '';
+    const uri = session?.resource ?? '';
+
+    useEffect(() => {
+      if (!uri) return;
+      void controller.changesets(uri)
+        .then((found) => {
+          app.store.set(CHANGE_SCOPES, found);
+          /*
+           * Settle on one, rather than leaving "whichever the host would pick".
+           *
+           * The screen can draw the default without naming it, but nothing
+           * else can act on it: ticking a file off needs the changeset's own
+           * URI, and "the one you would have chosen" is not a URI. So the
+           * first reachable scope becomes the chosen one the moment the list
+           * arrives, and every key after that has something concrete to work
+           * with.
+           */
+          if ((app.store.get<string>(CHANGE_AT) ?? '') !== '') return;
+          const first = found.find((scope) => scope.variables.length === 0);
+          if (first) app.store.set(CHANGE_AT, first.uriTemplate);
+        })
+        .catch((error: unknown) => controller.report(error));
+    }, [uri]);
+
+    // The chosen one, re-read when the choice moves. The default arrives on
+    // the session channel already, so only a named scope is fetched here.
+    useEffect(() => {
+      if (!uri || !at) return;
+      void controller.changesAt(uri, at)
+        .then((found) => app.store.set(CHANGES, found))
+        .catch((error: unknown) => controller.report(error));
+    }, [uri, at]);
+
+    const chosen = scopes.find((scope) => scope.uriTemplate === at)
+      ?? scopes.find((scope) => scope.variables.length === 0);
+
+    /*
+     * Which row the cursor is on, kept in step with the list.
+     *
+     * `onSelect` fires when the selection *moves*, and the list arrives with
+     * its first row already selected - so without this, a key acting on "this
+     * file" does nothing until somebody has pressed an arrow, which reads as a
+     * key that works the second time.
+     */
+    const row = useStoreValue<string>(CHANGE_ROW, '') ?? '';
+    useEffect(() => {
+      if (changes.files.some((one) => one.uri === row)) return;
+      app.store.set(CHANGE_ROW, changes.files[0]?.uri ?? '');
+    }, [changes.files.map((one) => one.uri).join('\u0000')]);
 
     const [loaded, setLoaded] = useState<{
       uri: string; before: string; after: string; binary?: { bytes: number; contentType?: string };
@@ -911,9 +975,46 @@ export const ChangesScreen: (props: Record<string, never>) => RenderOutput =
 
     return (
       <Panel title={title} flex={1}>
+        {scopes.length > 1 ? (
+          <Row gap={2}>
+            {scopes.map((scope) => {
+              const here = scope.uriTemplate === (chosen?.uriTemplate ?? '');
+              // A template with variables left in it is a question about a
+              // turn, and there is nothing on this screen to answer it from.
+              // Drawn anyway, dimmed: a scope the host offers and this screen
+              // cannot reach is worth saying, and silently dropping it is how
+              // somebody concludes their host does not have per-turn diffs.
+              const reachable = scope.variables.length === 0;
+              return (
+                <text
+                  key={scope.uriTemplate}
+                  content={reachable ? scope.label : `${scope.label} (needs a turn)`}
+                  {...(here ? { fg: 'accent' as SemanticVariant, bold: true } : {})}
+                  {...(reachable ? {} : { fg: 'muted' as SemanticVariant })}
+                />
+              );
+            })}
+          </Row>
+        ) : null}
+        {(changes.operations ?? []).length > 0 ? (
+          <Row gap={2}>
+            {(changes.operations ?? []).map((operation) => (
+              <text
+                key={operation.id}
+                content={operation.status === 'idle'
+                  ? operation.label
+                  : `${operation.label} (${operation.status})`}
+                fg={operation.status === 'error' ? 'danger' : operation.status === 'idle' ? 'muted' : 'warning'}
+              />
+            ))}
+          </Row>
+        ) : null}
         <ChangesList
           changes={changes}
-          onOpen={(uri: string) => app.store.set(OPEN_FILE, uri)}
+          reviewable={chosen?.reviewable === true}
+          onOpen={(found: string) => app.store.set(OPEN_FILE, found)}
+          onSelect={(found: string) => app.store.set(CHANGE_ROW, found)}
+          autoFocus
           flex={1}
         />
       </Panel>

@@ -11,7 +11,7 @@ import type { HostConnection } from './ahp/connection.js';
 import type { Terminals } from './terminal.js';
 import { createTerminals } from './terminal.js';
 import type {
-  Agent, Answer, Completion, ContentRef, Customization, FileContent, SessionConfig, SessionDetail,
+  Agent, Answer, Changeset, ChangesetScope, Completion, ContentRef, Customization, FileContent, SessionConfig, SessionDetail,
   SessionUri, Turn,
 } from './ahp/types.js';
 import { SessionFlag } from './ahp/types.js';
@@ -19,6 +19,7 @@ import { valueIcon } from './view/icons.js';
 import {
   ARCHIVED, CAN_ADD_CHAT, CHAT_URI, CHATS, CUSTOMIZATIONS, DRAFT, EXPANDED, FILTER, HAS_CHATS,
   HOST, HOST_ERROR, INPUT, MODEL, OPEN_TERMINAL,
+  CHANGES as CHANGES_AT_PATH, CHANGE_AT, CHANGE_ROW, CHANGE_SCOPES,
   OPEN, OPEN_FILE, PROVIDER, MARKDOWN, QUEUE, RUNNING, SCREEN, SELECTED, SETTINGS, SIDEBAR,
   SPLIT_AT, SPLIT_DEFAULT, TURNS, WORKSPACE,
   applyEvent, pendingInput, queue, sessions, turns, writeSessions, writeStatus,
@@ -94,6 +95,23 @@ export interface Controller {
   harnessCommands(): Promise<Customization[]>;
   /** Turn one on or off. The host decides and tells everyone watching. */
   setCustomizationEnabled(uri: SessionUri, id: string, enabled: boolean): void;
+  /**
+   * Which changesets this session offers.
+   *
+   * Asked once per session rather than derived: a host that advertises none
+   * has none, and a client that assumed the four the protocol names would
+   * offer a picker full of things to be refused.
+   */
+  changesets(uri: SessionUri): Promise<ChangesetScope[]>;
+  /** One of them, by the URI its template became. Absent is whichever the host would pick. */
+  changesAt(uri: SessionUri, changeset?: string): Promise<Changeset>;
+  /**
+   * Tick a file off, or take the tick back.
+   *
+   * Fire-and-forget: the host keeps the flag and tells every client watching,
+   * so what redraws this screen is the changeset coming back, not this call.
+   */
+  review(changeset: string, files: string[], reviewed: boolean): void;
   /** One file out of a changeset, fetched. Nothing calls it until a row opens. */
   content(ref: ContentRef): Promise<FileContent>;
   /**
@@ -133,6 +151,7 @@ export const SESSIONS_SCOPE = 'chat.sessions';
 export const CHAT_SCOPE = 'chat.conversation';
 export const SKILLS_SCOPE = 'chat.skills';
 export const MCP_SCOPE = 'chat.mcp';
+export const CHANGES_SCOPE = 'chat.changes';
 
 export function createController(
   app: TextUIApp,
@@ -569,6 +588,9 @@ export function createController(
     harnessCommands: () => host.harnessCommands(),
     setCustomizationEnabled: (uri, id, enabled) => host.setCustomizationEnabled(uri, id, enabled),
     content: (ref) => host.content(ref),
+    changesets: async (uri) => (await host.changesets?.(uri)) ?? [],
+    changesAt: (uri, changeset) => host.changes(uri, changeset),
+    review: (changeset, files, isReviewed) => { host.review?.(changeset, files, isReviewed); },
 
     async settings() {
       const uri = app.store.get<SessionUri>(OPEN) ?? null;
@@ -785,6 +807,56 @@ function commands(app: TextUIApp, controller: Controller): CommandDefinition[] {
       slots: ['palette'],
       when: `${OPEN}`,
       run: () => app.screens.push('mcp'),
+    },
+    {
+      /*
+       * The next changeset this session offers.
+       *
+       * One key rather than a picker widget, because the list is short and
+       * every entry is a whole screen: cycling is what a person does to see
+       * the other three, and a menu to choose between four things you are
+       * about to look at anyway is a step in the way.
+       *
+       * Only the ones that are already URIs. A template with `{turnId}` still
+       * in it is a question about a turn, and there is nothing on this screen
+       * to answer it from - which is why the greyed rows say so rather than
+       * being silently dropped.
+       */
+      id: 'changes.scope',
+      title: 'Next changeset',
+      category: 'Changes',
+      run: () => {
+        const offered = (app.store.get<ChangesetScope[]>(CHANGE_SCOPES) ?? [])
+          .filter((scope) => scope.variables.length === 0);
+        if (offered.length === 0) return;
+        const at = app.store.get<string>(CHANGE_AT) ?? '';
+        const seen = offered.findIndex((scope) => scope.uriTemplate === at);
+        const next = offered[(seen + 1) % offered.length];
+        app.store.set(CHANGE_AT, next?.uriTemplate ?? '');
+        // The open file belongs to the changeset it came from.
+        app.store.set(OPEN_FILE, null);
+      },
+    },
+    {
+      /*
+       * Ticking the row off, which is a note about reading rather than a change.
+       *
+       * The host keeps it and tells every client, so nothing is written here -
+       * what redraws the tick is the changeset coming back. That is the whole
+       * reason it is worth having: two people reading one diff can see which
+       * files the other has been through.
+       */
+      id: 'changes.review',
+      title: 'Mark this file read',
+      category: 'Changes',
+      run: () => {
+        const at = app.store.get<string>(CHANGE_AT) ?? '';
+        const row = app.store.get<string>(CHANGE_ROW) ?? '';
+        if (!at || !row) return;
+        const held = app.store.get<Changeset>(CHANGES_AT_PATH);
+        const file = held?.files.find((one) => one.uri === row);
+        controller.review(at, [row], file?.reviewed !== true);
+      },
     },
     {
       id: 'changes.close',
@@ -1423,6 +1495,20 @@ function keys(): {
     // The conversation. `i` is the one that gets you into the composer, and
     // out of it is escape - the pair that makes every other letter reachable.
     { keys: 'c', commandId: 'go.changes', scopeId: CHAT_SCOPE },
+    /*
+     * On the changes screen, and nowhere else.
+     *
+     * `]` rather than `tab`, which was the obvious choice and does not work:
+     * tab is how focus moves and the runtime has already spent it before any
+     * binding sees it. `]` is typed by nothing here and reads as "the next
+     * one", which is what it does.
+     *
+     * `r` is a letter, so it lives in the changes scope for the same reason
+     * `c` lives in the chat one - it must not fire while something is being
+     * typed on another screen.
+     */
+    { keys: ']', commandId: 'changes.scope', scopeId: CHANGES_SCOPE },
+    { keys: 'r', commandId: 'changes.review', scopeId: CHANGES_SCOPE },
     { keys: 's', commandId: 'go.settings', scopeId: CHAT_SCOPE },
     { keys: 't', commandId: 'chat.stop', scopeId: CHAT_SCOPE },
     { keys: 'k', commandId: 'go.skills', scopeId: CHAT_SCOPE },

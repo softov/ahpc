@@ -24,13 +24,23 @@ export interface ChangesListProps extends BoxProps {
   changes: Changeset;
   /** Enter on a row. Absent leaves the list a read-only account. */
   onOpen?(uri: string): void;
+  /** The cursor moved. What a key acting on "this file" needs. */
+  onSelect?(uri: string): void;
+  /**
+   * Whether to draw the read column at all.
+   *
+   * Per changeset, because the flag is: a host says which of its changesets it
+   * will keep a tick for, and a checkbox on one it will not is a control that
+   * silently does nothing.
+   */
+  reviewable?: boolean;
   focusId?: string;
   autoFocus?: boolean;
 }
 
 export const ChangesList: (props: ChangesListProps) => RenderOutput =
   defineComponent<ChangesListProps>('ChangesList', (props) => {
-    const { changes, onOpen, focusId, autoFocus, ...rest } = props;
+    const { changes, onOpen, onSelect, reviewable, focusId, autoFocus, ...rest } = props;
     const theme = useTheme();
 
     if (changes.files.length === 0) {
@@ -66,6 +76,16 @@ export const ChangesList: (props: ChangesListProps) => RenderOutput =
           flex={1}
           renderItem={(item: ListItem, state: ListItemState) => (
             <Row gap={1}>
+              {/* Absent is not-yet-read, which is what the protocol says a
+                  missing value means - so the empty box is a real state and
+                  not a placeholder. */}
+              {reviewable ? (
+                <text
+                  content={byUri.get(item.id)?.reviewed === true ? theme.glyphs.checkboxOn : theme.glyphs.checkboxOff}
+                  {...(byUri.get(item.id)?.reviewed === true ? { fg: 'success' as SemanticVariant } : { fg: 'muted' as SemanticVariant })}
+                  shrink={0}
+                />
+              ) : null}
               <text
                 content={item.icon ?? ''}
                 {...(state.selected ? {} : { fg: item.tone })}
@@ -84,6 +104,7 @@ export const ChangesList: (props: ChangesListProps) => RenderOutput =
             </Row>
           )}
           {...(onOpen ? { onActivate: (uri: string) => onOpen(uri) } : {})}
+          {...(onSelect ? { onSelect: (uri: string) => onSelect(uri) } : {})}
           {...(focusId ? { focusId } : {})}
           {...(autoFocus ? { autoFocus: true } : {})}
           emptyMessage="Nothing changed"

@@ -35,6 +35,18 @@ export const CHANGES = '$/chat/conv/changes' as BindingPath;
 export const CUSTOMIZATIONS = '$/chat/conv/customizations' as BindingPath;
 /** Which file of the changeset is open, by uri. Null is the list. */
 export const OPEN_FILE = '$/chat/conv/file' as BindingPath;
+/**
+ * Which changesets this session offers, and which one is on screen.
+ *
+ * The session advertises several - what the conversation changed, what one
+ * turn changed, what the working tree has - and drawing the first that needs
+ * no filling in was drawing one and hiding the rest. `CHANGE_AT` is the
+ * chosen changeset's own URI, or empty for "whichever the host would pick".
+ */
+export const CHANGE_SCOPES = '$/chat/conv/scopes' as BindingPath;
+export const CHANGE_AT = '$/chat/conv/scope' as BindingPath;
+/** The row the cursor is on, so a key can act on it. */
+export const CHANGE_ROW = '$/chat/conv/row' as BindingPath;
 export const STATUS = '$/chat/conv/status' as BindingPath;
 /**
  * Is there a turn to stop, as a `when` clause can ask it.
