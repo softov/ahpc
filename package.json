@@ -17,11 +17,10 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@microsoft/agent-host-protocol": "^0.8.0",
     "@textui/core": "^0.3.0",
     "@textui/terminal": "^0.3.0",
-    "@textui/widgets": "^0.3.0",
-    "@microsoft/agent-host-protocol": "^0.8.0",
-    "@anthropic-ai/claude-agent-sdk": "^0.3.250"
+    "@textui/widgets": "^0.3.0"
   },
   "devDependencies": {
     "@textui/testing": "^0.3.0",

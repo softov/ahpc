@@ -185,6 +185,36 @@ function until(
   });
 }
 
+/**
+ * Ask again once the catalogue moves, for an answer that starts out empty.
+ *
+ * A harness enumerates its models once its host has asked one, and a host that
+ * has just been started has not finished asking. An empty list is a real
+ * answer - a harness nobody has signed into has none - so this waits for the
+ * host to say something changed rather than for a fixed time, and gives up
+ * quickly enough that the real empty answer is still prompt.
+ */
+async function settled<T>(
+  host: HostConnection,
+  ask: () => Promise<T[]>,
+  seconds = 8,
+): Promise<T[]> {
+  const first = await ask();
+  if (first.length > 0) return first;
+  return await new Promise<T[]>((answer) => {
+    const stop = (found: T[]): void => {
+      clearTimeout(timer);
+      watching.close();
+      answer(found);
+    };
+    const timer = setTimeout(() => stop([]), seconds * 1000);
+    timer.unref?.();
+    const watching = host.onSessions(() => {
+      void ask().then((found) => { if (found.length > 0) stop(found); }).catch(() => {});
+    });
+  });
+}
+
 /** One session's snapshot, and nothing after it. */
 const snapshot = async (host: HostConnection, uri: SessionUri): Promise<Extract<HostEvent, { type: 'snapshot' }> | undefined> => {
   const event = await until(host, uri, (e) => e.type === 'snapshot', { timeoutSeconds: 30 });
@@ -204,9 +234,8 @@ const spoken = (turn: Turn): string => turn.parts
  * `HostConnection`, and the shape of the whole surface being readable in one
  * file is worth more than the indirection a registry would buy.
  */
-export async function cli(argv: string[]): Promise<number> {
-  const command = argv[0] ?? 'help';
-  const args = new Args(argv.slice(1));
+export async function cli(command: string, rest: string[]): Promise<number> {
+  const args = new Args(rest);
   const wants = args.has('--json');
   if (command === 'help' || args.has('--help')) { process.stdout.write(HELP); return 0; }
 
@@ -227,13 +256,15 @@ export async function cli(argv: string[]): Promise<number> {
       case 'resource': return await files(host, args, wants);
 
       case 'agents': {
-        const found = await host.agents();
+        const found = await settled(host, () => host.agents());
         if (wants) { json(found); break; }
         table(found.map((a) => [a.provider, a.displayName ?? '', `${a.models.length} model(s)`]));
         break;
       }
       case 'models': {
-        const found = await host.agents();
+        // Settled on the models rather than the harnesses: a host advertises a
+        // harness at once and its models when it has asked one.
+        const found = await settled(host, async () => (await host.agents()).filter((a) => a.models.length > 0));
         if (wants) { json(found.flatMap((a) => a.models.map((m) => ({ provider: a.provider, ...m })))); break; }
         table(found.flatMap((a) => a.models.map((m) => [a.provider, m.id, m.displayName])));
         break;

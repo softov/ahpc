@@ -10,7 +10,7 @@ npm install && npm run build
 
 node dist/src/main.js                        # the scripted host - needs nothing
 node dist/src/main.js --host ws://127.0.0.1:9187   # a real host, e.g. ahpd
-node dist/src/main.js --claude               # Claude Code in this process
+node dist/src/main.js --claude               # Claude Code, in an ahpd this starts
 node dist/src/main.js --help                 # every flag
 ```
 
@@ -18,12 +18,21 @@ It began as an example inside TextUI, which is why the sections below still
 read as an argument about which components a chat application needs. That
 argument is still the reason the code is shaped the way it is, so it stays.
 
-**On `--claude`.** Claude reached in-process, through the Agent SDK, with no
-host at all. It was the prototype that `ahpd` was built from and it is kept for
-now because it means this client runs with nothing else installed. The two are
-meant to be indistinguishable from up here - `--claude` and `--host` rendering
-the same screens is what the seam is for, and where they differ, one of them is
-wrong.
+**On `--claude`.** It starts an [`ahpd`](https://github.com/softov/ahpd) of its
+own - a port the operating system picks, a token nobody else is told - talks to
+it over the same WebSocket `--host` uses, and kills it on the way out. It needs
+`ahpd` installed (`npm i -g ahpd`, or `AHPD=/path/to/ahpd`).
+
+It used to reach Claude in this process, through the Agent SDK, with about
+eleven hundred lines of translation of its own. That was the prototype `ahpd`
+was built from, and keeping it meant two implementations of one translation -
+which is two answers to every question, and the one nobody is looking at is the
+one that drifts. A `chat/reasoning` bug in `ahpd` had gone unnoticed for exactly
+that reason: this client's own reducer was lenient about it, so no screen ever
+showed what every conformant client would have.
+
+`--claude` and `--host` are now the same path with a different daemon at the
+end of it, which is what the seam was for.
 
 The shell and the theme are a starting point rather than a fixture: `ctrl+t`
 changes the theme while it runs and the palette has both, previewing each as
@@ -83,7 +92,7 @@ tell which is answering:
 ```bash
 npm run dev                          # the scripted host
 npm run dev -- --host ws://…         # a real one, over the wire
-npm run dev -- --claude              # Claude Code, in this process
+npm run dev -- --claude              # Claude Code, in an ahpd this starts
 ```
 
 `dev` builds and runs on Node, which is what this ships on. `dev:bun` is

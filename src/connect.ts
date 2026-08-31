@@ -1,7 +1,7 @@
 /** Which host this run talks to, for either front end. */
 
 import { MissingProtocolPackage, liveHost } from './ahp/live.js';
-import { MissingAgentSdk, claudeHost } from './ahp/claude.js';
+import { MissingHost, spawnedHost } from './ahp/spawn.js';
 import { fakeHost } from './ahp/fake.js';
 import type { HostConnection } from './ahp/connection.js';
 
@@ -18,7 +18,7 @@ export interface Where {
   host?: string;
   /** A bearer token for it. */
   token?: string;
-  /** Claude Code in this process, through the Agent SDK. */
+  /** Claude Code, in an `ahpd` this client starts and stops. */
   claude?: boolean;
   /** Where the agent works - a path on the *host*, not on this machine. */
   path?: string;
@@ -46,19 +46,20 @@ export const sink: { report(message: string): void } = {
 export async function connect(options: Where): Promise<HostConnection & { pump?(): boolean }> {
   if (options.claude) {
     try {
-      return await claudeHost({
-        // The SDK spawns the CLI as a child of this process, so the host's
-        // filesystem is this one and its cwd is the only truthful default.
+      return await spawnedHost({
+        // A host of its own, started here. Its filesystem is this machine's,
+        // so this directory is the only truthful default.
         path: options.path ?? process.cwd(),
         onRefusal: (_uri, message) => sink.report(message),
+        onState: (state) => { if (state === 'offline') sink.report('The host stopped answering'); },
       });
     }
     catch (error) {
-      if (error instanceof MissingAgentSdk) {
+      if (error instanceof MissingHost) {
         process.stderr.write(`${error.message}\n`);
         process.exit(1);
       }
-      process.stderr.write(`Could not start Claude in ${options.path ?? process.cwd()}: ${String(error)}\n`);
+      process.stderr.write(`Could not start a host in ${options.path ?? process.cwd()}: ${String(error)}\n`);
       process.exit(1);
     }
   }
