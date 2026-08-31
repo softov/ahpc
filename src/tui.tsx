@@ -7,6 +7,7 @@ import {
 import { registerChat } from './app.js';
 import { CONTROLLER } from './control.js';
 import { connect, sink } from './connect.js';
+import { loadConfig } from './config.js';
 import { HOST_ERROR } from './state.js';
 
 /**
@@ -59,22 +60,16 @@ interface Options {
    */
   host?: string;
   token?: string;
-  /**
-   * Claude Code, in this process, through the Agent SDK.
-   *
-   * The third host. `--host` is somebody else's editor and this is the agent
-   * itself, and the seam is what makes them the same application.
-   */
-  claude: boolean;
+  /** Read this config instead of the one XDG names. */
+  configFile?: string;
   /**
    * Where the agent works.
    *
    * **A path on the host, not on this machine** - the same thing the
    * `compose.workspace` command says, and the reason there is one flag rather
-   * than two. Against `--claude` the host *is* this machine, so it defaults to
-   * the current directory. Against `--host` it defaults to nothing at all: the
-   * host is somewhere else, its filesystem is not this one, and a client that
-   * sent its own cwd would be naming a directory that does not exist there.
+   * than two. It defaults to nothing at all: the host is somewhere else, its
+   * filesystem is not this one, and a client that sent its own cwd would be
+   * naming a directory that does not exist there.
    */
   path?: string;
   help: boolean;
@@ -85,17 +80,15 @@ export const USAGE = `ahpc - a terminal client for the Agent Host Protocol
   ahpc [options]
 
 The host
-  --claude              Claude Code in this process, through the Agent SDK
   --host <url>          A live agent host, ws://host:port
   --token <tkn>         A bearer token for it
+  --config-file <f>     Read this instead of ~/.config/ahpc/config.json
   (none of these)       The scripted host, which needs nothing installed
 
 Where the agent works
   --path <dir>          A path on the host, not on this machine. The host
                         has to serve it, and says so if it does not.
-                        With --claude the host is this machine, so it
-                        defaults to the current directory. With --host it
-                        defaults to nothing - the host decides.
+                        Left out, the host decides.
 
 Appearance
   --theme <name>        workbench, paper-light, ...
@@ -136,7 +129,6 @@ function parse(argv: string[]): Options {
     shell: 'workbench',
     approve: false,
     answer: false,
-    claude: false,
     help: false,
   };
   for (let i = 0; i < argv.length; i++) {
@@ -159,7 +151,7 @@ function parse(argv: string[]): Options {
       case '--session': options.session = String(argv[++i]); break;
       case '--host': options.host = String(argv[++i]); break;
       case '--token': options.token = String(argv[++i]); break;
-      case '--claude': options.claude = true; break;
+      case '--config-file': options.configFile = String(argv[++i]); break;
       case '--path': options.path = String(argv[++i]); break;
       case '--help': case '-h': options.help = true; break;
       // A flag nobody reads is a flag nobody can rely on: an unknown one is
@@ -185,14 +177,11 @@ function overrides(options: Options): CapabilityOverrides {
 /**
  * Where a new session works, as this client can honestly answer it.
  *
- * `--path` when it was given, and it is a path on the **host**. Otherwise the
- * directory this was started in - but only for the hosts that *are* this
- * machine. Against `--host` the filesystem is somewhere else entirely, so a
- * path from here is one the host has never heard of, and the honest answer is
- * none at all: the host decides, which is what `--help` has always said.
+ * `--path` when it was given, and it is a path on the **host**. Otherwise
+ * nothing: the host's filesystem is not this one, so a path from here is one
+ * it has never heard of, and the honest answer is to let the host decide.
  */
-const workspaceFor = (options: Options): string =>
-  options.path ?? (options.host ? '' : process.cwd());
+const workspaceFor = (options: Options): string => options.path ?? '';
 
 /** One frame, to stdout. The same application, against a terminal that is a size. */
 async function still(options: Options): Promise<void> {
@@ -266,6 +255,18 @@ async function still(options: Options): Promise<void> {
  */
 export async function tui(argv: string[]): Promise<void> {
   const options = parse(argv);
+  /*
+   * The file, under whatever was typed.
+   *
+   * Same order as the CLI uses, because the two front ends answering
+   * differently about which host to talk to is the one difference nobody
+   * would think to look for.
+   */
+  const file = loadConfig('ahpc', options.configFile);
+  options.host = options.host ?? process.env.AHPC_HOST ?? file.host;
+  options.token = options.token ?? process.env.AHPC_TOKEN ?? file.token;
+  if (file.theme && !argv.includes('--theme')) options.theme = file.theme;
+  if (file.shell && !argv.includes('--shell')) options.shell = file.shell;
   if (options.help) {
     process.stdout.write(USAGE);
     return;

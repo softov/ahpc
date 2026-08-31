@@ -10,20 +10,42 @@ npm install && npm run build
 
 node dist/src/main.js                        # the scripted host - needs nothing
 node dist/src/main.js --host ws://127.0.0.1:9187   # a real host, e.g. ahpd
-node dist/src/main.js --claude               # Claude Code in this process
 node dist/src/main.js --help                 # every flag
 ```
+
+Configuration is XDG - `$XDG_CONFIG_HOME/ahpc/config.json`, or
+`~/.config/ahpc/config.json` - so the host need not be typed every time:
+
+```json
+{ "host": "ws://127.0.0.1:9187", "theme": "paper-light" }
+```
+
+A flag beats `AHPC_HOST` beats the file, because each is narrower than the one
+below it. `ahpc config` says where the file is and what it says, and answers
+without a host - which is what you want when the host is the thing that is
+wrong.
 
 It began as an example inside TextUI, which is why the sections below still
 read as an argument about which components a chat application needs. That
 argument is still the reason the code is shaped the way it is, so it stays.
 
-**On `--claude`.** Claude reached in-process, through the Agent SDK, with no
-host at all. It was the prototype that `ahpd` was built from and it is kept for
-now because it means this client runs with nothing else installed. The two are
-meant to be indistinguishable from up here - `--claude` and `--host` rendering
-the same screens is what the seam is for, and where they differ, one of them is
-wrong.
+**There is no `--claude`.** There used to be: Claude reached in this process
+through the Agent SDK, with about eleven hundred lines of translation of its
+own. That was the prototype [`ahpd`](https://github.com/softov/ahpd) was built
+from, and keeping it meant two implementations of one translation - two answers
+to every question, and the one nobody is looking at is the one that drifts. A
+`chat/reasoning` bug in `ahpd` had gone unnoticed for exactly that reason: this
+client's reducer was lenient about it, so no screen ever showed what every
+conformant client would have.
+
+It is gone, and this client depends on no agent SDK at all. It is a client:
+point it at a host and it draws what that host says. `ahpd` is one such host;
+so is VS Code's, which is the reason not to depend on either.
+
+```bash
+ahpd start                              # a host, in the background
+ahpc                                    # and this, which finds it
+```
 
 The shell and the theme are a starting point rather than a fixture: `ctrl+t`
 changes the theme while it runs and the palette has both, previewing each as
@@ -83,7 +105,6 @@ tell which is answering:
 ```bash
 npm run dev                          # the scripted host
 npm run dev -- --host ws://…         # a real one, over the wire
-npm run dev -- --claude              # Claude Code, in this process
 ```
 
 `dev` builds and runs on Node, which is what this ships on. `dev:bun` is

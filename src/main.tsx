@@ -17,16 +17,49 @@
  * would be a worse answer than a refusal.
  */
 const COMMANDS = new Set([
-  'help', 'status', 'session', 'chat', 'terminal', 'resource',
+  'help', 'status', 'config', 'session', 'chat', 'terminal', 'resource',
   'agents', 'models', 'commands', 'completions', 'changes', 'content',
   'prompt', 'exec', 'cancel', 'queue', 'unqueue',
   'watch', 'confirm', 'answer', 'dispatch',
 ]);
 
-const argv = process.argv.slice(2);
-const first = argv[0];
+/**
+ * Flags that take no value, so what follows one is not its value.
+ *
+ * Kept here rather than imported, because importing it would load the CLI to
+ * decide whether to load the CLI.
+ */
+const SWITCHES = new Set([
+  '--static', '-s', '--settled', '--approve', '--answer',
+  '--help', '-h', '--json', '--full', '--archived', '--unread', '--undo',
+  '--off', '--deny', '--reject', '--chat',
+]);
 
-if (first !== undefined && COMMANDS.has(first)) {
+/**
+ * The command, wherever it is.
+ *
+ * `ahpc --claude status` and `ahpc status --claude` mean the same thing, so
+ * this is a scan rather than a look at the first word - reading only the first
+ * one made every flag before a command silently open the screen instead.
+ * A flag that takes a value swallows the next word, or `--path status` would
+ * be a command.
+ */
+const commandIn = (argv: string[]): string | undefined => {
+  for (let i = 0; i < argv.length; i++) {
+    const word = argv[i] as string;
+    if (word.startsWith('-')) {
+      if (!SWITCHES.has(word)) i++;
+      continue;
+    }
+    return COMMANDS.has(word) ? word : undefined;
+  }
+  return undefined;
+};
+
+const argv = process.argv.slice(2);
+const first = commandIn(argv);
+
+if (first !== undefined) {
   /*
    * A closed pipe is not an error.
    *
@@ -41,7 +74,10 @@ if (first !== undefined && COMMANDS.has(first)) {
   });
   const { cli, Fault } = await import('./cli/main.js');
   try {
-    process.exitCode = await cli(argv);
+    // The command word taken out, so what is left is only flags and the
+    // command's own arguments - wherever in the line it happened to sit.
+    const at = argv.indexOf(first);
+    process.exitCode = await cli(first, [...argv.slice(0, at), ...argv.slice(at + 1)]);
   }
   catch (error) {
     // A `Fault` is a sentence written for the person who typed the command;

@@ -1,0 +1,62 @@
+/** What this client was told before anybody typed a flag. */
+
+import { readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+
+/** What a config file may say. Every key is what a flag would have said. */
+export interface Config {
+  /** A live agent host, `ws://host:port`. */
+  host?: string;
+  /** A bearer token for it. */
+  token?: string;
+  /** The theme to open on. */
+  theme?: string;
+  /** The shell layout. */
+  shell?: string;
+}
+
+/**
+ * Where a tool's configuration lives.
+ *
+ * XDG, and the environment variable first: `$XDG_CONFIG_HOME` is what a person
+ * sets when their configuration is not in `~/.config`, and a tool that reads
+ * the fallback anyway is a tool that ignores them.
+ */
+export const configHome = (): string =>
+  process.env.XDG_CONFIG_HOME || join(homedir(), '.config');
+
+/** This tool's own file. */
+export const configPath = (tool: string): string =>
+  join(configHome(), tool, 'config.json');
+
+/**
+ * Read it, or answer that there was nothing to read.
+ *
+ * A file that is not there is not an error - most people have none. A file
+ * that is there and is broken *is* one, and says so rather than starting with
+ * defaults somebody did not choose: silently ignoring a config somebody wrote
+ * is worse than refusing to start.
+ */
+export function loadConfig(tool: string, named?: string): Config {
+  const path = named ?? configPath(tool);
+  let text: string;
+  try {
+    text = readFileSync(path, 'utf8');
+  }
+  catch {
+    // Only a file that was *asked for* by name is worth complaining about.
+    if (named === undefined) return {};
+    throw new Error(`No configuration at ${named}`);
+  }
+  try {
+    const found: unknown = JSON.parse(text);
+    if (typeof found !== 'object' || found === null || Array.isArray(found)) {
+      throw new Error('it is not an object');
+    }
+    return found as Config;
+  }
+  catch (error) {
+    throw new Error(`${path} could not be read: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
