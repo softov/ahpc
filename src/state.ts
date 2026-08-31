@@ -47,6 +47,16 @@ export const CHANGE_SCOPES = '$/chat/conv/scopes' as BindingPath;
 export const CHANGE_AT = '$/chat/conv/scope' as BindingPath;
 /** The row the cursor is on, so a key can act on it. */
 export const CHANGE_ROW = '$/chat/conv/row' as BindingPath;
+/**
+ * Where the file browser is looking, and what it found.
+ *
+ * The host's filesystem, not this machine's. `FILES_AT` is a `file://`
+ * directory URI on the host; empty means the session's own workspace, which is
+ * the only directory a client can name without having listed something first.
+ */
+export const FILES_AT = '$/chat/files/at' as BindingPath;
+export const FILES_ENTRIES = '$/chat/files/entries' as BindingPath;
+export const FILES_OPEN = '$/chat/files/open' as BindingPath;
 export const STATUS = '$/chat/conv/status' as BindingPath;
 /**
  * Is there a turn to stop, as a `when` clause can ask it.

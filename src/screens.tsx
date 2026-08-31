@@ -14,13 +14,13 @@ import {
   useStoreValue,
   useTheme,
 } from '@textui/core';
-import { Badge, Column, Divider, EmptyState, Panel, RadioGroup, Row, SearchBox, argumentOf } from '@textui/widgets';
+import { Badge, Column, Divider, EmptyState, Marquee, Panel, RadioGroup, Row, SearchBox, argumentOf } from '@textui/widgets';
 import {
   CHANGES_SCOPE, CHAT_SCOPE, CONTROLLER, MCP_SCOPE, SESSIONS_SCOPE, SKILLS_SCOPE, settingCommand,
 } from './control.js';
 import { branchName,
   ARCHIVED, CHANGES, CUSTOMIZATIONS, DRAFT, EXPANDED, FILTER, FOCUS, HISTORY, HOST, INPUT,
-  CHANGE_AT, CHANGE_ROW, CHANGE_SCOPES,
+  CHANGE_AT, CHANGE_ROW, CHANGE_SCOPES, FILES_AT, FILES_ENTRIES, FILES_OPEN,
   MODEL, OPEN, OPEN_FILE, CHAT_URI, PROVIDER, QUEUE, SELECTED, SESSIONS, SETTINGS, SIDEBAR,
   CHATS, OPEN_TERMINAL, SPLIT_AT, SPLIT_DEFAULT, TERMINAL, TERMINALS, TURNS, WORKSPACE,
   openSession, visibleSessions, workspaceName,
@@ -28,7 +28,7 @@ import { branchName,
 import type { HostState } from './state.js';
 import { toBlocks } from './blocks.js';
 import type {
-  Agent, Changeset, ChangesetScope, Completion, ContentRef, Customization, FileContent, PendingInput, QueuedMessage,
+  Agent, Changeset, ChangesetScope, Completion, ContentRef, Customization, FileContent, PendingInput, QueuedMessage, ResourceEntry,
   TerminalRow, TerminalState,
   SessionConfig, SessionDetail, SessionSummary, SlashCommand, Turn,
 } from './ahp/types.js';
@@ -40,6 +40,7 @@ import { Creature } from './view/creature.js';
 import { settingIcon, valueIcon } from './view/icons.js';
 import { ChatHitl } from './view/hitl.js';
 import { ChangesList } from './view/changes.js';
+import { FileList } from './view/files.js';
 import { CustomizationList } from './view/customizations.js';
 import { TerminalView } from './view/terminal.js';
 import { FileDiff } from './view/filediff.js';
@@ -1014,6 +1015,120 @@ export const ChangesScreen: (props: Record<string, never>) => RenderOutput =
           reviewable={chosen?.reviewable === true}
           onOpen={(found: string) => app.store.set(OPEN_FILE, found)}
           onSelect={(found: string) => app.store.set(CHANGE_ROW, found)}
+          autoFocus
+          flex={1}
+        />
+      </Panel>
+    );
+  });
+
+// ------------------------------------------------------------- 6b. the files
+
+/**
+ * The host's filesystem, browsed.
+ *
+ * `resourceList` and `resourceRead` were on the connection and behind
+ * `ahpc resource`, and the only place a host's files were *drawn* was the `@`
+ * completion in the composer - so a host that serves a project made people
+ * type paths they could not see.
+ *
+ * One directory at a time rather than a tree: `resourceList` answers about one
+ * directory, and an expanding tree would be a request per node with nothing on
+ * screen meanwhile. Opening a file reads it and shows it; nothing here writes,
+ * though the host would now allow it - see the roadmap.
+ */
+export const FilesScreen: (props: Record<string, never>) => RenderOutput =
+  defineComponent<Record<string, never>>('FilesScreen', () => {
+    const app = useApp();
+    const controller = useRequiredService(CONTROLLER);
+    const session = openSession(app.store);
+    /*
+     * The session's own directory, until somebody moves.
+     *
+     * The only directory a client can name without having listed something
+     * first: everything else it knows about the host's filesystem it learned
+     * from an answer.
+     */
+    const root = session?.workingDirectories[0] ?? '';
+    const at = (useStoreValue<string>(FILES_AT, '') ?? '') || root;
+    const entries = useStoreValue<ResourceEntry[]>(FILES_ENTRIES, []) ?? [];
+    const open = useStoreValue<string>(FILES_OPEN, '') ?? '';
+
+    const [loading, setLoading] = useState(false);
+    const [failure, setFailure] = useState<string | null>(null);
+    const [body, setBody] = useState<{ uri: string; text: string; binary?: boolean } | null>(null);
+
+    useEffect(() => {
+      if (!at) return;
+      let live = true;
+      setLoading(true);
+      setFailure(null);
+      void controller.files(at)
+        .then((found) => { if (live) { app.store.set(FILES_ENTRIES, found); setLoading(false); } })
+        .catch((error: unknown) => {
+          if (!live) return;
+          setLoading(false);
+          setFailure(error instanceof Error ? error.message : String(error));
+        });
+      return () => { live = false; };
+    }, [at]);
+
+    useEffect(() => {
+      if (!open) { setBody(null); return; }
+      let live = true;
+      setBody(null);
+      void controller.file(open)
+        .then((found) => {
+          if (!live) return;
+          // The encoding is *reported* by the host rather than assumed here: a
+          // pane that rendered base64 as text would print a PNG to a terminal.
+          setBody(found.encoding === 'base64'
+            ? { uri: open, text: '', binary: true }
+            : { uri: open, text: found.data });
+        })
+        .catch((error: unknown) => {
+          if (live) setFailure(error instanceof Error ? error.message : String(error));
+        });
+      return () => { live = false; };
+    }, [open]);
+
+    const title = `Files ${session ? `- ${session.title}` : ''}`;
+
+    if (open) {
+      const name = open.replace(/^file:\/\//, '');
+      return (
+        <Panel title={title} flex={1}>
+          {body === null ? (
+            <EmptyState title="Reading the file" message={name} flex={1} />
+          ) : body.binary === true ? (
+            <EmptyState title="Not text" message={`${name} came back as bytes, so there is nothing to show.`} flex={1} />
+          ) : (
+            <Column flex={1}>
+              <Marquee content={name} truncate="start" fg="muted" />
+              <text content={body.text} flex={1} />
+            </Column>
+          )}
+        </Panel>
+      );
+    }
+
+    return (
+      <Panel title={title} flex={1}>
+        <FileList
+          at={at}
+          entries={entries}
+          loading={loading}
+          {...(failure !== null ? { failure } : {})}
+          // Never above the directory the session is in. The host refuses
+          // anything outside what it serves anyway, and offering the step is
+          // offering a refusal.
+          {...(at !== root && at.length > root.length
+            ? { onUp: () => app.store.set(FILES_AT, at.slice(0, at.lastIndexOf('/'))) }
+            : {})}
+          onOpen={(entry: ResourceEntry) => {
+            if (entry.kind === 'directory') app.store.set(FILES_AT, entry.uri);
+            else app.store.set(FILES_OPEN, entry.uri);
+          }}
           autoFocus
           flex={1}
         />

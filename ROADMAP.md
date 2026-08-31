@@ -20,23 +20,17 @@ That cuts the other way too. A feature is not unnecessary because ahpd is the on
 
 ---
 
-## B-01-04 — The filesystem is only a completion
+## B-01-05 — A diff is drawn from scratch here, and will stay that way
 
-`resourceList` and `resourceRead` are on the connection, behind `ahpc resource`, and now on the scripted host too — but the only place a host's filesystem is *drawn* is the `@` completion in the composer. A host that serves files is one a person could browse; this client makes them type a path they cannot see.
+Closed as **not viable**, and the reasoning is worth keeping so nobody re-opens it.
 
-The host no longer only serves the read half, which changes what this is worth: `resourceWrite`, `Delete`, `Mkdir`, `Move` and `Copy` are all served now, behind a `resourceRequest` grant. A browser over a tree that can be written is a different proposition from one over a tree that cannot.
+Two things were checked and neither was known when this entry was written. `@textui/textide-git` is `private: true` at `0.1.0` and is **not published** — ahpc consumes `@textui/core@0.3.0` and friends from npm, so reusing it means publishing it, vendoring it, or making this repository a member of the TextUI workspace. That is a decision about two projects rather than about a screen.
 
-The dependency question is settled — take the fiddly parts, keep our own layout — so what is left is only how much to build. `@textui/textide`'s `Explorer` is a whole screen with its own opinions and is the part *not* being taken.
+And the overlap is much smaller than this entry claimed. Every diff primitive there — `parseHunks`, `pairsOf`, `classify`, `hunkOfLine` — takes **unified diff text**: lines starting with `+`, `-` and `@@`, as `git diff` writes them. This client never has one. AHP carries a changeset as `before` and `after` content refs, so `filediff.tsx` computes `diffLines(before, after)` and there is no patch anywhere in the pipeline to parse. What is genuinely shared is `scrollDiff`, which is three lines, and the gutter marks.
 
-**Suggestions.** (1) A minimal tree of our own over `resourceList`, opening into the diff viewer this client already has — smallest thing that stops people typing paths they cannot see. (2) That, plus writing through `resourceWrite` behind the grant, which is the first place this client would ever change somebody's files and wants the same confirmation B-01-07 is waiting on. (3) Leave it: the `@` completion reaches the same tree, and a browser is a convenience rather than a gap.
+So the decision recorded against this entry — take the fiddly parts, keep our own layout — was answering a question that does not arise: the fiddly part is hunk parsing, and hunk parsing needs a format this protocol does not carry.
 
-## B-01-05 — A diff is drawn from scratch here
-
-`filediff.tsx` renders a changeset file from `before` and `after` text. `@textui/textide-git` already exports a diff renderer with `DiffMode`, `DiffCell` and `DiffPair`, hunk parsing (`parseHunks`, `hunkAt`, `patchFor`) and gutter marks — the parts this screen either has thinner versions of or does without.
-
-Decided: adopt `parseHunks`, `hunkAt`, `patchFor` and the gutter marks, and keep our own layout. The hunk maths is fiddly and is not this client's business; the pane is.
-
-**Suggestions.** (1) Take the four and leave `filediff.tsx`'s layout alone, which is the decision as made. (2) Take the gutter as well, so a long file scrolls by hunk rather than by line — the thing our version does without and the one people notice. (3) Take nothing yet and record the decision, so the next person reads it here instead of re-arguing it.
+**Suggestions.** (1) Close it, which is what this says. (2) If per-hunk staging is ever wanted here, the missing piece is a host that can *produce* a patch — `changeset/*` has no such thing today, so it is a protocol gap rather than a client one, and belongs on the host's roadmap. (3) Publish `textide-git` anyway if some other screen wants its components, and re-open this with what actually overlaps rather than with what looked like it did.
 
 ---
 
@@ -46,6 +40,8 @@ Decided: adopt `parseHunks`, `hunkAt`, `patchFor` and the gutter marks, and keep
 
 **On the scripted host.** It implements every optional method on the seam except `close`, and `test/fake.test.ts` names them, so a method added to `HostConnection` and not to the fake fails there rather than being noticed a screen later. It has already earned this once: it delivers its opening snapshot *synchronously* inside `subscribe`, which a socket does not, and that difference was hiding a real bug in `until()` — every waiting command failed against the scripted host and worked against a daemon.
 
+**On what is left of TextUI reuse.** Two entries were closed by the same discovery rather than by being built: `@textui/textide` and `@textui/textide-git` are `private: true` and unpublished, and this client takes `@textui/core` from npm. The file browser was built here instead; the diff was closed outright, because its reusable parts read a unified patch AHP does not carry.
+
 **On asking twice.** Running a destructive verb from the screen asks two questions, not one: the operation's own `confirmation`, and then whether to grant the host write access. They read like the same question and are not — "discard this file" is about a file, and the grant is about the repository — so a client that folded them together would be one where saying yes to a diff quietly hands over the working tree.
 
-**On reusing TextUI.** Decided, so it is not re-argued per screen: take the fiddly parts and keep our own layout. `parseHunks`, `hunkAt`, `patchFor` and the gutter marks from `@textui/textide-git` are hard to get right and are not this client's business; the panes are. That is B-01-05's answer and B-01-04's, and it is why neither is a dependency question any more.
+**On reusing TextUI.** It was decided to take the fiddly parts and keep our own layout, and then it turned out there is nothing to take: `@textui/textide` and `@textui/textide-git` are both `private: true` and unpublished, and their diff primitives read a unified patch that AHP never carries. Recorded because the decision was sound and the premise under it was mine and was wrong — see B-01-05.

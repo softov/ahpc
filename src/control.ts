@@ -12,7 +12,7 @@ import type { HostConnection } from './ahp/connection.js';
 import type { Terminals } from './terminal.js';
 import { createTerminals } from './terminal.js';
 import type {
-  Agent, Answer, Changeset, ChangesetScope, Completion, ContentRef, Customization, FileContent, SessionConfig, SessionDetail,
+  Agent, Answer, Changeset, ChangesetScope, Completion, ContentRef, Customization, FileContent, ResourceEntry, SessionConfig, SessionDetail,
   SessionUri, Turn,
 } from './ahp/types.js';
 import { SessionFlag } from './ahp/types.js';
@@ -20,7 +20,7 @@ import { valueIcon } from './view/icons.js';
 import {
   ARCHIVED, CAN_ADD_CHAT, CHAT_URI, CHATS, CUSTOMIZATIONS, DRAFT, EXPANDED, FILTER, HAS_CHATS,
   HOST, HOST_ERROR, INPUT, MODEL, OPEN_TERMINAL,
-  CHANGES as CHANGES_AT_PATH, CHANGE_AT, CHANGE_ROW, CHANGE_SCOPES,
+  CHANGES as CHANGES_AT_PATH, CHANGE_AT, CHANGE_ROW, CHANGE_SCOPES, FILES_AT, FILES_OPEN,
   OPEN, OPEN_FILE, PROVIDER, MARKDOWN, QUEUE, RUNNING, SCREEN, SELECTED, SETTINGS, SIDEBAR,
   SPLIT_AT, SPLIT_DEFAULT, TURNS, WORKSPACE,
   applyEvent, pendingInput, queue, sessions, turns, writeSessions, writeStatus,
@@ -96,6 +96,20 @@ export interface Controller {
   harnessCommands(): Promise<Customization[]>;
   /** Turn one on or off. The host decides and tells everyone watching. */
   setCustomizationEnabled(uri: SessionUri, id: string, enabled: boolean): void;
+  /**
+   * One directory of the host's filesystem.
+   *
+   * The *host's*, which is the whole reason this goes through the connection
+   * rather than through `node:fs`: the daemon may be on another machine, and
+   * the project a session is working in is over there.
+   *
+   * Empty for a host that serves none - `createHost` takes its filesystem as a
+   * port and one given none answers `-32601`, which a client reads as nothing
+   * to browse rather than as a failure.
+   */
+  files(uri: string): Promise<ResourceEntry[]>;
+  /** One file's bytes, by URI on the host. */
+  file(uri: string): Promise<{ data: string; encoding: string; contentType?: string }>;
   /**
    * Which changesets this session offers.
    *
@@ -589,6 +603,11 @@ export function createController(
     harnessCommands: () => host.harnessCommands(),
     setCustomizationEnabled: (uri, id, enabled) => host.setCustomizationEnabled(uri, id, enabled),
     content: (ref) => host.content(ref),
+    files: async (uri) => (await host.resourceList?.(uri)) ?? [],
+    file: async (uri) => {
+      if (!host.resourceRead) throw new Error('This host serves no files.');
+      return await host.resourceRead(uri);
+    },
     changesets: async (uri) => (await host.changesets?.(uri)) ?? [],
     changesAt: (uri, changeset) => host.changes(uri, changeset),
     review: (changeset, files, isReviewed) => { host.review?.(changeset, files, isReviewed); },
@@ -803,6 +822,28 @@ function commands(
       // Always the list, never wherever it was left. A screen that reopens on
       // the one file somebody read an hour ago hides the other nineteen.
       run: () => { app.store.set(OPEN_FILE, null); app.screens.push('changes'); },
+    },
+    {
+      /*
+       * The host's filesystem, which is where the project actually is.
+       *
+       * Beside the changes screen rather than under it: what changed and what
+       * is there are different questions, and a browser that only ever showed
+       * the changed files would be a changeset with a worse name.
+       */
+      id: 'go.files',
+      title: 'Browse the host\'s files',
+      category: 'Screens',
+      description: 'The project, as the host sees it',
+      slots: ['palette'],
+      when: `${OPEN}`,
+      run: () => {
+        // Always back at the top. A browser that reopens six directories deep
+        // is one nobody can tell from a broken one.
+        app.store.set(FILES_OPEN, '');
+        app.store.set(FILES_AT, '');
+        app.screens.push('files');
+      },
     },
     {
       id: 'go.skills',
@@ -1593,6 +1634,7 @@ function keys(): {
     // The conversation. `i` is the one that gets you into the composer, and
     // out of it is escape - the pair that makes every other letter reachable.
     { keys: 'c', commandId: 'go.changes', scopeId: CHAT_SCOPE },
+    { keys: 'f', commandId: 'go.files', scopeId: CHAT_SCOPE },
     /*
      * On the changes screen, and nowhere else.
      *

@@ -18,7 +18,7 @@ import {
 import type { HostState } from './state.js';
 import { decodeStatus } from './ahp/status.js';
 import {
-  ChangesScreen, ChatScreen, HostsScreen, McpScreen, NewSessionScreen, SessionsScreen, TerminalScreen,
+  ChangesScreen, ChatScreen, FilesScreen, HostsScreen, McpScreen, NewSessionScreen, SessionsScreen, TerminalScreen,
   SettingsScreen, SkillsScreen,
 } from './screens.js';
 import { ChatBubble, ReasoningBlock, StreamingText } from './view/bubble.js';
@@ -26,6 +26,7 @@ import { ChatComposer } from './view/composer.js';
 import { ChatHitl } from './view/hitl.js';
 import { ChatTranscript } from './view/transcript.js';
 import { ChangesList } from './view/changes.js';
+import { FileList } from './view/files.js';
 import { ConnectionBadge, SessionList } from './view/sessions.js';
 import { ToolCallRow } from './view/toolcall.js';
 
@@ -216,13 +217,13 @@ const Hints = defineComponent<BoxProps>('ChatHints', (props) => {
 
   // The three list screens. `tab move` is a form's answer and these are
   // lists: what moves is the cursor, and enter is what a row is for.
-  if (screen === 'changes' || screen === 'skills' || screen === 'mcp') {
+  if (screen === 'changes' || screen === 'skills' || screen === 'mcp' || screen === 'files') {
     return (
       <KeyHints
         {...props}
         hints={[
           { keys: upDown, label: 'move' },
-          { keys: 'enter', label: screen === 'changes' ? 'open' : 'on / off' },
+          { keys: 'enter', label: screen === 'changes' || screen === 'files' ? 'open' : 'on / off' },
           // Only where they do something. A hint for a key that is inert on
           // this screen is worse than no hint.
           ...(screen === 'changes'
@@ -332,11 +333,13 @@ export function registerChat(app: TextUIApp, options: ChatOptions = {}): Disposa
     ['SessionList', SessionList],
     ['ConnectionBadge', ConnectionBadge],
     ['ChangesList', ChangesList],
+    ['FileList', FileList],
     ['SessionsScreen', SessionsScreen],
     ['ChatScreen', ChatScreen],
     ['NewSessionScreen', NewSessionScreen],
     ['TerminalScreen', TerminalScreen],
     ['ChangesScreen', ChangesScreen],
+    ['FilesScreen', FilesScreen],
     ['SettingsScreen', SettingsScreen],
     ['HostsScreen', HostsScreen],
     ['SkillsScreen', SkillsScreen],
@@ -363,6 +366,7 @@ export function registerChat(app: TextUIApp, options: ChatOptions = {}): Disposa
     { id: 'chat', component: 'ChatScreen', keepAlive: true },
     { id: 'new', component: 'NewSessionScreen' },
     { id: 'changes', component: 'ChangesScreen' },
+    { id: 'files', component: 'FilesScreen' },
     { id: 'settings', component: 'SettingsScreen' },
     { id: 'hosts', component: 'HostsScreen' },
     { id: 'skills', component: 'SkillsScreen' },
