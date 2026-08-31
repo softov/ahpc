@@ -265,6 +265,58 @@ export interface FileContent {
 export interface Changeset {
   status: 'computing' | 'complete';
   files: FileEdit[];
+  /**
+   * The verbs the host offers on this changeset.
+   *
+   * Server-advertised, and that is the access model rather than a hint: a host
+   * refuses an `operationId` it did not put in this list, so a client may
+   * offer nothing that is not here. Absent means there is nothing to do to
+   * this changeset, which is a real answer for a host that computes diffs and
+   * never acts on one.
+   */
+  operations?: ChangesetOperation[];
+}
+
+/**
+ * One verb a changeset offers.
+ *
+ * `confirmation` is not decoration: the protocol says a client **MUST**
+ * display it before invoking, and its presence is also how the host says the
+ * operation is destructive - so a client that dropped it would be one that
+ * deletes somebody's work without asking.
+ */
+export interface ChangesetOperation {
+  id: string;
+  label: string;
+  description?: string;
+  /** Whether it applies to the whole changeset, one file, or a range in one. */
+  scopes: ('changeset' | 'resource' | 'range')[];
+  /** Ask this first. Present iff the host considers the operation destructive. */
+  confirmation?: string;
+  /** A hint, e.g. `git-commit` or `discard`. */
+  icon?: string;
+  /** Operations sharing one are drawn together. */
+  group?: string;
+  /**
+   * What may be pressed, and what is happening.
+   *
+   * The host's, not this client's: `disabled` while a turn is running,
+   * `running` while an invocation of it is out, `error` after one failed. Two
+   * clients watching one changeset see the same spinner because the host is
+   * what they see it through.
+   */
+  status: 'idle' | 'running' | 'error' | 'disabled';
+  /** Why the last invocation failed. Present iff `status` is `error`. */
+  error?: { message: string };
+}
+
+/** The file, or lines of it, an operation is pointed at. */
+export interface ChangesetOperationTarget {
+  kind: 'resource' | 'range';
+  /** The row's id, which is a `file://` URI. */
+  resource: string;
+  side?: 'before' | 'after';
+  range?: { startLine: number; endLine: number };
 }
 
 /**

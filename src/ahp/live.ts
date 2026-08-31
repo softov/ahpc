@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { HostConnection, HostEvent } from './connection.js';
 import type {
-  Agent, Answer, Changeset, Completion, ConfigProperty, ContentRef, Customization, CustomizationKind,
+  Agent, Answer, Changeset, ChangesetOperation, ChangesetOperationTarget, Completion, ConfigProperty, ContentRef, Customization, CustomizationKind,
   TerminalRow, TerminalState,
   FileContent, FileEdit, McpState, PendingInput, QueuedMessage, Question, QuestionKind,
   ResponsePart, SessionConfig, SessionDetail, SessionSummary, SessionUri, ToolCall,
@@ -428,6 +428,15 @@ function config(value: unknown): SessionConfig {
   };
 }
 
+/** What an invocation said for itself. Failure is the rejection, not a field. */
+function decodeInvoked(value: unknown): { message?: string } {
+  const found = bag(value);
+  // `message` may be a string or a `{ markdown }`, because the protocol's
+  // `StringOrMarkdown` is either.
+  const said = str(found.message) ?? str(bag(found.message).markdown);
+  return said !== undefined ? { message: said } : {};
+}
+
 function changeset(value: unknown): Changeset {
   const found = bag(value);
   return {
@@ -455,7 +464,38 @@ function changeset(value: unknown): Changeset {
         ...(Object.keys(refs).length > 0 ? { content: refs } : {}),
       };
     }),
+    ...(list(found.operations).length > 0 ? { operations: operations(found.operations) } : {}),
   };
+}
+
+/**
+ * The verbs, as the host advertises them.
+ *
+ * `status` defaults to `idle` rather than being dropped when a host leaves it
+ * out: the protocol says an absent status means ready, and a control drawn
+ * with no state at all is one nobody can tell from a disabled one.
+ */
+function operations(value: unknown): ChangesetOperation[] {
+  return list(value).map((entry): ChangesetOperation => {
+    const one = bag(entry);
+    const status = str(one.status);
+    return {
+      id: str(one.id) ?? '',
+      label: str(one.label) ?? str(one.id) ?? '',
+      ...(str(one.description) ? { description: str(one.description) as string } : {}),
+      scopes: list(one.scopes)
+        .filter((scope): scope is string => typeof scope === 'string')
+        .filter((scope): scope is 'changeset' | 'resource' | 'range' =>
+          scope === 'changeset' || scope === 'resource' || scope === 'range'),
+      // Carried whatever it is: the protocol says a client MUST show it before
+      // invoking, so dropping it would be deleting somebody's work unasked.
+      ...(str(one.confirmation) ? { confirmation: str(one.confirmation) as string } : {}),
+      ...(str(one.icon) ? { icon: str(one.icon) as string } : {}),
+      ...(str(one.group) ? { group: str(one.group) as string } : {}),
+      status: status === 'running' || status === 'error' || status === 'disabled' ? status : 'idle',
+      ...(str(bag(one.error).message) ? { error: { message: str(bag(one.error).message) as string } } : {}),
+    };
+  });
 }
 
 function contentRef(value: unknown): ContentRef | undefined {
@@ -1211,6 +1251,27 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
     review: (changesetUri, files, isReviewed) => {
       client.dispatch(changesetUri, { type: 'changeset/filesReviewChanged', files, reviewed: isReviewed });
     },
+
+    requestResource: async (uri, access) => {
+      await client.request('resourceRequest', { channel: ROOT, uri, ...access });
+    },
+
+    /**
+     * Run one, and let the refusal through.
+     *
+     * Deliberately not negotiating here. A `-32009` carries the request that
+     * would unlock the same call, and answering it is a *decision* - retry
+     * quietly, or stop and ask the person - which belongs above the seam where
+     * the screen and the shell can differ. `operate()` is where that lives, so
+     * it happens the same way against this host and against the scripted one.
+     */
+    invoke: async (changesetUri, operationId, target) => decodeInvoked(
+      await client.request('invokeChangesetOperation', {
+        channel: changesetUri,
+        operationId,
+        ...(target ? { target } : {}),
+      }),
+    ),
 
     changes: async (uri, wanted) => {
       if (wanted) return changeset(await snapshotOf(wanted) ?? {});

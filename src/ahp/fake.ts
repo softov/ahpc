@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { HostConnection, HostEvent } from './connection.js';
 import type {
-  Agent, Changeset, ChangesetScope, ChatInputRequest, ContentRef, Customization, FileContent, FileEdit,
+  Agent, Changeset, ChangesetOperation, ChangesetScope, ChatInputRequest, ContentRef, Customization, FileContent, FileEdit,
   PendingInput, QueuedMessage, ResourceEntry, ResponsePart, SessionConfig, SessionDetail, SessionSummary,
   SessionUri, TerminalState, ToolCall, Turn,
 } from './types.js';
@@ -53,6 +53,15 @@ export interface FakeHost extends HostConnection {
    * one nothing can check.
    */
   dispatched(): { uri: SessionUri; action: Record<string, unknown>; chat?: boolean }[];
+  /**
+   * Every changeset operation that actually ran.
+   *
+   * Not on `HostConnection` for the same reason `dispatched` is not: a real
+   * host does not hand a client back its own history. Here because the
+   * interesting assertion is that an operation ran *after* the grant rather
+   * than despite the gate.
+   */
+  invoked(): { changeset: string; operationId: string; target?: unknown }[];
 }
 
 type Step = () => void;
@@ -292,6 +301,11 @@ export function fakeHost(): FakeHost {
    */
   const sent: { uri: SessionUri; action: Record<string, unknown>; chat?: boolean }[] = [];
 
+  /** Resources this client has been granted write on, as a real host keeps them. */
+  const granted = new Set<string>();
+  /** Every operation actually run, so a test can assert the gate was passed rather than skipped. */
+  const invoked: { changeset: string; operationId: string; target?: unknown }[] = [];
+
   /**
    * A changeset URI split back into the session and the scope.
    *
@@ -393,10 +407,39 @@ export function fakeHost(): FakeHost {
        */
       const spoken = (options.turns ?? []).filter((turn) => turn.role === 'agent').map((turn) => turn.id);
       const files = options.changes.files;
+      /*
+       * The verbs, on the scope each actually belongs to.
+       *
+       * A real host advertises different ones per scope - the working tree can
+       * be committed and a turn cannot, and what a turn changed can be put
+       * back because both sides of it were captured. A fixture that offered
+       * the same three everywhere would let a screen be built that is wrong
+       * against every real host.
+       */
+      const COMMIT: ChangesetOperation = {
+        id: 'commit', label: 'Commit', scopes: ['changeset'], icon: 'git-commit', group: 'commit', status: 'idle',
+      };
+      const DISCARD: ChangesetOperation = {
+        id: 'discard',
+        label: 'Discard Changes',
+        scopes: ['resource'],
+        confirmation: 'Discard the changes to this file? This cannot be undone.',
+        icon: 'discard',
+        status: 'idle',
+      };
+      const REVERT: ChangesetOperation = {
+        id: 'revert',
+        label: 'Revert This File',
+        scopes: ['resource'],
+        confirmation: 'Put this file back the way the agent found it?',
+        icon: 'discard',
+        status: 'idle',
+      };
       const per = new Map<string, Changeset>([
-        ['session', options.changes],
+        ['session', { ...options.changes, operations: [REVERT] }],
         ['uncommitted', {
           status: 'complete',
+          operations: [COMMIT, DISCARD],
           files: [
             ...files,
             // Somebody else's edit, sitting in the tree beside the agent's.
@@ -408,7 +451,7 @@ export function fakeHost(): FakeHost {
       ]);
       for (const id_ of spoken) {
         const one = files[spoken.indexOf(id_) % files.length];
-        if (one) per.set(`turn/${id_}`, { status: 'complete', files: [one] });
+        if (one) per.set(`turn/${id_}`, { status: 'complete', files: [one], operations: [REVERT] });
       }
       const [first, second] = spoken;
       if (first !== undefined && second !== undefined) {
@@ -1365,6 +1408,65 @@ export function fakeHost(): FakeHost {
     },
 
     /**
+     * Which resources this client has talked its way into writing.
+     *
+     * A set on the host and not on the caller, because that is where it lives
+     * on a real one: the grant is per connection, and a client that kept its
+     * own copy would be the only thing that believed in it.
+     */
+    requestResource: async (uri, access) => {
+      if (!uri.startsWith('file://')) throw Object.assign(new Error(`This host does not mediate ${uri}`), { code: -32009 });
+      if (access.write === true) granted.add(uri);
+    },
+
+    /**
+     * Run one, with the gate a real host puts in front of it.
+     *
+     * Refused until the write has been asked for, and the refusal carries the
+     * request that would unlock it - which is the whole reason a client can
+     * negotiate rather than just fail. Scripting the refusal is the point: a
+     * fixture that always said yes would let a client be built that never
+     * learned to ask.
+     */
+    invoke: async (changeset, operationId, target) => {
+      const at = scopeIn(changeset);
+      const held = at && scoped.get(at.owner)?.get(at.scope);
+      if (!at || !held) throw new Error(`${changeset} is not a changeset here`);
+      const offered = (held.operations ?? []).find((one) => one.id === operationId);
+      // The advertised list *is* the access model on a real host, so a fake
+      // that ran an unadvertised id would be a laxer host than any real one.
+      if (!offered) throw Object.assign(new Error(`No operation called ${operationId} on ${changeset}`), { code: -32602 });
+      const kind = target?.kind ?? 'changeset';
+      if (!offered.scopes.includes(kind)) {
+        throw Object.assign(new Error(`${operationId} cannot be invoked on a ${kind}`), { code: -32602 });
+      }
+      const wanted = target?.resource ?? (summaries.get(at.owner)?.workingDirectories[0] ?? '');
+      if (!granted.has(wanted)) {
+        throw Object.assign(new Error(`Write access to ${wanted} has not been granted`), {
+          code: -32009,
+          data: { request: { channel: 'ahp-root://', uri: wanted, write: true } },
+        });
+      }
+      invoked.push({ changeset, operationId, ...(target ? { target } : {}) });
+      // What it did reaches every client through the changeset's own channel,
+      // never through this answer.
+      if (operationId === 'commit') {
+        const after: Changeset = { status: 'complete', files: [], ...(held.operations ? { operations: [] } : {}) };
+        scoped.get(at.owner)?.set(at.scope, after);
+        emit(at.owner, { type: 'changes', changes: after });
+        return { message: 'Committed 1a2b3c4: what the session changed' };
+      }
+      const after: Changeset = {
+        ...held,
+        files: held.files.filter((file) => file.uri !== target?.resource),
+      };
+      scoped.get(at.owner)?.set(at.scope, after);
+      if (at.scope === 'session') changesets.set(at.owner, after);
+      emit(at.owner, { type: 'changes', changes: after });
+      return { message: `${offered.label} on ${(target?.resource ?? '').split('/').pop() ?? ''}` };
+    },
+
+    /**
      * One directory of the host's filesystem.
      *
      * Rooted at whichever served directory the URI is under, so what this
@@ -1504,5 +1606,7 @@ export function fakeHost(): FakeHost {
     pending: () => script.length,
 
     dispatched: () => [...sent],
+
+    invoked: () => [...invoked],
   };
 }

@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest';
 import { fakeHost } from '../src/ahp/fake.js';
+import { operate } from '../src/ahp/operate.js';
 import type { HostConnection } from '../src/ahp/connection.js';
 import type { HostEvent } from '../src/ahp/connection.js';
 import type { Changeset } from '../src/ahp/types.js';
@@ -24,6 +25,7 @@ it('implements every optional method on the seam', () => {
   // to the fake fails here instead of being noticed a screen later.
   const optional: (keyof HostConnection)[] = [
     'changesets', 'review', 'resourceList', 'resourceRead', 'dispatch', 'flush',
+    'invoke', 'requestResource',
   ];
   for (const name of optional) expect(typeof host[name], name).toBe('function');
   // `close` is the one that stays absent, and on purpose: it exists for a host
@@ -181,4 +183,60 @@ it('starts a turn dispatched as an action, the same as one said', async () => {
   expect(seen.some((event) => event.type === 'turnComplete')).toBe(true);
   expect(host.pending()).toBe(0);
   watch.close();
+});
+
+it('advertises different verbs per scope, and refuses one it did not', async () => {
+  const host = fakeHost();
+  const tree = await host.changes(WITH_CHANGES, `${WITH_CHANGES}/changeset/uncommitted`);
+  const session = await host.changes(WITH_CHANGES, `${WITH_CHANGES}/changeset/session`);
+  // The working tree can be committed and a conversation cannot; what a turn
+  // changed can be put back because both sides of it were captured.
+  expect((tree.operations ?? []).map((one) => one.id)).toEqual(['commit', 'discard']);
+  expect((session.operations ?? []).map((one) => one.id)).toEqual(['revert']);
+  // The advertised list is the access model, not a hint.
+  await expect(host.invoke?.(`${WITH_CHANGES}/changeset/session`, 'commit'))
+    .rejects.toMatchObject({ code: -32602 });
+});
+
+it('carries the confirmation, because a client MUST show it', async () => {
+  const host = fakeHost();
+  const tree = await host.changes(WITH_CHANGES, `${WITH_CHANGES}/changeset/uncommitted`);
+  const discard = (tree.operations ?? []).find((one) => one.id === 'discard');
+  expect(discard?.confirmation).toBeDefined();
+  // And the one that is not destructive must not grow one.
+  expect((tree.operations ?? []).find((one) => one.id === 'commit')?.confirmation).toBeUndefined();
+});
+
+it('refuses a write until it is asked for, and names the request that would do it', async () => {
+  const host = fakeHost();
+  const changeset = `${WITH_CHANGES}/changeset/uncommitted`;
+  const denied = await host.invoke?.(changeset, 'commit').then(() => undefined, (e: unknown) => e) as {
+    code: number; data: { request: { uri: string; write: boolean } };
+  };
+  expect(denied.code).toBe(-32009);
+  expect(denied.data.request.write).toBe(true);
+  expect(host.invoked()).toEqual([]);
+});
+
+it('negotiates once and then runs it, the same way against either host', async () => {
+  const host = fakeHost();
+  const changeset = `${WITH_CHANGES}/changeset/uncommitted`;
+  const asked: string[] = [];
+  const done = await operate(host, changeset, 'commit', { ask: (r) => { asked.push(r.uri); return true; } });
+  expect(asked).toHaveLength(1);
+  expect(done.message).toContain('Committed');
+  // It ran *after* the grant rather than despite the gate.
+  expect(host.invoked().map((one) => one.operationId)).toEqual(['commit']);
+  // And what it did comes back on the changeset, not in that answer.
+  expect((await host.changes(WITH_CHANGES, changeset)).files).toEqual([]);
+});
+
+it('lets somebody say no, and leaves the refusal standing', async () => {
+  const host = fakeHost();
+  const changeset = `${WITH_CHANGES}/changeset/uncommitted`;
+  // Somebody asked whether to let a host write to their repository and said
+  // no. That is an outcome, not a failure to handle.
+  await expect(operate(host, changeset, 'commit', { ask: () => false }))
+    .rejects.toMatchObject({ code: -32009 });
+  expect(host.invoked()).toEqual([]);
 });

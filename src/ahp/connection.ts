@@ -1,6 +1,6 @@
 import type {
   Agent, Answer, Changeset, Completion, ContentRef, Customization, FileContent, PendingInput, QueuedMessage,
-  ChangesetScope, ResourceEntry, SessionConfig, SessionDetail, SessionSummary, SessionUri, TerminalRow, TerminalState,
+  ChangesetOperationTarget, ChangesetScope, ResourceEntry, SessionConfig, SessionDetail, SessionSummary, SessionUri, TerminalRow, TerminalState,
   ToolCall, Turn,
 } from './types.js';
 
@@ -207,6 +207,32 @@ export interface HostConnection {
    * reviewable. Sent to the changeset's own channel, not the session's.
    */
   review?(changeset: string, files: string[], reviewed: boolean): void;
+
+  /**
+   * Run one of the verbs a changeset advertised.
+   *
+   * Not fire-and-forget, unlike most of what a client sends: the host answers
+   * whether it accepted, and refuses out loud - so a button that failed can
+   * say why instead of looking like one that did nothing. What the operation
+   * *did* still arrives on the changeset's channel, because every other client
+   * has to see it too.
+   *
+   * `target` is omitted for a changeset-scoped operation and required for the
+   * others. A host refuses an `operationId` it did not advertise, which is why
+   * this takes one rather than an enum.
+   */
+  invoke?(changeset: string, operationId: string, target?: ChangesetOperationTarget): Promise<{ message?: string }>;
+
+  /**
+   * Ask to be allowed to write something.
+   *
+   * The other half of `invoke`, and the reason a refused operation is not a
+   * dead end: a host that will not run a write refuses with a payload naming
+   * the request that would unlock it, and this is what sends that request. A
+   * client that only knew how to press the button would show one that fails
+   * and cannot explain itself.
+   */
+  requestResource?(uri: string, access: { read?: boolean; write?: boolean }): Promise<void>;
 
   /**
    * One file out of a changeset, fetched.

@@ -5,6 +5,7 @@ import { configPath, loadConfig } from '../config.js';
 import type { Where } from '../connect.js';
 import { ago, archived, branch, json, line, mark, project, table } from './render.js';
 import type { HostConnection, HostEvent } from '../ahp/connection.js';
+import { operate } from '../ahp/operate.js';
 import type { Answer, SessionUri, Turn } from '../ahp/types.js';
 
 export const HELP = `ahpc - drive an agent host from a shell
@@ -53,6 +54,10 @@ The harness
 
 Changes and files
   changes <uri>                the files a session touched            [--json]
+                               [--list] [--scope s] [--<variable> v]
+                               [--reviewed f] [--unreviewed f]
+                               [--operations]           what may be done to it
+                               [--run id] [--file f] [--yes]      do one of them
                                [--list] every changeset it offers
                                [--scope <name>] one of them, e.g. turn
                                [--turnId <id>] what a chosen scope still needs
@@ -439,8 +444,83 @@ export async function cli(command: string, rest: string[]): Promise<number> {
           await host.flush?.();
         }
 
+        /*
+         * Running one of the verbs the changeset advertises.
+         *
+         * Here rather than a command of its own for the same reason ticking is:
+         * choosing which changeset is the same question, and a second command
+         * would ask it again. `--run` names an id from `--operations`, and
+         * `--file` points it at a row where the operation is not
+         * changeset-wide.
+         */
+        const running = args.value('--run');
+        if (running !== undefined) {
+          if (!target) throw new Fault('Which changeset? --scope says, and --list says what there is.');
+          if (!host.invoke) throw new Fault('This host connection cannot run changeset operations.');
+          const set = await host.changes(uri, target);
+          const one = (set.operations ?? []).find((op) => op.id === running);
+          if (!one) {
+            throw new Fault(`No operation called ${running} on that changeset.`
+              + ` It offers ${(set.operations ?? []).map((op) => op.id).join(', ') || 'none'}.`);
+          }
+          if (one.status === 'disabled') throw new Fault(`${one.label} is disabled right now, probably because a turn is running.`);
+          const file = args.value('--file');
+          const needsFile = !one.scopes.includes('changeset');
+          if (needsFile && file === undefined) throw new Fault(`${one.label} acts on one file. Pass --file.`);
+          // The protocol says a client MUST show the confirmation before
+          // invoking. In a shell that means saying it and requiring the person
+          // to have meant it.
+          if (one.confirmation !== undefined && !args.has('--yes')) {
+            throw new Fault(`${one.confirmation}\nPass --yes to go ahead.`);
+          }
+          const done = await operate(host, target, running, {
+            ...(needsFile || file !== undefined
+              ? {
+                target: {
+                  kind: 'resource' as const,
+                  resource: file?.startsWith('file://') === true ? file : `file://${file ?? ''}`,
+                },
+              }
+              : {}),
+            /*
+             * A shell says what it is about to do and does it.
+             *
+             * `--yes` has already been required for anything the host called
+             * destructive, so the person has said so once; making them say it
+             * twice for the *permission* would be asking about the plumbing
+             * rather than about the act. What is not silent is the fact that
+             * access was taken, which is printed.
+             */
+            ask: (request) => {
+              line(`Asking ${request.uri} for write access.`);
+              return true;
+            },
+          });
+          await host.flush?.();
+          if (wants) { json(done); break; }
+          line(done.message ?? `${one.label} done.`);
+          break;
+        }
+
         const found = await host.changes(uri, target);
         if (wants) { json(found); break; }
+
+        if (args.has('--operations')) {
+          const offered = found.operations ?? [];
+          if (offered.length === 0) { line('This changeset offers nothing to do to it.'); break; }
+          // The status is the half worth having: a verb that cannot be pressed
+          // right now looks exactly like one that can without it.
+          table(offered.map((op) => [
+            op.id,
+            op.status,
+            op.scopes.join('/'),
+            op.confirmation !== undefined ? 'asks first' : '',
+            op.label,
+            brief(op.error?.message ?? op.description),
+          ]));
+          break;
+        }
+
         if (found.files.length === 0) { line('No changes.'); break; }
         // Creation and deletion are the absences, which is how the protocol
         // says them: no `before` is new, no `after` is gone.
