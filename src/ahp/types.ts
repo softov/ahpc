@@ -446,3 +446,19 @@ export interface ResourceEntry {
   kind: string;
   size?: number;
 }
+
+/**
+ * One changeset a session offers, as its catalogue advertises it.
+ *
+ * A *scope*, not a diff: what this conversation changed, what one turn
+ * changed, what changed between two, what the working tree has. The host names
+ * them and a client picks; `variables` is what still has to be filled in
+ * before the template is a URI - empty for one that already is.
+ */
+export interface ChangesetScope {
+  label: string;
+  uriTemplate: string;
+  description?: string;
+  /** The `{name}` placeholders left in the template, in the order they appear. */
+  variables: string[];
+}
