@@ -785,6 +785,13 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
         // `claude-sonnet-4-5-20250929`.
         // A gate, not a hint. Absent means `createChat` must not be called.
         ...(bag(agent.capabilities).multipleChats !== undefined ? { multipleChats: true } : {}),
+        // The same decoder a session's list goes through, because it is the
+        // same shape - the protocol says these entries are augmented and
+        // propagated into a session's own when one is created with this agent,
+        // so two decoders would be two readings of one thing.
+        ...(list(agent.customizations).length > 0
+          ? { customizations: customizations(agent.customizations) }
+          : {}),
         models: list(agent.models).map((raw) => {
           const model = bag(raw);
           return {

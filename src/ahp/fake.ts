@@ -1024,12 +1024,20 @@ export function fakeHost(): FakeHost {
           { id: 'claude-opus-5', displayName: 'Opus 5' },
           { id: 'claude-sonnet-5', displayName: 'Sonnet 5' },
         ],
+        // What this harness offers, before any session exists. The same list a
+        // session reports, which is what the protocol says it is: entries here
+        // are propagated into a session's own when one is created with this
+        // agent, so two different lists would be a fixture lying about the
+        // relationship it exists to demonstrate.
+        customizations: CUSTOMIZATIONS.map((entry) => ({ ...entry })),
       },
       // No models, on purpose. This is what a real host answers for a harness
       // nobody has given it a token for: the harness is there, and it will
       // enumerate nothing to run on until somebody signs in. A fixture where
       // every harness has models is a client that has never been asked to say
       // "none", and it says it by showing an empty panel forever.
+      // And no customizations either, for the same reason: a harness nobody
+      // has signed into enumerates neither.
       { provider: 'copilotcli', displayName: 'Copilot CLI', models: [] },
     ],
 

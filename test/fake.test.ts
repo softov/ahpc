@@ -32,6 +32,22 @@ it('implements every optional method on the seam', () => {
   expect(host.close).toBeUndefined();
 });
 
+it('says what each harness offers before any session exists', async () => {
+  const host = fakeHost();
+  const [claude, copilot] = await host.agents();
+  // The protocol puts the list here as well as on a session, and says entries
+  // here are propagated into a session's own. So they have to be the same list
+  // or the fixture is lying about the relationship it exists to show.
+  const offered = claude?.customizations ?? [];
+  expect(offered.length).toBeGreaterThan(0);
+  expect(offered.map((one) => one.id).sort())
+    .toEqual((await host.customizations('ahp-session:/4e18')).map((one) => one.id).sort());
+  // A harness nobody has signed into enumerates no models and no
+  // customizations. Both halves of "none" have to be scriptable.
+  expect(copilot?.models).toEqual([]);
+  expect(copilot?.customizations).toBeUndefined();
+});
+
 it('offers four scopes, two of them templates still to be filled in', async () => {
   const host = fakeHost();
   const scopes = await host.changesets?.(WITH_CHANGES) ?? [];

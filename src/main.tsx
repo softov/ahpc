@@ -18,7 +18,7 @@
  */
 const COMMANDS = new Set([
   'help', 'status', 'config', 'session', 'chat', 'terminal', 'resource',
-  'agents', 'models', 'commands', 'completions', 'changes', 'content',
+  'agents', 'models', 'commands', 'customizations', 'completions', 'changes', 'content',
   'prompt', 'exec', 'cancel', 'queue', 'unqueue',
   'watch', 'confirm', 'answer', 'dispatch',
 ]);

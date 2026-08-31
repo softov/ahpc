@@ -345,6 +345,19 @@ export interface Agent {
    * `createChat` MUST NOT be called, so the command is not offered either.
    */
   multipleChats?: boolean;
+  /**
+   * What this harness offers, before any session exists.
+   *
+   * The protocol puts the same list in two places on purpose: here, where a
+   * client can read it without creating anything, and on a session, where it
+   * has been resolved against that session's directory. The first is what a
+   * new-session screen needs - somebody choosing a skill to open with is
+   * choosing before there is a session to ask.
+   *
+   * Empty is a real answer, and the one to expect from a host whose harness
+   * nobody has signed into.
+   */
+  customizations?: Customization[];
 }
 
 /**

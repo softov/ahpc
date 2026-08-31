@@ -47,6 +47,8 @@ The harness
   agents                       what it serves, and each one's models  [--json]
   models                       every model, by harness                [--json]
   commands                     what a slash offers                    [--json]
+  customizations               skills, prompts, agents and MCP servers,
+                               before any session exists     [--kind k] [--json]
   completions <uri> <text>     what the host would complete  [--offset N] [--json]
 
 Changes and files
@@ -308,6 +310,45 @@ export async function cli(command: string, rest: string[]): Promise<number> {
         table(found.map((c) => [`/${c.name}`, c.kind, c.description ?? '']));
         break;
       }
+      /*
+       * What every harness on this host offers, with no session anywhere.
+       *
+       * `session customizations` is the same list resolved against one
+       * session's directory. This is the unresolved one, off the root channel,
+       * and it is the only one answerable before somebody has decided which
+       * agent to start - which is when a person picking a skill to open with
+       * is asking.
+       *
+       * Settled on, because a harness is advertised at once and what it offers
+       * arrives when its probe answers.
+       */
+      case 'customizations': {
+        const kind = args.value('--kind');
+        const found = await settled(host, async () => (await host.agents())
+          .filter((agent) => (agent.customizations ?? []).length > 0));
+        const rows = found.flatMap((agent) => (agent.customizations ?? [])
+          .filter((one) => kind === undefined || one.kind === kind)
+          .map((one) => ({ provider: agent.provider, ...one })));
+        if (wants) { json(rows); break; }
+        if (rows.length === 0) {
+          line('This host advertises no customizations. A harness nobody has signed into offers none.');
+          break;
+        }
+        table(rows.map((one) => [
+          one.provider,
+          one.kind,
+          one.name,
+          // The state is the half a list is read for: a server that needs
+          // signing into looks exactly like a working one without it.
+          one.state ?? (one.enabled ? 'on' : 'off'),
+          // The first sentence, clipped. A skill's description is written for
+          // a model deciding whether to load it and runs to a paragraph, which
+          // in a table is one row pushing the next sixty off the screen.
+          // `--json` is where the whole thing is.
+          brief(one.description),
+        ]));
+        break;
+      }
       case 'completions': {
         const uri = needs(args, 0, 'a session URI');
         const text = needs(args, 1, 'the text being typed');
@@ -543,6 +584,19 @@ async function sessions(host: HostConnection, args: Args, wants: boolean): Promi
     default: throw new Fault(`No 'session ${verb}'. Try 'ahpc help'.`);
   }
 }
+
+/**
+ * One line of a description, short enough to sit in a column.
+ *
+ * Skill descriptions are written for a model choosing whether to load one, so
+ * they run to a paragraph and carry newlines. `--json` is the whole answer;
+ * this is the one a person reads down.
+ */
+const brief = (text: string | undefined, width = 72): string => {
+  if (!text) return '';
+  const line_ = text.split('\n')[0]?.trim() ?? '';
+  return line_.length > width ? `${line_.slice(0, width - 1)}…` : line_;
+};
 
 /** Everything under `chat`. */
 async function chats(host: HostConnection, args: Args, wants: boolean): Promise<number> {
