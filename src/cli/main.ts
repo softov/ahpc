@@ -54,6 +54,8 @@ Changes and files
                                [--list] every changeset it offers
                                [--scope <name>] one of them, e.g. turn
                                [--turnId <id>] what a chosen scope still needs
+                               [--reviewed <file>] tick one off, repeatable
+                               [--unreviewed <file>] and clear one
   content <uri> <file>         one of them, in full
   resource list <uri>          a directory the host serves            [--json]
   resource read <uri>          a file on the host
@@ -336,6 +338,7 @@ export async function cli(command: string, rest: string[]): Promise<number> {
           table(scopes.map((s) => [
             named(s.uriTemplate),
             s.variables.map((v) => `--${v}`).join(' '),
+            s.reviewable ? 'reviewable' : '',
             s.label,
             s.description ?? '',
           ]));
@@ -374,12 +377,34 @@ export async function cli(command: string, rest: string[]): Promise<number> {
           }
         }
 
+        /*
+         * Ticking files off, which needs the changeset's own URI.
+         *
+         * So it is here rather than a command of its own: choosing which
+         * changeset is the same question either way, and a second command
+         * would have to ask it again.
+         */
+        const ticking = args.every('--reviewed').concat(args.every('--unreviewed'));
+        if (ticking.length > 0) {
+          if (!target) throw new Fault('Which changeset? --scope says, and --list says what there is.');
+          if (!host.review) throw new Fault('This host connection cannot mark files reviewed.');
+          const on = args.every('--reviewed');
+          const off = args.every('--unreviewed');
+          // Whole `file://` URIs are what a row's id is, and what this prints,
+          // so a path typed as it was printed is accepted too.
+          const idOf = (one: string): string => (one.startsWith('file://') ? one : `file://${one}`);
+          if (on.length > 0) host.review(target, on.map(idOf), true);
+          if (off.length > 0) host.review(target, off.map(idOf), false);
+          await host.flush?.();
+        }
+
         const found = await host.changes(uri, target);
         if (wants) { json(found); break; }
         if (found.files.length === 0) { line('No changes.'); break; }
         // Creation and deletion are the absences, which is how the protocol
         // says them: no `before` is new, no `after` is gone.
         table(found.files.map((f) => [
+          f.reviewed ? '\u2713' : ' ',
           f.before === undefined ? 'new' : f.after === undefined ? 'gone' : 'edit',
           `+${f.diff.added} -${f.diff.removed}`,
           f.uri.replace(/^file:\/\//, ''),

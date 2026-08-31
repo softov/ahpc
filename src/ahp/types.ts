@@ -219,6 +219,13 @@ export type Answer =
 
 export interface FileEdit {
   uri: string;
+  /**
+   * Whether somebody has ticked this file off.
+   *
+   * Absent is not-yet-reviewed, which is what the protocol says a missing
+   * value means - so a client must not read absence as a third state.
+   */
+  reviewed?: boolean;
   /** Absent `before` is a creation, absent `after` a deletion. */
   before?: string;
   after?: string;
@@ -459,6 +466,20 @@ export interface ChangesetScope {
   label: string;
   uriTemplate: string;
   description?: string;
+  /**
+   * What kind of changeset this is, for grouping and icons.
+   *
+   * An advisory hint, and the protocol says to fall back sensibly on a value
+   * this client has never heard of rather than to drop the entry.
+   */
+  changeKind?: string;
+  /**
+   * Whether files here can be ticked off as read.
+   *
+   * On the *catalogue* entry, which is what lets a client decide whether to
+   * draw the checkbox before it subscribes to anything.
+   */
+  reviewable?: boolean;
   /** The `{name}` placeholders left in the template, in the order they appear. */
   variables: string[];
 }

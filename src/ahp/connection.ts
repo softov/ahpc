@@ -200,6 +200,13 @@ export interface HostConnection {
    * any way to ask for another.
    */
   changes(uri: SessionUri, uri_?: string): Promise<Changeset>;
+  /**
+   * Mark files in a changeset reviewed, or clear them.
+   *
+   * Optional, and only where the changeset's catalogue entry says it is
+   * reviewable. Sent to the changeset's own channel, not the session's.
+   */
+  review?(changeset: string, files: string[], reviewed: boolean): void;
 
   /**
    * One file out of a changeset, fetched.

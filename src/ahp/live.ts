@@ -445,6 +445,7 @@ function changeset(value: unknown): Changeset {
       };
       return {
         uri: after ?? before ?? '',
+        ...(bag(entry).reviewed === true ? { reviewed: true } : {}),
         ...(before ? { before } : {}),
         ...(after ? { after } : {}),
         diff: {
@@ -1179,13 +1180,29 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
         return [{
           label: str(found.label) ?? 'Changes',
           uriTemplate: template,
+          ...(str(found.changeKind) ? { changeKind: str(found.changeKind) as string } : {}),
           ...(str(found.description) ? { description: str(found.description) as string } : {}),
+          // A presence flag: an empty object means supported, absence means
+          // not. Sub-fields are reserved, so only its being there is read.
+          ...(bag(found.capabilities).review !== undefined ? { reviewable: true } : {}),
           // RFC 6570 in the only shape this protocol defines: `{name}`, and
           // nothing else. A variable this client does not know how to fill in
           // is still worth naming, so a caller can say what it needs.
           variables: [...template.matchAll(/\{(\w+)\}/g)].map((found_) => found_[1] as string),
         }];
       });
+    },
+
+    /*
+     * Tick a file off, or clear it.
+     *
+     * Dispatched on the *changeset's* channel rather than the session's, and
+     * deliberately not an operation: the protocol has clients dispatch this
+     * and the server keep the flag, which is why it needs no `operations`
+     * entry and writes nothing to anybody's repository.
+     */
+    review: (changesetUri, files, isReviewed) => {
+      client.dispatch(changesetUri, { type: 'changeset/filesReviewChanged', files, reviewed: isReviewed });
     },
 
     changes: async (uri, wanted) => {
