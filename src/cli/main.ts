@@ -51,6 +51,9 @@ The harness
 
 Changes and files
   changes <uri>                the files a session touched            [--json]
+                               [--list] every changeset it offers
+                               [--scope <name>] one of them, e.g. turn
+                               [--turnId <id>] what a chosen scope still needs
   content <uri> <file>         one of them, in full
   resource list <uri>          a directory the host serves            [--json]
   resource read <uri>          a file on the host
@@ -317,7 +320,61 @@ export async function cli(command: string, rest: string[]): Promise<number> {
 
       case 'changes': {
         const uri = needs(args, 0, 'a session URI');
-        const found = await host.changes(uri);
+        const scopes = (await host.changesets?.(uri)) ?? [];
+
+        /** What a scope is called, once the parts still to be filled in are gone. */
+        const named = (template: string): string => template
+          .replace(uri, '')
+          .replace(/^\/changeset\//, '')
+          .replace(/\/?\{\w+\}/g, '');
+
+        if (args.has('--list')) {
+          if (wants) { json(scopes); break; }
+          if (scopes.length === 0) { line('This host advertises no changesets.'); break; }
+          // The name to pass to --scope first, since that is what this
+          // listing is read for.
+          table(scopes.map((s) => [
+            named(s.uriTemplate),
+            s.variables.map((v) => `--${v}`).join(' '),
+            s.label,
+            s.description ?? '',
+          ]));
+          break;
+        }
+
+        /*
+         * Which one, and what fills it in.
+         *
+         * A scope is chosen by label or by the tail of its template, because
+         * those are what `--list` prints; the variables come from flags named
+         * after them, which is the only mapping that survives the protocol
+         * adding a template shape this client has never heard of.
+         */
+        const wantedName = args.value('--scope');
+        const chosen = wantedName === undefined
+          ? undefined
+          : scopes.find((s) => s.label === wantedName
+            || s.uriTemplate === wantedName
+            || named(s.uriTemplate) === wantedName);
+        if (wantedName !== undefined && !chosen) {
+          throw new Fault(`No changeset called ${wantedName}. 'changes <uri> --list' says what there is.`);
+        }
+
+        let target: string | undefined;
+        if (chosen) {
+          target = chosen.uriTemplate;
+          for (const variable of chosen.variables) {
+            // `{turnId}` is filled from `--turnId`, and so is anything else
+            // the protocol adds later without this needing to know it.
+            const given = args.value(`--${variable}`);
+            if (given === undefined) {
+              throw new Fault(`${chosen.label} needs --${variable}. Its template is ${chosen.uriTemplate}.`);
+            }
+            target = target.replace(`{${variable}}`, given);
+          }
+        }
+
+        const found = await host.changes(uri, target);
         if (wants) { json(found); break; }
         if (found.files.length === 0) { line('No changes.'); break; }
         // Creation and deletion are the absences, which is how the protocol

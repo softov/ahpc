@@ -1171,12 +1171,30 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
       });
     },
 
-    changes: async (uri) => {
+    changesets: async (uri) => {
+      const state = await snapshotOf(uri);
+      return list(bag(state).changesets).map(bag).flatMap((found) => {
+        const template = str(found.uriTemplate);
+        if (!template) return [];
+        return [{
+          label: str(found.label) ?? 'Changes',
+          uriTemplate: template,
+          ...(str(found.description) ? { description: str(found.description) as string } : {}),
+          // RFC 6570 in the only shape this protocol defines: `{name}`, and
+          // nothing else. A variable this client does not know how to fill in
+          // is still worth naming, so a caller can say what it needs.
+          variables: [...template.matchAll(/\{(\w+)\}/g)].map((found_) => found_[1] as string),
+        }];
+      });
+    },
+
+    changes: async (uri, wanted) => {
+      if (wanted) return changeset(await snapshotOf(wanted) ?? {});
       const state = await snapshotOf(uri);
       const entry = list(bag(state).changesets)
         .map(bag)
-        // The session-wide view. A template with variables in it is a diff
-        // between two turns, and there is nothing here to fill them in from.
+        // The first that is already a URI. One with variables left in it is a
+        // turn or a pair of them, and there is nothing here to fill them from.
         .find((found) => str(found.uriTemplate) && !str(found.uriTemplate)?.includes('{'));
       const template = str(entry?.uriTemplate);
       if (!template) return { status: 'complete', files: [] };

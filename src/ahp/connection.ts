@@ -1,6 +1,6 @@
 import type {
   Agent, Answer, Changeset, Completion, ContentRef, Customization, FileContent, PendingInput, QueuedMessage,
-  ResourceEntry, SessionConfig, SessionDetail, SessionSummary, SessionUri, TerminalRow, TerminalState,
+  ChangesetScope, ResourceEntry, SessionConfig, SessionDetail, SessionSummary, SessionUri, TerminalRow, TerminalState,
   ToolCall, Turn,
 } from './types.js';
 
@@ -184,7 +184,22 @@ export interface HostConnection {
   /** Answer a question. An accept with no answers resumes the agent on none. */
   completeInput(uri: SessionUri, requestId: string, accepted: boolean, answers: Record<string, Answer>): void;
 
-  changes(uri: SessionUri): Promise<Changeset>;
+  /**
+   * Which changesets this session offers.
+   *
+   * The protocol has a session advertise several - what the conversation
+   * changed, what one turn changed, what the working tree has - and a client
+   * that reads only the first shows one of them and hides the rest.
+   */
+  changesets?(uri: SessionUri): Promise<ChangesetScope[]>;
+  /**
+   * One of them, by the URI its template became.
+   *
+   * Left out, the first that needs no filling in - which is what a screen
+   * showing a single changeset wants and what this answered before there was
+   * any way to ask for another.
+   */
+  changes(uri: SessionUri, uri_?: string): Promise<Changeset>;
 
   /**
    * One file out of a changeset, fetched.
