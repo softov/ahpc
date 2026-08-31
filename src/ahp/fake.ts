@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import type { HostConnection, HostEvent } from './connection.js';
 import type {
-  Agent, Changeset, ChatInputRequest, ContentRef, Customization, FileContent, FileEdit,
-  PendingInput, QueuedMessage, ResponsePart, SessionConfig, SessionDetail, SessionSummary,
+  Agent, Changeset, ChangesetScope, ChatInputRequest, ContentRef, Customization, FileContent, FileEdit,
+  PendingInput, QueuedMessage, ResourceEntry, ResponsePart, SessionConfig, SessionDetail, SessionSummary,
   SessionUri, TerminalState, ToolCall, Turn,
 } from './types.js';
 import { SessionFlag } from './types.js';
@@ -44,6 +44,15 @@ export interface FakeHost extends HostConnection {
    * watching" is a thing a test can make happen.
    */
   rename(uri: SessionUri, title: string): void;
+  /**
+   * Every action sent through `dispatch`, in order.
+   *
+   * Not on `HostConnection`: a real host does not hand its clients back what
+   * they sent it. Here because `dispatch` carries actions this fake has no
+   * behaviour for, and an escape hatch whose effect is nothing observable is
+   * one nothing can check.
+   */
+  dispatched(): { uri: SessionUri; action: Record<string, unknown>; chat?: boolean }[];
 }
 
 type Step = () => void;
@@ -112,6 +121,26 @@ const FILES: Record<string, string[]> = {
   'src/': ['app.tsx', 'control.ts', 'state.ts', 'ahp/'],
   'src/ahp/': ['fake.ts', 'live.ts', 'types.ts'],
   'test/': ['smoke.test.tsx'],
+};
+
+/**
+ * What each of those files says, for the half of the client that reads them.
+ *
+ * Every leaf in `FILES` has one. A tree that lists nine files and can open two
+ * is a fixture that makes a viewer look broken, and the completion menu and the
+ * file reader have to agree about what exists or one of them is testing a
+ * different host.
+ */
+const SOURCES: Record<string, string> = {
+  'README.md': '# ahpc\n\nA terminal client for the Agent Host Protocol.\n\nIt talks to any AHP host. It depends on no agent SDK.\n',
+  'package.json': '{\n  "name": "ahpc",\n  "type": "module",\n  "bin": { "ahpc": "./dist/src/main.js" }\n}\n',
+  'src/app.tsx': "import { fakeHost } from './ahp/fake.js';\n\n// The screens, and what drives them.\nexport function App() {\n  return null;\n}\n",
+  'src/control.ts': '// Keys in, intent out. Nothing here draws anything.\nexport type Intent = { kind: string };\n',
+  'src/state.ts': '// What is on screen, as one object nothing else may write to.\nexport interface State { screen: string }\n',
+  'src/ahp/fake.ts': '// A scripted host, so the client runs with nothing installed.\nexport function fakeHost() { return {}; }\n',
+  'src/ahp/live.ts': '// The same seam over a WebSocket.\nexport function liveHost(url: string) { return { url }; }\n',
+  'src/ahp/types.ts': '// The shapes both hosts speak in.\nexport interface Turn { id: string }\n',
+  'test/smoke.test.tsx': "import { it } from 'vitest';\n\nit('draws something', () => {});\n",
 };
 
 export function fakeHost(): FakeHost {
@@ -199,6 +228,16 @@ export function fakeHost(): FakeHost {
     };
   };
 
+  /**
+   * The changesets one session offers, keyed by the scope segment.
+   *
+   * Scoped rather than one per session, because on a real host a session
+   * advertises several and they differ - what this conversation changed is not
+   * what the working tree has, and a fake that answered the same list for every
+   * scope would let a picker be built that looked right and proved nothing.
+   */
+  const scoped = new Map<SessionUri, Map<string, Changeset>>();
+
   const EDITS: Changeset = {
     status: 'complete',
     files: [
@@ -244,6 +283,57 @@ export function fakeHost(): FakeHost {
    * A real host says this on its root channel; here it is said by whatever
    * changed a summary, which is the same thing from the outside.
    */
+  /**
+   * Every action a client has sent through `dispatch`, in order.
+   *
+   * Kept because the escape hatch is the one method whose whole job is to
+   * carry things this fake does not understand: there is nothing to observe
+   * for most of them, so without a record there is nothing to assert either.
+   */
+  const sent: { uri: SessionUri; action: Record<string, unknown>; chat?: boolean }[] = [];
+
+  /**
+   * A changeset URI split back into the session and the scope.
+   *
+   * `<sessionUri>/changeset/<scope>`, which is the protocol's own nesting -
+   * and the reason a scope may itself contain slashes, so only the first
+   * separator is the one that matters.
+   */
+  const scopeIn = (uri: string): { owner: SessionUri; scope: string } | undefined => {
+    const cut = uri.indexOf('/changeset/');
+    if (cut <= 0) return undefined;
+    return { owner: uri.slice(0, cut), scope: uri.slice(cut + '/changeset/'.length) };
+  };
+
+  /**
+   * The directories this host serves, as paths, longest first.
+   *
+   * Longest first so the deepest one wins: two served directories where one
+   * contains the other would otherwise resolve every file under the inner one
+   * against the outer, and list the wrong tree.
+   */
+  const roots = (): string[] => [...new Set([...summaries.values()]
+    .flatMap((one) => one.workingDirectories)
+    .map((one) => one.replace(/^file:\/\//, '')))]
+    .sort((a, b) => b.length - a.length);
+
+  /**
+   * A `file://` URI, as a root and a path relative to it.
+   *
+   * `inside` is spelled the way `FILES` and `SOURCES` key themselves - a
+   * directory ends in a slash and the root itself is the empty string - so a
+   * URI can be looked up in either without a second convention.
+   */
+  const inTree = (uri: string): { root: string; inside: string } | undefined => {
+    if (!uri.startsWith('file://')) return undefined;
+    const path = uri.slice('file://'.length);
+    const root = roots().find((one) => path === one || path.startsWith(`${one}/`));
+    if (root === undefined) return undefined;
+    const rest = path.slice(root.length).replace(/^\//, '');
+    if (rest === '') return { root, inside: '' };
+    return { root, inside: FILES[`${rest}/`] === undefined ? rest : `${rest}/` };
+  };
+
   const catalogue = new Set<() => void>();
   const moved = (): void => { for (const listener of catalogue) listener(); };
 
@@ -289,7 +379,43 @@ export function fakeHost(): FakeHost {
     turns.set(id, options.turns ?? []);
     if (options.active) active.set(id, options.active);
     if (options.input) inputs.set(id, options.input);
-    if (options.changes) changesets.set(id, options.changes);
+    if (options.changes) {
+      changesets.set(id, options.changes);
+      /*
+       * The same files, cut four ways.
+       *
+       * A real host answers a different list per scope, and the differences
+       * are the point of having scopes at all: the working tree holds work
+       * nobody's agent did, one turn holds one file, and a comparison holds
+       * the span between two. A fake that returned the session's list for
+       * every one of them would let a picker be built that switched between
+       * four identical screens.
+       */
+      const spoken = (options.turns ?? []).filter((turn) => turn.role === 'agent').map((turn) => turn.id);
+      const files = options.changes.files;
+      const per = new Map<string, Changeset>([
+        ['session', options.changes],
+        ['uncommitted', {
+          status: 'complete',
+          files: [
+            ...files,
+            // Somebody else's edit, sitting in the tree beside the agent's.
+            // What makes `uncommitted` worth a separate scope rather than a
+            // second name for `session`.
+            edited(`${options.dir}/notes.todo`, null, 'check the kqueue patch against 10.1\n'),
+          ],
+        }],
+      ]);
+      for (const id_ of spoken) {
+        const one = files[spoken.indexOf(id_) % files.length];
+        if (one) per.set(`turn/${id_}`, { status: 'complete', files: [one] });
+      }
+      const [first, second] = spoken;
+      if (first !== undefined && second !== undefined) {
+        per.set(`compare/${first}/${second}`, { status: 'complete', files: files.slice(0, 2) });
+      }
+      scoped.set(id, per);
+    }
     // `ahp-chat:/<uuid>`, which is the protocol's own shape - a chat is its
     // own channel, not a path under the session.
     chats.set(id, `ahp-chat:/${id.split('/').pop() ?? id}`);
@@ -640,6 +766,28 @@ export function fakeHost(): FakeHost {
    * message would be the other way to get it wrong: they were written as
    * separate messages, and the agent reading them is entitled to see that.
    */
+  /**
+   * Cut the turn short.
+   *
+   * A function rather than only a method, because two callers want it: the
+   * control that stops a turn, and `chat/turnCancelled` arriving through
+   * `dispatch` - which is the same thing said the other way, and must not be
+   * a second, slightly different implementation of it.
+   */
+  function stop(uri: SessionUri): void {
+    script.length = 0;
+    const turn = active.get(uri);
+    if (turn) {
+      turn.state = 'cancelled';
+      turns.get(uri)?.push(turn);
+      active.delete(uri);
+      emit(uri, { type: 'turnComplete', turn });
+    }
+    inputs.delete(uri);
+    emit(uri, { type: 'inputResolved' });
+    touch(uri);
+  }
+
   function drain(uri: SessionUri): void {
     if (active.has(uri)) return;
     const waiting = queues.get(uri) ?? [];
@@ -1083,19 +1231,7 @@ export function fakeHost(): FakeHost {
       emit(uri, { type: 'queued', messages: waiting });
     },
 
-    stopTurn: (uri) => {
-      script.length = 0;
-      const turn = active.get(uri);
-      if (turn) {
-        turn.state = 'cancelled';
-        turns.get(uri)?.push(turn);
-        active.delete(uri);
-        emit(uri, { type: 'turnComplete', turn });
-      }
-      inputs.delete(uri);
-      emit(uri, { type: 'inputResolved' });
-      touch(uri);
-    },
+    stopTurn: stop,
 
     confirmToolCall: (uri, toolCallId, approved) => {
       const input = inputs.get(uri);
@@ -1127,7 +1263,167 @@ export function fakeHost(): FakeHost {
       });
     },
 
-    changes: async (uri) => changesets.get(uri) ?? { status: 'complete', files: [] },
+    /**
+     * Which changesets a session offers.
+     *
+     * Four, the way the protocol has them: two that are already URIs and two
+     * that are templates a client has to fill in from turns it can see. A
+     * session with nothing changed offers none, which is what makes "the host
+     * advertises no scopes" a case a screen can be built against.
+     */
+    changesets: async (uri): Promise<ChangesetScope[]> => {
+      const per = scoped.get(uri);
+      if (!per) return [];
+      return [
+        {
+          label: 'This Session',
+          description: 'Everything this conversation changed',
+          uriTemplate: `${uri}/changeset/session`,
+          changeKind: 'session',
+          reviewable: true,
+          variables: [],
+        },
+        {
+          label: 'Uncommitted Changes',
+          description: 'The working tree, against HEAD',
+          uriTemplate: `${uri}/changeset/uncommitted`,
+          changeKind: 'uncommitted',
+          variables: [],
+        },
+        {
+          label: 'This Turn',
+          description: 'What one turn changed',
+          uriTemplate: `${uri}/changeset/turn/{turnId}`,
+          changeKind: 'turn',
+          reviewable: true,
+          variables: ['turnId'],
+        },
+        {
+          label: 'Between Two Turns',
+          uriTemplate: `${uri}/changeset/compare/{originalTurnId}/{modifiedTurnId}`,
+          changeKind: 'compare-turns',
+          reviewable: true,
+          variables: ['originalTurnId', 'modifiedTurnId'],
+        },
+      ];
+    },
+
+    /**
+     * One of them, by the URI its template became.
+     *
+     * The second argument is honoured rather than ignored: it is the whole
+     * difference between a screen that can show four changesets and one that
+     * shows the first and hides the rest. Left out, the session's own - which
+     * is what a screen drawing a single changeset wants.
+     */
+    changes: async (uri, wanted) => {
+      if (wanted === undefined) return changesets.get(uri) ?? { status: 'complete', files: [] };
+      const at = scopeIn(wanted);
+      // A scope this session does not offer is not an empty changeset - it is
+      // a question about something that did not happen, and a host says so.
+      if (!at) throw new Error(`${wanted} is not a changeset of ${uri}`);
+      const found = scoped.get(at.owner)?.get(at.scope);
+      if (!found) throw new Error(`${wanted} is not a changeset of ${at.owner}`);
+      return found;
+    },
+
+    /**
+     * Ticked off, or cleared.
+     *
+     * The host keeps the flag and tells everyone watching, which is why this
+     * returns nothing: a client that toggled its own copy would be the only
+     * one that ever saw it, and would disagree with the next snapshot.
+     */
+    review: (changeset, files, reviewed) => {
+      const at = scopeIn(changeset);
+      if (!at) return;
+      const held = scoped.get(at.owner)?.get(at.scope);
+      if (!held) return;
+      const wanted = new Set(files);
+      const after: Changeset = {
+        status: held.status,
+        files: held.files.map((file) => {
+          if (!wanted.has(file.uri)) return file;
+          // The key goes rather than turning `false`, because absent is what
+          // the protocol says not-yet-reviewed is - and a row carrying
+          // `reviewed: false` invites a client to read it as a third state.
+          const { reviewed: _was, ...rest } = file;
+          return reviewed ? { ...rest, reviewed: true } : rest;
+        }),
+      };
+      scoped.get(at.owner)?.set(at.scope, after);
+      if (at.scope === 'session') changesets.set(at.owner, after);
+      emit(at.owner, { type: 'changes', changes: after });
+    },
+
+    /**
+     * One directory of the host's filesystem.
+     *
+     * Rooted at whichever served directory the URI is under, so what this
+     * lists is the same tree the `@` completion offers - two views of one
+     * fixture rather than two fixtures that will drift.
+     */
+    resourceList: async (uri): Promise<ResourceEntry[]> => {
+      const at = inTree(uri);
+      if (at === undefined) throw new Error(`${uri} is not a directory this host serves`);
+      const here = FILES[at.inside];
+      if (here === undefined) throw new Error(`${uri} is not a directory`);
+      return here.map((name) => ({
+        uri: `file://${at.root}/${at.inside}${name}`.replace(/\/$/, ''),
+        name: name.replace(/\/$/, ''),
+        kind: name.endsWith('/') ? 'directory' : 'file',
+        ...(name.endsWith('/') ? {} : { size: (SOURCES[`${at.inside}${name}`] ?? '').length }),
+      }));
+    },
+
+    /**
+     * One file's bytes, off the same tree.
+     *
+     * `encoding` is reported rather than assumed, as a real host reports it -
+     * a caller that took every answer for text is a caller that prints a PNG
+     * to a terminal, and a fake that only ever answers text never catches one.
+     */
+    resourceRead: async (uri) => {
+      const at = inTree(uri);
+      const body = at === undefined ? undefined : SOURCES[at.inside];
+      if (body === undefined) throw new Error(`${uri} is not a file this host serves`);
+      return { data: body, encoding: 'utf-8', contentType: 'text/plain' };
+    },
+
+    /**
+     * One action, verbatim, without this fake knowing what most of them mean.
+     *
+     * Every one is recorded, and the handful this host can honour are carried
+     * out. That split is the honest one: a real host handles what it handles
+     * and ignores the rest, and a fake that silently dropped everything would
+     * make `dispatch` untestable in exactly the place it exists to be tested.
+     */
+    dispatch: (uri, action, chat) => {
+      sent.push({ uri, action, ...(chat === true ? { chat: true } : {}) });
+      const type = String(action.type ?? '');
+      if (type === 'chat/turnStarted') {
+        const message = action.message as { text?: string } | undefined;
+        const text = message?.text ?? String(action.content ?? '');
+        if (text !== '') reply(uri, text);
+        return;
+      }
+      if (type === 'chat/turnCancelled') { stop(uri); return; }
+      if (type === 'session/isReadChanged') { setFlag(uri, SessionFlag.IsRead, action.isRead === true); return; }
+      if (type === 'session/isArchivedChanged') setFlag(uri, SessionFlag.IsArchived, action.isArchived === true);
+    },
+
+    /**
+     * Wait for what was dispatched to have taken effect.
+     *
+     * On a socket this is bytes leaving; here it is the script running out,
+     * which is the same promise from the caller's side - after it, everything
+     * asked for has happened. A caller that dispatches one thing and exits is
+     * the reason either exists.
+     */
+    flush: async () => {
+      for (let i = 0; i < 5000; i++) if (!pump()) break;
+    },
+
 
     content: async (ref: ContentRef): Promise<FileContent> => {
       const found = contents.get(ref.uri);
@@ -1198,5 +1494,7 @@ export function fakeHost(): FakeHost {
     },
 
     pending: () => script.length,
+
+    dispatched: () => [...sent],
   };
 }
