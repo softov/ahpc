@@ -1,6 +1,7 @@
 /** Every command, and the argv reading that picks one. */
 
 import { connect } from '../connect.js';
+import { configPath, loadConfig } from '../config.js';
 import type { Where } from '../connect.js';
 import { ago, archived, branch, json, line, mark, project, table } from './render.js';
 import type { HostConnection, HostEvent } from '../ahp/connection.js';
@@ -67,10 +68,13 @@ Anything else
   help                         this
 
 The host
-  --host <url>    ws://host:port, or AHPC_HOST
-  --token <tkn>   a bearer token for it, or AHPC_TOKEN
-  --claude        Claude Code in this process, through the Agent SDK
+  --host <url>    ws://host:port, or AHPC_HOST, or the config file
+  --token <tkn>   a bearer token for it, or AHPC_TOKEN, or the config file
+  --config-file   read this instead of the one below
   (none)          the scripted host, which needs nothing installed
+
+Configuration
+  config          where the file is, and what is in force  [--json]
 
 Output is for reading. --json is the same answer for a program.
 `;
@@ -131,17 +135,23 @@ const SWITCHES = new Set([
 /** A message for the person, not a stack trace. */
 export class Fault extends Error {}
 
-/** Where the host is, from flags or the environment, the way agora does it. */
-const where = (args: Args): Where => ({
-  ...(args.value('--host') ?? process.env.AHPC_HOST
-    ? { host: (args.value('--host') ?? process.env.AHPC_HOST) as string }
-    : {}),
-  ...(args.value('--token') ?? process.env.AHPC_TOKEN
-    ? { token: (args.value('--token') ?? process.env.AHPC_TOKEN) as string }
-    : {}),
-  ...(args.has('--claude') ? { claude: true } : {}),
-  ...(args.value('--cwd') ? { path: args.value('--cwd') as string } : {}),
-});
+/**
+ * Where the host is: a flag, then the environment, then the config file.
+ *
+ * In that order because each is more deliberate than the next. A flag is this
+ * invocation, an environment variable is this shell, and a file is every
+ * invocation until somebody edits it - so the narrower answer wins.
+ */
+const where = (args: Args): Where => {
+  const file = loadConfig('ahpc', args.value('--config-file'));
+  const host = args.value('--host') ?? process.env.AHPC_HOST ?? file.host;
+  const token = args.value('--token') ?? process.env.AHPC_TOKEN ?? file.token;
+  return {
+    ...(host ? { host } : {}),
+    ...(token ? { token } : {}),
+    ...(args.value('--cwd') ? { path: args.value('--cwd') as string } : {}),
+  };
+};
 
 /** A URI the command needs, said plainly when it is missing. */
 const needs = (args: Args, index: number, what: string): string => {
@@ -238,6 +248,24 @@ export async function cli(command: string, rest: string[]): Promise<number> {
   const args = new Args(rest);
   const wants = args.has('--json');
   if (command === 'help' || args.has('--help')) { process.stdout.write(HELP); return 0; }
+
+  /*
+   * Answered before any connection, because it is not a question about one.
+   *
+   * `ahpc config` is what you run when the host cannot be reached and you want
+   * to know which host it was trying - so needing a host to answer it would
+   * make it useless exactly when it is wanted.
+   */
+  if (command === 'config') {
+    const file = loadConfig('ahpc', args.value('--config-file'));
+    const at = args.value('--config-file') ?? configPath('ahpc');
+    if (wants) { json({ path: at, values: file }); return 0; }
+    line(at);
+    const rows = Object.entries(file).map(([key, value]) => [key, String(value)]);
+    if (rows.length === 0) line('  (nothing set)');
+    else table(rows);
+    return 0;
+  }
 
   const host = await connect(where(args));
   try {

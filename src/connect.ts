@@ -1,7 +1,6 @@
 /** Which host this run talks to, for either front end. */
 
 import { MissingProtocolPackage, liveHost } from './ahp/live.js';
-import { MissingHost, spawnedHost } from './ahp/spawn.js';
 import { fakeHost } from './ahp/fake.js';
 import type { HostConnection } from './ahp/connection.js';
 
@@ -18,8 +17,6 @@ export interface Where {
   host?: string;
   /** A bearer token for it. */
   token?: string;
-  /** Claude Code, in an `ahpd` this client starts and stops. */
-  claude?: boolean;
   /** Where the agent works - a path on the *host*, not on this machine. */
   path?: string;
 }
@@ -44,25 +41,6 @@ export const sink: { report(message: string): void } = {
  * is named. A live connection is asked for by URL; anything else is the script.
  */
 export async function connect(options: Where): Promise<HostConnection & { pump?(): boolean }> {
-  if (options.claude) {
-    try {
-      return await spawnedHost({
-        // A host of its own, started here. Its filesystem is this machine's,
-        // so this directory is the only truthful default.
-        path: options.path ?? process.cwd(),
-        onRefusal: (_uri, message) => sink.report(message),
-        onState: (state) => { if (state === 'offline') sink.report('The host stopped answering'); },
-      });
-    }
-    catch (error) {
-      if (error instanceof MissingHost) {
-        process.stderr.write(`${error.message}\n`);
-        process.exit(1);
-      }
-      process.stderr.write(`Could not start a host in ${options.path ?? process.cwd()}: ${String(error)}\n`);
-      process.exit(1);
-    }
-  }
   if (!options.host) return fakeHost();
   try {
     return await liveHost({

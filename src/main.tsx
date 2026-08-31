@@ -17,7 +17,7 @@
  * would be a worse answer than a refusal.
  */
 const COMMANDS = new Set([
-  'help', 'status', 'session', 'chat', 'terminal', 'resource',
+  'help', 'status', 'config', 'session', 'chat', 'terminal', 'resource',
   'agents', 'models', 'commands', 'completions', 'changes', 'content',
   'prompt', 'exec', 'cancel', 'queue', 'unqueue',
   'watch', 'confirm', 'answer', 'dispatch',
@@ -30,7 +30,7 @@ const COMMANDS = new Set([
  * decide whether to load the CLI.
  */
 const SWITCHES = new Set([
-  '--static', '-s', '--settled', '--approve', '--answer', '--claude',
+  '--static', '-s', '--settled', '--approve', '--answer',
   '--help', '-h', '--json', '--full', '--archived', '--unread', '--undo',
   '--off', '--deny', '--reject', '--chat',
 ]);
