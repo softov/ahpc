@@ -20,55 +20,29 @@ That cuts the other way too. A feature is not unnecessary because ahpd is the on
 
 ---
 
-## B-01-02 — The changes screen draws one changeset
+## B-01-07 — The verbs cannot be pressed from the screen
 
-A session offers several — what this conversation changed, what one turn changed, what changed between two, what the working tree has — and the screen draws the first that needs no filling in, then nothing else.
+`ahpc changes --run` invokes them from a shell, and the changes screen draws them with their status and gets no further. What is missing is a place to ask: the protocol says a client **MUST** display an operation's `confirmation` before invoking, and this application has no prompt — the shell answers that with `--yes`, and a full-screen client cannot.
 
-`ahpc changes --list` and `--scope` reach all of them from a shell, so the client can *read* every scope its host serves. The screen has no way to choose one, which means per-turn diffs exist, are captured on both sides, are fetchable, and are invisible to anybody looking at the screen. A turn's scope needs a turn picked out of the transcript, which is where the id is; `compare` needs two, which is a selection rather than a control and is the harder half.
-
-Nothing waits on the host any more: the scripted host now answers a different changeset per scope, so this is buildable and checkable without a daemon running.
-
-**Suggestions.** (1) A control row on the changes screen, like the composer's — the scopes with no variables are a picker, and the ones with variables are greyed until a turn is selected. (2) Reach the per-turn scope from the *transcript* instead: a key on a turn that opens the changes screen already scoped to it, which is where a person is when they want it and needs no picker at all. (3) Do both — the picker for `session` and `uncommitted`, the transcript for `turn` — and leave `compare` until somebody asks for it, since selecting two turns is a mode and the other two are not.
-
-## B-01-03 — A file can be ticked off, and nothing draws the tick
-
-`capabilities.review` says whether a changeset's files can be marked read, and `reviewed` says which are. Both are carried through the connection, both reach the shell, and both are now in the scripted host. The screen renders neither: there is no checkbox, and a file already ticked from elsewhere looks exactly like one nobody has read.
-
-Small, and it belongs with B-01-02 — they are the same screen, and a person reading a diff wants to choose *which* diff and mark their way through it in the same breath.
-
-**Suggestions.** (1) A glyph in the changes list and a key to toggle it, which is the whole feature and about twenty lines. (2) That, plus hiding reviewed files behind a filter, which is what makes review useful on a changeset of forty files rather than four. (3) Only draw it where the catalogue entry says `reviewable` — worth stating because the flag is per changeset, and a checkbox on a scope the host will not keep is a control that silently does nothing.
-
-## B-01-07 — A changeset offers verbs and nothing here can press one
-
-A host advertises `operations` on a changeset — commit, discard, revert — with a status per operation and a `confirmation` on the destructive ones that a client **MUST** display before invoking. ahpd serves all of it. This client does not carry `operations` across the seam at all, so there is nothing to draw and nothing to invoke.
-
-There is a second half that is easy to miss and is the whole reason the first half is safe. An operation that writes is refused `-32009` until the connection holds a `resourceRequest` grant on what it would write, and the refusal *carries the request that would unlock it*. So the flow is: press, be refused, ask, press again — and a client that only knows how to press shows a button that fails and cannot explain why.
-
-**Suggestions.** (1) Carry `operations` on `Changeset`, add `invoke(changeset, operationId, target?)` and `requestResource(uri, write)` to the seam, and answer a `-32009` by asking for the grant named in its own `data` before retrying once — which turns the negotiation into something a person never sees. (2) The same, but surface the grant as a prompt rather than retrying, on the grounds that "this will write to your repository" is exactly the moment a person should be asked and the protocol has already stopped to ask. (3) Read-only: draw the operations with their status and confirmation, greyed, and invoke none — honest, cheap, and worth almost nothing, since a button that cannot be pressed is a label.
+**Suggestions.** (1) A modal confirm over the changes screen, which every destructive control this client grows later will want as well. (2) A two-key press — the verb, then enter to mean it — which needs no new component and is a convention nobody has agreed to. (3) Leave it in the shell, and record that the screen shows what may be done and the command line does it, which is true today and is a smaller client.
 
 ## B-01-04 — The filesystem is only a completion
 
 `resourceList` and `resourceRead` are on the connection, behind `ahpc resource`, and now on the scripted host too — but the only place a host's filesystem is *drawn* is the `@` completion in the composer. A host that serves files is one a person could browse; this client makes them type a path they cannot see.
 
-There is something to reuse rather than build. TextUI's `@textui/textide` exports `Explorer` and `Editor` over a `ResourceProvider` — `{ scheme, stat, list?, read?, write? }` — which is close enough to `resourceList` / `resourceRead` that a provider backed by the protocol is a small adapter rather than a screen. `readonly: true` is already in its options, which is exactly what a host serving only the read half offers.
+The host no longer only serves the read half, which changes what this is worth: `resourceWrite`, `Delete`, `Mkdir`, `Move` and `Copy` are all served now, behind a `resourceRequest` grant. A browser over a tree that can be written is a different proposition from one over a tree that cannot.
 
-**Suggestions.** (1) Write the adapter and mount `Explorer` as a screen, reusing the tree, the icons and the keys. (2) Adapter plus `Editor` as a read-only viewer, so opening a file has somewhere to open into — the same component the changes screen would want for a whole-file view. (3) Build a minimal list of our own instead, if depending on `textide` from a client that deliberately depends on almost nothing is a trade worth refusing — that is the decision, and it is about dependency shape rather than about the code.
+The dependency question is settled — take the fiddly parts, keep our own layout — so what is left is only how much to build. `@textui/textide`'s `Explorer` is a whole screen with its own opinions and is the part *not* being taken.
+
+**Suggestions.** (1) A minimal tree of our own over `resourceList`, opening into the diff viewer this client already has — smallest thing that stops people typing paths they cannot see. (2) That, plus writing through `resourceWrite` behind the grant, which is the first place this client would ever change somebody's files and wants the same confirmation B-01-07 is waiting on. (3) Leave it: the `@` completion reaches the same tree, and a browser is a convenience rather than a gap.
 
 ## B-01-05 — A diff is drawn from scratch here
 
 `filediff.tsx` renders a changeset file from `before` and `after` text. `@textui/textide-git` already exports a diff renderer with `DiffMode`, `DiffCell` and `DiffPair`, hunk parsing (`parseHunks`, `hunkAt`, `patchFor`) and gutter marks — the parts this screen either has thinner versions of or does without.
 
-Worth naming because it is the same question as B-01-04 and should be answered the same way: either this client reuses TextUI's components or it deliberately does not, and answering differently per screen is how two diff renderers end up in one application.
+Decided: adopt `parseHunks`, `hunkAt`, `patchFor` and the gutter marks, and keep our own layout. The hunk maths is fiddly and is not this client's business; the pane is.
 
-**Suggestions.** (1) Adopt the `textide-git` renderer and delete ours, keeping only the protocol-to-diff mapping. (2) Adopt only `parseHunks` and the gutter, which are the fiddly parts, and keep our own layout. (3) Keep ours and record that this client draws its own, so nobody re-opens it — the current one works, and a shared component that has to serve an IDE may not fit a chat client's pane.
-
-## B-01-06 — A session cannot be taken out of the client
-
-Everything a session is — its detail, its config, its turns, its changesets — can be read one command at a time and never as one document. There is no way to hand somebody a session, keep one after a host is gone, or diff two of them.
-
-Export is the half that is possible: it is what `session show`, `session history` and `changes` already return, assembled. Import is not, and saying so is the point of the entry — nothing in the protocol carries a turn *into* a host, so a session read out of one cannot be put back into another.
-
-**Suggestions.** (1) `ahpc session export <uri>` as one JSON document, which is assembly of what exists and needs nothing new. (2) That, plus a readable form — Markdown, one heading per turn — which is what somebody actually pastes into a ticket. (3) Leave it, and let `--json` on each command be the export, which is true today and costs a person three commands and a script.
+**Suggestions.** (1) Take the four and leave `filediff.tsx`'s layout alone, which is the decision as made. (2) Take the gutter as well, so a long file scrolls by hunk rather than by line — the thing our version does without and the one people notice. (3) Take nothing yet and record the decision, so the next person reads it here instead of re-arguing it.
 
 ---
 
@@ -76,4 +50,6 @@ Export is the half that is possible: it is what `session show`, `session history
 
 **On depending on nothing.** This client depends on no agent SDK and on no particular host. Anything added here that names one harness is a mistake, and `--claude` was one: it made a client that could talk to any host need one specific host installed to talk to any of them. B-01-04 and B-01-05 are the live version of that question — TextUI is not a harness, but it is a dependency, and the answer should be the same for both entries.
 
-**On the scripted host.** It implements every optional method on the seam except `close`, and `test/fake.test.ts` names them, so a method added to `HostConnection` and not to the fake fails there rather than being noticed a screen later. Anything added to the seam for B-01-07 goes on both sides in the same commit — the drift that entry would otherwise reintroduce is the one B-01-01 existed to fix.
+**On the scripted host.** It implements every optional method on the seam except `close`, and `test/fake.test.ts` names them, so a method added to `HostConnection` and not to the fake fails there rather than being noticed a screen later. It has already earned this once: it delivers its opening snapshot *synchronously* inside `subscribe`, which a socket does not, and that difference was hiding a real bug in `until()` — every waiting command failed against the scripted host and worked against a daemon.
+
+**On reusing TextUI.** Decided, so it is not re-argued per screen: take the fiddly parts and keep our own layout. `parseHunks`, `hunkAt`, `patchFor` and the gutter marks from `@textui/textide-git` are hard to get right and are not this client's business; the panes are. That is B-01-05's answer and B-01-04's, and it is why neither is a dependency question any more.

@@ -240,3 +240,15 @@ it('lets somebody say no, and leaves the refusal standing', async () => {
     .rejects.toMatchObject({ code: -32009 });
   expect(host.invoked()).toEqual([]);
 });
+
+it('delivers the opening snapshot inside subscribe, which is what a waiting caller must survive', async () => {
+  const host = fakeHost();
+  let arrived = false;
+  // A host holding the state already has no reason to wait a tick, and this
+  // one does not. Every caller that closes its subscription on the first event
+  // has to cope with having no handle yet - which `until()` did not, so every
+  // waiting command failed here and worked against a socket.
+  const held = host.subscribe(WITH_CHANGES, (event) => { if (event.type === 'snapshot') arrived = true; });
+  expect(arrived).toBe(true);
+  held.close();
+});

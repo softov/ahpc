@@ -23,6 +23,8 @@ Sessions
   session read <uri>           mark read                     [--unread]
   session archive <uri>        put it away                   [--undo]
   session customizations <uri> skills, prompts, agents, servers        [--json]
+  session export <uri>         the whole session as one document
+                               [--json] [--markdown]
   session toggle <uri> <id>    turn one on                   [--off]
 
 Turns
@@ -188,11 +190,23 @@ function until(
 ): Promise<HostEvent | undefined> {
   return new Promise((answer) => {
     let closed = false;
+    /*
+     * The handle may not exist yet when this runs.
+     *
+     * A host is entitled to deliver the opening snapshot *synchronously*
+     * inside `subscribe` - the scripted one does, and it is the honest thing
+     * for a host holding the state already - so a condition satisfied by that
+     * first event fires before `subscribe` has returned anything to close.
+     * Reading the handle there threw, which made every waiting command fail
+     * against the scripted host and work against a socket, purely because one
+     * of them answers a tick later.
+     */
+    let handle: { close(): void } | undefined;
     const finish = (event: HostEvent | undefined): void => {
       if (closed) return;
       closed = true;
       clearTimeout(timer);
-      handle.close();
+      handle?.close();
       answer(event);
     };
     const timer = setTimeout(
@@ -200,10 +214,13 @@ function until(
       Math.max(1, (options.timeoutSeconds ?? 900)) * 1000,
     );
     timer.unref?.();
-    const handle = host.subscribe(uri, (event) => {
+    handle = host.subscribe(uri, (event) => {
       options.onEvent?.(event);
       if (done(event)) finish(event);
     });
+    // Already over, before there was a handle to close. Closing it now is what
+    // `finish` could not do.
+    if (closed) handle.close();
   });
 }
 
@@ -654,6 +671,89 @@ async function sessions(host: HostConnection, args: Args, wants: boolean): Promi
       const found = await host.customizations(uri);
       if (wants) { json(found); return 0; }
       table(found.map((c) => [c.enabled ? 'on' : 'off', c.kind, c.name, c.description ?? '']));
+      return 0;
+    }
+    /*
+     * The whole session, as one document.
+     *
+     * Everything here could already be read one command at a time and never
+     * together, so there was no way to hand somebody a session, keep one after
+     * a host is gone, or diff two. This is assembly rather than anything new -
+     * `show`, `history`, `customizations` and `changes`, fetched in parallel
+     * and written out once.
+     *
+     * There is no import, and that is not an omission. Nothing in the protocol
+     * carries a turn *into* a host: `createSession` starts an empty one and
+     * every turn after it is the agent's own work. So a session read out of a
+     * host cannot be put back into another, and a command that pretended
+     * otherwise would be the worst thing here.
+     */
+    case 'export': {
+      const [detail, shot, custom, rows] = await Promise.all([
+        host.detail(uri),
+        snapshot(host, uri),
+        host.customizations(uri).catch(() => []),
+        host.listSessions().catch(() => []),
+      ]);
+      const row = rows.find((one) => one.resource === uri);
+      const turns = [...(shot?.turns ?? []), ...(shot?.active ? [shot.active] : [])];
+
+      /*
+       * Every changeset the host will answer for, not only the default one.
+       *
+       * A scope still carrying `{turnId}` is skipped rather than guessed at:
+       * an export that filled a template with the first turn id it saw would
+       * be putting a diff in the document that nobody asked about.
+       */
+      const scopes = (await host.changesets?.(uri).catch(() => [])) ?? [];
+      const sets = await Promise.all(scopes
+        .filter((scope) => scope.variables.length === 0)
+        .map(async (scope) => ({
+          label: scope.label,
+          uri: scope.uriTemplate,
+          changes: await host.changes(uri, scope.uriTemplate).catch(() => undefined),
+        })));
+
+      const document = {
+        exportedAt: new Date().toISOString(),
+        host: { url: host.url },
+        session: { resource: uri, ...(row ?? {}), detail },
+        turns,
+        customizations: custom,
+        changesets: sets.filter((one) => one.changes !== undefined),
+      };
+      if (!args.has('--markdown')) { json(document); return 0; }
+
+      // The readable form, which is what somebody actually pastes into a
+      // ticket. One heading per turn, and the diffs as counts rather than
+      // bodies - a changeset of forty files would otherwise bury the
+      // conversation the document is about.
+      line(`# ${row?.title ?? uri}`);
+      line();
+      line(`- Session: \`${uri}\``);
+      if (row?.provider) line(`- Harness: ${row.provider}`);
+      if (detail.model) line(`- Model: ${detail.model}`);
+      if (row?.workingDirectories?.length) {
+        line(`- Workspace: ${row.workingDirectories.map((d) => d.replace(/^file:\/\//, '')).join(', ')}`);
+      }
+      line(`- Exported: ${document.exportedAt}`);
+      line();
+      for (const turn of turns) {
+        const text = turn.role === 'user' ? (turn.message ?? '') : spoken(turn);
+        line(`## ${turn.role === 'user' ? 'Said' : 'Answered'}${turn.model ? ` (${turn.model})` : ''}`);
+        line();
+        if (text) { line(text); line(); }
+      }
+      for (const set of sets) {
+        if (!set.changes || set.changes.files.length === 0) continue;
+        line(`## ${set.label}`);
+        line();
+        for (const file of set.changes.files) {
+          const kind = file.before === undefined ? 'new' : file.after === undefined ? 'gone' : 'edit';
+          line(`- \`${file.uri.replace(/^file:\/\//, '')}\` — ${kind}, +${file.diff.added} -${file.diff.removed}`);
+        }
+        line();
+      }
       return 0;
     }
     case 'toggle': {
