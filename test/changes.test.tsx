@@ -214,3 +214,40 @@ describe('choosing which changeset, and ticking files off', () => {
     await t.unmount();
   });
 });
+
+describe('running one of the verbs from the screen', () => {
+  it('shows the confirmation before invoking, which the protocol requires', async () => {
+    const t = await changes();
+    // `revert` on what the conversation changed. The host called it
+    // destructive by giving it a confirmation, so nothing may happen until
+    // that has been shown and accepted.
+    void t.app.execute('changes.run', { operation: 'revert' });
+    for (let i = 0; i < 10; i++) await t.settle();
+    expect(t.hasText('Put this file back the way the agent found it?')).toBe(true);
+    await t.unmount();
+  });
+
+  it('does nothing at all when the confirmation is declined', async () => {
+    const t = await changes();
+    void t.app.execute('changes.run', { operation: 'revert' });
+    for (let i = 0; i < 10; i++) await t.settle();
+    await t.press('escape');
+    for (let i = 0; i < 10; i++) await t.settle();
+    // Not even the grant was asked for. Declining the act must not leave a
+    // client that has quietly taken write access to the tree.
+    expect(t.hasText('needs write access')).toBe(false);
+    await t.unmount();
+  });
+
+  it('asks for the write separately, because it is a different question', async () => {
+    const t = await changes();
+    void t.app.execute('changes.run', { operation: 'revert' });
+    for (let i = 0; i < 10; i++) await t.settle();
+    await t.press('enter');
+    for (let i = 0; i < 12; i++) await t.settle();
+    // "Revert this file" and "let this host write to your repository" are two
+    // questions, and answering the first is not answering the second.
+    expect(t.hasText('Let the host write?')).toBe(true);
+    await t.unmount();
+  });
+});

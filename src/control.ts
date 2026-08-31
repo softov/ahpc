@@ -7,6 +7,7 @@ import type {
 } from '@textui/core';
 import { createBag, serviceKey } from '@textui/core';
 import { confirm } from '@textui/widgets';
+import { operate } from './ahp/operate.js';
 import type { HostConnection } from './ahp/connection.js';
 import type { Terminals } from './terminal.js';
 import { createTerminals } from './terminal.js';
@@ -623,7 +624,7 @@ export function createController(
   // is only ever as fresh as the last time somebody navigated to it.
   const watching = host.onSessions(refreshSoon);
   bag.add({ dispose: () => watching.close() });
-  for (const command of commands(app, controller)) bag.add(app.commands.register(command));
+  for (const command of commands(app, controller, host)) bag.add(app.commands.register(command));
   for (const binding of keys()) bag.add(app.keybindings.register(binding));
 
   return Object.assign(controller, { dispose: () => bag.dispose() });
@@ -653,7 +654,20 @@ interface Catalogue {
   agents: Agent[];
 }
 
-function commands(app: TextUIApp, controller: Controller): CommandDefinition[] {
+function commands(
+  app: TextUIApp,
+  controller: Controller,
+  /*
+   * The connection, for the one command that needs it directly.
+   *
+   * Everything else here goes through the controller, and should: it is what
+   * keeps the commands from knowing there is a protocol. `changes.run` is the
+   * exception because `operate` is the negotiation - a refusal, a question,
+   * a retry - and wrapping that in a controller method would be hiding the
+   * question, which is the part a person has to answer.
+   */
+  connection: HostConnection,
+): CommandDefinition[] {
   const selected = (): SessionUri | null => app.store.get<SessionUri>(SELECTED) ?? null;
   const openUri = (): SessionUri | null => app.store.get<SessionUri>(OPEN) ?? null;
 
@@ -856,6 +870,90 @@ function commands(app: TextUIApp, controller: Controller): CommandDefinition[] {
         const held = app.store.get<Changeset>(CHANGES_AT_PATH);
         const file = held?.files.find((one) => one.uri === row);
         controller.review(at, [row], file?.reviewed !== true);
+      },
+    },
+    {
+      /*
+       * Run the verb the changeset offers, asking first where the host said to.
+       *
+       * One command rather than one per verb, with the id as an argument, for
+       * the reason the config settings are registered the other way round: the
+       * *settings* are a fixed schema a host publishes once, and these change
+       * with every changeset - a command per operation would be registering
+       * and disposing three of them each time the scope moves.
+       *
+       * The confirmation is not optional. The protocol says a client MUST
+       * display it before invoking, and its presence is also how the host says
+       * the operation is destructive - so this is the screen's half of what
+       * `--yes` is in the shell.
+       */
+      id: 'changes.run',
+      title: 'Do something with these changes',
+      category: 'Changes',
+      when: `${SCREEN} == 'changes'`,
+      args: [{
+        name: 'operation',
+        type: 'string' as const,
+        required: true,
+        description: 'Which of the verbs this changeset offers',
+        // What the changeset advertises, now. An id that was not offered is
+        // one the host will refuse, so there is nothing to gain by listing
+        // more than it says.
+        choices: () => {
+          const held = app.store.get<Changeset>(CHANGES_AT_PATH);
+          return (held?.operations ?? [])
+            .filter((one) => one.status !== 'disabled')
+            .map((one) => ({ value: one.id, label: one.label, description: one.description ?? '' }));
+        },
+      }],
+      run: async (given?: Record<string, unknown>) => {
+        const at = app.store.get<string>(CHANGE_AT) ?? '';
+        const held = app.store.get<Changeset>(CHANGES_AT_PATH);
+        const wanted = String(given?.operation ?? '');
+        const operation = (held?.operations ?? []).find((one) => one.id === wanted);
+        if (!at || !operation) return;
+        const row = app.store.get<string>(CHANGE_ROW) ?? '';
+        const onFile = !operation.scopes.includes('changeset');
+        if (onFile && !row) return;
+
+        if (operation.confirmation !== undefined) {
+          const yes = await confirm(app.layers, {
+            title: operation.label,
+            message: operation.confirmation,
+            confirmLabel: operation.label,
+            cancelLabel: 'Leave it',
+            // The presence of a confirmation is the host calling this
+            // destructive, so the button is styled as one.
+            tone: 'danger',
+          });
+          if (!yes) return;
+        }
+        try {
+          const done = await operate(connection, at, wanted, {
+            ...(onFile ? { target: { kind: 'resource' as const, resource: row } } : {}),
+            /*
+             * Asked here as well, and separately.
+             *
+             * "Discard this file" and "let this host write to your repository"
+             * are two different questions, and answering the first is not
+             * answering the second. A client that took the grant silently
+             * would be one where saying yes to a diff quietly hands over the
+             * working tree.
+             */
+            ask: (request: { uri: string }) => confirm(app.layers, {
+              title: 'Let the host write?',
+              message: `${operation.label} needs write access to ${request.uri.replace(/^file:\/\//, '')}.`,
+              confirmLabel: 'Allow',
+              cancelLabel: 'No',
+              tone: 'danger',
+            }),
+          });
+          // The host's own sentence about what it did, shown where a refusal
+          // would be. A silent success on a destructive verb reads as one that
+          // did not happen.
+          if (done.message !== undefined) app.store.set(HOST_ERROR, done.message);
+        }
+        catch (error) { controller.report(error); }
       },
     },
     {
@@ -1509,6 +1607,10 @@ function keys(): {
      */
     { keys: ']', commandId: 'changes.scope', scopeId: CHANGES_SCOPE },
     { keys: 'r', commandId: 'changes.review', scopeId: CHANGES_SCOPE },
+    // `x` for "do something to this". The command takes which one as an
+    // argument, so the key opens the picker rather than committing to a verb -
+    // which is right, because the verbs differ per changeset and per host.
+    { keys: 'x', commandId: 'changes.run', scopeId: CHANGES_SCOPE },
     { keys: 's', commandId: 'go.settings', scopeId: CHAT_SCOPE },
     { keys: 't', commandId: 'chat.stop', scopeId: CHAT_SCOPE },
     { keys: 'k', commandId: 'go.skills', scopeId: CHAT_SCOPE },

@@ -20,12 +20,6 @@ That cuts the other way too. A feature is not unnecessary because ahpd is the on
 
 ---
 
-## B-01-07 — The verbs cannot be pressed from the screen
-
-`ahpc changes --run` invokes them from a shell, and the changes screen draws them with their status and gets no further. What is missing is a place to ask: the protocol says a client **MUST** display an operation's `confirmation` before invoking, and this application has no prompt — the shell answers that with `--yes`, and a full-screen client cannot.
-
-**Suggestions.** (1) A modal confirm over the changes screen, which every destructive control this client grows later will want as well. (2) A two-key press — the verb, then enter to mean it — which needs no new component and is a convention nobody has agreed to. (3) Leave it in the shell, and record that the screen shows what may be done and the command line does it, which is true today and is a smaller client.
-
 ## B-01-04 — The filesystem is only a completion
 
 `resourceList` and `resourceRead` are on the connection, behind `ahpc resource`, and now on the scripted host too — but the only place a host's filesystem is *drawn* is the `@` completion in the composer. A host that serves files is one a person could browse; this client makes them type a path they cannot see.
@@ -51,5 +45,7 @@ Decided: adopt `parseHunks`, `hunkAt`, `patchFor` and the gutter marks, and keep
 **On depending on nothing.** This client depends on no agent SDK and on no particular host. Anything added here that names one harness is a mistake, and `--claude` was one: it made a client that could talk to any host need one specific host installed to talk to any of them. B-01-04 and B-01-05 are the live version of that question — TextUI is not a harness, but it is a dependency, and the answer should be the same for both entries.
 
 **On the scripted host.** It implements every optional method on the seam except `close`, and `test/fake.test.ts` names them, so a method added to `HostConnection` and not to the fake fails there rather than being noticed a screen later. It has already earned this once: it delivers its opening snapshot *synchronously* inside `subscribe`, which a socket does not, and that difference was hiding a real bug in `until()` — every waiting command failed against the scripted host and worked against a daemon.
+
+**On asking twice.** Running a destructive verb from the screen asks two questions, not one: the operation's own `confirmation`, and then whether to grant the host write access. They read like the same question and are not — "discard this file" is about a file, and the grant is about the repository — so a client that folded them together would be one where saying yes to a diff quietly hands over the working tree.
 
 **On reusing TextUI.** Decided, so it is not re-argued per screen: take the fiddly parts and keep our own layout. `parseHunks`, `hunkAt`, `patchFor` and the gutter marks from `@textui/textide-git` are hard to get right and are not this client's business; the panes are. That is B-01-05's answer and B-01-04's, and it is why neither is a dependency question any more.

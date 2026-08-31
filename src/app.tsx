@@ -226,7 +226,7 @@ const Hints = defineComponent<BoxProps>('ChatHints', (props) => {
           // Only where they do something. A hint for a key that is inert on
           // this screen is worse than no hint.
           ...(screen === 'changes'
-            ? [{ keys: ']', label: 'changeset' }, { keys: 'r', label: 'read' }]
+            ? [{ keys: ']', label: 'changeset' }, { keys: 'r', label: 'read' }, { keys: 'x', label: 'do' }]
             : []),
           { keys: 'esc', label: 'back' },
           { keys: 'ctrl+p', label: 'commands' },
