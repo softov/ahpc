@@ -14,8 +14,8 @@ import {
   useStoreValue,
   useTheme,
 } from '@textui/core';
-import { Badge, Column, Divider, EmptyState, Field, Form, FormActions, Marquee, Panel, RadioGroup, Row, SearchBox, TextInput, argumentOf, useForm } from '@textui/widgets';
-import { scheduleProblem, zoneIsKnownHere } from './schedule.js';
+import { Badge, Column, Divider, EmptyState, Field, Form, FormActions, Marquee, Panel, RadioGroup, Row, SearchBox, Select, TextInput, argumentOf, useForm } from '@textui/widgets';
+import { PRESETS, presetFor, scheduleProblem, zoneIsKnownHere } from './schedule.js';
 import {
   AUTOMATIONS_SCOPE, CHANGES_SCOPE, CHAT_SCOPE, CONTROLLER, MCP_SCOPE, SESSIONS_SCOPE, SKILLS_SCOPE, settingCommand,
 } from './control.js';
@@ -1121,54 +1121,98 @@ export const NewAutomationScreen: (props: Record<string, never>) => RenderOutput
       <Panel title="A new automation" flex={1}>
         <Form form={form as never} flex={1}>
           <Column gap={0} flex={1}>
-            <Field name="title" label="Name" labelWidth={10} required>
-              <TextInput
-                value={form.values.title}
-                autoFocus
-                placeholder="Nightly framework build"
-                onChange={(value: string) => { form.setValue('title', value); form.touch('title'); }}
-              />
-            </Field>
-            <Field name="message" label="Says" labelWidth={10} required hint="the first thing it says">
+            {/* Paired, so the whole form fits a 24-row terminal. That is not
+                tidiness: the last thing on it is the button that submits it,
+                and a form whose Create is below the fold cannot be finished by
+                somebody who cannot scroll to it - this library's scroll view
+                does not follow focus, so there is nowhere to put the overflow. */}
+            <Row gap={1}>
+              <Field name="title" label="Name" labelWidth={10} required flex={2}>
+                <TextInput
+                  value={form.values.title}
+                  autoFocus
+                  placeholder="Nightly framework build"
+                  onChange={(value: string) => { form.setValue('title', value); form.touch('title'); }}
+                />
+              </Field>
+              <Field name="directory" label="in" labelWidth={3} flex={2}>
+                <TextInput
+                  value={form.values.directory}
+                  placeholder="the host's default directory"
+                  onChange={(value: string) => { form.setValue('directory', value); form.touch('directory'); }}
+                />
+              </Field>
+            </Row>
+            <Field name="message" label="Says" labelWidth={10} required>
               <TextInput
                 value={form.values.message}
                 placeholder="review what changed today"
                 onChange={(value: string) => { form.setValue('message', value); form.touch('message'); }}
               />
             </Field>
-            <Field name="directory" label="Runs in" labelWidth={10}>
-              <TextInput
-                value={form.values.directory}
-                placeholder="the host's default directory"
-                onChange={(value: string) => { form.setValue('directory', value); form.touch('directory'); }}
-              />
-            </Field>
             <Divider />
-            <Field
-              name="expression"
-              label="Schedule"
-              labelWidth={10}
-              hint="minute hour day month weekday"
-            >
-              <TextInput
-                value={form.values.expression}
-                placeholder="0 9 * * 1-5"
-                onChange={(value: string) => { form.setValue('expression', value); form.touch('expression'); }}
+            {/* The easy path first. Choosing one writes the expression below,
+                which stays the authoritative value - so a preset is a way of
+                filling the field in, never a second place the answer lives. */}
+            <Field name="preset" label="Runs" labelWidth={10}>
+              <Select
+                options={[
+                  ...PRESETS.map((one) => ({ value: one.id, label: one.label })),
+                  // Only reachable by typing. Offering it as a choice would be
+                  // offering to clear the field somebody just filled in.
+                  ...(presetFor(form.values.expression) === undefined
+                    ? [{ value: 'custom', label: 'Something else, written below' }]
+                    : []),
+                ]}
+                value={presetFor(form.values.expression)?.id ?? 'custom'}
+                mode="floating"
+                onChange={(value: string) => {
+                  const chosen = PRESETS.find((one) => one.id === value);
+                  if (!chosen) return;
+                  form.setValue('expression', chosen.expression);
+                  form.touch('expression');
+                }}
               />
             </Field>
-            <Field name="timeZone" label="Zone" labelWidth={10}>
-              <TextInput
-                value={form.values.timeZone}
-                placeholder="UTC"
-                onChange={(value: string) => { form.setValue('timeZone', value); form.touch('timeZone'); }}
-              />
-            </Field>
+            {/* One row, because they are one fact: an expression without the
+                zone it is read in does not name a time. It also buys back the
+                rows the picker above costs, so the whole form still fits a
+                short terminal - which matters more than usual here, because
+                the button that submits it is at the bottom. */}
+            <Row gap={1}>
+              <Field
+                name="expression"
+                label="Schedule"
+                labelWidth={10}
+                hint="minute hour day month weekday"
+                flex={2}
+              >
+                <TextInput
+                  value={form.values.expression}
+                  placeholder="0 9 * * 1-5"
+                  onChange={(value: string) => { form.setValue('expression', value); form.touch('expression'); }}
+                />
+              </Field>
+              <Field name="timeZone" label="Zone" labelWidth={5} flex={1}>
+                <TextInput
+                  value={form.values.timeZone}
+                  placeholder="UTC"
+                  onChange={(value: string) => { form.setValue('timeZone', value); form.touch('timeZone'); }}
+                />
+              </Field>
+            </Row>
             {/* Said once, where it cannot be mistaken for a rule about this
                 form: when it fires is the host's answer, not this screen's. */}
+            {/* A preset's label is true by construction - it is the words the
+                expression was chosen by. A hand-written expression gets no
+                gloss at all, because paraphrasing one would be this screen
+                claiming to understand what only the host evaluates. */}
             <text
               content={form.values.expression.trim() === ''
-                ? 'Empty: it runs when somebody presses Run.'
-                : 'The host works out when this comes round.'}
+                ? 'No schedule: it runs when somebody presses Run.'
+                : presetFor(form.values.expression)
+                  ? `${presetFor(form.values.expression)?.label}. The host works out the next one.`
+                  : 'The host works out when this comes round, and the list will say.'}
               fg="subtle"
             />
             {failure !== null ? <text content={failure} fg="danger" wrap="word" /> : null}

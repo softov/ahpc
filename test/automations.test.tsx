@@ -16,10 +16,10 @@ import { AUTOMATION_ROW } from '../src/state.js';
  * would say a switched-off automation runs every weekday.
  */
 
-async function open(width = 90) {
+async function open(width = 90, height = 30) {
   const host = fakeHost();
   const t = await renderApp({
-    width, height: 30, shell: 'workbench', theme: 'dark',
+    width, height, shell: 'workbench', theme: 'dark',
     onBoot: (app) => { registerChat(app, { host }); },
   });
   for (let i = 0; i < 8; i++) await t.settle();
@@ -140,7 +140,7 @@ describe('writing a new automation', () => {
 
   for (const width of [90, 60]) {
     it(`offers the form, at ${width} columns`, async () => {
-      const { t } = await open(width);
+      const { t } = await open(width, 24);
       await t.app.execute('automation.new');
       for (let i = 0; i < 8; i++) await t.settle();
       expect(t.hasText('A new automation')).toBe(true);
@@ -149,6 +149,12 @@ describe('writing a new automation', () => {
       // is the one that has to survive a narrow shell.
       expect(t.hasText('Schedule')).toBe(true);
       expect(t.hasText('presses Run')).toBe(true);
+      // The common ones, offered rather than left to be known.
+      expect(t.hasText('By hand only')).toBe(true);
+      // And the button that submits it, on screen at 24 rows - this library's
+      // scroll view does not follow focus, so anything below the fold here is
+      // unreachable rather than merely out of sight.
+      expect(t.hasText('Create')).toBe(true);
       await t.unmount();
     });
   }

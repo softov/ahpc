@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { scheduleProblem, zoneIsKnownHere } from '../src/schedule.js';
+import { PRESETS, presetFor, scheduleProblem, zoneIsKnownHere } from '../src/schedule.js';
 
 /*
  * Grammar, and deliberately not meaning.
@@ -64,5 +64,33 @@ describe('the zone', () => {
   it('does not know a typo', () => {
     expect(zoneIsKnownHere('America/Sao Paulo')).toBe(false);
     expect(zoneIsKnownHere('')).toBe(false);
+  });
+});
+
+describe('the common ones', () => {
+  it('offers manual-only first, because it is a real choice', () => {
+    expect(PRESETS[0]?.expression).toBe('');
+  });
+
+  it('offers expressions this same file accepts', () => {
+    // A preset that does not parse would be a screen handing somebody a
+    // schedule its own field then refuses.
+    for (const preset of PRESETS) {
+      if (preset.expression === '') continue;
+      expect(scheduleProblem(preset.expression), preset.label).toBeUndefined();
+    }
+  });
+
+  it('recognises one written out by hand', () => {
+    // Matched on the expression, not remembered as a choice - so typing what a
+    // preset would have written is still that preset.
+    expect(presetFor('0 2 * * *')?.label).toBe('Every day at 02:00');
+    expect(presetFor('  0 2 * * *  ')?.id).toBe('daily');
+  });
+
+  it('says nothing about an expression that is somebody own', () => {
+    // The gloss is a label read off a known expression. An edited preset is
+    // not one any more, and this screen will not put words in their mouth.
+    expect(presetFor('0 2 * * 3')).toBeUndefined();
   });
 });

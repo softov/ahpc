@@ -116,3 +116,46 @@ export function zoneIsKnownHere(timeZone: string): boolean {
   }
   catch { return false; }
 }
+
+// ------------------------------------------------------------- the common ones
+
+/**
+ * Schedules people actually ask for, as expressions.
+ *
+ * A label paired with a *known* expression, which is the whole reason this can
+ * say "every day at 02:00" in English while `scheduleProblem` refuses to
+ * paraphrase anything. Reading a label off a table is not the same as claiming
+ * to understand an arbitrary expression: choose one of these and the sentence
+ * is true by construction, write your own and this says nothing about it.
+ *
+ * Empty is first and is a real choice: no trigger at all is what manual-only
+ * means, and it is the thing somebody wants more often than any single cron.
+ */
+export interface Preset {
+  id: string;
+  label: string;
+  /** Empty for manual-only. */
+  expression: string;
+}
+
+export const PRESETS: Preset[] = [
+  { id: 'manual', label: 'By hand only', expression: '' },
+  { id: 'half-hourly', label: 'Every 30 minutes', expression: '*/30 * * * *' },
+  { id: 'hourly', label: 'Every hour, on the hour', expression: '0 * * * *' },
+  { id: 'daily', label: 'Every day at 02:00', expression: '0 2 * * *' },
+  { id: 'weekdays', label: 'Weekdays at 09:00', expression: '0 9 * * 1-5' },
+  { id: 'saturday', label: 'Saturdays at 23:00', expression: '0 23 * * 6' },
+];
+
+/**
+ * Which preset an expression is, if it is one.
+ *
+ * Matched on the expression rather than remembered as a choice, so a preset
+ * typed out by hand is recognised and an edited preset stops claiming to be
+ * one. Undefined means the expression is the person's own, and nothing here
+ * will put words in their mouth about it.
+ */
+export function presetFor(expression: string): Preset | undefined {
+  const trimmed = expression.trim();
+  return PRESETS.find((one) => one.expression === trimmed);
+}
