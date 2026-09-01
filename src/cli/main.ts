@@ -5,6 +5,7 @@ import { configPath, loadConfig } from '../config.js';
 import type { Where } from '../connect.js';
 import { ago, archived, branch, json, line, mark, project, table } from './render.js';
 import type { HostConnection, HostEvent } from '../ahp/connection.js';
+import { operate } from '../ahp/operate.js';
 import type { Answer, SessionUri, Turn } from '../ahp/types.js';
 
 export const HELP = `ahpc - drive an agent host from a shell
@@ -22,6 +23,8 @@ Sessions
   session read <uri>           mark read                     [--unread]
   session archive <uri>        put it away                   [--undo]
   session customizations <uri> skills, prompts, agents, servers        [--json]
+  session export <uri>         the whole session as one document
+                               [--json] [--markdown]
   session toggle <uri> <id>    turn one on                   [--off]
 
 Turns
@@ -47,13 +50,21 @@ The harness
   agents                       what it serves, and each one's models  [--json]
   models                       every model, by harness                [--json]
   commands                     what a slash offers                    [--json]
+  customizations               skills, prompts, agents and MCP servers,
+                               before any session exists     [--kind k] [--json]
   completions <uri> <text>     what the host would complete  [--offset N] [--json]
 
 Changes and files
   changes <uri>                the files a session touched            [--json]
+                               [--list] [--scope s] [--<variable> v]
+                               [--reviewed f] [--unreviewed f]
+                               [--operations]           what may be done to it
+                               [--run id] [--file f] [--yes]      do one of them
                                [--list] every changeset it offers
                                [--scope <name>] one of them, e.g. turn
                                [--turnId <id>] what a chosen scope still needs
+                               [--reviewed <file>] tick one off, repeatable
+                               [--unreviewed <file>] and clear one
   content <uri> <file>         one of them, in full
   resource list <uri>          a directory the host serves            [--json]
   resource read <uri>          a file on the host
@@ -179,11 +190,23 @@ function until(
 ): Promise<HostEvent | undefined> {
   return new Promise((answer) => {
     let closed = false;
+    /*
+     * The handle may not exist yet when this runs.
+     *
+     * A host is entitled to deliver the opening snapshot *synchronously*
+     * inside `subscribe` - the scripted one does, and it is the honest thing
+     * for a host holding the state already - so a condition satisfied by that
+     * first event fires before `subscribe` has returned anything to close.
+     * Reading the handle there threw, which made every waiting command fail
+     * against the scripted host and work against a socket, purely because one
+     * of them answers a tick later.
+     */
+    let handle: { close(): void } | undefined;
     const finish = (event: HostEvent | undefined): void => {
       if (closed) return;
       closed = true;
       clearTimeout(timer);
-      handle.close();
+      handle?.close();
       answer(event);
     };
     const timer = setTimeout(
@@ -191,10 +214,13 @@ function until(
       Math.max(1, (options.timeoutSeconds ?? 900)) * 1000,
     );
     timer.unref?.();
-    const handle = host.subscribe(uri, (event) => {
+    handle = host.subscribe(uri, (event) => {
       options.onEvent?.(event);
       if (done(event)) finish(event);
     });
+    // Already over, before there was a handle to close. Closing it now is what
+    // `finish` could not do.
+    if (closed) handle.close();
   });
 }
 
@@ -306,6 +332,45 @@ export async function cli(command: string, rest: string[]): Promise<number> {
         table(found.map((c) => [`/${c.name}`, c.kind, c.description ?? '']));
         break;
       }
+      /*
+       * What every harness on this host offers, with no session anywhere.
+       *
+       * `session customizations` is the same list resolved against one
+       * session's directory. This is the unresolved one, off the root channel,
+       * and it is the only one answerable before somebody has decided which
+       * agent to start - which is when a person picking a skill to open with
+       * is asking.
+       *
+       * Settled on, because a harness is advertised at once and what it offers
+       * arrives when its probe answers.
+       */
+      case 'customizations': {
+        const kind = args.value('--kind');
+        const found = await settled(host, async () => (await host.agents())
+          .filter((agent) => (agent.customizations ?? []).length > 0));
+        const rows = found.flatMap((agent) => (agent.customizations ?? [])
+          .filter((one) => kind === undefined || one.kind === kind)
+          .map((one) => ({ provider: agent.provider, ...one })));
+        if (wants) { json(rows); break; }
+        if (rows.length === 0) {
+          line('This host advertises no customizations. A harness nobody has signed into offers none.');
+          break;
+        }
+        table(rows.map((one) => [
+          one.provider,
+          one.kind,
+          one.name,
+          // The state is the half a list is read for: a server that needs
+          // signing into looks exactly like a working one without it.
+          one.state ?? (one.enabled ? 'on' : 'off'),
+          // The first sentence, clipped. A skill's description is written for
+          // a model deciding whether to load it and runs to a paragraph, which
+          // in a table is one row pushing the next sixty off the screen.
+          // `--json` is where the whole thing is.
+          brief(one.description),
+        ]));
+        break;
+      }
       case 'completions': {
         const uri = needs(args, 0, 'a session URI');
         const text = needs(args, 1, 'the text being typed');
@@ -336,6 +401,7 @@ export async function cli(command: string, rest: string[]): Promise<number> {
           table(scopes.map((s) => [
             named(s.uriTemplate),
             s.variables.map((v) => `--${v}`).join(' '),
+            s.reviewable ? 'reviewable' : '',
             s.label,
             s.description ?? '',
           ]));
@@ -374,12 +440,109 @@ export async function cli(command: string, rest: string[]): Promise<number> {
           }
         }
 
+        /*
+         * Ticking files off, which needs the changeset's own URI.
+         *
+         * So it is here rather than a command of its own: choosing which
+         * changeset is the same question either way, and a second command
+         * would have to ask it again.
+         */
+        const ticking = args.every('--reviewed').concat(args.every('--unreviewed'));
+        if (ticking.length > 0) {
+          if (!target) throw new Fault('Which changeset? --scope says, and --list says what there is.');
+          if (!host.review) throw new Fault('This host connection cannot mark files reviewed.');
+          const on = args.every('--reviewed');
+          const off = args.every('--unreviewed');
+          // Whole `file://` URIs are what a row's id is, and what this prints,
+          // so a path typed as it was printed is accepted too.
+          const idOf = (one: string): string => (one.startsWith('file://') ? one : `file://${one}`);
+          if (on.length > 0) host.review(target, on.map(idOf), true);
+          if (off.length > 0) host.review(target, off.map(idOf), false);
+          await host.flush?.();
+        }
+
+        /*
+         * Running one of the verbs the changeset advertises.
+         *
+         * Here rather than a command of its own for the same reason ticking is:
+         * choosing which changeset is the same question, and a second command
+         * would ask it again. `--run` names an id from `--operations`, and
+         * `--file` points it at a row where the operation is not
+         * changeset-wide.
+         */
+        const running = args.value('--run');
+        if (running !== undefined) {
+          if (!target) throw new Fault('Which changeset? --scope says, and --list says what there is.');
+          if (!host.invoke) throw new Fault('This host connection cannot run changeset operations.');
+          const set = await host.changes(uri, target);
+          const one = (set.operations ?? []).find((op) => op.id === running);
+          if (!one) {
+            throw new Fault(`No operation called ${running} on that changeset.`
+              + ` It offers ${(set.operations ?? []).map((op) => op.id).join(', ') || 'none'}.`);
+          }
+          if (one.status === 'disabled') throw new Fault(`${one.label} is disabled right now, probably because a turn is running.`);
+          const file = args.value('--file');
+          const needsFile = !one.scopes.includes('changeset');
+          if (needsFile && file === undefined) throw new Fault(`${one.label} acts on one file. Pass --file.`);
+          // The protocol says a client MUST show the confirmation before
+          // invoking. In a shell that means saying it and requiring the person
+          // to have meant it.
+          if (one.confirmation !== undefined && !args.has('--yes')) {
+            throw new Fault(`${one.confirmation}\nPass --yes to go ahead.`);
+          }
+          const done = await operate(host, target, running, {
+            ...(needsFile || file !== undefined
+              ? {
+                target: {
+                  kind: 'resource' as const,
+                  resource: file?.startsWith('file://') === true ? file : `file://${file ?? ''}`,
+                },
+              }
+              : {}),
+            /*
+             * A shell says what it is about to do and does it.
+             *
+             * `--yes` has already been required for anything the host called
+             * destructive, so the person has said so once; making them say it
+             * twice for the *permission* would be asking about the plumbing
+             * rather than about the act. What is not silent is the fact that
+             * access was taken, which is printed.
+             */
+            ask: (request) => {
+              line(`Asking ${request.uri} for write access.`);
+              return true;
+            },
+          });
+          await host.flush?.();
+          if (wants) { json(done); break; }
+          line(done.message ?? `${one.label} done.`);
+          break;
+        }
+
         const found = await host.changes(uri, target);
         if (wants) { json(found); break; }
+
+        if (args.has('--operations')) {
+          const offered = found.operations ?? [];
+          if (offered.length === 0) { line('This changeset offers nothing to do to it.'); break; }
+          // The status is the half worth having: a verb that cannot be pressed
+          // right now looks exactly like one that can without it.
+          table(offered.map((op) => [
+            op.id,
+            op.status,
+            op.scopes.join('/'),
+            op.confirmation !== undefined ? 'asks first' : '',
+            op.label,
+            brief(op.error?.message ?? op.description),
+          ]));
+          break;
+        }
+
         if (found.files.length === 0) { line('No changes.'); break; }
         // Creation and deletion are the absences, which is how the protocol
         // says them: no `before` is new, no `after` is gone.
         table(found.files.map((f) => [
+          f.reviewed ? '\u2713' : ' ',
           f.before === undefined ? 'new' : f.after === undefined ? 'gone' : 'edit',
           `+${f.diff.added} -${f.diff.removed}`,
           f.uri.replace(/^file:\/\//, ''),
@@ -510,6 +673,89 @@ async function sessions(host: HostConnection, args: Args, wants: boolean): Promi
       table(found.map((c) => [c.enabled ? 'on' : 'off', c.kind, c.name, c.description ?? '']));
       return 0;
     }
+    /*
+     * The whole session, as one document.
+     *
+     * Everything here could already be read one command at a time and never
+     * together, so there was no way to hand somebody a session, keep one after
+     * a host is gone, or diff two. This is assembly rather than anything new -
+     * `show`, `history`, `customizations` and `changes`, fetched in parallel
+     * and written out once.
+     *
+     * There is no import, and that is not an omission. Nothing in the protocol
+     * carries a turn *into* a host: `createSession` starts an empty one and
+     * every turn after it is the agent's own work. So a session read out of a
+     * host cannot be put back into another, and a command that pretended
+     * otherwise would be the worst thing here.
+     */
+    case 'export': {
+      const [detail, shot, custom, rows] = await Promise.all([
+        host.detail(uri),
+        snapshot(host, uri),
+        host.customizations(uri).catch(() => []),
+        host.listSessions().catch(() => []),
+      ]);
+      const row = rows.find((one) => one.resource === uri);
+      const turns = [...(shot?.turns ?? []), ...(shot?.active ? [shot.active] : [])];
+
+      /*
+       * Every changeset the host will answer for, not only the default one.
+       *
+       * A scope still carrying `{turnId}` is skipped rather than guessed at:
+       * an export that filled a template with the first turn id it saw would
+       * be putting a diff in the document that nobody asked about.
+       */
+      const scopes = (await host.changesets?.(uri).catch(() => [])) ?? [];
+      const sets = await Promise.all(scopes
+        .filter((scope) => scope.variables.length === 0)
+        .map(async (scope) => ({
+          label: scope.label,
+          uri: scope.uriTemplate,
+          changes: await host.changes(uri, scope.uriTemplate).catch(() => undefined),
+        })));
+
+      const document = {
+        exportedAt: new Date().toISOString(),
+        host: { url: host.url },
+        session: { resource: uri, ...(row ?? {}), detail },
+        turns,
+        customizations: custom,
+        changesets: sets.filter((one) => one.changes !== undefined),
+      };
+      if (!args.has('--markdown')) { json(document); return 0; }
+
+      // The readable form, which is what somebody actually pastes into a
+      // ticket. One heading per turn, and the diffs as counts rather than
+      // bodies - a changeset of forty files would otherwise bury the
+      // conversation the document is about.
+      line(`# ${row?.title ?? uri}`);
+      line();
+      line(`- Session: \`${uri}\``);
+      if (row?.provider) line(`- Harness: ${row.provider}`);
+      if (detail.model) line(`- Model: ${detail.model}`);
+      if (row?.workingDirectories?.length) {
+        line(`- Workspace: ${row.workingDirectories.map((d) => d.replace(/^file:\/\//, '')).join(', ')}`);
+      }
+      line(`- Exported: ${document.exportedAt}`);
+      line();
+      for (const turn of turns) {
+        const text = turn.role === 'user' ? (turn.message ?? '') : spoken(turn);
+        line(`## ${turn.role === 'user' ? 'Said' : 'Answered'}${turn.model ? ` (${turn.model})` : ''}`);
+        line();
+        if (text) { line(text); line(); }
+      }
+      for (const set of sets) {
+        if (!set.changes || set.changes.files.length === 0) continue;
+        line(`## ${set.label}`);
+        line();
+        for (const file of set.changes.files) {
+          const kind = file.before === undefined ? 'new' : file.after === undefined ? 'gone' : 'edit';
+          line(`- \`${file.uri.replace(/^file:\/\//, '')}\` — ${kind}, +${file.diff.added} -${file.diff.removed}`);
+        }
+        line();
+      }
+      return 0;
+    }
     case 'toggle': {
       const id = needs(args, 2, 'a customization id');
       host.setCustomizationEnabled(uri, id, !args.has('--off'));
@@ -518,6 +764,19 @@ async function sessions(host: HostConnection, args: Args, wants: boolean): Promi
     default: throw new Fault(`No 'session ${verb}'. Try 'ahpc help'.`);
   }
 }
+
+/**
+ * One line of a description, short enough to sit in a column.
+ *
+ * Skill descriptions are written for a model choosing whether to load one, so
+ * they run to a paragraph and carry newlines. `--json` is the whole answer;
+ * this is the one a person reads down.
+ */
+const brief = (text: string | undefined, width = 72): string => {
+  if (!text) return '';
+  const line_ = text.split('\n')[0]?.trim() ?? '';
+  return line_.length > width ? `${line_.slice(0, width - 1)}…` : line_;
+};
 
 /** Everything under `chat`. */
 async function chats(host: HostConnection, args: Args, wants: boolean): Promise<number> {

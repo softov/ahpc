@@ -144,3 +144,110 @@ describe('the changeset', () => {
     await t.unmount();
   });
 });
+
+describe('choosing which changeset, and ticking files off', () => {
+  it('names every scope the host offers, and says which one cannot be reached', async () => {
+    const t = await changes();
+    // The four the fixture advertises. A screen that drew only the first was
+    // showing one and hiding three.
+    expect(t.hasText('This Session')).toBe(true);
+    expect(t.hasText('Uncommitted Changes')).toBe(true);
+    // A template with `{turnId}` still in it is a question about a turn, and
+    // there is nothing on this screen to answer it from. Said rather than
+    // dropped: silently hiding it is how somebody concludes their host has no
+    // per-turn diffs.
+    expect(t.hasText('needs a turn')).toBe(true);
+    await t.unmount();
+  });
+
+  it('cycles to the next one, and draws what that one has', async () => {
+    const t = await changes();
+    // The working tree carries an edit no agent made, which is what makes it
+    // a different answer from the session's own.
+    expect(t.hasText('notes.todo')).toBe(false);
+    await t.press(']');
+    for (let i = 0; i < 10; i++) await t.settle();
+    expect(t.hasText('notes.todo')).toBe(true);
+    await t.unmount();
+  });
+
+  it('draws the verbs the changeset offers, which it could not before', async () => {
+    const t = await changes();
+    // `revert` on what the conversation changed. The status is the half worth
+    // having: a verb that cannot be pressed looks exactly like one that can
+    // without it.
+    expect(t.hasText('Revert This File')).toBe(true);
+    await t.press(']');
+    for (let i = 0; i < 10; i++) await t.settle();
+    // And the working tree offers different ones, which is the point of
+    // advertising them per scope.
+    expect(t.hasText('Commit')).toBe(true);
+    expect(t.hasText('Discard Changes')).toBe(true);
+    await t.unmount();
+  });
+
+  it('ticks a file off and takes it back, through the host', async () => {
+    const t = await changes();
+    // Whichever glyph set the theme is on: the full one draws filled and
+    // hollow squares, the ASCII fallback draws brackets.
+    const ticked = () => t.hasText('■') || t.hasText('[x]');
+    expect(ticked()).toBe(false);
+    await t.press('r');
+    for (let i = 0; i < 10; i++) await t.settle();
+    // Nothing was written here: the host keeps the flag and tells every client
+    // watching, and what redrew this screen is the changeset coming back.
+    expect(ticked()).toBe(true);
+    await t.press('r');
+    for (let i = 0; i < 10; i++) await t.settle();
+    expect(ticked()).toBe(false);
+    await t.unmount();
+  });
+
+  it('draws no tick column on a changeset the host will not keep one for', async () => {
+    const t = await changes();
+    // `uncommitted` is not reviewable in the fixture, as it is not on a real
+    // host: the working tree is whatever it is now, and a tick against a file
+    // something else may rewrite is bookkeeping about a thing that has moved.
+    await t.press(']');
+    for (let i = 0; i < 10; i++) await t.settle();
+    expect(t.hasText('□') || t.hasText('[ ]')).toBe(false);
+    await t.unmount();
+  });
+});
+
+describe('running one of the verbs from the screen', () => {
+  it('shows the confirmation before invoking, which the protocol requires', async () => {
+    const t = await changes();
+    // `revert` on what the conversation changed. The host called it
+    // destructive by giving it a confirmation, so nothing may happen until
+    // that has been shown and accepted.
+    void t.app.execute('changes.run', { operation: 'revert' });
+    for (let i = 0; i < 10; i++) await t.settle();
+    expect(t.hasText('Put this file back the way the agent found it?')).toBe(true);
+    await t.unmount();
+  });
+
+  it('does nothing at all when the confirmation is declined', async () => {
+    const t = await changes();
+    void t.app.execute('changes.run', { operation: 'revert' });
+    for (let i = 0; i < 10; i++) await t.settle();
+    await t.press('escape');
+    for (let i = 0; i < 10; i++) await t.settle();
+    // Not even the grant was asked for. Declining the act must not leave a
+    // client that has quietly taken write access to the tree.
+    expect(t.hasText('needs write access')).toBe(false);
+    await t.unmount();
+  });
+
+  it('asks for the write separately, because it is a different question', async () => {
+    const t = await changes();
+    void t.app.execute('changes.run', { operation: 'revert' });
+    for (let i = 0; i < 10; i++) await t.settle();
+    await t.press('enter');
+    for (let i = 0; i < 12; i++) await t.settle();
+    // "Revert this file" and "let this host write to your repository" are two
+    // questions, and answering the first is not answering the second.
+    expect(t.hasText('Let the host write?')).toBe(true);
+    await t.unmount();
+  });
+});

@@ -7,11 +7,12 @@ import type {
 } from '@textui/core';
 import { createBag, serviceKey } from '@textui/core';
 import { confirm } from '@textui/widgets';
+import { operate } from './ahp/operate.js';
 import type { HostConnection } from './ahp/connection.js';
 import type { Terminals } from './terminal.js';
 import { createTerminals } from './terminal.js';
 import type {
-  Agent, Answer, Completion, ContentRef, Customization, FileContent, SessionConfig, SessionDetail,
+  Agent, Answer, Changeset, ChangesetScope, Completion, ContentRef, Customization, FileContent, ResourceEntry, SessionConfig, SessionDetail,
   SessionUri, Turn,
 } from './ahp/types.js';
 import { SessionFlag } from './ahp/types.js';
@@ -19,6 +20,7 @@ import { valueIcon } from './view/icons.js';
 import {
   ARCHIVED, CAN_ADD_CHAT, CHAT_URI, CHATS, CUSTOMIZATIONS, DRAFT, EXPANDED, FILTER, HAS_CHATS,
   HOST, HOST_ERROR, INPUT, MODEL, OPEN_TERMINAL,
+  CHANGES as CHANGES_AT_PATH, CHANGE_AT, CHANGE_ROW, CHANGE_SCOPES, FILES_AT, FILES_OPEN,
   OPEN, OPEN_FILE, PROVIDER, MARKDOWN, QUEUE, RUNNING, SCREEN, SELECTED, SETTINGS, SIDEBAR,
   SPLIT_AT, SPLIT_DEFAULT, TURNS, WORKSPACE,
   applyEvent, pendingInput, queue, sessions, turns, writeSessions, writeStatus,
@@ -94,6 +96,37 @@ export interface Controller {
   harnessCommands(): Promise<Customization[]>;
   /** Turn one on or off. The host decides and tells everyone watching. */
   setCustomizationEnabled(uri: SessionUri, id: string, enabled: boolean): void;
+  /**
+   * One directory of the host's filesystem.
+   *
+   * The *host's*, which is the whole reason this goes through the connection
+   * rather than through `node:fs`: the daemon may be on another machine, and
+   * the project a session is working in is over there.
+   *
+   * Empty for a host that serves none - `createHost` takes its filesystem as a
+   * port and one given none answers `-32601`, which a client reads as nothing
+   * to browse rather than as a failure.
+   */
+  files(uri: string): Promise<ResourceEntry[]>;
+  /** One file's bytes, by URI on the host. */
+  file(uri: string): Promise<{ data: string; encoding: string; contentType?: string }>;
+  /**
+   * Which changesets this session offers.
+   *
+   * Asked once per session rather than derived: a host that advertises none
+   * has none, and a client that assumed the four the protocol names would
+   * offer a picker full of things to be refused.
+   */
+  changesets(uri: SessionUri): Promise<ChangesetScope[]>;
+  /** One of them, by the URI its template became. Absent is whichever the host would pick. */
+  changesAt(uri: SessionUri, changeset?: string): Promise<Changeset>;
+  /**
+   * Tick a file off, or take the tick back.
+   *
+   * Fire-and-forget: the host keeps the flag and tells every client watching,
+   * so what redraws this screen is the changeset coming back, not this call.
+   */
+  review(changeset: string, files: string[], reviewed: boolean): void;
   /** One file out of a changeset, fetched. Nothing calls it until a row opens. */
   content(ref: ContentRef): Promise<FileContent>;
   /**
@@ -133,6 +166,7 @@ export const SESSIONS_SCOPE = 'chat.sessions';
 export const CHAT_SCOPE = 'chat.conversation';
 export const SKILLS_SCOPE = 'chat.skills';
 export const MCP_SCOPE = 'chat.mcp';
+export const CHANGES_SCOPE = 'chat.changes';
 
 export function createController(
   app: TextUIApp,
@@ -569,6 +603,14 @@ export function createController(
     harnessCommands: () => host.harnessCommands(),
     setCustomizationEnabled: (uri, id, enabled) => host.setCustomizationEnabled(uri, id, enabled),
     content: (ref) => host.content(ref),
+    files: async (uri) => (await host.resourceList?.(uri)) ?? [],
+    file: async (uri) => {
+      if (!host.resourceRead) throw new Error('This host serves no files.');
+      return await host.resourceRead(uri);
+    },
+    changesets: async (uri) => (await host.changesets?.(uri)) ?? [],
+    changesAt: (uri, changeset) => host.changes(uri, changeset),
+    review: (changeset, files, isReviewed) => { host.review?.(changeset, files, isReviewed); },
 
     async settings() {
       const uri = app.store.get<SessionUri>(OPEN) ?? null;
@@ -601,7 +643,7 @@ export function createController(
   // is only ever as fresh as the last time somebody navigated to it.
   const watching = host.onSessions(refreshSoon);
   bag.add({ dispose: () => watching.close() });
-  for (const command of commands(app, controller)) bag.add(app.commands.register(command));
+  for (const command of commands(app, controller, host)) bag.add(app.commands.register(command));
   for (const binding of keys()) bag.add(app.keybindings.register(binding));
 
   return Object.assign(controller, { dispose: () => bag.dispose() });
@@ -631,7 +673,20 @@ interface Catalogue {
   agents: Agent[];
 }
 
-function commands(app: TextUIApp, controller: Controller): CommandDefinition[] {
+function commands(
+  app: TextUIApp,
+  controller: Controller,
+  /*
+   * The connection, for the one command that needs it directly.
+   *
+   * Everything else here goes through the controller, and should: it is what
+   * keeps the commands from knowing there is a protocol. `changes.run` is the
+   * exception because `operate` is the negotiation - a refusal, a question,
+   * a retry - and wrapping that in a controller method would be hiding the
+   * question, which is the part a person has to answer.
+   */
+  connection: HostConnection,
+): CommandDefinition[] {
   const selected = (): SessionUri | null => app.store.get<SessionUri>(SELECTED) ?? null;
   const openUri = (): SessionUri | null => app.store.get<SessionUri>(OPEN) ?? null;
 
@@ -769,6 +824,28 @@ function commands(app: TextUIApp, controller: Controller): CommandDefinition[] {
       run: () => { app.store.set(OPEN_FILE, null); app.screens.push('changes'); },
     },
     {
+      /*
+       * The host's filesystem, which is where the project actually is.
+       *
+       * Beside the changes screen rather than under it: what changed and what
+       * is there are different questions, and a browser that only ever showed
+       * the changed files would be a changeset with a worse name.
+       */
+      id: 'go.files',
+      title: 'Browse the host\'s files',
+      category: 'Screens',
+      description: 'The project, as the host sees it',
+      slots: ['palette'],
+      when: `${OPEN}`,
+      run: () => {
+        // Always back at the top. A browser that reopens six directories deep
+        // is one nobody can tell from a broken one.
+        app.store.set(FILES_OPEN, '');
+        app.store.set(FILES_AT, '');
+        app.screens.push('files');
+      },
+    },
+    {
       id: 'go.skills',
       title: 'Skills and commands',
       category: 'Screens',
@@ -785,6 +862,140 @@ function commands(app: TextUIApp, controller: Controller): CommandDefinition[] {
       slots: ['palette'],
       when: `${OPEN}`,
       run: () => app.screens.push('mcp'),
+    },
+    {
+      /*
+       * The next changeset this session offers.
+       *
+       * One key rather than a picker widget, because the list is short and
+       * every entry is a whole screen: cycling is what a person does to see
+       * the other three, and a menu to choose between four things you are
+       * about to look at anyway is a step in the way.
+       *
+       * Only the ones that are already URIs. A template with `{turnId}` still
+       * in it is a question about a turn, and there is nothing on this screen
+       * to answer it from - which is why the greyed rows say so rather than
+       * being silently dropped.
+       */
+      id: 'changes.scope',
+      title: 'Next changeset',
+      category: 'Changes',
+      run: () => {
+        const offered = (app.store.get<ChangesetScope[]>(CHANGE_SCOPES) ?? [])
+          .filter((scope) => scope.variables.length === 0);
+        if (offered.length === 0) return;
+        const at = app.store.get<string>(CHANGE_AT) ?? '';
+        const seen = offered.findIndex((scope) => scope.uriTemplate === at);
+        const next = offered[(seen + 1) % offered.length];
+        app.store.set(CHANGE_AT, next?.uriTemplate ?? '');
+        // The open file belongs to the changeset it came from.
+        app.store.set(OPEN_FILE, null);
+      },
+    },
+    {
+      /*
+       * Ticking the row off, which is a note about reading rather than a change.
+       *
+       * The host keeps it and tells every client, so nothing is written here -
+       * what redraws the tick is the changeset coming back. That is the whole
+       * reason it is worth having: two people reading one diff can see which
+       * files the other has been through.
+       */
+      id: 'changes.review',
+      title: 'Mark this file read',
+      category: 'Changes',
+      run: () => {
+        const at = app.store.get<string>(CHANGE_AT) ?? '';
+        const row = app.store.get<string>(CHANGE_ROW) ?? '';
+        if (!at || !row) return;
+        const held = app.store.get<Changeset>(CHANGES_AT_PATH);
+        const file = held?.files.find((one) => one.uri === row);
+        controller.review(at, [row], file?.reviewed !== true);
+      },
+    },
+    {
+      /*
+       * Run the verb the changeset offers, asking first where the host said to.
+       *
+       * One command rather than one per verb, with the id as an argument, for
+       * the reason the config settings are registered the other way round: the
+       * *settings* are a fixed schema a host publishes once, and these change
+       * with every changeset - a command per operation would be registering
+       * and disposing three of them each time the scope moves.
+       *
+       * The confirmation is not optional. The protocol says a client MUST
+       * display it before invoking, and its presence is also how the host says
+       * the operation is destructive - so this is the screen's half of what
+       * `--yes` is in the shell.
+       */
+      id: 'changes.run',
+      title: 'Do something with these changes',
+      category: 'Changes',
+      when: `${SCREEN} == 'changes'`,
+      args: [{
+        name: 'operation',
+        type: 'string' as const,
+        required: true,
+        description: 'Which of the verbs this changeset offers',
+        // What the changeset advertises, now. An id that was not offered is
+        // one the host will refuse, so there is nothing to gain by listing
+        // more than it says.
+        choices: () => {
+          const held = app.store.get<Changeset>(CHANGES_AT_PATH);
+          return (held?.operations ?? [])
+            .filter((one) => one.status !== 'disabled')
+            .map((one) => ({ value: one.id, label: one.label, description: one.description ?? '' }));
+        },
+      }],
+      run: async (given?: Record<string, unknown>) => {
+        const at = app.store.get<string>(CHANGE_AT) ?? '';
+        const held = app.store.get<Changeset>(CHANGES_AT_PATH);
+        const wanted = String(given?.operation ?? '');
+        const operation = (held?.operations ?? []).find((one) => one.id === wanted);
+        if (!at || !operation) return;
+        const row = app.store.get<string>(CHANGE_ROW) ?? '';
+        const onFile = !operation.scopes.includes('changeset');
+        if (onFile && !row) return;
+
+        if (operation.confirmation !== undefined) {
+          const yes = await confirm(app.layers, {
+            title: operation.label,
+            message: operation.confirmation,
+            confirmLabel: operation.label,
+            cancelLabel: 'Leave it',
+            // The presence of a confirmation is the host calling this
+            // destructive, so the button is styled as one.
+            tone: 'danger',
+          });
+          if (!yes) return;
+        }
+        try {
+          const done = await operate(connection, at, wanted, {
+            ...(onFile ? { target: { kind: 'resource' as const, resource: row } } : {}),
+            /*
+             * Asked here as well, and separately.
+             *
+             * "Discard this file" and "let this host write to your repository"
+             * are two different questions, and answering the first is not
+             * answering the second. A client that took the grant silently
+             * would be one where saying yes to a diff quietly hands over the
+             * working tree.
+             */
+            ask: (request: { uri: string }) => confirm(app.layers, {
+              title: 'Let the host write?',
+              message: `${operation.label} needs write access to ${request.uri.replace(/^file:\/\//, '')}.`,
+              confirmLabel: 'Allow',
+              cancelLabel: 'No',
+              tone: 'danger',
+            }),
+          });
+          // The host's own sentence about what it did, shown where a refusal
+          // would be. A silent success on a destructive verb reads as one that
+          // did not happen.
+          if (done.message !== undefined) app.store.set(HOST_ERROR, done.message);
+        }
+        catch (error) { controller.report(error); }
+      },
     },
     {
       id: 'changes.close',
@@ -1423,6 +1634,25 @@ function keys(): {
     // The conversation. `i` is the one that gets you into the composer, and
     // out of it is escape - the pair that makes every other letter reachable.
     { keys: 'c', commandId: 'go.changes', scopeId: CHAT_SCOPE },
+    { keys: 'f', commandId: 'go.files', scopeId: CHAT_SCOPE },
+    /*
+     * On the changes screen, and nowhere else.
+     *
+     * `]` rather than `tab`, which was the obvious choice and does not work:
+     * tab is how focus moves and the runtime has already spent it before any
+     * binding sees it. `]` is typed by nothing here and reads as "the next
+     * one", which is what it does.
+     *
+     * `r` is a letter, so it lives in the changes scope for the same reason
+     * `c` lives in the chat one - it must not fire while something is being
+     * typed on another screen.
+     */
+    { keys: ']', commandId: 'changes.scope', scopeId: CHANGES_SCOPE },
+    { keys: 'r', commandId: 'changes.review', scopeId: CHANGES_SCOPE },
+    // `x` for "do something to this". The command takes which one as an
+    // argument, so the key opens the picker rather than committing to a verb -
+    // which is right, because the verbs differ per changeset and per host.
+    { keys: 'x', commandId: 'changes.run', scopeId: CHANGES_SCOPE },
     { keys: 's', commandId: 'go.settings', scopeId: CHAT_SCOPE },
     { keys: 't', commandId: 'chat.stop', scopeId: CHAT_SCOPE },
     { keys: 'k', commandId: 'go.skills', scopeId: CHAT_SCOPE },

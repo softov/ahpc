@@ -219,6 +219,13 @@ export type Answer =
 
 export interface FileEdit {
   uri: string;
+  /**
+   * Whether somebody has ticked this file off.
+   *
+   * Absent is not-yet-reviewed, which is what the protocol says a missing
+   * value means - so a client must not read absence as a third state.
+   */
+  reviewed?: boolean;
   /** Absent `before` is a creation, absent `after` a deletion. */
   before?: string;
   after?: string;
@@ -258,6 +265,58 @@ export interface FileContent {
 export interface Changeset {
   status: 'computing' | 'complete';
   files: FileEdit[];
+  /**
+   * The verbs the host offers on this changeset.
+   *
+   * Server-advertised, and that is the access model rather than a hint: a host
+   * refuses an `operationId` it did not put in this list, so a client may
+   * offer nothing that is not here. Absent means there is nothing to do to
+   * this changeset, which is a real answer for a host that computes diffs and
+   * never acts on one.
+   */
+  operations?: ChangesetOperation[];
+}
+
+/**
+ * One verb a changeset offers.
+ *
+ * `confirmation` is not decoration: the protocol says a client **MUST**
+ * display it before invoking, and its presence is also how the host says the
+ * operation is destructive - so a client that dropped it would be one that
+ * deletes somebody's work without asking.
+ */
+export interface ChangesetOperation {
+  id: string;
+  label: string;
+  description?: string;
+  /** Whether it applies to the whole changeset, one file, or a range in one. */
+  scopes: ('changeset' | 'resource' | 'range')[];
+  /** Ask this first. Present iff the host considers the operation destructive. */
+  confirmation?: string;
+  /** A hint, e.g. `git-commit` or `discard`. */
+  icon?: string;
+  /** Operations sharing one are drawn together. */
+  group?: string;
+  /**
+   * What may be pressed, and what is happening.
+   *
+   * The host's, not this client's: `disabled` while a turn is running,
+   * `running` while an invocation of it is out, `error` after one failed. Two
+   * clients watching one changeset see the same spinner because the host is
+   * what they see it through.
+   */
+  status: 'idle' | 'running' | 'error' | 'disabled';
+  /** Why the last invocation failed. Present iff `status` is `error`. */
+  error?: { message: string };
+}
+
+/** The file, or lines of it, an operation is pointed at. */
+export interface ChangesetOperationTarget {
+  kind: 'resource' | 'range';
+  /** The row's id, which is a `file://` URI. */
+  resource: string;
+  side?: 'before' | 'after';
+  range?: { startLine: number; endLine: number };
 }
 
 /**
@@ -338,6 +397,19 @@ export interface Agent {
    * `createChat` MUST NOT be called, so the command is not offered either.
    */
   multipleChats?: boolean;
+  /**
+   * What this harness offers, before any session exists.
+   *
+   * The protocol puts the same list in two places on purpose: here, where a
+   * client can read it without creating anything, and on a session, where it
+   * has been resolved against that session's directory. The first is what a
+   * new-session screen needs - somebody choosing a skill to open with is
+   * choosing before there is a session to ask.
+   *
+   * Empty is a real answer, and the one to expect from a host whose harness
+   * nobody has signed into.
+   */
+  customizations?: Customization[];
 }
 
 /**
@@ -459,6 +531,20 @@ export interface ChangesetScope {
   label: string;
   uriTemplate: string;
   description?: string;
+  /**
+   * What kind of changeset this is, for grouping and icons.
+   *
+   * An advisory hint, and the protocol says to fall back sensibly on a value
+   * this client has never heard of rather than to drop the entry.
+   */
+  changeKind?: string;
+  /**
+   * Whether files here can be ticked off as read.
+   *
+   * On the *catalogue* entry, which is what lets a client decide whether to
+   * draw the checkbox before it subscribes to anything.
+   */
+  reviewable?: boolean;
   /** The `{name}` placeholders left in the template, in the order they appear. */
   variables: string[];
 }

@@ -1,0 +1,25 @@
+{
+  "version": "5",
+  "specifiers": {
+    "jsr:@deno/installer-shell-setup@*": "0.3.4"
+  },
+  "jsr": {
+    "@deno/installer-shell-setup@0.3.4": {
+      "integrity": "48665d1a737d487cce6874bc97bba70a5aeffa7053aca3f60df93c6fab8963b4"
+    }
+  },
+  "workspace": {
+    "packageJson": {
+      "dependencies": [
+        "npm:@microsoft/agent-host-protocol@0.8",
+        "npm:@textui/core@0.3",
+        "npm:@textui/terminal@0.3",
+        "npm:@textui/testing@0.3",
+        "npm:@textui/widgets@0.3",
+        "npm:@types/node@^22.10.2",
+        "npm:typescript@^5.9.3",
+        "npm:vitest@3"
+      ]
+    }
+  }
+}
