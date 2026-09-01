@@ -136,6 +136,24 @@ export const SETTINGS = '$/chat/compose/settings' as BindingPath;
 /** What the host last refused, in the host's own words. Cleared by success. */
 export const HOST_ERROR = '$/chat/host/error' as BindingPath;
 
+/**
+ * What became of the answer just given, on the row above the composer.
+ *
+ * Not `HOST_ERROR`, which is the application's last refusal and lives in the
+ * footer: this is about the block that is waiting on a person, and it only
+ * ever says anything between pressing a button on that block and the host
+ * letting go of the question. Both, for a refusal of *this* - the footer is
+ * twenty rows from the button that was pressed, and a person who pressed
+ * Approve and was told nothing has no reason to look down there.
+ */
+export const INPUT_STATUS = '$/chat/conv/inputStatus' as BindingPath;
+
+/** The row's two states: gone to the host, or never going. */
+export interface InputStatus {
+  state: 'sending' | 'failed';
+  text: string;
+}
+
 export const OPEN = '$/chat/ui/open' as BindingPath;
 /** Which of the bood this run got. One animal, wherever one is drawn. */
 export const BOOD = '$/chat/ui/bood' as BindingPath;
@@ -255,6 +273,7 @@ export function applyEvent(store: ReactiveStore, event: HostEvent, model: Turn[]
       // A snapshot arrived, so whatever the host last refused is not what is
       // on screen any more.
       store.set(HOST_ERROR, null);
+      store.set(INPUT_STATUS, null);
       return next;
     }
     case 'turnStarted': {
@@ -281,9 +300,16 @@ export function applyEvent(store: ReactiveStore, event: HostEvent, model: Turn[]
       return model;
     case 'inputNeeded':
       store.set(INPUT, event.input);
+      // A new question, about which nothing has been said yet. Left alone it
+      // would arrive under the last one's "Approving..." - or, worse, under
+      // the refusal that is the reason this one is being asked again.
+      store.set(INPUT_STATUS, null);
       return model;
     case 'inputResolved':
       store.set(INPUT, null);
+      // The host has let go of the question, which is the answer to whatever
+      // this row was waiting to hear.
+      store.set(INPUT_STATUS, null);
       return model;
     case 'chats':
       store.set(CHATS, event.items);
@@ -307,6 +333,29 @@ export function applyEvent(store: ReactiveStore, event: HostEvent, model: Turn[]
     default:
       return model;
   }
+}
+
+/** The answer has gone to the host, which has not said anything about it yet. */
+export function sendingInput(store: ReactiveStore, text: string): void {
+  store.set(INPUT_STATUS, { state: 'sending', text } satisfies InputStatus);
+}
+
+/** It is not going, and this is why. */
+export function inputRefused(store: ReactiveStore, text: string): void {
+  store.set(INPUT_STATUS, { state: 'failed', text } satisfies InputStatus);
+}
+
+/**
+ * The host refused something, wherever it was asked from.
+ *
+ * The footer says so always. The block waiting on a person says so too when
+ * it was that block's answer being refused, and only then - a refusal earned
+ * by some other command has no business turning the row above the composer
+ * red, which is exactly what reading `HOST_ERROR` from there would do.
+ */
+export function reportHostError(store: ReactiveStore, message: string): void {
+  store.set(HOST_ERROR, message);
+  if (store.get<InputStatus>(INPUT_STATUS)?.state === 'sending') inputRefused(store, message);
 }
 
 /** The number, and the one question everything else asks of it. */

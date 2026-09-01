@@ -24,7 +24,8 @@ import {
   CHANGES as CHANGES_AT_PATH, CHANGE_AT, CHANGE_ROW, CHANGE_SCOPES, FILES_AT, FILES_OPEN,
   OPEN, OPEN_FILE, PROVIDER, MARKDOWN, QUEUE, RUNNING, SCREEN, SELECTED, SETTINGS, SIDEBAR,
   SPLIT_AT, SPLIT_DEFAULT, TURNS, WORKSPACE,
-  applyEvent, pendingInput, queue, sessions, turns, writeSessions, writeStatus,
+  applyEvent, inputRefused, pendingInput, queue, reportHostError, sendingInput, sessions, turns,
+  writeSessions, writeStatus,
 } from './state.js';
 
 /**
@@ -320,7 +321,7 @@ export function createController(
   const failed = (error: unknown): void => {
     const rpc = error as { code?: number; message?: string } | null;
     const message = rpc?.message ?? String(error);
-    app.store.set(HOST_ERROR, typeof rpc?.code === 'number' ? `${message} (${rpc.code})` : message);
+    reportHostError(app.store, typeof rpc?.code === 'number' ? `${message} (${rpc.code})` : message);
   };
 
   /**
@@ -551,28 +552,56 @@ export function createController(
       if (uri) host.stopTurn(uri);
     },
 
+    /*
+     * The three that answer the block, and the one thing they have in common.
+     *
+     * Each of them can decline to do anything at all - there is no session
+     * open, the block up is the other kind, a required question is unanswered
+     * - and returning on that quietly is how a button comes to do nothing
+     * when pressed. Every path out of here now says which one it took, on the
+     * row above the composer: gone to the host, or not going and why.
+     */
     approve(optionId) {
       const uri = app.store.get<SessionUri>(OPEN);
       const input = pendingInput(app.store);
-      if (!uri || input?.kind !== 'toolConfirmation') return;
+      if (!uri || input?.kind !== 'toolConfirmation') {
+        inputRefused(app.store, 'Nothing is waiting to be approved');
+        return;
+      }
+      // The option's label, not its id: a live host's option ids are whole
+      // sentences with punctuation in them, and one of those in a status row
+      // is the row's whole width spent on something nobody reads.
+      const chosen = input.call.options?.find((option) => option.id === optionId);
+      sendingInput(app.store, chosen ? `Approving - ${chosen.label}...` : 'Approving...');
       host.confirmToolCall(uri, input.call.id, true, optionId);
     },
 
     deny() {
       const uri = app.store.get<SessionUri>(OPEN);
       const input = pendingInput(app.store);
-      if (!uri || input?.kind !== 'toolConfirmation') return;
+      if (!uri || input?.kind !== 'toolConfirmation') {
+        inputRefused(app.store, 'Nothing is waiting to be denied');
+        return;
+      }
+      sendingInput(app.store, 'Denying...');
       host.confirmToolCall(uri, input.call.id, false);
     },
 
     answer(answers, accepted = true) {
       const uri = app.store.get<SessionUri>(OPEN);
       const input = pendingInput(app.store);
-      if (!uri || input?.kind !== 'chatInput') return;
+      if (!uri || input?.kind !== 'chatInput') {
+        inputRefused(app.store, 'No question is waiting to be answered');
+        return;
+      }
       // An accept with no answers resumes the agent on the answers it already
       // had, which for a question it has just asked is none.
       const missing = input.questions.filter((q) => q.required && !answers[q.id]);
-      if (accepted && missing.length > 0) return;
+      if (accepted && missing.length > 0) {
+        inputRefused(app.store, `${String(missing.length)} still to answer`);
+        return;
+      }
+      sendingInput(app.store, accepted ? 'Sending your answer...' : 'Declining...');
       host.completeInput(uri, input.id, accepted, answers);
     },
 

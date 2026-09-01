@@ -12,10 +12,11 @@ import { CONTROLLER, createController } from './control.js';
 import { fakeHost } from './ahp/fake.js';
 import type { HostConnection } from './ahp/connection.js';
 import {
-  BOOD, BOOD_FLOAT, BOOD_FLOOR, BOOD_INLINE, FOCUS, HOST, HOST_ERROR, INPUT, OPEN, RUNNING, SCREEN, SESSIONS,
+  BOOD, BOOD_FLOAT, BOOD_FLOOR, BOOD_INLINE, FOCUS, HOST, HOST_ERROR, INPUT, INPUT_STATUS, OPEN, RUNNING, SCREEN,
+  SESSIONS,
   SPLIT_AT, SPLIT_DEFAULT, STATUS, WORKSPACE, boodFloor, openSession, workspaceName,
 } from './state.js';
-import type { HostState } from './state.js';
+import type { HostState, InputStatus } from './state.js';
 import { decodeStatus } from './ahp/status.js';
 import {
   AutomationsScreen, ChangesScreen, ChatScreen, FilesScreen, HostsScreen, McpScreen, NewAutomationScreen, NewSessionScreen, SessionsScreen, TerminalScreen,
@@ -351,7 +352,14 @@ const Status = defineComponent<Record<string, never>>('ChatStatus', () => {
   // What the host last refused, where a person is already looking. A refusal
   // that only reaches a log is a client that appears to have ignored the key
   // you pressed.
-  const error = useStoreValue<string | null>(HOST_ERROR, null) ?? null;
+  //
+  // Unless the row above the composer is already saying it, which it does
+  // when the refusal was of an answer given to the block waiting there. Said
+  // twice on a narrow terminal it is one sentence in red on two of twenty
+  // rows, and the second one adds nothing to the first.
+  const said = useStoreValue<InputStatus | null>(INPUT_STATUS, null) ?? null;
+  const refusal = useStoreValue<string | null>(HOST_ERROR, null) ?? null;
+  const error = said?.state === 'failed' && said.text === refusal ? null : refusal;
   return (
     <Row gap={2}>
       {error

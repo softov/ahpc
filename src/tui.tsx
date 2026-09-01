@@ -8,7 +8,7 @@ import { registerChat } from './app.js';
 import { CONTROLLER } from './control.js';
 import { connect, sink } from './connect.js';
 import { loadConfig } from './config.js';
-import { HOST_ERROR } from './state.js';
+import { reportHostError } from './state.js';
 
 /**
  * The entry point.
@@ -328,7 +328,7 @@ export async function tui(argv: string[]): Promise<void> {
   });
 
   app.services.provide(WRITER_KEY, createWriter(terminal.capabilities()));
-  sink.report = (message) => app.store.set(HOST_ERROR, message);
+  sink.report = (message) => reportHostError(app.store, message);
   await app.start();
 
   /**

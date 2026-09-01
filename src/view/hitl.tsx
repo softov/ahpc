@@ -1,5 +1,7 @@
 import type { BindingPath, BoxProps, RenderOutput } from '@textui/core';
-import { defineComponent, useApp, useFocusScope, useInput, useMeasure, useStore, useTheme } from '@textui/core';
+import {
+  defineComponent, useApp, useFocusScope, useInput, useMeasure, useStore, useStoreValue, useTheme,
+} from '@textui/core';
 import { useFloorTop } from './creature.js';
 import {
   Button,
@@ -13,6 +15,8 @@ import {
   TextInput,
 } from '@textui/widgets';
 import type { Answer, PendingInput, Question } from '../ahp/types.js';
+import type { InputStatus } from '../state.js';
+import { INPUT_STATUS } from '../state.js';
 
 /**
  * The block that means the agent is stopped, waiting on a person.
@@ -338,3 +342,32 @@ const QuestionField = defineComponent<{
     </Column>
   );
 });
+
+/**
+ * What came of the answer, on the row between the block and the composer.
+ *
+ * That row was a blank one, and it is where a person is already looking after
+ * pressing a button on the block above it. A press that reaches a host which
+ * then says nothing is indistinguishable from a key that was never read - so
+ * this says the answer has gone, and says so in red when it did not.
+ *
+ * Nothing to say is no row rather than an empty one: a status line that is
+ * always there is a row of chrome, and the composer is a row further from the
+ * conversation for the whole of every session in which nothing goes wrong.
+ */
+export const ChatInputStatus: (props: BoxProps) => RenderOutput =
+  defineComponent<BoxProps>('ChatInputStatus', (props) => {
+    const theme = useTheme();
+    const status = useStoreValue<InputStatus | null>(INPUT_STATUS, null) ?? null;
+    if (!status) return null;
+    const failed = status.state === 'failed';
+    const tone = failed ? 'danger' : 'muted';
+    return (
+      <Row gap={1} {...props}>
+        {/* The hollow dot this screen already uses for "in progress", rather
+            than an ellipsis in front of a sentence that ends in one. */}
+        <text content={failed ? theme.glyphs.warning : theme.glyphs.bulletHollow} fg={tone} />
+        <text content={status.text} fg={tone} flex={1} truncate="end" />
+      </Row>
+    );
+  });

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { HostConnection, HostEvent } from './connection.js';
 import type {
-  Agent, Automation, Changeset, ChangesetOperation, ChangesetScope, ChatInputRequest, ContentRef, Customization, FileContent, FileEdit,
+  Agent, Answer, Automation, Changeset, ChangesetOperation, ChangesetScope, ChatInputRequest, ContentRef, Customization, FileContent, FileEdit,
   PendingInput, QueuedMessage, ResourceEntry, ResponsePart, SessionConfig, SessionDetail, SessionSummary,
   SessionUri, TerminalState, ToolCall, Turn,
 } from './types.js';
@@ -1086,6 +1086,23 @@ export function fakeHost(): FakeHost {
     });
   }
 
+  /** What the script says next, once the question has been answered. */
+  function answered(uri: SessionUri, accepted: boolean, answers: Record<string, Answer>): void {
+    const chosen = answers.q1;
+    const where = !accepted ? 'nothing'
+      : chosen?.kind === 'selected' ? chosen.value
+        : chosen?.kind === 'text' ? chosen.value : 'nothing';
+    finish(uri, `Right - **${where}**. I will move the bindings and leave the modified keys where they are.`, {
+      changes: {
+        status: 'complete',
+        files: [
+          { uri: 'file:///github/textui/examples/chat/src/control.ts', before: 'x', after: 'y', diff: { added: 34, removed: 6 } },
+          { uri: 'file:///github/textui/examples/chat/test/keys.test.tsx', after: 'y', diff: { added: 51, removed: 0 } },
+        ],
+      },
+    });
+  }
+
   /** One scripted step. The application's ticker and a test's loop share it. */
   function pump(): boolean {
     const step = script.shift();
@@ -1418,33 +1435,36 @@ export function fakeHost(): FakeHost {
 
     stopTurn: stop,
 
+    /*
+     * Both answers land on the next step, not inside the call.
+     *
+     * A host answers over a socket, and a fake that has resolved the question
+     * before its own caller has returned is one where the interval between
+     * pressing a button and being told anything does not exist. That interval
+     * is the whole of what a client has to draw - it is where "I pressed
+     * Approve and nothing happened" lives - so the script has it too.
+     */
     confirmToolCall: (uri, toolCallId, approved) => {
       const input = inputs.get(uri);
       if (!input || input.kind !== 'toolConfirmation' || input.call.id !== toolCallId) return;
-      inputs.delete(uri);
-      emit(uri, { type: 'inputResolved' });
-      touch(uri);
-      afterApproval(uri, input.call, approved);
+      // At the front: whatever the script already holds comes after the
+      // question is let go of, never before it.
+      script.unshift(() => {
+        inputs.delete(uri);
+        emit(uri, { type: 'inputResolved' });
+        touch(uri);
+        afterApproval(uri, input.call, approved);
+      });
     },
 
     completeInput: (uri, requestId, accepted, answers) => {
       const input = inputs.get(uri);
       if (!input || input.id !== requestId) return;
-      inputs.delete(uri);
-      emit(uri, { type: 'inputResolved' });
-      touch(uri);
-      const chosen = answers.q1;
-      const where = !accepted ? 'nothing'
-        : chosen?.kind === 'selected' ? chosen.value
-          : chosen?.kind === 'text' ? chosen.value : 'nothing';
-      finish(uri, `Right - **${where}**. I will move the bindings and leave the modified keys where they are.`, {
-        changes: {
-          status: 'complete',
-          files: [
-            { uri: 'file:///github/textui/examples/chat/src/control.ts', before: 'x', after: 'y', diff: { added: 34, removed: 6 } },
-            { uri: 'file:///github/textui/examples/chat/test/keys.test.tsx', after: 'y', diff: { added: 51, removed: 0 } },
-          ],
-        },
+      script.unshift(() => {
+        inputs.delete(uri);
+        emit(uri, { type: 'inputResolved' });
+        touch(uri);
+        answered(uri, accepted, answers);
       });
     },
 

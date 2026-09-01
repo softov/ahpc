@@ -38,7 +38,7 @@ import { ChatTranscript } from './view/transcript.js';
 import { ChatComposer } from './view/composer.js';
 import { ChatSessionHead } from './view/sessionhead.js';
 import { settingIcon, valueIcon } from './view/icons.js';
-import { ChatHitl } from './view/hitl.js';
+import { ChatHitl, ChatInputStatus } from './view/hitl.js';
 import { ChangesList } from './view/changes.js';
 import { FileList } from './view/files.js';
 import { AutomationList } from './view/automations.js';
@@ -669,6 +669,10 @@ export const ChatScreen: (props: Record<string, never>) => RenderOutput =
             }}
           />
         ) : null}
+
+        {/* Under the block and over the composer, which is where the answer
+            was given and where the next thing will be typed. */}
+        <ChatInputStatus />
 
         <ChatComposer
           value={draft}

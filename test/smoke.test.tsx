@@ -12,9 +12,10 @@ import { SessionFlag } from '../src/ahp/types.js';
 import { CLIPBOARD_PATH, layoutMarkdown, wrapRuns } from '@textui/core';
 import { toBlocks } from '../src/blocks.js';
 import {
-  CHATS, CHAT_URI, DRAFT, HOST_ERROR, INPUT, OPEN, OPEN_TERMINAL, PROVIDER, QUEUE, SELECTED,
-  SETTINGS, SIDEBAR, TURNS, WORKSPACE,
+  CHATS, CHAT_URI, DRAFT, HOST_ERROR, INPUT, INPUT_STATUS, OPEN, OPEN_TERMINAL, PROVIDER, QUEUE,
+  SELECTED, SETTINGS, SIDEBAR, TURNS, WORKSPACE,
 } from '../src/state.js';
+import type { InputStatus } from '../src/state.js';
 import type { Turn } from '../src/ahp/types.js';
 import { PICKER, openPicker } from '../src/view/picker.js';
 
@@ -211,6 +212,119 @@ describe('when the agent is waiting', () => {
     m.t.app.services.require(CONTROLLER).approve();
     await run(m, 1);
     expect(m.t.store.get(INPUT)).toBeNull();
+    await m.t.unmount();
+  });
+
+  /**
+   * The row above the composer, and the reason it is there.
+   *
+   * "I click Approve and nothing happens" is a report that can be earned two
+   * ways - the press never reached anything, or it reached a host that had
+   * nothing to say - and a client that draws neither leaves a person with no
+   * way to tell them apart. So every way out of `approve` says which one it
+   * took, on the row between the block and the composer.
+   */
+  it('says the answer has gone, where the answer was given', async () => {
+    const m = await conversation();
+    m.t.app.services.require(CONTROLLER).send('run the tests');
+    await run(m);
+
+    // Nothing has been pressed, so there is nothing to say and no row saying
+    // it: a status line that is always there is a row of chrome.
+    expect(m.t.store.get(INPUT_STATUS) ?? null).toBeNull();
+
+    m.t.app.services.require(CONTROLLER).approve();
+    await m.t.settle();
+    expect(m.t.store.get<InputStatus>(INPUT_STATUS)?.state).toBe('sending');
+    expect(m.t.hasText('Approving...')).toBe(true);
+
+    // The host let go of the question, which is the answer this row was
+    // waiting for. It does not stay up over the next one.
+    await run(m, 1);
+    expect(m.t.store.get(INPUT)).toBeNull();
+    expect(m.t.store.get(INPUT_STATUS) ?? null).toBeNull();
+    expect(m.t.hasText('Approving...')).toBe(false);
+    await m.t.unmount();
+  });
+
+  it('says so when there is nothing to approve, rather than nothing at all', async () => {
+    const m = await idle();
+    // The palette offers `chat.approve` and a key is bound to it, so this is
+    // reachable with no block up at all - and it used to return silently,
+    // which is a command that does nothing and says nothing about it.
+    m.t.app.services.require(CONTROLLER).approve();
+    await m.t.settle();
+
+    expect(m.t.store.get<InputStatus>(INPUT_STATUS)?.state).toBe('failed');
+    expect(m.t.hasText('Nothing is waiting to be approved')).toBe(true);
+    await m.t.unmount();
+  });
+
+  it('turns the row red when the host refuses the answer', async () => {
+    const m = await conversation();
+    const controller = m.t.app.services.require(CONTROLLER);
+    controller.send('run the tests');
+    await run(m);
+
+    controller.approve();
+    await m.t.settle();
+    // What a refusal of the dispatch arrives as: `onRefusal` on the live host
+    // is wired straight to this.
+    controller.report(new Error('the host stopped answering'));
+    await m.t.settle();
+
+    const status = m.t.store.get<InputStatus>(INPUT_STATUS);
+    expect(status?.state).toBe('failed');
+    expect(status?.text).toContain('the host stopped answering');
+    expect(m.t.hasText('the host stopped answering')).toBe(true);
+    await m.t.unmount();
+  });
+
+  /**
+   * The narrow terminal, where a status row is most able to do damage.
+   *
+   * A host's refusal is a sentence, not a word, and a row that wraps it takes
+   * three lines out of a twenty-line screen - which is the composer pushed
+   * off the bottom by the message explaining why the last thing you typed did
+   * not work.
+   */
+  it('keeps the refusal to one row on a narrow terminal', async () => {
+    const m = await conversation({ width: 76, height: 20 });
+    const controller = m.t.app.services.require(CONTROLLER);
+    controller.send('run the tests');
+    await run(m);
+
+    controller.approve();
+    await m.t.settle();
+    controller.report(new Error(
+      'the host refused this confirmation because the tool call it names has already been settled by another client',
+    ));
+    await m.t.settle();
+
+    // Cut, not wrapped: the tail is off the row rather than on the next one.
+    expect(m.t.hasText('the host refused this confirmation')).toBe(true);
+    expect(m.t.hasText('settled by another client')).toBe(false);
+    // And said once. The footer says what the host refused too, and the same
+    // sentence in red on two of twenty rows is the second one wasted.
+    const rows = m.t.text().split('\n').filter((row) => row.includes('the host refused'));
+    expect(rows).toHaveLength(1);
+    await m.t.unmount();
+  });
+
+  it('leaves the row alone for a refusal that was not the answer', async () => {
+    const m = await conversation();
+    const controller = m.t.app.services.require(CONTROLLER);
+    controller.send('run the tests');
+    await run(m);
+
+    // Nothing has been answered, so this refusal belongs to some other
+    // command. The footer is where it goes; the row above the composer would
+    // be blaming the block that is waiting for a failure that is not its own.
+    controller.report(new Error('could not list the terminals'));
+    await m.t.settle();
+
+    expect(m.t.store.get(INPUT_STATUS) ?? null).toBeNull();
+    expect(m.t.store.get<string>(HOST_ERROR)).toContain('could not list the terminals');
     await m.t.unmount();
   });
 
