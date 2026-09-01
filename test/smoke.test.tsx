@@ -421,15 +421,21 @@ describe('the slash menu', () => {
     const m = await composing('/go');
     // The first row is marked; down moves the mark to the second.
     const marked = (): string => m.t.lines().find((line) => line.includes('\u25b8 /go')) ?? '';
-    expect(marked()).toContain('/go.back');
+    const first = marked();
+    expect(first).toContain('/go.back');
 
+    // *A* second row, not a named one. Which command sits under `/go.back` is
+    // whatever has been registered, and a test that pinned it would fail every
+    // time a screen is added - which is not what this is checking.
     m.t.press('down');
     for (let i = 0; i < 4; i++) await m.t.settle();
-    expect(marked()).toContain('/go.sessions');
+    const second = marked();
+    expect(second).toContain('/go.');
+    expect(second).not.toBe(first);
 
     m.t.press('up');
     for (let i = 0; i < 4; i++) await m.t.settle();
-    expect(marked()).toContain('/go.back');
+    expect(marked()).toBe(first);
     await m.t.unmount();
   });
 

@@ -1,5 +1,5 @@
 import type {
-  Agent, Answer, Changeset, Completion, ContentRef, Customization, FileContent, PendingInput, QueuedMessage,
+  Agent, Answer, Automation, Changeset, Completion, ContentRef, Customization, FileContent, PendingInput, QueuedMessage,
   ChangesetOperationTarget, ChangesetScope, ResourceEntry, SessionConfig, SessionDetail, SessionSummary, SessionUri, TerminalRow, TerminalState,
   ToolCall, Turn,
 } from './types.js';
@@ -317,6 +317,28 @@ export interface HostConnection {
    * closing the connection in the same breath closes it first, and the
    * dispatch is never sent at all.
    */
+  /**
+   * Every automation this host holds.
+   *
+   * Optional, and the absence is the answer: a host that serves no automations
+   * channel answers `-32601`, and a client that drew an empty list for it
+   * would be claiming the host has none rather than that it has no such thing.
+   */
+  automations?(): Promise<Automation[]>;
+  /**
+   * Told when one moves, so the screen is not polled.
+   *
+   * The interesting change is the one nobody made: an automation firing at
+   * nine in the morning arrives here and nowhere else.
+   */
+  onAutomations?(observer: () => void): { close(): void };
+  /** Start one now, whatever its schedule says. */
+  runAutomation?(uri: string): Promise<void>;
+  /** Switch one on or off, which is a patch of its definition. */
+  setAutomationEnabled?(uri: string, enabled: boolean): Promise<void>;
+  /** Forget one, and everything it has done. */
+  removeAutomation?(uri: string): Promise<void>;
+
   flush?(): Promise<void>;
   close?(): void | Promise<void>;
 }

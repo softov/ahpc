@@ -34,36 +34,6 @@ So the decision recorded against this entry — take the fiddly parts, keep our 
 
 ---
 
----
-
-## B-01-06 — Automations are a channel this client cannot see
-
-New with protocol 0.9.0, and the mirror of the host's A-01-03f. The protocol
-declares `listAutomationTriggerDefinitions`, `runAutomation` and
-`fetchAutomationRuns`, and an `ahp-automation:/<id>` channel carrying a
-definition, the next occurrence awaiting evaluation, and a bounded newest-first
-window of run summaries. ahpd serves the channel and holds no clock; VS Code's
-host is the other end and has not been checked for it.
-
-Nothing here reads any of it. That costs a reader two different things. The
-smaller one is the screen that is missing: on a host with automations there is
-no way to see what is scheduled, when it next runs, or how the last few went.
-The larger one is quieter - 0.9.0 also gave a session an `origin`, so a session
-an automation started can now say so, and this client draws a catalogue in
-which it is indistinguishable from one somebody typed.
-
-Counted from the protocol package and from ahpd's roadmap, not driven against a
-host that fires one - there is not one to drive.
-
-**Suggestions.** (1) Take `origin` alone. It is one optional field on a session
-the catalogue already draws, it needs no new screen, and it answers "where did
-this come from" wherever a host schedules anything. (2) Take the channel: a
-screen listing automations, their next run and their recent runs, with Run as a
-verb - which is the whole channel, and a shape this client does not have yet.
-(3) Leave it until a host fires one. ahpd holds no clock by choice, so the list
-today would be whatever its store was handed, and a screen built against a
-channel with nothing in it is a screen built against a guess.
-
 # Notes
 
 **On depending on nothing.** This client depends on no agent SDK and on no particular host. Anything added here that names one harness is a mistake, and `--claude` was one: it made a client that could talk to any host need one specific host installed to talk to any of them. B-01-04 and B-01-05 are the live version of that question — TextUI is not a harness, but it is a dependency, and the answer should be the same for both entries.

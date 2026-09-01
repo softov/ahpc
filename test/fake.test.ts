@@ -26,6 +26,7 @@ it('implements every optional method on the seam', () => {
   const optional: (keyof HostConnection)[] = [
     'changesets', 'review', 'resourceList', 'resourceRead', 'dispatch', 'flush',
     'invoke', 'requestResource',
+    'automations', 'onAutomations', 'runAutomation', 'setAutomationEnabled', 'removeAutomation',
   ];
   for (const name of optional) expect(typeof host[name], name).toBe('function');
   // `close` is the one that stays absent, and on purpose: it exists for a host

@@ -12,7 +12,7 @@ import type { HostConnection } from './ahp/connection.js';
 import type { Terminals } from './terminal.js';
 import { createTerminals } from './terminal.js';
 import type {
-  Agent, Answer, Changeset, ChangesetScope, Completion, ContentRef, Customization, FileContent, ResourceEntry, SessionConfig, SessionDetail,
+  Agent, Answer, Automation, Changeset, ChangesetScope, Completion, ContentRef, Customization, FileContent, ResourceEntry, SessionConfig, SessionDetail,
   SessionUri, Turn,
 } from './ahp/types.js';
 import { SessionFlag } from './ahp/types.js';
@@ -20,6 +20,7 @@ import { valueIcon } from './view/icons.js';
 import {
   ARCHIVED, CAN_ADD_CHAT, CHAT_URI, CHATS, CUSTOMIZATIONS, DRAFT, EXPANDED, FILTER, HAS_CHATS,
   HOST, HOST_ERROR, INPUT, MODEL, OPEN_TERMINAL,
+  AUTOMATIONS, AUTOMATION_ROW,
   CHANGES as CHANGES_AT_PATH, CHANGE_AT, CHANGE_ROW, CHANGE_SCOPES, FILES_AT, FILES_OPEN,
   OPEN, OPEN_FILE, PROVIDER, MARKDOWN, QUEUE, RUNNING, SCREEN, SELECTED, SETTINGS, SIDEBAR,
   SPLIT_AT, SPLIT_DEFAULT, TURNS, WORKSPACE,
@@ -108,6 +109,22 @@ export interface Controller {
    * to browse rather than as a failure.
    */
   files(uri: string): Promise<ResourceEntry[]>;
+  /**
+   * Every automation the host holds.
+   *
+   * Rejects, rather than answering empty, for a host that serves none: an
+   * empty list is a host with a clock and nothing on it, and the two want
+   * different words on the screen.
+   */
+  automations(): Promise<Automation[]>;
+  /** Told when one moves, including one that fired while nobody was looking. */
+  onAutomations(observer: () => void): { close(): void };
+  /** Start one now, whatever its schedule says. */
+  runAutomation(uri: string): Promise<void>;
+  /** Switch one on or off. */
+  setAutomationEnabled(uri: string, enabled: boolean): Promise<void>;
+  /** Forget one. */
+  removeAutomation(uri: string): Promise<void>;
   /** One file's bytes, by URI on the host. */
   file(uri: string): Promise<{ data: string; encoding: string; contentType?: string }>;
   /**
@@ -167,6 +184,7 @@ export const CHAT_SCOPE = 'chat.conversation';
 export const SKILLS_SCOPE = 'chat.skills';
 export const MCP_SCOPE = 'chat.mcp';
 export const CHANGES_SCOPE = 'chat.changes';
+export const AUTOMATIONS_SCOPE = 'chat.automations';
 
 export function createController(
   app: TextUIApp,
@@ -608,6 +626,14 @@ export function createController(
       if (!host.resourceRead) throw new Error('This host serves no files.');
       return await host.resourceRead(uri);
     },
+    automations: async () => {
+      if (!host.automations) throw new Error('This host serves no automations.');
+      return await host.automations();
+    },
+    onAutomations: (observer) => host.onAutomations?.(observer) ?? { close: () => {} },
+    runAutomation: async (uri) => { await host.runAutomation?.(uri); },
+    setAutomationEnabled: async (uri, enabled) => { await host.setAutomationEnabled?.(uri, enabled); },
+    removeAutomation: async (uri) => { await host.removeAutomation?.(uri); },
     changesets: async (uri) => (await host.changesets?.(uri)) ?? [],
     changesAt: (uri, changeset) => host.changes(uri, changeset),
     review: (changeset, files, isReviewed) => { host.review?.(changeset, files, isReviewed); },
@@ -794,6 +820,89 @@ function commands(
         // at all. From there it means "show me what already exists".
         if (app.screens.current()?.id === 'new') { toSessions(); return; }
         app.screens.pop();
+      },
+    },
+    {
+      /*
+       * The other half of what a host holds.
+       *
+       * Not gated on a session being open, unlike `go.changes`: an automation
+       * belongs to the host and outlives every session it starts, so it is
+       * reachable from anywhere - including from a client that has opened
+       * nothing at all.
+       */
+      id: 'go.automations',
+      title: 'What the host runs on its own',
+      category: 'Screens',
+      description: 'Show the automations',
+      slots: ['palette'],
+      run: () => { app.screens.push('automations'); },
+    },
+    {
+      id: 'automation.run',
+      title: 'Run this automation now',
+      category: 'Automations',
+      description: 'Start a run, whatever the schedule says',
+      slots: ['palette'],
+      when: `${AUTOMATION_ROW}`,
+      run: async () => {
+        const uri = app.store.get<string>(AUTOMATION_ROW) ?? '';
+        const found = (app.store.get<Automation[]>(AUTOMATIONS) ?? []).find((one) => one.resource === uri);
+        // The host says which verbs it will accept, and a client that pressed
+        // one it did not offer would be asking to be refused. A switched-off
+        // automation offers no `run`.
+        if (!found?.operations.includes('run')) return;
+        try { await controller.runAutomation(uri); }
+        catch (error) { controller.report(error); }
+      },
+    },
+    {
+      id: 'automation.toggle',
+      title: 'Switch this automation on or off',
+      category: 'Automations',
+      description: 'Stop it firing, or let it fire again',
+      slots: ['palette'],
+      when: `${AUTOMATION_ROW}`,
+      run: async () => {
+        const uri = app.store.get<string>(AUTOMATION_ROW) ?? '';
+        const found = (app.store.get<Automation[]>(AUTOMATIONS) ?? []).find((one) => one.resource === uri);
+        if (!found?.operations.includes('update')) return;
+        try { await controller.setAutomationEnabled(uri, !found.enabled); }
+        catch (error) { controller.report(error); }
+      },
+    },
+    {
+      id: 'automation.remove',
+      title: 'Forget this automation',
+      category: 'Automations',
+      description: 'Delete it and everything it has done',
+      slots: ['palette'],
+      when: `${AUTOMATION_ROW}`,
+      run: async () => {
+        const uri = app.store.get<string>(AUTOMATION_ROW) ?? '';
+        const found = (app.store.get<Automation[]>(AUTOMATIONS) ?? []).find((one) => one.resource === uri);
+        if (!found?.operations.includes('remove')) return;
+        /*
+         * Asked, because nothing gives it back.
+         *
+         * The protocol has no confirmation on this the way a changeset
+         * operation carries one, so the question is this client's own - which
+         * is the right way round: the host cannot know that a person is about
+         * to lose the only copy of a schedule they wrote.
+         */
+        const yes = await confirm(app.layers, {
+          title: 'Forget this automation?',
+          message: `${found.title} and its history go, and nothing here brings them back.`,
+          confirmLabel: 'Forget it',
+          cancelLabel: 'Keep it',
+          tone: 'danger',
+        });
+        if (!yes) return;
+        try {
+          await controller.removeAutomation(uri);
+          app.store.set(AUTOMATION_ROW, '');
+        }
+        catch (error) { controller.report(error); }
       },
     },
     {
@@ -1653,6 +1762,11 @@ function keys(): {
     // argument, so the key opens the picker rather than committing to a verb -
     // which is right, because the verbs differ per changeset and per host.
     { keys: 'x', commandId: 'changes.run', scopeId: CHANGES_SCOPE },
+    // Scoped to the screen, so a letter is a letter everywhere else. `enter`
+    // runs one and is the list's own, which leaves the switch and the
+    // one that does not come back.
+    { keys: 'e', commandId: 'automation.toggle', scopeId: AUTOMATIONS_SCOPE },
+    { keys: 'd', commandId: 'automation.remove', scopeId: AUTOMATIONS_SCOPE },
     { keys: 's', commandId: 'go.settings', scopeId: CHAT_SCOPE },
     { keys: 't', commandId: 'chat.stop', scopeId: CHAT_SCOPE },
     { keys: 'k', commandId: 'go.skills', scopeId: CHAT_SCOPE },

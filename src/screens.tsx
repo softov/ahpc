@@ -16,10 +16,10 @@ import {
 } from '@textui/core';
 import { Badge, Column, Divider, EmptyState, Marquee, Panel, RadioGroup, Row, SearchBox, argumentOf } from '@textui/widgets';
 import {
-  CHANGES_SCOPE, CHAT_SCOPE, CONTROLLER, MCP_SCOPE, SESSIONS_SCOPE, SKILLS_SCOPE, settingCommand,
+  AUTOMATIONS_SCOPE, CHANGES_SCOPE, CHAT_SCOPE, CONTROLLER, MCP_SCOPE, SESSIONS_SCOPE, SKILLS_SCOPE, settingCommand,
 } from './control.js';
 import { branchName,
-  ARCHIVED, CHANGES, CUSTOMIZATIONS, DRAFT, EXPANDED, FILTER, FOCUS, HISTORY, HOST, INPUT,
+  ARCHIVED, AUTOMATIONS, AUTOMATION_ROW, CHANGES, CUSTOMIZATIONS, DRAFT, EXPANDED, FILTER, FOCUS, HISTORY, HOST, INPUT,
   CHANGE_AT, CHANGE_ROW, CHANGE_SCOPES, FILES_AT, FILES_ENTRIES, FILES_OPEN,
   MODEL, OPEN, OPEN_FILE, CHAT_URI, PROVIDER, QUEUE, SELECTED, SESSIONS, SETTINGS, SIDEBAR,
   CHATS, OPEN_TERMINAL, SPLIT_AT, SPLIT_DEFAULT, TERMINAL, TERMINALS, TURNS, WORKSPACE,
@@ -28,7 +28,7 @@ import { branchName,
 import type { HostState } from './state.js';
 import { toBlocks } from './blocks.js';
 import type {
-  Agent, Changeset, ChangesetScope, Completion, ContentRef, Customization, FileContent, PendingInput, QueuedMessage, ResourceEntry,
+  Agent, Automation, Changeset, ChangesetScope, Completion, ContentRef, Customization, FileContent, PendingInput, QueuedMessage, ResourceEntry,
   TerminalRow, TerminalState,
   SessionConfig, SessionDetail, SessionSummary, SlashCommand, Turn,
 } from './ahp/types.js';
@@ -41,6 +41,7 @@ import { settingIcon, valueIcon } from './view/icons.js';
 import { ChatHitl } from './view/hitl.js';
 import { ChangesList } from './view/changes.js';
 import { FileList } from './view/files.js';
+import { AutomationList } from './view/automations.js';
 import { CustomizationList } from './view/customizations.js';
 import { TerminalView } from './view/terminal.js';
 import { FileDiff } from './view/filediff.js';
@@ -1017,6 +1018,87 @@ export const ChangesScreen: (props: Record<string, never>) => RenderOutput =
           onSelect={(found: string) => app.store.set(CHANGE_ROW, found)}
           autoFocus
           flex={1}
+        />
+      </Panel>
+    );
+  });
+
+// -------------------------------------------------------- 6c. the automations
+
+/**
+ * What the host does without being asked.
+ *
+ * The catalogue answers "what has been said"; this answers "what will happen".
+ * They are both the host's and only one of them was drawn, so a session that
+ * appeared at nine this morning was a session with no account of itself - which
+ * is what protocol 0.9.0's `origin` is for, and it is read on the catalogue
+ * rather than here.
+ *
+ * Read whole on every change rather than patched. The channel says an
+ * automation moved and the list is a dozen rows; a client that reduced its own
+ * copy would be a second answer to what the host holds, for no gain at this
+ * size.
+ */
+export const AutomationsScreen: (props: Record<string, never>) => RenderOutput =
+  defineComponent<Record<string, never>>('AutomationsScreen', () => {
+    const app = useApp();
+    const controller = useRequiredService(CONTROLLER);
+    useFocusScope({ id: AUTOMATIONS_SCOPE });
+    const automations = useStoreValue<Automation[]>(AUTOMATIONS, []) ?? [];
+    const [failure, setFailure] = useState<string | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+      let live = true;
+      const read = (): void => {
+        void controller.automations()
+          .then((found) => {
+            if (!live) return;
+            app.store.set(AUTOMATIONS, found);
+            setFailure(null);
+            setLoading(false);
+          })
+          .catch((error: unknown) => {
+            if (!live) return;
+            setLoading(false);
+            // The host's own words. "Serves no automations" and "the daemon
+            // has gone" want opposite things from a person.
+            setFailure(error instanceof Error ? error.message : String(error));
+          });
+      };
+      read();
+      // The change worth hearing about is the one nobody made.
+      const watch = controller.onAutomations(() => read());
+      return () => { live = false; watch.close(); };
+    }, []);
+
+    if (failure !== null) {
+      return (
+        <Panel title="Automations" flex={1}>
+          <EmptyState title="Nothing to schedule here" message={failure} flex={1} />
+        </Panel>
+      );
+    }
+
+    if (loading && automations.length === 0) {
+      return (
+        <Panel title="Automations" flex={1}>
+          <EmptyState title="Asking the host" message="Reading what it holds." flex={1} />
+        </Panel>
+      );
+    }
+
+    return (
+      <Panel title="Automations" flex={1}>
+        <AutomationList
+          automations={automations}
+          focusId="chat.automations"
+          autoFocus
+          flex={1}
+          onSelect={(uri) => app.store.set(AUTOMATION_ROW, uri)}
+          // Enter runs it, which is the verb this screen is for. The others
+          // are keys, and all three are named in the hints.
+          onOpen={(uri) => { app.store.set(AUTOMATION_ROW, uri); void app.execute('automation.run'); }}
         />
       </Panel>
     );

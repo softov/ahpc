@@ -252,7 +252,7 @@ terminal.
 
 ## The screens
 
-Eight, and each is a different question.
+Eleven, and each is a different question.
 
 | | Screen | Is | Reached by |
 |---|---|---|---|
@@ -264,6 +264,9 @@ Eight, and each is a different question.
 | 6 | `hosts` | Which host, whether it is answering, what it advertises | palette |
 | 7 | `skills` | What plugins and directories handed this session, and a switch on each | `k` |
 | 8 | `mcp` | Which MCP servers it has, and whether they answered | `p` |
+| 9 | `files` | The host's filesystem, one directory at a time, and one file out of it | palette |
+| 10 | `terminal` | A shell on the host's machine | palette |
+| 11 | `automations` | What the host runs on its own: the schedule, when it next fires, and how the last few went | palette |
 
 Everything else that came up is **not** a screen:
 
@@ -371,6 +374,12 @@ happens to be reading it is not a quit key.
 | On the skills or MCP panel | |
 |---|---|
 | `↑ ↓` | move · `enter` turns one on or off |
+| `esc` | back |
+
+| On the automations list | |
+|---|---|
+| `↑ ↓` | move · `enter` runs one now |
+| `e` `d` | switch it off or on · forget it, after asking |
 | `esc` | back |
 
 | While the agent is waiting | |
