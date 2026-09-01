@@ -159,7 +159,7 @@ and answer a turn. Every action rebuilds the view and re-emits it as a
 snapshot, which the transcript already renders from - that is what it does when
 you open one.
 
-It is written from the protocol package's own `src/types/` and from Advisor's client, and negotiates `1.0.0` - the version a VS Code 1.135 host speaks - falling back through `0.8.0` and `0.7.0` for older ones.
+It is written from the protocol package's own `src/types/` and from Advisor's client, and negotiates `1.0.0` - the version a VS Code 1.135 host speaks - falling back through `0.9.0`, the newest published, and then `0.8.0` and `0.7.0` for older ones.
 Driven against a real host it found one thing immediately, and it is the rule
 this file is now built on: **a host that says no is answering.**
 
@@ -252,7 +252,7 @@ terminal.
 
 ## The screens
 
-Eight, and each is a different question.
+Twelve, and each is a different question.
 
 | | Screen | Is | Reached by |
 |---|---|---|---|
@@ -264,6 +264,10 @@ Eight, and each is a different question.
 | 6 | `hosts` | Which host, whether it is answering, what it advertises | palette |
 | 7 | `skills` | What plugins and directories handed this session, and a switch on each | `k` |
 | 8 | `mcp` | Which MCP servers it has, and whether they answered | `p` |
+| 9 | `files` | The host's filesystem, one directory at a time, and one file out of it | palette |
+| 10 | `terminal` | A shell on the host's machine | palette |
+| 11 | `automations` | What the host runs on its own: the schedule, when it next fires, and how the last few went | palette |
+| 12 | `automation.new` | Writing one down: a name, the first thing it says, and a schedule - or none, to run it by hand | `n` on the automations list |
 
 Everything else that came up is **not** a screen:
 
@@ -371,6 +375,13 @@ happens to be reading it is not a quit key.
 | On the skills or MCP panel | |
 |---|---|
 | `↑ ↓` | move · `enter` turns one on or off |
+| `esc` | back |
+
+| On the automations list | |
+|---|---|
+| `↑ ↓` | move · `enter` runs one now |
+| `n` | write a new one |
+| `e` `d` | switch it off or on · forget it, after asking |
 | `esc` | back |
 
 | While the agent is waiting | |

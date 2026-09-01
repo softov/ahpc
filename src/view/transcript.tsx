@@ -134,6 +134,17 @@ const BlockView = defineComponent<{
           <text content={block.content} fg="muted" wrap="word" flex={1} />
         </Row>
       );
+    // Not a notice. A notice is the harness saying something in passing, and
+    // this is the turn stopping - so it takes the danger tone and says whether
+    // there is anything to carry on from.
+    case 'failure':
+      return (
+        <Row gap={1}>
+          <text content={theme.glyphs.cross} fg="danger" />
+          <text content={block.content} fg="danger" wrap="word" flex={1} />
+          {block.resumable ? <text content="resumable" fg="subtle" /> : null}
+        </Row>
+      );
     case 'tool':
       // No gutter. A tool call is something the agent *did*, not something it
       // said, so it sits at the turn's own left edge with a status glyph where

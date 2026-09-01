@@ -68,6 +68,10 @@ export const SessionList: (props: SessionListProps) => RenderOutput =
           // What the host says it is doing, in its own words. Last, because it
           // is the one that is usually not there.
           session.activity ?? '',
+          // Why it is here at all, when nobody started it. Without this a
+          // session that appeared at nine in the morning is a row with no
+          // account of itself, sitting among rows somebody typed.
+          session.origin?.kind === 'automation' ? 'by an automation' : '',
           status.archived ? 'archived' : '',
         ].filter(Boolean).join(dot),
         meta: status.label,

@@ -57,6 +57,14 @@ export const CHANGE_ROW = '$/chat/conv/row' as BindingPath;
 export const FILES_AT = '$/chat/files/at' as BindingPath;
 export const FILES_ENTRIES = '$/chat/files/entries' as BindingPath;
 export const FILES_OPEN = '$/chat/files/open' as BindingPath;
+/**
+ * The automations screen: what the host holds, and which row the cursor is on.
+ *
+ * The host's, not a session's - an automation outlives every session it
+ * starts, and belongs to the host the way the catalogue does.
+ */
+export const AUTOMATIONS = '$/chat/automations/all' as BindingPath;
+export const AUTOMATION_ROW = '$/chat/automations/row' as BindingPath;
 export const STATUS = '$/chat/conv/status' as BindingPath;
 /**
  * Is there a turn to stop, as a `when` clause can ask it.

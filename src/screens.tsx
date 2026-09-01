@@ -14,12 +14,13 @@ import {
   useStoreValue,
   useTheme,
 } from '@textui/core';
-import { Badge, Column, Divider, EmptyState, Marquee, Panel, RadioGroup, Row, SearchBox, argumentOf } from '@textui/widgets';
+import { Badge, Column, Divider, EmptyState, Field, Form, FormActions, Marquee, Panel, RadioGroup, Row, SearchBox, Select, TextInput, argumentOf, useForm } from '@textui/widgets';
+import { PRESETS, presetFor, scheduleProblem, zoneIsKnownHere } from './schedule.js';
 import {
-  CHANGES_SCOPE, CHAT_SCOPE, CONTROLLER, MCP_SCOPE, SESSIONS_SCOPE, SKILLS_SCOPE, settingCommand,
+  AUTOMATIONS_SCOPE, CHANGES_SCOPE, CHAT_SCOPE, CONTROLLER, MCP_SCOPE, SESSIONS_SCOPE, SKILLS_SCOPE, settingCommand,
 } from './control.js';
 import { branchName,
-  ARCHIVED, CHANGES, CUSTOMIZATIONS, DRAFT, EXPANDED, FILTER, FOCUS, HISTORY, HOST, INPUT,
+  ARCHIVED, AUTOMATIONS, AUTOMATION_ROW, CHANGES, CUSTOMIZATIONS, DRAFT, EXPANDED, FILTER, FOCUS, HISTORY, HOST, INPUT,
   CHANGE_AT, CHANGE_ROW, CHANGE_SCOPES, FILES_AT, FILES_ENTRIES, FILES_OPEN,
   MODEL, OPEN, OPEN_FILE, CHAT_URI, PROVIDER, QUEUE, SELECTED, SESSIONS, SETTINGS, SIDEBAR,
   CHATS, OPEN_TERMINAL, SPLIT_AT, SPLIT_DEFAULT, TERMINAL, TERMINALS, TURNS, WORKSPACE,
@@ -28,7 +29,7 @@ import { branchName,
 import type { HostState } from './state.js';
 import { toBlocks } from './blocks.js';
 import type {
-  Agent, Changeset, ChangesetScope, Completion, ContentRef, Customization, FileContent, PendingInput, QueuedMessage, ResourceEntry,
+  Agent, Automation, Changeset, ChangesetScope, Completion, ContentRef, Customization, FileContent, PendingInput, QueuedMessage, ResourceEntry,
   TerminalRow, TerminalState,
   SessionConfig, SessionDetail, SessionSummary, SlashCommand, Turn,
 } from './ahp/types.js';
@@ -41,6 +42,7 @@ import { settingIcon, valueIcon } from './view/icons.js';
 import { ChatHitl } from './view/hitl.js';
 import { ChangesList } from './view/changes.js';
 import { FileList } from './view/files.js';
+import { AutomationList } from './view/automations.js';
 import { CustomizationList } from './view/customizations.js';
 import { TerminalView } from './view/terminal.js';
 import { FileDiff } from './view/filediff.js';
@@ -1017,6 +1019,286 @@ export const ChangesScreen: (props: Record<string, never>) => RenderOutput =
           onSelect={(found: string) => app.store.set(CHANGE_ROW, found)}
           autoFocus
           flex={1}
+        />
+      </Panel>
+    );
+  });
+
+// ---------------------------------------------------- 6d. a new automation
+
+/**
+ * Writing one down.
+ *
+ * The half that was missing: this client could list, run and switch off an
+ * automation and could not make one, so the only way to have any was to write
+ * the daemon's own file by hand and restart it. That is not a workflow, it is
+ * what a person does when a client has a hole in it.
+ *
+ * The expression is checked here and *understood* on the host. `scheduleProblem`
+ * reads the protocol's grammar and stops there; when it next comes round is the
+ * host's answer, and it arrives as `nextRunAt` on the row this screen leaves
+ * behind. So the confirmation that a schedule is real is the list saying when it
+ * will fire, not this form saying it looks right.
+ *
+ * Manual-only is a real choice and not an empty box. The protocol says an
+ * automation with no triggers is one nothing fires, so leaving the schedule
+ * blank writes a definition with an empty trigger list rather than a broken one.
+ */
+export const NewAutomationScreen: (props: Record<string, never>) => RenderOutput =
+  defineComponent<Record<string, never>>('NewAutomationScreen', () => {
+    const app = useApp();
+    const controller = useRequiredService(CONTROLLER);
+    const session = openSession(app.store);
+    const [failure, setFailure] = useState<string | null>(null);
+
+    const form = useForm<{
+      title: string;
+      message: string;
+      directory: string;
+      expression: string;
+      timeZone: string;
+    }>({
+      initialValues: {
+        title: '',
+        message: '',
+        // Where the open session is working, when there is one. It is the only
+        // directory this client can name without having listed something.
+        directory: (session?.workingDirectories[0] ?? '').replace(/^file:\/\//, ''),
+        expression: '',
+        // The machine's own, because a schedule written without thinking about
+        // the zone means the one the person writing it is in.
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+      },
+      validate: (values) => {
+        const errors: { title?: string; message?: string; expression?: string; timeZone?: string } = {};
+        if (values.title.trim() === '') errors.title = 'An automation needs a name to be found by';
+        // The first message is what the automation is *for*: a session created
+        // and never spoken to does nothing at all.
+        if (values.message.trim() === '') errors.message = 'This is what it will say, so it cannot be empty';
+        // Blank is manual-only, which is a choice. Anything else has to parse.
+        if (values.expression.trim() !== '') {
+          const problem = scheduleProblem(values.expression);
+          if (problem !== undefined) errors.expression = problem;
+          else if (!zoneIsKnownHere(values.timeZone)) {
+            errors.timeZone = `This machine does not know ${values.timeZone}`;
+          }
+        }
+        return errors;
+      },
+      onSubmit: async (values) => {
+        const scheduled = values.expression.trim() !== '';
+        try {
+          await controller.createAutomation({
+            title: values.title.trim(),
+            enabled: true,
+            message: { text: values.message.trim() },
+            session: {
+              ...(session?.provider ? { provider: session.provider } : {}),
+              ...(values.directory.trim() !== ''
+                ? { workingDirectories: [`file://${values.directory.trim()}`] }
+                : {}),
+            },
+            // An empty list, not an absent key: the protocol says an empty
+            // trigger list is what manual-only means, and a definition with no
+            // `triggers` at all is one a host has to guess about.
+            triggers: scheduled
+              ? [{
+                id: 't1',
+                kind: 'schedule',
+                schedule: { expression: values.expression.trim(), timeZone: values.timeZone.trim() },
+              }]
+              : [],
+          });
+          app.screens.pop();
+        }
+        catch (error) {
+          setFailure(error instanceof Error ? error.message : String(error));
+        }
+      },
+    });
+
+    return (
+      <Panel title="A new automation" flex={1}>
+        <Form form={form as never} flex={1}>
+          <Column gap={0} flex={1}>
+            {/* Paired, so the whole form fits a 24-row terminal. That is not
+                tidiness: the last thing on it is the button that submits it,
+                and a form whose Create is below the fold cannot be finished by
+                somebody who cannot scroll to it - this library's scroll view
+                does not follow focus, so there is nowhere to put the overflow. */}
+            <Row gap={1}>
+              <Field name="title" label="Name" labelWidth={10} required flex={2}>
+                <TextInput
+                  value={form.values.title}
+                  autoFocus
+                  placeholder="Nightly framework build"
+                  onChange={(value: string) => { form.setValue('title', value); form.touch('title'); }}
+                />
+              </Field>
+              <Field name="directory" label="in" labelWidth={3} flex={2}>
+                <TextInput
+                  value={form.values.directory}
+                  placeholder="the host's default directory"
+                  onChange={(value: string) => { form.setValue('directory', value); form.touch('directory'); }}
+                />
+              </Field>
+            </Row>
+            <Field name="message" label="Says" labelWidth={10} required>
+              <TextInput
+                value={form.values.message}
+                placeholder="review what changed today"
+                onChange={(value: string) => { form.setValue('message', value); form.touch('message'); }}
+              />
+            </Field>
+            <Divider />
+            {/* The easy path first. Choosing one writes the expression below,
+                which stays the authoritative value - so a preset is a way of
+                filling the field in, never a second place the answer lives. */}
+            <Field name="preset" label="Runs" labelWidth={10}>
+              <Select
+                options={[
+                  ...PRESETS.map((one) => ({ value: one.id, label: one.label })),
+                  // Only reachable by typing. Offering it as a choice would be
+                  // offering to clear the field somebody just filled in.
+                  ...(presetFor(form.values.expression) === undefined
+                    ? [{ value: 'custom', label: 'Something else, written below' }]
+                    : []),
+                ]}
+                value={presetFor(form.values.expression)?.id ?? 'custom'}
+                mode="floating"
+                onChange={(value: string) => {
+                  const chosen = PRESETS.find((one) => one.id === value);
+                  if (!chosen) return;
+                  form.setValue('expression', chosen.expression);
+                  form.touch('expression');
+                }}
+              />
+            </Field>
+            {/* One row, because they are one fact: an expression without the
+                zone it is read in does not name a time. It also buys back the
+                rows the picker above costs, so the whole form still fits a
+                short terminal - which matters more than usual here, because
+                the button that submits it is at the bottom. */}
+            <Row gap={1}>
+              <Field
+                name="expression"
+                label="Schedule"
+                labelWidth={10}
+                hint="minute hour day month weekday"
+                flex={2}
+              >
+                <TextInput
+                  value={form.values.expression}
+                  placeholder="0 9 * * 1-5"
+                  onChange={(value: string) => { form.setValue('expression', value); form.touch('expression'); }}
+                />
+              </Field>
+              <Field name="timeZone" label="Zone" labelWidth={5} flex={1}>
+                <TextInput
+                  value={form.values.timeZone}
+                  placeholder="UTC"
+                  onChange={(value: string) => { form.setValue('timeZone', value); form.touch('timeZone'); }}
+                />
+              </Field>
+            </Row>
+            {/* Said once, where it cannot be mistaken for a rule about this
+                form: when it fires is the host's answer, not this screen's. */}
+            {/* A preset's label is true by construction - it is the words the
+                expression was chosen by. A hand-written expression gets no
+                gloss at all, because paraphrasing one would be this screen
+                claiming to understand what only the host evaluates. */}
+            <text
+              content={form.values.expression.trim() === ''
+                ? 'No schedule: it runs when somebody presses Run.'
+                : presetFor(form.values.expression)
+                  ? `${presetFor(form.values.expression)?.label}. The host works out the next one.`
+                  : 'The host works out when this comes round, and the list will say.'}
+              fg="subtle"
+            />
+            {failure !== null ? <text content={failure} fg="danger" wrap="word" /> : null}
+            <FormActions submitLabel="Create" cancelLabel="Cancel" onCancel={() => app.screens.pop()} />
+          </Column>
+        </Form>
+      </Panel>
+    );
+  });
+
+// -------------------------------------------------------- 6c. the automations
+
+/**
+ * What the host does without being asked.
+ *
+ * The catalogue answers "what has been said"; this answers "what will happen".
+ * They are both the host's and only one of them was drawn, so a session that
+ * appeared at nine this morning was a session with no account of itself - which
+ * is what protocol 0.9.0's `origin` is for, and it is read on the catalogue
+ * rather than here.
+ *
+ * Read whole on every change rather than patched. The channel says an
+ * automation moved and the list is a dozen rows; a client that reduced its own
+ * copy would be a second answer to what the host holds, for no gain at this
+ * size.
+ */
+export const AutomationsScreen: (props: Record<string, never>) => RenderOutput =
+  defineComponent<Record<string, never>>('AutomationsScreen', () => {
+    const app = useApp();
+    const controller = useRequiredService(CONTROLLER);
+    useFocusScope({ id: AUTOMATIONS_SCOPE });
+    const automations = useStoreValue<Automation[]>(AUTOMATIONS, []) ?? [];
+    const [failure, setFailure] = useState<string | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+      let live = true;
+      const read = (): void => {
+        void controller.automations()
+          .then((found) => {
+            if (!live) return;
+            app.store.set(AUTOMATIONS, found);
+            setFailure(null);
+            setLoading(false);
+          })
+          .catch((error: unknown) => {
+            if (!live) return;
+            setLoading(false);
+            // The host's own words. "Serves no automations" and "the daemon
+            // has gone" want opposite things from a person.
+            setFailure(error instanceof Error ? error.message : String(error));
+          });
+      };
+      read();
+      // The change worth hearing about is the one nobody made.
+      const watch = controller.onAutomations(() => read());
+      return () => { live = false; watch.close(); };
+    }, []);
+
+    if (failure !== null) {
+      return (
+        <Panel title="Automations" flex={1}>
+          <EmptyState title="Nothing to schedule here" message={failure} flex={1} />
+        </Panel>
+      );
+    }
+
+    if (loading && automations.length === 0) {
+      return (
+        <Panel title="Automations" flex={1}>
+          <EmptyState title="Asking the host" message="Reading what it holds." flex={1} />
+        </Panel>
+      );
+    }
+
+    return (
+      <Panel title="Automations" flex={1}>
+        <AutomationList
+          automations={automations}
+          focusId="chat.automations"
+          autoFocus
+          flex={1}
+          onSelect={(uri) => app.store.set(AUTOMATION_ROW, uri)}
+          // Enter runs it, which is the verb this screen is for. The others
+          // are keys, and all three are named in the hints.
+          onOpen={(uri) => { app.store.set(AUTOMATION_ROW, uri); void app.execute('automation.run'); }}
         />
       </Panel>
     );

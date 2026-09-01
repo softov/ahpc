@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { HostConnection, HostEvent } from './connection.js';
 import type {
-  Agent, Changeset, ChangesetOperation, ChangesetScope, ChatInputRequest, ContentRef, Customization, FileContent, FileEdit,
+  Agent, Automation, Changeset, ChangesetOperation, ChangesetScope, ChatInputRequest, ContentRef, Customization, FileContent, FileEdit,
   PendingInput, QueuedMessage, ResourceEntry, ResponsePart, SessionConfig, SessionDetail, SessionSummary,
   SessionUri, TerminalState, ToolCall, Turn,
 } from './types.js';
@@ -367,6 +367,49 @@ export function fakeHost(): FakeHost {
     touch(uri);
   };
 
+  // ----------------------------------------------------------- the automations
+
+  /**
+   * Automations this host holds, and who is watching them.
+   *
+   * Two, because the interesting screen is the one with both kinds on it: one
+   * on a clock with a history behind it, and one that is only ever run by
+   * hand. A fixture with a single scheduled automation would let a screen be
+   * built that assumes every automation has a next run.
+   */
+  const automations = new Map<string, Automation>([
+    ['ahp-automation:/9c4a', {
+      resource: 'ahp-automation:/9c4a',
+      title: 'Nightly framework build',
+      enabled: true,
+      schedule: { expression: '0 9 * * 1-5', timeZone: 'America/Sao_Paulo' },
+      // Relative to now, so the fixture is still a *next* run tomorrow and
+      // next year. A hardcoded date becomes a schedule in the past, which is
+      // the one thing a next run cannot be.
+      nextRunAt: new Date(Date.now() + 4 * 3_600_000 + 12 * 60_000).toISOString(),
+      runs: [
+        { resource: 'ahp-automation-run:/r3', status: 'completed', session: 'ahp-session:/1f0a', triggered: true },
+        { resource: 'ahp-automation-run:/r2', status: 'completed', session: 'ahp-session:/6b21', triggered: true },
+        { resource: 'ahp-automation-run:/r1', status: 'failed', triggered: true },
+      ],
+      operations: ['update', 'remove', 'run'],
+    }],
+    ['ahp-automation:/2e71', {
+      resource: 'ahp-automation:/2e71',
+      title: 'Triage new Desk cases',
+      // Switched off, which is why it has no next run despite the host having
+      // a clock. The absent `nextRunAt` means the same thing for both.
+      enabled: false,
+      schedule: { expression: '*/30 * * * *', timeZone: 'UTC' },
+      runs: [],
+      // No `run` while it is off: offering the button anyway would be a
+      // control that argues with the switch beside it.
+      operations: ['update', 'remove'],
+    }],
+  ]);
+  const automationWatchers = new Set<() => void>();
+  const automationsMoved = (): void => { for (const listener of automationWatchers) listener(); };
+
   // ------------------------------------------------------------ the catalogue
 
   const seed = (options: {
@@ -381,6 +424,8 @@ export function fakeHost(): FakeHost {
     permissions?: string;
     isolation?: string;
     activity?: string;
+    /** What started it, when it was not a person. */
+    origin?: { kind: 'automation'; automation: string; run: string };
     turns?: Turn[];
     active?: Turn;
     input?: PendingInput;
@@ -476,6 +521,7 @@ export function fakeHost(): FakeHost {
       modifiedAt: AT,
       workingDirectories: [options.dir],
       ...(options.activity ? { activity: options.activity } : {}),
+      ...(options.origin ? { origin: options.origin } : {}),
       ...(options.changes
         ? {
           changes: {
@@ -635,6 +681,10 @@ export function fakeHost(): FakeHost {
         parts: [
           { kind: 'systemNotification', id: 's4-n1', content: 'The session ended: the host refused the request.' },
           { kind: 'markdown', id: 's4-m1', content: 'The host answered `-32007 Authentication is required to use Claude`. That is a sign-in on the host, not a network problem here.' },
+          // How a 0.9.0 host ends a turn it could not finish. A `failed` turn
+          // carrying no such part is the shape every earlier version had, so
+          // the one scripted failure here has one.
+          { kind: 'error', id: 's4-e1', message: 'Sign in on the host, then run this turn again.', resumable: true },
         ],
       },
     ],
@@ -1091,6 +1141,90 @@ export function fakeHost(): FakeHost {
       properties: CONFIG,
       values: { permissionMode: 'default', isolation: 'workspace', ...values },
     }),
+
+    automations: async () => [...automations.values()],
+
+    onAutomations: (observer) => {
+      automationWatchers.add(observer);
+      return { close: () => { automationWatchers.delete(observer); } };
+    },
+
+    createAutomation: async (definition) => {
+      const uri = `ahp-automation:/${(0x8000 + automations.size).toString(16)}`;
+      const triggers = Array.isArray(definition.triggers) ? definition.triggers : [];
+      const schedule = triggers
+        .map((one) => (typeof one === 'object' && one !== null ? one as Record<string, unknown> : {}))
+        .find((one) => one.kind === 'schedule');
+      const timing = (typeof schedule?.schedule === 'object' && schedule.schedule !== null
+        ? schedule.schedule
+        : {}) as { expression?: string; timeZone?: string };
+      automations.set(uri, {
+        resource: uri,
+        title: typeof definition.title === 'string' ? definition.title : 'Untitled automation',
+        enabled: definition.enabled !== false,
+        ...(timing.expression
+          ? { schedule: { expression: timing.expression, timeZone: timing.timeZone ?? 'UTC' } }
+          : {}),
+        // A host with a clock answers with when it will fire, and that answer
+        // is the confirmation the form is waiting for. An hour from now, so
+        // the fixture is a *next* run whenever this is read.
+        ...(timing.expression
+          ? { nextRunAt: new Date(Date.now() + 3_600_000).toISOString() }
+          : {}),
+        runs: [],
+        operations: ['update', 'remove', 'run'],
+      });
+      automationsMoved();
+      return uri;
+    },
+
+    /**
+     * Run one now, which is what the host does with nobody watching.
+     *
+     * The session it starts carries the origin, because that is the whole
+     * point of the field: a catalogue that showed this next to one somebody
+     * typed, with nothing to tell them apart, is what 0.9.0 added it for.
+     */
+    runAutomation: async (uri) => {
+      const found = automations.get(uri);
+      if (!found || !found.operations.includes('run')) return;
+      const run = `ahp-automation-run:/${(0x100 + found.runs.length).toString(16)}`;
+      const session = `ahp-session:/${(0x1000 + summaries.size).toString(16)}`;
+      seed({
+        id: session,
+        provider: 'claude',
+        title: found.title,
+        dir: 'file:///brb_main/src/brb_framework',
+        read: false,
+        origin: { kind: 'automation', automation: uri, run },
+      });
+      automations.set(uri, {
+        ...found,
+        runs: [{ resource: run, status: 'running', session, triggered: false }, ...found.runs],
+      });
+      moved();
+      automationsMoved();
+    },
+
+    setAutomationEnabled: async (uri, enabled) => {
+      const found = automations.get(uri);
+      if (!found) return;
+      automations.set(uri, {
+        ...found,
+        enabled,
+        // What the host would answer with, rather than what was asked for: an
+        // automation switched off stops offering Run, and switching it back on
+        // offers it again.
+        operations: enabled ? ['update', 'remove', 'run'] : ['update', 'remove'],
+        ...(enabled ? {} : { nextRunAt: undefined }),
+      });
+      automationsMoved();
+    },
+
+    removeAutomation: async (uri) => {
+      if (!automations.delete(uri)) return;
+      automationsMoved();
+    },
 
     createSession: async ({ provider, workingDirectory }) => {
       const uri = `ahp-session:/${(0x1000 + summaries.size).toString(16)}`;

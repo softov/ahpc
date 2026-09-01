@@ -40,6 +40,14 @@ export interface SessionSummary {
   workingDirectories: string[];
   /** What the host says it is doing, in its own words. Often absent. */
   activity?: string;
+  /**
+   * What started this, when it was not a person.
+   *
+   * New in protocol 0.9.0, and the only way a catalogue can tell a session
+   * somebody typed from one that started itself at nine this morning. Absent
+   * for a session a person opened, which is most of them.
+   */
+  origin?: { kind: 'automation'; automation: string; run: string };
   /** The footprint, so a list can show it without subscribing to a changeset. */
   changes?: { files?: number; additions?: number; deletions?: number };
   /**
@@ -81,7 +89,7 @@ export interface SessionDetail {
    */
   chat: string | null;
   chats: { resource: string; title: string }[];
-  lifecycle: 'creating' | 'ready' | 'creationFailed';
+  lifecycle: 'creating' | 'ready' | 'failed';
   config: SessionConfig;
   /** What the last turn ran on. A session has no model; each message has one. */
   model?: string;
@@ -133,7 +141,9 @@ export type ResponsePart =
   | { kind: 'markdown'; id: string; content: string }
   | { kind: 'reasoning'; id: string; content: string }
   | { kind: 'systemNotification'; id: string; content: string }
-  | { kind: 'toolCall'; id: string; call: ToolCall };
+  | { kind: 'toolCall'; id: string; call: ToolCall }
+  /** How a turn failed, in the host's words. `resumable`: the host can carry on from it. */
+  | { kind: 'error'; id: string; message: string; resumable: boolean };
 
 /**
  * A turn.
@@ -547,4 +557,46 @@ export interface ChangesetScope {
   reviewable?: boolean;
   /** The `{name}` placeholders left in the template, in the order they appear. */
   variables: string[];
+}
+
+// ------------------------------------------------------------- automations
+
+/**
+ * One run of an automation, flattened to what a list row shows.
+ *
+ * The protocol carries a lifecycle object and an origin object; a reader wants
+ * to know whether it worked, whether anybody asked for it, and what to open.
+ */
+export interface AutomationRun {
+  resource: string;
+  /** `pending`, `running`, `completed`, `failed` or `cancelled`. */
+  status: string;
+  /** The session it started, once it has one. What opening the run opens. */
+  session?: string;
+  /** Whether a trigger started it, rather than somebody pressing Run. */
+  triggered: boolean;
+}
+
+/**
+ * One automation: a session the host starts without anybody asking.
+ *
+ * `schedule` and `nextRunAt` answer different questions and both are worth
+ * showing. The first is what somebody wrote and is true whatever the host
+ * does with it; the second is what the host will actually do, and its absence
+ * is how a host says it will not fire this - because it holds no clock,
+ * because the automation is switched off, or because the expression is one it
+ * could not read.
+ */
+export interface Automation {
+  resource: string;
+  title: string;
+  enabled: boolean;
+  /** The cron expression and zone, as written. Absent for a manual-only one. */
+  schedule?: { expression: string; timeZone: string };
+  /** ISO 8601. Absent when nothing will fire it. */
+  nextRunAt?: string;
+  /** Newest first, and a bounded window of them. */
+  runs: AutomationRun[];
+  /** Which of `update`, `remove` and `run` the host will accept for it now. */
+  operations: string[];
 }

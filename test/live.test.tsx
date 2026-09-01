@@ -15,10 +15,10 @@ import { sessions } from '../src/state.js';
  * drained for something else and thrown away.
  */
 
-async function open(height = 26) {
+async function open(height = 26, width = 90) {
   const host = fakeHost();
   const t = await renderApp({
-    width: 90, height, shell: 'workbench', theme: 'dark',
+    width, height, shell: 'workbench', theme: 'dark',
     onBoot: (app) => { registerChat(app, { host }); },
   });
   for (let i = 0; i < 8; i++) await t.settle();
@@ -168,4 +168,32 @@ describe('the conversation, above and around', () => {
     expect(feed.props.pageKeys).toBe('always');
     await t.unmount();
   });
+});
+
+/*
+ * A turn that failed says so in the transcript, not only in its header.
+ *
+ * 0.9.0 gave the protocol an error response part, and it is a *part* because
+ * what came before it still stands - the agent said three things and then hit
+ * this. Dropped, the reader gets a turn that simply stops, and a `failed`
+ * marker in the header they have to scroll back up to find.
+ */
+describe('a turn the host could not finish', () => {
+  for (const width of [90, 60]) {
+    it(`says what went wrong, at ${width} columns`, async () => {
+      const { t } = await open(40, width);
+      t.app.services.require(CONTROLLER).open('ahp-session:/2d55');
+      t.app.screens.push('chat');
+      for (let i = 0; i < 12; i++) await t.settle();
+      t.focus('chat.transcript');
+      t.press('end');
+      for (let i = 0; i < 8; i++) await t.settle();
+
+      // The host's own words, and the one thing a reader can act on: whether
+      // there is anything left to carry on from.
+      expect(t.hasText('Sign in on the host, then run this turn again.')).toBe(true);
+      expect(t.hasText('resumable')).toBe(true);
+      await t.unmount();
+    });
+  }
 });

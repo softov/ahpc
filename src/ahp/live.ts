@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { HostConnection, HostEvent } from './connection.js';
 import type {
-  Agent, Answer, Changeset, ChangesetOperation, ChangesetOperationTarget, Completion, ConfigProperty, ContentRef, Customization, CustomizationKind,
+  Agent, Answer, Automation, AutomationRun, Changeset, ChangesetOperation, ChangesetOperationTarget, Completion, ConfigProperty, ContentRef, Customization, CustomizationKind,
   TerminalRow, TerminalState,
   FileContent, FileEdit, McpState, PendingInput, QueuedMessage, Question, QuestionKind,
   ResponsePart, SessionConfig, SessionDetail, SessionSummary, SessionUri, ToolCall,
@@ -30,7 +30,7 @@ import type {
  * npm install @microsoft/agent-host-protocol
  * ```
  *
- * Written against protocol 0.7.0, from the package's own `src/types/`. What it
+ * Written against protocol 0.9.0, from the package's own `src/types/`. What it
  * speaks is the subset this client needs: `initialize`, `listSessions`,
  * `subscribe`, `createSession`, `disposeSession`, `resolveSessionConfig`, and
  * the seven client-dispatchable actions that drive and answer a turn.
@@ -55,22 +55,25 @@ export interface LiveHostOptions {
 }
 
 /**
- * Versions to offer, newest first.
+ * Versions to offer at `initialize`, most preferred first.
  *
- * Offering one the installed library has no types for is safe: every command
- * used here has been stable across all of them, and 1.0.0 is the stabilised
- * 0.8.0 rather than a new wire format - the host that speaks it gates no
- * action behind a version newer than 0.8.0.
+ * A host picks the first entry it also speaks, so this is a preference rather
+ * than a floor. Offering one the installed library has no types for is safe:
+ * every command used here is stable across all of them.
  *
- * This list is load-bearing, because there is no fallback behind it. The
- * `0.9.0` it used to lead with was a guess at a host that never shipped, and
- * when VS Code went 0.8.0 -> 1.0.0 the host - which accepts `^1.0.0` and
- * nothing 0.x - refused all three entries with `-32005`, which arrives here
- * looking like a host that is not there.
+ * `1.0.0` is not published - VS Code's host vendors the protocol from its
+ * repository and runs ahead of npm - and it accepts `^1.0.0` and nothing 0.x.
+ * Leaving it out is therefore not the conservative choice: it is every entry
+ * refused with `-32005`, which arrives here looking like a host that is not
+ * there. `0.9.0` is the newest published, and the version the package below
+ * is built from.
+ *
+ * This list is load-bearing, because there is no fallback behind it.
  */
-const VERSIONS = ['1.0.0', '0.8.0', '0.7.0'];
+const VERSIONS = ['1.0.0', '0.9.0', '0.8.0', '0.7.0'];
 
 const ROOT = 'ahp-root://';
+const AUTOMATIONS = 'ahp-automations://';
 
 // --------------------------------------------------------------- the package
 
@@ -108,6 +111,7 @@ interface Loaded {
   Client: new (transport: unknown, config?: unknown) => Client;
   Mirror: new () => Mirror;
   connect(url: string): Promise<unknown>;
+  automationReducer(state: unknown, action: unknown): unknown;
   chatReducer(state: unknown, action: unknown): unknown;
   sessionReducer(state: unknown, action: unknown): unknown;
   terminalReducer(state: unknown, action: unknown): unknown;
@@ -133,6 +137,7 @@ async function load(): Promise<Loaded> {
       Client: client.AhpClient as unknown as Loaded['Client'],
       Mirror: client.AhpStateMirror as unknown as Loaded['Mirror'],
       connect: (url) => transport.connect(url),
+      automationReducer: core.automationReducer as unknown as Loaded['automationReducer'],
       chatReducer: core.chatReducer as unknown as Loaded['chatReducer'],
       sessionReducer: core.sessionReducer as unknown as Loaded['sessionReducer'],
       terminalReducer: core.terminalReducer as unknown as Loaded['terminalReducer'],
@@ -231,6 +236,20 @@ function parts(value: unknown): ResponsePart[] {
       case 'toolCall': {
         const call = toolCall(part.toolCall);
         out.push({ kind: 'toolCall', id: call.id, call });
+        break;
+      }
+      // A turn that failed mid-stream, new in 0.9.0. It is a part rather than
+      // a turn state because what came before it still stands: the agent said
+      // three things and then hit this, and dropping it leaves a turn that
+      // simply stops.
+      case 'error': {
+        const error = bag(part.error);
+        out.push({
+          kind: 'error',
+          id,
+          message: str(error.message) ?? str(error.errorType) ?? 'The agent failed.',
+          resumable: part.resumable === true,
+        });
         break;
       }
       default:
@@ -367,6 +386,19 @@ function summary(value: unknown): SessionSummary {
     modifiedAt: str(found.modifiedAt) ?? str(found.createdAt) ?? '',
     workingDirectories: list(found.workingDirectories).filter((dir): dir is string => typeof dir === 'string'),
     ...(str(found.activity) ? { activity: str(found.activity) as string } : {}),
+    // What started it, when it was not a person. Only `automation` exists in
+    // 0.9.0, and an origin of some later kind is left off rather than drawn
+    // as one - a catalogue that called an unknown origin an automation would
+    // be making something up.
+    ...(str(bag(found.origin).automation)
+      ? {
+        origin: {
+          kind: 'automation' as const,
+          automation: str(bag(found.origin).automation) as string,
+          run: str(bag(found.origin).run) ?? '',
+        },
+      }
+      : {}),
     // Both only when the host said them: a project with an empty name would
     // draw a blank where the directory used to be, which is worse than the
     // fallback it replaced.
@@ -390,6 +422,53 @@ function summary(value: unknown): SessionSummary {
         },
       }
       : {}),
+  };
+}
+
+/** One run, flattened out of its lifecycle and its origin. */
+function automationRun(value: unknown): AutomationRun {
+  const found = bag(value);
+  return {
+    resource: str(found.resource) ?? '',
+    status: str(bag(found.lifecycle).status) ?? 'pending',
+    ...(str(found.primarySession) ? { session: str(found.primarySession) as string } : {}),
+    triggered: str(bag(found.origin).kind) === 'trigger',
+  };
+}
+
+/**
+ * One automation, flattened.
+ *
+ * The schedule is read out of the *definition*, which is the client's own
+ * writing given back - so this reads the first schedule trigger and shows what
+ * it says. `nextRunAt` is the host's, and the two disagreeing is the useful
+ * case rather than a contradiction: an expression that is written down and is
+ * never going to fire is exactly what a reader needs to see.
+ */
+function automation(value: unknown): Automation {
+  const found = bag(value);
+  const definition = bag(found.definition);
+  const schedule = list(definition.triggers)
+    .map(bag)
+    .find((trigger) => trigger.kind === 'schedule');
+  const timing = bag(schedule?.schedule);
+  return {
+    resource: str(found.resource) ?? '',
+    title: str(definition.title) ?? 'Untitled automation',
+    // Absent means on. It is the definition's own default, and a client that
+    // read a missing key as off would switch off everything it was shown.
+    enabled: definition.enabled !== false,
+    ...(str(timing.expression)
+      ? {
+        schedule: {
+          expression: str(timing.expression) as string,
+          timeZone: str(timing.timeZone) ?? 'UTC',
+        },
+      }
+      : {}),
+    ...(str(found.nextRunAt) ? { nextRunAt: str(found.nextRunAt) as string } : {}),
+    runs: list(found.runs).map(automationRun),
+    operations: list(found.operations).filter((one): one is string => typeof one === 'string'),
   };
 }
 
@@ -656,6 +735,41 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
     } catch { moveTo('offline'); }
   })();
 
+  /**
+   * The automations channel, watched for as long as this connection lives.
+   *
+   * Subscribed once at connect rather than when the screen opens, for the same
+   * reason the root channel is: the change worth hearing about is the one
+   * nobody made, and an automation that fires at nine in the morning has to
+   * reach a client that was not looking at the time.
+   *
+   * A host that serves none refuses this, and the refusal is *kept* rather
+   * than retried - it is an answer about what this host is, and it will not
+   * become a different answer on the next keystroke.
+   */
+  const automationWatchers = new Set<() => void>();
+  let automationState: Bag | null = null;
+  let noAutomations: string | undefined;
+  try {
+    const channel = await client.subscribe(AUTOMATIONS);
+    automationState = bag(channel.result.snapshot?.state);
+    void (async () => {
+      try {
+        for await (const event of channel.subscription) {
+          if (event.type !== 'action') continue;
+          // The host's own reducer. Two mutations is not eighty, but a second
+          // answer to "what is the state now" is a second answer at any size.
+          automationState = bag(ahp.automationReducer(automationState, bag(event.params).action));
+          for (const listener of automationWatchers) listener();
+        }
+      } catch { /* the connection going is reported by the root channel */ }
+    })();
+  }
+  catch (error) {
+    const rpc = error as { message?: string } | null;
+    noAutomations = rpc?.message ?? 'This host serves no automations.';
+  }
+
   /** The chat a session dispatches to, remembered so it is asked for once. */
   const chats = new Map<SessionUri, string>();
   /**
@@ -873,12 +987,81 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
       return resource;
     },
 
+    automations: async () => {
+      // The host's words, not ours. "Serves no automations" and "the daemon
+      // has gone" want opposite things from a person.
+      if (noAutomations !== undefined) throw new Error(noAutomations);
+      return list(bag(automationState).entries).map(automation);
+    },
+
+    onAutomations: (observer) => {
+      automationWatchers.add(observer);
+      return { close: () => { automationWatchers.delete(observer); } };
+    },
+
+    createAutomation: async (definition) => {
+      const uri = `ahp-automation:/${randomUUID()}`;
+      // A *request*, in the protocol's own spelling: the client says what it
+      // wants and the host decides, then says what it actually holds with
+      // `automation/set`. So nothing is echoed back here - what appears on the
+      // screen is the host's answer arriving on the channel.
+      client.dispatch(AUTOMATIONS, {
+        type: 'automation/createRequested',
+        resource: uri,
+        definition,
+      });
+      return uri;
+    },
+
+    runAutomation: async (uri) => {
+      await client.request('runAutomation', {
+        channel: AUTOMATIONS,
+        automation: uri,
+        // The protocol has this so a client can match its own request to the
+        // run it gets back; this client reads the catalogue instead, and sends
+        // one because the field is required.
+        requestId: randomUUID(),
+      });
+    },
+
+    setAutomationEnabled: async (uri, enabled) => {
+      // Straight at the channel. The `dispatch` above resolves a *session's*
+      // chat, which this is not.
+      //
+      // `changes` and not the whole definition: it is a patch, and sending
+      // everything back would revert whatever another client changed
+      // meanwhile. A request rather than a write - the host answers with
+      // `automation/set` saying what it actually holds, which is where the
+      // screen reads it from.
+      client.dispatch(AUTOMATIONS, {
+        type: 'automation/updateRequested',
+        resource: uri,
+        changes: { enabled },
+      });
+    },
+
+    removeAutomation: async (uri) => {
+      // `automation/removed`, in the protocol's own spelling: the client says
+      // it is gone and the host revalidates that `remove` is still offered
+      // before it is.
+      client.dispatch(AUTOMATIONS, { type: 'automation/removed', resource: uri });
+    },
+
     terminals: async () => list(mirror.root.terminals).map((raw): TerminalRow => {
       const found = bag(raw);
+      // Both forms of the exit code, because this client speaks four versions.
+      // 0.9.0 moved it inside `lifecycle`, where it exists only once the
+      // process has exited; before that it was flat on the terminal. Reading
+      // one name leaves every exit under half the hosts reported as still
+      // running.
+      const exited = bag(found.lifecycle).exitCode;
+      const code = typeof exited === 'number' ? exited
+        : typeof found.exitCode === 'number' ? found.exitCode
+        : undefined;
       return {
         resource: str(found.resource) ?? '',
         title: str(found.title) ?? 'Terminal',
-        ...(typeof found.exitCode === 'number' ? { exitCode: found.exitCode } : {}),
+        ...(code !== undefined ? { exitCode: code } : {}),
       };
     }).filter((row) => row.resource !== ''),
 
@@ -1386,7 +1569,12 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
         })),
         // What the host said, when it said no. A pane reading "creating" over
         // a session whose agent is gone is worse than one that says so.
-        lifecycle: (str(state.lifecycle) ?? 'creating') as SessionDetail['lifecycle'],
+        // 0.9.0 renamed `creationFailed` to `failed`, and this client speaks
+        // both sides of that rename - so the old name is translated here
+        // rather than carried inland as a second word for one state.
+        lifecycle: (str(state.lifecycle) === 'creationFailed'
+          ? 'failed'
+          : str(state.lifecycle) ?? 'creating') as SessionDetail['lifecycle'],
         ...(refused.has(uri) ? { refusal: refused.get(uri) as string } : {}),
         config: config(state.config),
         ...(last ? { model: str(bag(bag(bag(last).message).model).id) as string } : {}),

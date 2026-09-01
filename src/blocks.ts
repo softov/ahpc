@@ -19,6 +19,7 @@ export type Block =
   | { kind: 'prose'; id: string; turnId: string; content: string; streaming: boolean }
   | { kind: 'reasoning'; id: string; turnId: string; content: string; streaming: boolean }
   | { kind: 'notice'; id: string; turnId: string; content: string }
+  | { kind: 'failure'; id: string; turnId: string; content: string; resumable: boolean }
   | { kind: 'tool'; id: string; turnId: string; call: ToolCall }
   | { kind: 'queued'; id: string; messageId: string; text: string };
 
@@ -62,6 +63,9 @@ export function toBlocks(turns: Turn[], queued: QueuedMessage[] = []): Block[] {
           break;
         case 'toolCall':
           blocks.push({ kind: 'tool', id: part.id, turnId: turn.id, call: part.call });
+          break;
+        case 'error':
+          blocks.push({ kind: 'failure', id: part.id, turnId: turn.id, content: part.message, resumable: part.resumable });
           break;
         default:
           break;

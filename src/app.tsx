@@ -18,7 +18,7 @@ import {
 import type { HostState } from './state.js';
 import { decodeStatus } from './ahp/status.js';
 import {
-  ChangesScreen, ChatScreen, FilesScreen, HostsScreen, McpScreen, NewSessionScreen, SessionsScreen, TerminalScreen,
+  AutomationsScreen, ChangesScreen, ChatScreen, FilesScreen, HostsScreen, McpScreen, NewAutomationScreen, NewSessionScreen, SessionsScreen, TerminalScreen,
   SettingsScreen, SkillsScreen,
 } from './screens.js';
 import { ChatBubble, ReasoningBlock, StreamingText } from './view/bubble.js';
@@ -27,6 +27,7 @@ import { ChatHitl } from './view/hitl.js';
 import { ChatTranscript } from './view/transcript.js';
 import { ChangesList } from './view/changes.js';
 import { FileList } from './view/files.js';
+import { AutomationList } from './view/automations.js';
 import { ConnectionBadge, SessionList } from './view/sessions.js';
 import { ToolCallRow } from './view/toolcall.js';
 
@@ -215,19 +216,25 @@ const Hints = defineComponent<BoxProps>('ChatHints', (props) => {
     );
   }
 
-  // The three list screens. `tab move` is a form's answer and these are
+  // The list screens. `tab move` is a form's answer and these are
   // lists: what moves is the cursor, and enter is what a row is for.
-  if (screen === 'changes' || screen === 'skills' || screen === 'mcp' || screen === 'files') {
+  if (screen === 'changes' || screen === 'skills' || screen === 'mcp' || screen === 'files'
+    || screen === 'automations') {
     return (
       <KeyHints
         {...props}
         hints={[
           { keys: upDown, label: 'move' },
-          { keys: 'enter', label: screen === 'changes' || screen === 'files' ? 'open' : 'on / off' },
+          { keys: 'enter', label: screen === 'changes' || screen === 'files' ? 'open' : screen === 'automations' ? 'run' : 'on / off' },
           // Only where they do something. A hint for a key that is inert on
           // this screen is worse than no hint.
           ...(screen === 'changes'
             ? [{ keys: ']', label: 'changeset' }, { keys: 'r', label: 'read' }, { keys: 'x', label: 'do' }]
+            : []),
+          // Named only where they do something. `enter` already runs one, so
+          // what is left is the switch and the one that does not come back.
+          ...(screen === 'automations'
+            ? [{ keys: 'n', label: 'new' }, { keys: 'e', label: 'on / off' }, { keys: 'd', label: 'forget' }]
             : []),
           { keys: 'esc', label: 'back' },
           { keys: 'ctrl+p', label: 'commands' },
@@ -334,12 +341,15 @@ export function registerChat(app: TextUIApp, options: ChatOptions = {}): Disposa
     ['ConnectionBadge', ConnectionBadge],
     ['ChangesList', ChangesList],
     ['FileList', FileList],
+    ['AutomationList', AutomationList],
     ['SessionsScreen', SessionsScreen],
     ['ChatScreen', ChatScreen],
     ['NewSessionScreen', NewSessionScreen],
     ['TerminalScreen', TerminalScreen],
     ['ChangesScreen', ChangesScreen],
     ['FilesScreen', FilesScreen],
+    ['AutomationsScreen', AutomationsScreen],
+    ['NewAutomationScreen', NewAutomationScreen],
     ['SettingsScreen', SettingsScreen],
     ['HostsScreen', HostsScreen],
     ['SkillsScreen', SkillsScreen],
@@ -367,6 +377,8 @@ export function registerChat(app: TextUIApp, options: ChatOptions = {}): Disposa
     { id: 'new', component: 'NewSessionScreen' },
     { id: 'changes', component: 'ChangesScreen' },
     { id: 'files', component: 'FilesScreen' },
+    { id: 'automations', component: 'AutomationsScreen' },
+    { id: 'automation.new', component: 'NewAutomationScreen' },
     { id: 'settings', component: 'SettingsScreen' },
     { id: 'hosts', component: 'HostsScreen' },
     { id: 'skills', component: 'SkillsScreen' },
