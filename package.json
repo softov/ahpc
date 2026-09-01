@@ -17,7 +17,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@microsoft/agent-host-protocol": "^0.8.0",
+    "@microsoft/agent-host-protocol": "^0.9.0",
     "@textui/core": "^0.3.0",
     "@textui/terminal": "^0.3.0",
     "@textui/widgets": "^0.3.0"

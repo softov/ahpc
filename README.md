@@ -159,7 +159,7 @@ and answer a turn. Every action rebuilds the view and re-emits it as a
 snapshot, which the transcript already renders from - that is what it does when
 you open one.
 
-It is written from the protocol package's own `src/types/` and from Advisor's client, and negotiates `1.0.0` - the version a VS Code 1.135 host speaks - falling back through `0.8.0` and `0.7.0` for older ones.
+It is written from the protocol package's own `src/types/` and from Advisor's client, and negotiates `1.0.0` - the version a VS Code 1.135 host speaks - falling back through `0.9.0`, the newest published, and then `0.8.0` and `0.7.0` for older ones.
 Driven against a real host it found one thing immediately, and it is the rule
 this file is now built on: **a host that says no is answering.**
 

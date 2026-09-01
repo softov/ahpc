@@ -30,7 +30,7 @@ import type {
  * npm install @microsoft/agent-host-protocol
  * ```
  *
- * Written against protocol 0.7.0, from the package's own `src/types/`. What it
+ * Written against protocol 0.9.0, from the package's own `src/types/`. What it
  * speaks is the subset this client needs: `initialize`, `listSessions`,
  * `subscribe`, `createSession`, `disposeSession`, `resolveSessionConfig`, and
  * the seven client-dispatchable actions that drive and answer a turn.
@@ -55,20 +55,22 @@ export interface LiveHostOptions {
 }
 
 /**
- * Versions to offer, newest first.
+ * Versions to offer at `initialize`, most preferred first.
  *
- * Offering one the installed library has no types for is safe: every command
- * used here has been stable across all of them, and 1.0.0 is the stabilised
- * 0.8.0 rather than a new wire format - the host that speaks it gates no
- * action behind a version newer than 0.8.0.
+ * A host picks the first entry it also speaks, so this is a preference rather
+ * than a floor. Offering one the installed library has no types for is safe:
+ * every command used here is stable across all of them.
  *
- * This list is load-bearing, because there is no fallback behind it. The
- * `0.9.0` it used to lead with was a guess at a host that never shipped, and
- * when VS Code went 0.8.0 -> 1.0.0 the host - which accepts `^1.0.0` and
- * nothing 0.x - refused all three entries with `-32005`, which arrives here
- * looking like a host that is not there.
+ * `1.0.0` is not published - VS Code's host vendors the protocol from its
+ * repository and runs ahead of npm - and it accepts `^1.0.0` and nothing 0.x.
+ * Leaving it out is therefore not the conservative choice: it is every entry
+ * refused with `-32005`, which arrives here looking like a host that is not
+ * there. `0.9.0` is the newest published, and the version the package below
+ * is built from.
+ *
+ * This list is load-bearing, because there is no fallback behind it.
  */
-const VERSIONS = ['1.0.0', '0.8.0', '0.7.0'];
+const VERSIONS = ['1.0.0', '0.9.0', '0.8.0', '0.7.0'];
 
 const ROOT = 'ahp-root://';
 
@@ -231,6 +233,20 @@ function parts(value: unknown): ResponsePart[] {
       case 'toolCall': {
         const call = toolCall(part.toolCall);
         out.push({ kind: 'toolCall', id: call.id, call });
+        break;
+      }
+      // A turn that failed mid-stream, new in 0.9.0. It is a part rather than
+      // a turn state because what came before it still stands: the agent said
+      // three things and then hit this, and dropping it leaves a turn that
+      // simply stops.
+      case 'error': {
+        const error = bag(part.error);
+        out.push({
+          kind: 'error',
+          id,
+          message: str(error.message) ?? str(error.errorType) ?? 'The agent failed.',
+          resumable: part.resumable === true,
+        });
         break;
       }
       default:
@@ -875,10 +891,19 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
 
     terminals: async () => list(mirror.root.terminals).map((raw): TerminalRow => {
       const found = bag(raw);
+      // Both forms of the exit code, because this client speaks four versions.
+      // 0.9.0 moved it inside `lifecycle`, where it exists only once the
+      // process has exited; before that it was flat on the terminal. Reading
+      // one name leaves every exit under half the hosts reported as still
+      // running.
+      const exited = bag(found.lifecycle).exitCode;
+      const code = typeof exited === 'number' ? exited
+        : typeof found.exitCode === 'number' ? found.exitCode
+        : undefined;
       return {
         resource: str(found.resource) ?? '',
         title: str(found.title) ?? 'Terminal',
-        ...(typeof found.exitCode === 'number' ? { exitCode: found.exitCode } : {}),
+        ...(code !== undefined ? { exitCode: code } : {}),
       };
     }).filter((row) => row.resource !== ''),
 
@@ -1386,7 +1411,12 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
         })),
         // What the host said, when it said no. A pane reading "creating" over
         // a session whose agent is gone is worse than one that says so.
-        lifecycle: (str(state.lifecycle) ?? 'creating') as SessionDetail['lifecycle'],
+        // 0.9.0 renamed `creationFailed` to `failed`, and this client speaks
+        // both sides of that rename - so the old name is translated here
+        // rather than carried inland as a second word for one state.
+        lifecycle: (str(state.lifecycle) === 'creationFailed'
+          ? 'failed'
+          : str(state.lifecycle) ?? 'creating') as SessionDetail['lifecycle'],
         ...(refused.has(uri) ? { refusal: refused.get(uri) as string } : {}),
         config: config(state.config),
         ...(last ? { model: str(bag(bag(bag(last).message).model).id) as string } : {}),

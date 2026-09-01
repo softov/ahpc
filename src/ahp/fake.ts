@@ -635,6 +635,10 @@ export function fakeHost(): FakeHost {
         parts: [
           { kind: 'systemNotification', id: 's4-n1', content: 'The session ended: the host refused the request.' },
           { kind: 'markdown', id: 's4-m1', content: 'The host answered `-32007 Authentication is required to use Claude`. That is a sign-in on the host, not a network problem here.' },
+          // How a 0.9.0 host ends a turn it could not finish. A `failed` turn
+          // carrying no such part is the shape every earlier version had, so
+          // the one scripted failure here has one.
+          { kind: 'error', id: 's4-e1', message: 'Sign in on the host, then run this turn again.', resumable: true },
         ],
       },
     ],

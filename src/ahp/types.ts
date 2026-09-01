@@ -81,7 +81,7 @@ export interface SessionDetail {
    */
   chat: string | null;
   chats: { resource: string; title: string }[];
-  lifecycle: 'creating' | 'ready' | 'creationFailed';
+  lifecycle: 'creating' | 'ready' | 'failed';
   config: SessionConfig;
   /** What the last turn ran on. A session has no model; each message has one. */
   model?: string;
@@ -133,7 +133,9 @@ export type ResponsePart =
   | { kind: 'markdown'; id: string; content: string }
   | { kind: 'reasoning'; id: string; content: string }
   | { kind: 'systemNotification'; id: string; content: string }
-  | { kind: 'toolCall'; id: string; call: ToolCall };
+  | { kind: 'toolCall'; id: string; call: ToolCall }
+  /** How a turn failed, in the host's words. `resumable`: the host can carry on from it. */
+  | { kind: 'error'; id: string; message: string; resumable: boolean };
 
 /**
  * A turn.
