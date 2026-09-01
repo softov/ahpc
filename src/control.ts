@@ -119,6 +119,8 @@ export interface Controller {
   automations(): Promise<Automation[]>;
   /** Told when one moves, including one that fired while nobody was looking. */
   onAutomations(observer: () => void): { close(): void };
+  /** Write a new one, and answer with the URI the host gave it. */
+  createAutomation(definition: Record<string, unknown>): Promise<string>;
   /** Start one now, whatever its schedule says. */
   runAutomation(uri: string): Promise<void>;
   /** Switch one on or off. */
@@ -631,6 +633,10 @@ export function createController(
       return await host.automations();
     },
     onAutomations: (observer) => host.onAutomations?.(observer) ?? { close: () => {} },
+    createAutomation: async (definition) => {
+      if (!host.createAutomation) throw new Error('This host serves no automations.');
+      return await host.createAutomation(definition);
+    },
     runAutomation: async (uri) => { await host.runAutomation?.(uri); },
     setAutomationEnabled: async (uri, enabled) => { await host.setAutomationEnabled?.(uri, enabled); },
     removeAutomation: async (uri) => { await host.removeAutomation?.(uri); },
@@ -837,6 +843,14 @@ function commands(
       description: 'Show the automations',
       slots: ['palette'],
       run: () => { app.screens.push('automations'); },
+    },
+    {
+      id: 'automation.new',
+      title: 'Write a new automation',
+      category: 'Automations',
+      description: 'A session the host starts without being asked',
+      slots: ['palette'],
+      run: () => { app.screens.push('automation.new'); },
     },
     {
       id: 'automation.run',
@@ -1765,6 +1779,7 @@ function keys(): {
     // Scoped to the screen, so a letter is a letter everywhere else. `enter`
     // runs one and is the list's own, which leaves the switch and the
     // one that does not come back.
+    { keys: 'n', commandId: 'automation.new', scopeId: AUTOMATIONS_SCOPE },
     { keys: 'e', commandId: 'automation.toggle', scopeId: AUTOMATIONS_SCOPE },
     { keys: 'd', commandId: 'automation.remove', scopeId: AUTOMATIONS_SCOPE },
     { keys: 's', commandId: 'go.settings', scopeId: CHAT_SCOPE },

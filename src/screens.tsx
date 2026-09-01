@@ -14,7 +14,8 @@ import {
   useStoreValue,
   useTheme,
 } from '@textui/core';
-import { Badge, Column, Divider, EmptyState, Marquee, Panel, RadioGroup, Row, SearchBox, argumentOf } from '@textui/widgets';
+import { Badge, Column, Divider, EmptyState, Field, Form, FormActions, Marquee, Panel, RadioGroup, Row, SearchBox, TextInput, argumentOf, useForm } from '@textui/widgets';
+import { scheduleProblem, zoneIsKnownHere } from './schedule.js';
 import {
   AUTOMATIONS_SCOPE, CHANGES_SCOPE, CHAT_SCOPE, CONTROLLER, MCP_SCOPE, SESSIONS_SCOPE, SKILLS_SCOPE, settingCommand,
 } from './control.js';
@@ -1019,6 +1020,161 @@ export const ChangesScreen: (props: Record<string, never>) => RenderOutput =
           autoFocus
           flex={1}
         />
+      </Panel>
+    );
+  });
+
+// ---------------------------------------------------- 6d. a new automation
+
+/**
+ * Writing one down.
+ *
+ * The half that was missing: this client could list, run and switch off an
+ * automation and could not make one, so the only way to have any was to write
+ * the daemon's own file by hand and restart it. That is not a workflow, it is
+ * what a person does when a client has a hole in it.
+ *
+ * The expression is checked here and *understood* on the host. `scheduleProblem`
+ * reads the protocol's grammar and stops there; when it next comes round is the
+ * host's answer, and it arrives as `nextRunAt` on the row this screen leaves
+ * behind. So the confirmation that a schedule is real is the list saying when it
+ * will fire, not this form saying it looks right.
+ *
+ * Manual-only is a real choice and not an empty box. The protocol says an
+ * automation with no triggers is one nothing fires, so leaving the schedule
+ * blank writes a definition with an empty trigger list rather than a broken one.
+ */
+export const NewAutomationScreen: (props: Record<string, never>) => RenderOutput =
+  defineComponent<Record<string, never>>('NewAutomationScreen', () => {
+    const app = useApp();
+    const controller = useRequiredService(CONTROLLER);
+    const session = openSession(app.store);
+    const [failure, setFailure] = useState<string | null>(null);
+
+    const form = useForm<{
+      title: string;
+      message: string;
+      directory: string;
+      expression: string;
+      timeZone: string;
+    }>({
+      initialValues: {
+        title: '',
+        message: '',
+        // Where the open session is working, when there is one. It is the only
+        // directory this client can name without having listed something.
+        directory: (session?.workingDirectories[0] ?? '').replace(/^file:\/\//, ''),
+        expression: '',
+        // The machine's own, because a schedule written without thinking about
+        // the zone means the one the person writing it is in.
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+      },
+      validate: (values) => {
+        const errors: { title?: string; message?: string; expression?: string; timeZone?: string } = {};
+        if (values.title.trim() === '') errors.title = 'An automation needs a name to be found by';
+        // The first message is what the automation is *for*: a session created
+        // and never spoken to does nothing at all.
+        if (values.message.trim() === '') errors.message = 'This is what it will say, so it cannot be empty';
+        // Blank is manual-only, which is a choice. Anything else has to parse.
+        if (values.expression.trim() !== '') {
+          const problem = scheduleProblem(values.expression);
+          if (problem !== undefined) errors.expression = problem;
+          else if (!zoneIsKnownHere(values.timeZone)) {
+            errors.timeZone = `This machine does not know ${values.timeZone}`;
+          }
+        }
+        return errors;
+      },
+      onSubmit: async (values) => {
+        const scheduled = values.expression.trim() !== '';
+        try {
+          await controller.createAutomation({
+            title: values.title.trim(),
+            enabled: true,
+            message: { text: values.message.trim() },
+            session: {
+              ...(session?.provider ? { provider: session.provider } : {}),
+              ...(values.directory.trim() !== ''
+                ? { workingDirectories: [`file://${values.directory.trim()}`] }
+                : {}),
+            },
+            // An empty list, not an absent key: the protocol says an empty
+            // trigger list is what manual-only means, and a definition with no
+            // `triggers` at all is one a host has to guess about.
+            triggers: scheduled
+              ? [{
+                id: 't1',
+                kind: 'schedule',
+                schedule: { expression: values.expression.trim(), timeZone: values.timeZone.trim() },
+              }]
+              : [],
+          });
+          app.screens.pop();
+        }
+        catch (error) {
+          setFailure(error instanceof Error ? error.message : String(error));
+        }
+      },
+    });
+
+    return (
+      <Panel title="A new automation" flex={1}>
+        <Form form={form as never} flex={1}>
+          <Column gap={0} flex={1}>
+            <Field name="title" label="Name" labelWidth={10} required>
+              <TextInput
+                value={form.values.title}
+                autoFocus
+                placeholder="Nightly framework build"
+                onChange={(value: string) => { form.setValue('title', value); form.touch('title'); }}
+              />
+            </Field>
+            <Field name="message" label="Says" labelWidth={10} required hint="the first thing it says">
+              <TextInput
+                value={form.values.message}
+                placeholder="review what changed today"
+                onChange={(value: string) => { form.setValue('message', value); form.touch('message'); }}
+              />
+            </Field>
+            <Field name="directory" label="Runs in" labelWidth={10}>
+              <TextInput
+                value={form.values.directory}
+                placeholder="the host's default directory"
+                onChange={(value: string) => { form.setValue('directory', value); form.touch('directory'); }}
+              />
+            </Field>
+            <Divider />
+            <Field
+              name="expression"
+              label="Schedule"
+              labelWidth={10}
+              hint="minute hour day month weekday"
+            >
+              <TextInput
+                value={form.values.expression}
+                placeholder="0 9 * * 1-5"
+                onChange={(value: string) => { form.setValue('expression', value); form.touch('expression'); }}
+              />
+            </Field>
+            <Field name="timeZone" label="Zone" labelWidth={10}>
+              <TextInput
+                value={form.values.timeZone}
+                placeholder="UTC"
+                onChange={(value: string) => { form.setValue('timeZone', value); form.touch('timeZone'); }}
+              />
+            </Field>
+            {/* Said once, where it cannot be mistaken for a rule about this
+                form: when it fires is the host's answer, not this screen's. */}
+            <text
+              content={form.values.expression.trim() === ''
+                ? 'Empty: it runs when somebody presses Run.'
+                : 'The host works out when this comes round.'}
+              fg="subtle"
+            />
+            {failure !== null ? <text content={failure} fg="danger" wrap="word" /> : null}
+            <FormActions submitLabel="Create" cancelLabel="Cancel" onCancel={() => app.screens.pop()} />
+          </Column>
+        </Form>
       </Panel>
     );
   });

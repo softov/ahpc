@@ -18,7 +18,7 @@ import {
 import type { HostState } from './state.js';
 import { decodeStatus } from './ahp/status.js';
 import {
-  AutomationsScreen, ChangesScreen, ChatScreen, FilesScreen, HostsScreen, McpScreen, NewSessionScreen, SessionsScreen, TerminalScreen,
+  AutomationsScreen, ChangesScreen, ChatScreen, FilesScreen, HostsScreen, McpScreen, NewAutomationScreen, NewSessionScreen, SessionsScreen, TerminalScreen,
   SettingsScreen, SkillsScreen,
 } from './screens.js';
 import { ChatBubble, ReasoningBlock, StreamingText } from './view/bubble.js';
@@ -234,7 +234,7 @@ const Hints = defineComponent<BoxProps>('ChatHints', (props) => {
           // Named only where they do something. `enter` already runs one, so
           // what is left is the switch and the one that does not come back.
           ...(screen === 'automations'
-            ? [{ keys: 'e', label: 'on / off' }, { keys: 'd', label: 'forget' }]
+            ? [{ keys: 'n', label: 'new' }, { keys: 'e', label: 'on / off' }, { keys: 'd', label: 'forget' }]
             : []),
           { keys: 'esc', label: 'back' },
           { keys: 'ctrl+p', label: 'commands' },
@@ -349,6 +349,7 @@ export function registerChat(app: TextUIApp, options: ChatOptions = {}): Disposa
     ['ChangesScreen', ChangesScreen],
     ['FilesScreen', FilesScreen],
     ['AutomationsScreen', AutomationsScreen],
+    ['NewAutomationScreen', NewAutomationScreen],
     ['SettingsScreen', SettingsScreen],
     ['HostsScreen', HostsScreen],
     ['SkillsScreen', SkillsScreen],
@@ -377,6 +378,7 @@ export function registerChat(app: TextUIApp, options: ChatOptions = {}): Disposa
     { id: 'changes', component: 'ChangesScreen' },
     { id: 'files', component: 'FilesScreen' },
     { id: 'automations', component: 'AutomationsScreen' },
+    { id: 'automation.new', component: 'NewAutomationScreen' },
     { id: 'settings', component: 'SettingsScreen' },
     { id: 'hosts', component: 'HostsScreen' },
     { id: 'skills', component: 'SkillsScreen' },

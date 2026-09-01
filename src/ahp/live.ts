@@ -999,6 +999,20 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
       return { close: () => { automationWatchers.delete(observer); } };
     },
 
+    createAutomation: async (definition) => {
+      const uri = `ahp-automation:/${randomUUID()}`;
+      // A *request*, in the protocol's own spelling: the client says what it
+      // wants and the host decides, then says what it actually holds with
+      // `automation/set`. So nothing is echoed back here - what appears on the
+      // screen is the host's answer arriving on the channel.
+      client.dispatch(AUTOMATIONS, {
+        type: 'automation/createRequested',
+        resource: uri,
+        definition,
+      });
+      return uri;
+    },
+
     runAutomation: async (uri) => {
       await client.request('runAutomation', {
         channel: AUTOMATIONS,

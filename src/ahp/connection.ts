@@ -332,6 +332,16 @@ export interface HostConnection {
    * nine in the morning arrives here and nowhere else.
    */
   onAutomations?(observer: () => void): { close(): void };
+  /**
+   * Write a new one, and answer with the URI it was given.
+   *
+   * The client picks the URI, as it does for a session and a chat, so the
+   * thing is addressable before the host has answered. `definition` is the
+   * protocol's own shape and is passed through rather than modelled here -
+   * what this client fills in is a subset, and a host may hold keys it never
+   * wrote.
+   */
+  createAutomation?(definition: Record<string, unknown>): Promise<string>;
   /** Start one now, whatever its schedule says. */
   runAutomation?(uri: string): Promise<void>;
   /** Switch one on or off, which is a patch of its definition. */

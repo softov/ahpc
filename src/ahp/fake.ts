@@ -1149,6 +1149,35 @@ export function fakeHost(): FakeHost {
       return { close: () => { automationWatchers.delete(observer); } };
     },
 
+    createAutomation: async (definition) => {
+      const uri = `ahp-automation:/${(0x8000 + automations.size).toString(16)}`;
+      const triggers = Array.isArray(definition.triggers) ? definition.triggers : [];
+      const schedule = triggers
+        .map((one) => (typeof one === 'object' && one !== null ? one as Record<string, unknown> : {}))
+        .find((one) => one.kind === 'schedule');
+      const timing = (typeof schedule?.schedule === 'object' && schedule.schedule !== null
+        ? schedule.schedule
+        : {}) as { expression?: string; timeZone?: string };
+      automations.set(uri, {
+        resource: uri,
+        title: typeof definition.title === 'string' ? definition.title : 'Untitled automation',
+        enabled: definition.enabled !== false,
+        ...(timing.expression
+          ? { schedule: { expression: timing.expression, timeZone: timing.timeZone ?? 'UTC' } }
+          : {}),
+        // A host with a clock answers with when it will fire, and that answer
+        // is the confirmation the form is waiting for. An hour from now, so
+        // the fixture is a *next* run whenever this is read.
+        ...(timing.expression
+          ? { nextRunAt: new Date(Date.now() + 3_600_000).toISOString() }
+          : {}),
+        runs: [],
+        operations: ['update', 'remove', 'run'],
+      });
+      automationsMoved();
+      return uri;
+    },
+
     /**
      * Run one now, which is what the host does with nobody watching.
      *
