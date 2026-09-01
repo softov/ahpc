@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { renderApp } from '@textui/testing';
 import type { RenderOptions } from '@textui/testing';
 import {
-  BOOD, BOUNDS, FORMS, MOODS, Creature, WORLD, art, blit, createBody, creatureFrames,
-  creatureMotion, creatureSize, drawCreature, fill, getCreature, livelyNames, metric,
-  poseFrames, poseOf, registerCreature, stepBody,
+  BOOD, BOUNDS, FORMS, GRIP, MOODS, Creature, WORLD, art, blit, carry, createBody,
+  creatureFrames, creatureMotion, creatureSize, drawCreature, fill, getCreature, grab,
+  livelyNames, metric, poseFrames, poseOf, registerCreature, release, slipped, stepBody,
 } from '../src/view/bood/index.js';
 import type {
   CreatureProps, CreatureSpec, Form, Mood, Motion, World,
@@ -323,6 +323,58 @@ function live(name: string, mood: Mood, seconds: number, seed = 7) {
 }
 
 describe('a creature with somewhere to be', () => {
+
+  /**
+   * A hand that never let go.
+   *
+   * A terminal reports a button going down and coming back up, and it reports
+   * neither once the pointer has left the window - so letting go outside the
+   * terminal is a release nothing downstream is ever told about. The runtime
+   * gives the next press to the hit test rather than to whoever was holding
+   * the pointer, so the handler that would put the creature down is never
+   * called again: it hangs in the corner it was dragged to for the rest of
+   * the session, and clicking elsewhere does not reach it. The grip times out
+   * instead, and it wriggles free.
+   */
+  it('lets go when the release never arrives', () => {
+    const motion = creatureMotion('cat') as Motion;
+    const body = createBody(30, FIELD.floor);
+    const grip = grab(body, 32, FIELD.floor);
+    expect(body.held).toBe(true);
+
+    carry(body, grip, 4, 1, FIELD, 40);
+    expect(body.x).toBe(2);      // carried by the corner it was taken by
+    expect(body.y).toBe(1);
+    expect(slipped(body, grip)).toBe(false);
+
+    // And then nothing at all, which is what the wire says about a release
+    // that happened somewhere else.
+    for (let tick = 0; tick < Math.ceil((GRIP + 0.5) * 12); tick += 1) {
+      stepBody(body, motion, 'sad', FIELD, 1 / 12, dice(3));
+      expect(body.held).toBe(true);   // the physics does not free it; the view does
+    }
+    expect(slipped(body, grip)).toBe(true);
+
+    // Dropped rather than thrown: the samples are from a gesture that ended
+    // seconds ago, so reading them would fling it along a stale swipe.
+    release(body);
+    expect(body.held).toBe(false);
+    expect(body.vx).toBe(0);
+    for (let tick = 0; tick < 24; tick += 1) stepBody(body, motion, 'sad', FIELD, 1 / 12, dice(3));
+    expect(body.y).toBe(FIELD.floor);
+  });
+
+  /** Let go by hand, it keeps the hand's speed. */
+  it('throws what was moving when it was released', () => {
+    const body = createBody(30, FIELD.floor);
+    const grip = grab(body, 30, FIELD.floor);
+    carry(body, grip, 34, FIELD.floor, FIELD, 0);
+    carry(body, grip, 42, FIELD.floor, FIELD, 200);
+    release(body, grip);
+    expect(body.vx).toBeGreaterThan(20);
+    expect(body.held).toBe(false);
+  });
+
   /**
    * Both ways, and this is the regression rather than a nicety.
    *
@@ -636,6 +688,32 @@ describe('the figure that moves on screen', () => {
     const carried = where(t.lines());
     expect(carried.col).toBeGreaterThan(start.col + 12);
     expect(carried.row).toBeLessThan(start.row);
+    await t.unmount();
+  });
+
+  /**
+   * The same gesture, missing its ending, through the real decoder.
+   *
+   * `t.drag` always releases, so the case that broke - a press, a carry, and
+   * then silence - has to be fed as bytes: `CSI < 0 ; x ; y M` is the button
+   * going down, `CSI < 32 ; x ; y M` is the pointer carrying it, and nothing
+   * follows, because the button came up outside the terminal.
+   */
+  it('lets go of a drag that was never released', async () => {
+    const t = await live({ name: 'cat', mood: 'sad', fieldWidth: 60, fieldHeight: 10 });
+    const start = where(t.lines());
+
+    t.feed(`\u001b[<0;${start.col + 4};${start.row + 2}M`);
+    t.feed('\u001b[<32;6;1M');
+    await t.settle();
+    expect(where(t.lines()).row).toBe(0);
+
+    for (let sample = 0; sample < 50; sample += 1) {
+      t.advance(120);
+      await t.settle();
+    }
+    // Back on the ground it was carried off, rather than pinned to the corner.
+    expect(where(t.lines()).row).toBeGreaterThan(2);
     await t.unmount();
   });
 

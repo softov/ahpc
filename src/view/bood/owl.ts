@@ -216,7 +216,7 @@ export const owl = defineCreature({
 `, art`
    #####
    %%% )_
-  /(   \\\
+  /(   \\
     " "
 `],
       'fly.right': [art`
@@ -238,13 +238,13 @@ export const owl = defineCreature({
       jump: art`
   #####
  \(%%%)/
-   )_(
+   )w(
 `,
       // The glide, which is also what a dropped owl does instead of falling.
       fall: art`
-  #####
- -(%%%)-
-   )_(
+   #####
+---(%%%)---
+    )w(
 `,
       land: art`
   #####
@@ -254,7 +254,7 @@ export const owl = defineCreature({
       held: art`
   #####
   (%%%)
-  /) (\
+  /)_(\
    " "
 `,
       sleep: art`
@@ -265,12 +265,26 @@ export const owl = defineCreature({
 `,
       // The one figure that changes shape rather than expression: an owl that
       // is only scowling reads as an owl that is concentrating.
-      alarm: art`
+      alarm: [
+        art`
   #####
- \(%%%)/
- /(___)\
-   v v
+\\(%%%)//
+  (___)
+   "w"
 `,
+art`
+  #####
+__(%%%)__ 
+  (___)
+   "w"
+`,
+art`
+  #####
+  (%%%)
+//(___)\\
+   "w"
+`
+      ],
     },
   },
 });

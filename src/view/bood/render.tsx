@@ -3,7 +3,10 @@ import { defineComponent, useFrame, useMeasure, useMemo, useRef, useState } from
 import { Column } from '@textui/widgets';
 
 import { anchorOf, blit, fill, metric } from './art.js';
-import { createBody, faceOf, frameOf, poseOf, stepBody, WORLD } from './motion.js';
+import type { Grip } from './motion.js';
+import {
+  carry, createBody, faceOf, frameOf, grab, poseOf, release, slipped, stepBody, WORLD,
+} from './motion.js';
 import { creatureFrames, creatureMotion, creatureNames, poseFrames } from './registry.js';
 import type { Form, Mood } from './types.js';
 
@@ -116,7 +119,7 @@ export const Creature: (props: CreatureProps) => RenderOutput =
     // Where the field is on the terminal, so an absolute pointer can be asked
     // which cell of the field it is over.
     const rect = useMeasure();
-    const drag = useRef<{ dx: number; dy: number; samples: { at: number; x: number; y: number }[] } | null>(null);
+    const drag = useRef<Grip | null>(null);
     /**
      * What tells the runtime the body moved.
      *
@@ -155,6 +158,14 @@ export const Creature: (props: CreatureProps) => RenderOutput =
       seen.current = beat;
       for (let tick = 0; tick < ticks; tick += 1) stepBody(body.current, motion, mood, world, 1 / MOTION_FPS);
 
+      // The body's clock runs while it is held, so a grip nothing has touched
+      // for a while is a gesture that ended where this handler could not see -
+      // a release outside the terminal, which is never reported at all.
+      if (drag.current && slipped(body.current, drag.current)) {
+        release(body.current);
+        drag.current = null;
+      }
+
       const pose = poseOf(body.current, motion, mood);
       const at = poseFrames(chosen, pose, body.current.facing, mood);
       const shape = at ? metric(at[0] as string[]) : { width: 1, height: 1, anchor: 0 };
@@ -183,14 +194,9 @@ export const Creature: (props: CreatureProps) => RenderOutput =
           const over = x >= held.x - anchor - 1 && x <= held.x - anchor + shape.width
             && y >= held.y - shape.height + 1 && y <= held.y + 1;
           if (over) {
-            drag.current = { dx: x - held.x, dy: y - held.y, samples: [] };
-            held.held = true;
-            held.vx = 0;
-            held.vy = 0;
-            held.stillFor = 0;
-            held.wantsFlight = false;
+            drag.current = grab(held, x, y);
             repaint();
-          return true;
+            return true;
           }
           held.intent = { kind: 'goto', x: clamp(x, world.left, world.right), until: held.now + 10 };
           held.sitting = false;
@@ -205,29 +211,28 @@ export const Creature: (props: CreatureProps) => RenderOutput =
 
         if (!drag.current) return undefined;
 
+        // Only a press takes hold. A drag reaches this handler either because
+        // the press did - the runtime gives the rest of a gesture to whoever
+        // claimed it - or because the pointer passed over the figure during
+        // somebody else's unclaimed drag, and the second must not snatch the
+        // creature into a hand that was doing something else entirely.
         if (event.action === 'drag') {
-          held.x = clamp(x - drag.current.dx, world.left, world.right);
-          held.y = clamp(y - drag.current.dy, 0, world.floor);
-          if (event.at !== undefined) drag.current.samples.push({ at: event.at, x: held.x, y: held.y });
-          while (drag.current.samples.length > 5) drag.current.samples.shift();
+          carry(held, drag.current, x, y, world, event.at);
           repaint();
           return true;
         }
 
+        // A pointer moving with no button down is a pointer that was released
+        // while this handler was not being told.
+        if (event.action === 'move') {
+          release(held);
+          drag.current = null;
+          repaint();
+          return undefined;
+        }
+
         if (event.action === 'up') {
-          // It inherits the hand's speed, so letting go while moving is a
-          // throw and letting go still is a drop. A terminal that does not
-          // stamp its mouse events cannot tell the two apart, so it drops.
-          const samples = drag.current.samples;
-          const first = samples[0];
-          const last = samples[samples.length - 1];
-          if (first && last && last.at > first.at) {
-            const seconds = (last.at - first.at) / 1000;
-            held.vx = clamp((last.x - first.x) / seconds, -45, 45);
-            held.vy = clamp((last.y - first.y) / seconds, -45, 45);
-          }
-          held.held = false;
-          held.grounded = false;
+          release(held, drag.current);
           drag.current = null;
           repaint();
           return true;

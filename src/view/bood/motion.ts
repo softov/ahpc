@@ -134,6 +134,74 @@ export function createBody(x = 0, y = 0): Body {
   };
 }
 
+/**
+ * A gesture in progress: where the pointer took hold, and when it last said so.
+ *
+ * `last` is on the body's own clock rather than a wall clock, which is what
+ * makes a lost release recoverable. A terminal reports a button going down and
+ * coming back up, and it reports neither once the pointer has left the window
+ * - so a release outside the terminal is a release nothing is ever told about,
+ * and the runtime hands the next press to the hit test rather than to whoever
+ * was holding the pointer. Without a timeout, a creature dragged into a corner
+ * and let go off-screen is held there for the rest of the session, and no
+ * amount of clicking elsewhere reaches the handler that could put it down.
+ */
+export interface Grip {
+  dx: number;
+  dy: number;
+  samples: { at: number; x: number; y: number }[];
+  last: number;
+}
+
+/** Seconds a hand can hold a creature still before it wriggles out. */
+export const GRIP = 2.5;
+
+/** Take hold, at the offset the pointer took hold at. */
+export function grab(body: Body, x: number, y: number): Grip {
+  body.held = true;
+  body.vx = 0;
+  body.vy = 0;
+  body.stillFor = 0;
+  body.wantsFlight = false;
+  return { dx: x - body.x, dy: y - body.y, samples: [], last: body.now };
+}
+
+/** Carry it, keeping the last few positions so a release can read the hand's speed. */
+export function carry(body: Body, grip: Grip, x: number, y: number, world: World, at?: number): void {
+  body.x = clamp(x - grip.dx, world.left, world.right);
+  body.y = clamp(y - grip.dy, 0, world.floor);
+  grip.last = body.now;
+  if (at !== undefined) grip.samples.push({ at, x: body.x, y: body.y });
+  while (grip.samples.length > 5) grip.samples.shift();
+}
+
+/**
+ * Let go.
+ *
+ * With a grip it inherits the hand's speed, so letting go while moving is a
+ * throw and letting go still is a drop. Without one - a grip that timed out,
+ * or a pointer found moving with no button down - it is only ever a drop: the
+ * samples are from before whatever happened off-screen and reading them would
+ * fling the creature along a gesture that ended some seconds ago.
+ */
+export function release(body: Body, grip?: Grip | null): void {
+  const samples = grip?.samples ?? [];
+  const first = samples[0];
+  const last = samples[samples.length - 1];
+  if (first && last && last.at > first.at) {
+    const seconds = (last.at - first.at) / 1000;
+    body.vx = clamp((last.x - first.x) / seconds, -45, 45);
+    body.vy = clamp((last.y - first.y) / seconds, -45, 45);
+  }
+  body.held = false;
+  body.grounded = false;
+}
+
+/** Nothing has touched this grip for long enough that the gesture is over. */
+export function slipped(body: Body, grip: Grip): boolean {
+  return body.now - grip.last > GRIP;
+}
+
 /** What just happened to it, for a caller that wants to say so. */
 export type Event = 'landed' | 'bounced' | 'hard' | 'wall' | 'took off';
 

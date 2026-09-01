@@ -35,9 +35,10 @@ export {
 } from './registry.js';
 export type { DrawOptions } from './registry.js';
 export {
-  createBody, decide, faceOf, frameOf, GAITS, poseOf, stepBody, WORLD,
+  carry, createBody, decide, faceOf, frameOf, GAITS, GRIP, grab, poseOf, release, slipped,
+  stepBody, WORLD,
 } from './motion.js';
-export type { Body, Gait, Intent, World } from './motion.js';
+export type { Body, Gait, Grip, Intent, World } from './motion.js';
 export { BOUNDS, FACINGS, FORMS, MOODS, POSES, defineCreature } from './types.js';
 export type {
   Cell, Creature as RegisteredCreature, CreatureSpec, Facing, Form, Mood, Motion, Pose, PoseKey,

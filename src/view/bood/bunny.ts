@@ -141,7 +141,7 @@ c((_ _))
 `, art`
   #####
   (%%%)
- ((_ _))c
+ ((_ _))D
 `],
       'idle.right': [art`
  #####
@@ -149,9 +149,9 @@ c((_ _))
 c(")_(")
 `],
       'idle.left': [art`
- #####
- (%%% )
- (")_(")c
+  #####
+  (%%% )
+ (")_(")D
 `],
       'sit.front': art`
   #####
@@ -161,12 +161,12 @@ c(")_(")
       'sit.right': art`
  #####
  ( %%%)
- c(")(")
+ C(")(")
 `,
       'sit.left': art`
  #####
  (%%% )
- (")(")c
+ (")(")D
 `,
       'walk.right': art`
  #####
@@ -174,32 +174,32 @@ c(")_(")
 .(")_(")
 `,
       'walk.left': art`
- #####
- (%%% )
- (")_(").
+  #####
+  (%%% )
+ (")_(")D
 `,
       'jump.right': art`
- #####
- ( %%%)
- (")_(")
-  "   "
+  #####
+  ( %%%)
+C((")(")
+(") (")
 `,
       'jump.left': art`
  #####
  (%%% )
- (")_(")
-  "   "
+ (")("))D
+  (") (")
 `,
       'fall.right': art`
  #####
  ( %%%)
-c(")_(")
+C(")_(")
   '   '
 `,
       'fall.left': art`
  #####
  (%%% )
- (")_(")c
+ (")_(")D
   '   '
 `,
       // A squash is wider and shorter. Bottom-aligned, so it settles onto the
@@ -212,8 +212,8 @@ c(")_(")
       held: art`
   #####
   (%%%)
-  (")(")
-   " "
+  ("|")
+ (")U(")
 `,
       // Pins its own face over the mood, and the mood comes straight back when
       // anything wakes it.
@@ -225,8 +225,8 @@ c(")_(")
       alarm: art`
   #####
   (%%%)
-c((_ _))c
- ^    ^
+C((_ _))
+  ^   ^
 `,
     },
   },
