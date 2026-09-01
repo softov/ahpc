@@ -37,7 +37,6 @@ import { decodeStatus } from './ahp/status.js';
 import { ChatTranscript } from './view/transcript.js';
 import { ChatComposer } from './view/composer.js';
 import { ChatSessionHead } from './view/sessionhead.js';
-import { Creature } from './view/creature.js';
 import { settingIcon, valueIcon } from './view/icons.js';
 import { ChatHitl } from './view/hitl.js';
 import { ChangesList } from './view/changes.js';
@@ -748,11 +747,16 @@ export const NewSessionScreen: (props: Record<string, never>) => RenderOutput =
         {/* Nothing has been said, so there is nothing to draw above the field.
             What fills the space is the invitation, and it stays out of the way
             of the one control that matters. */}
+        {/* Back, and walking this time.
+            It was moved to the catalogue on the argument that this screen has
+            a composer and that one has nothing - which is true, and beside the
+            point: the application opens *here*, and a mascot on a screen you
+            reach by pressing escape on a host that owns no sessions is one
+            nobody ever meets. The catalogue keeps its own; this is the one
+            that gets seen. */}
+        {/* No figure here any more. There is one, and it is on the floating
+            layer over every screen - two of them would be two mascots. */}
         <Column flex={1} justify="center" align="center" gap={0}>
-          {/* One of six, picked when the screen mounts. Only here: an empty
-              screen is the one place a client can afford a figure, and every
-              other screen has a conversation to show instead. */}
-          <Creature mood="happy" margin={[0, 0, 1, 0]} />
           <text content="A new session" fg="muted" />
           <text content="The first message is what starts it." fg="subtle" />
           <text content={`${theme.glyphs.chevronLeft} esc for the sessions you already have`} fg="subtle" />

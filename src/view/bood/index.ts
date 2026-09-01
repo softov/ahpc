@@ -19,19 +19,30 @@ import { sprout } from './sprout.js';
 export const BOOD = [cat, bunny, crab, owl, beetle, sprout].map(registerCreature);
 
 export { beetle, bunny, cat, crab, owl, sprout };
-export { alternate, art, blink } from './art.js';
+export { alternate, anchorOf, art, blink, blit, fill, metric } from './art.js';
 export {
   boodHeight,
   creatureFrames,
+  creatureMotion,
   creatureNames,
   creatureSize,
   drawCreature,
   getCreature,
   listCreatures,
+  livelyNames,
+  poseFrames,
   registerCreature,
 } from './registry.js';
 export type { DrawOptions } from './registry.js';
-export { BOUNDS, FORMS, MOODS, defineCreature } from './types.js';
-export type { Cell, Creature as RegisteredCreature, CreatureSpec, Form, Mood } from './types.js';
+export {
+  createBody, decide, faceOf, frameOf, GAITS, poseOf, stepBody, WORLD,
+} from './motion.js';
+export type { Body, Gait, Intent, World } from './motion.js';
+export { BOUNDS, FACINGS, FORMS, MOODS, POSES, defineCreature } from './types.js';
+export type {
+  Cell, Creature as RegisteredCreature, CreatureSpec, Facing, Form, Mood, Motion, Pose, PoseKey,
+} from './types.js';
 export { Creature } from './render.js';
+export { BoodSprite } from './sprite.js';
+export type { BoodSpriteProps } from './sprite.js';
 export type { CreatureProps } from './render.js';

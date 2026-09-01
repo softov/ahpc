@@ -18,7 +18,7 @@ import type {
 import { SessionFlag } from './ahp/types.js';
 import { valueIcon } from './view/icons.js';
 import {
-  ARCHIVED, CAN_ADD_CHAT, CHAT_URI, CHATS, CUSTOMIZATIONS, DRAFT, EXPANDED, FILTER, HAS_CHATS,
+  ARCHIVED, BOOD_FLOAT, CAN_ADD_CHAT, CHAT_URI, CHATS, CUSTOMIZATIONS, DRAFT, EXPANDED, FILTER, HAS_CHATS,
   HOST, HOST_ERROR, INPUT, MODEL, OPEN_TERMINAL,
   AUTOMATIONS, AUTOMATION_ROW,
   CHANGES as CHANGES_AT_PATH, CHANGE_AT, CHANGE_ROW, CHANGE_SCOPES, FILES_AT, FILES_OPEN,
@@ -793,6 +793,23 @@ function commands(
   };
 
   return [
+    {
+      /**
+       * The creature, on and off, without editing a file.
+       *
+       * `boodFloat` in the config says what it is on startup; this says what
+       * it is now. A mascot that can only be turned off by quitting, editing
+       * JSON and starting again is one somebody keeps off.
+       */
+      id: 'bood.toggle',
+      title: 'Show the creature',
+      category: 'View',
+      slots: ['palette'],
+      run: () => {
+        const showing = app.store.get<boolean>(BOOD_FLOAT) ?? false;
+        app.store.set(BOOD_FLOAT, !showing);
+      },
+    },
     {
       id: 'app.palette',
       title: 'Command Palette',
@@ -1692,6 +1709,7 @@ function keys(): {
   return [
     // Global: nothing types these, so they are safe wherever focus is.
     { keys: 'ctrl+p', commandId: 'app.palette' },
+    { keys: 'ctrl+g', commandId: 'bood.toggle' },
     // The clause is on the *binding*, not only on the command. A binding that
     // matches has handled the key - whether or not the command it names then
     // declines to run - so a `when` that lives only on the command swallows

@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { renderApp } from '@textui/testing';
 import type { Harness } from '@textui/testing';
 import { registerChat } from '../src/app.js';
-import { CREATURES, MOODS, drawCreature } from '../src/view/creature.js';
-import { visibleSessions } from '../src/state.js';
+import { CREATURES, MOODS, creatureMotion, drawCreature } from '../src/view/creature.js';
+import { BOOD, BOOD_FLOAT, BOOD_FLOOR, FILTER, SESSIONS, visibleSessions } from '../src/state.js';
 import { CONTROLLER } from '../src/control.js';
 import { fakeHost } from '../src/ahp/fake.js';
 import type { FakeHost } from '../src/ahp/fake.js';
@@ -1569,17 +1569,141 @@ describe('the figure on an empty screen', () => {
     }
   });
 
-  it('puts one above the invitation, at either size', async () => {
-    for (const size of SIZES) {
-      const { t } = await open(size);
-      // Which one is a coin toss, so the assertion is that whichever it was is
-      // on screen whole - every row of it, above the words.
-      const drawn = CREATURES.map((name) => drawCreature(name, 'happy'))
-        .find((rows) => rows.every((row) => t.hasText(row.trim())));
-      expect(drawn).toBeTruthy();
-      expect(t.hasText('A new session')).toBe(true);
-      await t.unmount();
-    }
+  /**
+   * One creature, over the whole application.
+   *
+   * It was a widget on a screen twice - the new-session screen, then the
+   * catalogue - and both were wrong for the same reason: a figure that belongs
+   * to a screen is unmounted by navigating away from it, so pressing escape
+   * made it vanish. It lives on the `floating` layer now, which is a plane
+   * over every screen rather than a thing on one, and what is asserted is that
+   * moving between screens does not lose it.
+   */
+  it('stays on screen when the screen changes', async () => {
+    const host = fakeHost();
+    const t = await renderApp({
+      width: 100, height: 30, shell: 'workbench', theme: 'workbench',
+      onBoot: (app) => { registerChat(app, { host, boodFloat: true }); },
+    });
+    for (let i = 0; i < 8; i += 1) await t.settle();
+    t.app.screens.push('sessions');
+    for (let i = 0; i < 4; i += 1) await t.settle();
+    const m = { t };
+    const name = m.t.app.store.get<string>(BOOD) as string;
+    const face = drawCreature(name, 'happy', { form: 'inline' })[0] as string;
+    expect(creatureMotion(name)).toBeDefined();
+    expect(face).toBeTruthy();
+
+    const drawn = (): boolean => {
+      const rows = m.t.lines().join('\n');
+      return MOODS.some((mood) => rows.includes(creatureMotion(name)?.faces[mood] ?? '\u0000'));
+    };
+    for (let sample = 0; sample < 10 && !drawn(); sample += 1) { m.t.advance(150); await m.t.settle(); }
+    expect(drawn()).toBe(true);
+
+    m.t.app.screens.push('new');
+    for (let i = 0; i < 4; i += 1) await m.t.settle();
+    for (let sample = 0; sample < 10 && !drawn(); sample += 1) { m.t.advance(150); await m.t.settle(); }
+    expect(drawn()).toBe(true);
+    await m.t.unmount();
+  });
+
+  /**
+   * It stands on whatever is at the bottom, and the bottom moves.
+   *
+   * The composer grows a slash menu upward; the block that asks about a tool
+   * appears above the composer and is a sibling of it rather than a part of
+   * it. Both say which row they start at, and the creature takes the row above
+   * the highest of them - so it is never standing in the question a person is
+   * being asked, which is the one thing on the screen that must be readable.
+   */
+  it('keeps off the block that asks about a tool', async () => {
+    const host = fakeHost();
+    const t = await renderApp({
+      width: 92, height: 26, shell: 'workbench', theme: 'workbench',
+      onBoot: (app) => { registerChat(app, { host, boodFloat: true }); },
+    });
+    for (let i = 0; i < 8; i += 1) await t.settle();
+    t.app.services.require(CONTROLLER).open(SEEDED);
+    t.app.screens.push('chat');
+    for (let i = 0; i < 10; i += 1) await t.settle();
+    for (let i = 0; i < 10; i += 1) { t.advance(140); await t.settle(); }
+
+    // The question is up, and both of the things at the bottom have said so.
+    const tops = t.app.store.get<Record<string, number>>(BOOD_FLOOR) ?? {};
+    expect(tops.ask).toBeGreaterThan(0);
+    expect(tops.composer).toBeGreaterThan(tops.ask as number);
+
+    // And its title is whole - no creature written through it.
+    expect(t.hasText('Run a command in')).toBe(true);
+    await t.unmount();
+  });
+
+  /** On and off without editing a file, or it is a mascot people keep off. */
+  it('takes ctrl+g for the creature', async () => {
+    const host = fakeHost();
+    const t = await renderApp({
+      width: 92, height: 26, shell: 'workbench', theme: 'workbench',
+      onBoot: (app) => { registerChat(app, { host, boodFloat: true }); },
+    });
+    for (let i = 0; i < 8; i += 1) await t.settle();
+    expect(t.app.store.get<boolean>(BOOD_FLOAT)).toBe(true);
+
+    t.press('ctrl+g');
+    for (let i = 0; i < 4; i += 1) await t.settle();
+    expect(t.app.store.get<boolean>(BOOD_FLOAT)).toBe(false);
+
+    t.press('ctrl+g');
+    for (let i = 0; i < 4; i += 1) await t.settle();
+    expect(t.app.store.get<boolean>(BOOD_FLOAT)).toBe(true);
+    await t.unmount();
+  });
+
+  /**
+   * The header's own name, and what it takes to give it up.
+   *
+   * The leftmost cell is the one part of the row that is the same on every
+   * screen, so trading it for a creature is off unless the config file asks -
+   * `boodInline` - and even then only on a session, where the seven cells are
+   * carrying that session's state rather than standing for nothing.
+   */
+  it('keeps the header its own name unless the config says otherwise', async () => {
+    const m = await conversation();
+    expect(m.t.hasText('Assistant')).toBe(true);
+    await m.t.unmount();
+  });
+
+  it('trades the header name for seven cells when boodInline is on', async () => {
+    const host = fakeHost();
+    const t = await renderApp({
+      ...(SIZES[0] as { width: number; height: number }),
+      shell: 'workbench',
+      theme: 'workbench',
+      onBoot: (app) => { registerChat(app, { host, boodInline: true }); },
+    });
+    for (let i = 0; i < 8; i++) await t.settle();
+
+    // No session yet, so there is nothing for the seven cells to be about.
+    expect(t.hasText('Assistant')).toBe(true);
+
+    t.app.services.require(CONTROLLER).open(SEEDED);
+    t.app.screens.push('chat');
+    for (let i = 0; i < 6; i++) await t.settle();
+
+    expect(t.hasText('Assistant')).toBe(false);
+    const name = t.app.store.get<string>(BOOD) as string;
+    const inline = MOODS.map((mood) => drawCreature(name, mood, { form: 'inline' })[0] as string);
+    expect(inline.some((row) => t.hasText(row))).toBe(true);
+    await t.unmount();
+  });
+
+  /** A filter that matches nothing is a different sentence, and says so. */
+  it('does not answer an empty search with a rabbit', async () => {
+    const m = await catalogue();
+    m.t.app.store.set(FILTER, 'nothing matches this');
+    await m.t.settle();
+    expect(m.t.hasText('No sessions on this host')).toBe(false);
+    await m.t.unmount();
   });
 });
 

@@ -1,5 +1,6 @@
 import type { BindingPath, BoxProps, RenderOutput } from '@textui/core';
-import { defineComponent, useApp, useFocusScope, useInput, useStore, useTheme } from '@textui/core';
+import { defineComponent, useApp, useFocusScope, useInput, useMeasure, useStore, useTheme } from '@textui/core';
+import { useFloorTop } from './creature.js';
 import {
   Button,
   Checkbox,
@@ -45,6 +46,9 @@ export interface ChatHitlProps extends BoxProps {
 
 export const ChatHitl: (props: ChatHitlProps) => RenderOutput =
   defineComponent<ChatHitlProps>('ChatHitl', (props) => {
+    // It sits above the composer rather than inside it, so it says where it
+    // starts: the composer alone left the creature standing in the question.
+    useFloorTop('ask', useMeasure().y);
     const { input, onApprove, onDeny, onAnswer, onEscape, ...rest } = props;
     const theme = useTheme();
     // Focused on arrival, and not trapped.
@@ -60,18 +64,22 @@ export const ChatHitl: (props: ChatHitlProps) => RenderOutput =
     // work from wherever the reader has gone.
     useFocusScope({ id: 'chat.hitl', autoFocus: true, restore: true });
 
+    // Wrapped, so that what `useFloorTop` measures is the box this occupies
+    // rather than the room inside its border - which is one row lower, and put
+    // the creature's feet through the title.
     return (
+      <Column {...rest}>
       <Panel
         title={input.kind === 'toolConfirmation' ? (input.call.confirmationTitle ?? 'The agent asks') : 'The agent asks'}
         tone="warning"
         border={theme.border}
         meta={`${theme.glyphs.warning} waiting on you`}
-        {...rest}
       >
         {input.kind === 'toolConfirmation'
           ? <ConfirmRequest input={input} onApprove={onApprove} onDeny={onDeny} {...(onEscape ? { onEscape } : {})} />
           : <QuestionForm input={input} onAnswer={onAnswer} {...(onEscape ? { onEscape } : {})} />}
       </Panel>
+      </Column>
     );
   });
 

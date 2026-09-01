@@ -44,6 +44,10 @@ interface Options {
   session?: string;
   theme: string;
   shell: string;
+  /** The header trades its name for a creature, on an open session. */
+  boodInline: boolean;
+  /** The creature roams the whole application. */
+  boodFloat: boolean;
   /** Say something on the open session before the frame is taken. */
   say?: string;
   /** Answer the confirmation the script stops at, to reach the question. */
@@ -94,6 +98,9 @@ Appearance
   --theme <name>        workbench, paper-light, ...
   --shell <name>        The shell layout
   --screen <name>       Which screen to open on
+  --bood                Let the creature loose on the whole screen. It
+                        keeps off the composer and off anything asking
+                        a question, and ctrl+g turns it off again.
   --session <uri>       Open this session
 
 Stills, for a README or a test
@@ -127,6 +134,8 @@ function parse(argv: string[]): Options {
     screen: 'sessions',
     theme: 'paper',
     shell: 'workbench',
+    boodInline: false,
+    boodFloat: false,
     approve: false,
     answer: false,
     help: false,
@@ -148,6 +157,7 @@ function parse(argv: string[]): Options {
       case '--screen': options.screen = String(argv[++i]); break;
       case '--theme': options.theme = String(argv[++i]); break;
       case '--shell': options.shell = String(argv[++i]); break;
+      case '--bood': options.boodFloat = true; break;
       case '--session': options.session = String(argv[++i]); break;
       case '--host': options.host = String(argv[++i]); break;
       case '--token': options.token = String(argv[++i]); break;
@@ -193,7 +203,12 @@ async function still(options: Options): Promise<void> {
     capabilities: overrides(options),
     theme: options.theme,
     shell: options.shell,
-    onBoot: (booted) => { registerChat(booted, { host, workspace: workspaceFor(options) }); },
+    onBoot: (booted) => {
+      registerChat(booted, {
+        host, workspace: workspaceFor(options),
+        boodInline: options.boodInline, boodFloat: options.boodFloat,
+      });
+    },
 
     // A still of a turn mid-flight is what `--pump` is for: run a fixed number
     // of scripted words rather than all of them, and the caret is wherever the
@@ -267,6 +282,8 @@ export async function tui(argv: string[]): Promise<void> {
   options.token = options.token ?? process.env.AHPC_TOKEN ?? file.token;
   if (file.theme && !argv.includes('--theme')) options.theme = file.theme;
   if (file.shell && !argv.includes('--shell')) options.shell = file.shell;
+  if (file.boodInline !== undefined) options.boodInline = file.boodInline;
+  if (file.boodFloat !== undefined && !argv.includes('--bood')) options.boodFloat = file.boodFloat;
   if (options.help) {
     process.stdout.write(USAGE);
     return;
@@ -286,7 +303,10 @@ export async function tui(argv: string[]): Promise<void> {
     shell: options.shell,
     session: { managed: true, altScreen: true, mouse: true, title: 'assistant' },
     onBoot: (booted) => {
-      registerChat(booted, { host, workspace: workspaceFor(options) });
+      registerChat(booted, {
+        host, workspace: workspaceFor(options),
+        boodInline: options.boodInline, boodFloat: options.boodFloat,
+      });
       booted.commands.register({
         id: 'app.quit',
         title: 'Quit',

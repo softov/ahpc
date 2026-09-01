@@ -137,6 +137,46 @@ export const SETTINGS = '$/chat/compose/settings' as BindingPath;
 export const HOST_ERROR = '$/chat/host/error' as BindingPath;
 
 export const OPEN = '$/chat/ui/open' as BindingPath;
+/** Which of the bood this run got. One animal, wherever one is drawn. */
+export const BOOD = '$/chat/ui/bood' as BindingPath;
+/**
+ * How many rows the bottom of the screen is keeping, which is the creature's
+ * floor.
+ *
+ * Published by whatever is down there rather than assumed, because it moves:
+ * the composer grows a slash menu upward, grows again with a multi-line draft,
+ * and is not on every screen at all. A constant was wrong the moment a menu
+ * opened - the figure stood at the height the composer used to be, which is
+ * inside the menu.
+ */
+export const BOOD_FLOOR = '$/chat/ui/boodFloor' as BindingPath;
+
+/**
+ * The top row of one thing standing at the bottom, under its own name.
+ *
+ * A row and not a height, because a height has to be right and a row only has
+ * to be where the thing is. Adding up heights meant trusting each measurement
+ * and a guess at the chrome underneath them - and the block that asks about a
+ * tool reported seven rows while drawing ten, which put the creature inside
+ * the question it was supposed to be standing on.
+ *
+ * A subtree because there is more than one of them: the composer is down
+ * there, and the block that asks is a sibling above it rather than a part of
+ * it, so neither one knows the whole answer.
+ */
+export const boodFloorFor = (key: string): BindingPath =>
+  `${BOOD_FLOOR}/${key}` as BindingPath;
+
+/** The highest thing standing at the bottom, or nothing standing there. */
+export function boodFloor(store: ReactiveStore): number | undefined {
+  const rows = Object.values(store.get<Record<string, number>>(BOOD_FLOOR) ?? {})
+    .filter((row) => typeof row === 'number' && row > 0);
+  return rows.length > 0 ? Math.min(...rows) : undefined;
+}
+/** Whether the creature roams the whole application rather than one screen. */
+export const BOOD_FLOAT = '$/chat/ui/boodFloat' as BindingPath;
+/** Whether the header trades its own name for a seven-cell creature. */
+export const BOOD_INLINE = '$/chat/ui/boodInline' as BindingPath;
 /** The catalogue's highlight. What a session command acts on when none is open. */
 export const SELECTED = '$/chat/ui/selected' as BindingPath;
 export const DRAFT = '$/chat/ui/draft' as BindingPath;

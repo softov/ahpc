@@ -30,7 +30,7 @@ const COMMANDS = new Set([
  * decide whether to load the CLI.
  */
 const SWITCHES = new Set([
-  '--static', '-s', '--settled', '--approve', '--answer',
+  '--static', '-s', '--settled', '--approve', '--answer', '--bood',
   '--help', '-h', '--json', '--full', '--archived', '--unread', '--undo',
   '--off', '--deny', '--reject', '--chat',
 ]);

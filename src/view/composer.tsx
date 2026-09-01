@@ -1,9 +1,10 @@
 import type { BoxProps, RenderOutput } from '@textui/core';
-import { defineComponent, useState, useTheme } from '@textui/core';
+import { defineComponent, useMeasure, useState, useTheme } from '@textui/core';
 import type { ListItem } from '@textui/widgets';
 import { Column, Divider, List, TextArea } from '@textui/widgets';
 import type { Completion, SlashCommand } from '../ahp/types.js';
 import { ComposerBar } from './controls.js';
+import { useFloorTop } from './creature.js';
 import type { ComposerOption } from './controls.js';
 
 /**
@@ -131,6 +132,11 @@ export const ChatComposer: (props: ChatComposerProps) => RenderOutput =
     const step = (direction: -1 | 1): void => {
       setHighlight((matches.length + index + direction) % matches.length);
     };
+
+    // Where this box starts, so the creature has somewhere to stand that is
+    // not on it. The slash menu grows this upward, so it is read every time
+    // rather than being a number somebody wrote down once.
+    useFloorTop('composer', useMeasure().y);
 
     return (
       <Column {...rest} gap={0}>

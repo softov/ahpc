@@ -14,6 +14,24 @@ export interface Config {
   theme?: string;
   /** The shell layout. */
   shell?: string;
+  /**
+   * Trade the header's own name for a seven-cell creature, on an open session.
+   *
+   * Off unless it is asked for. The header's leftmost cell is the one part of
+   * the row that is the same on every screen, and a client that gives it away
+   * by default has decided something about itself on somebody else's behalf.
+   */
+  boodInline?: boolean;
+  /**
+   * Let the creature loose on the whole application.
+   *
+   * Off unless it is asked for, and the reason is the one thing a terminal
+   * cannot do: there is no per-cell transparency, so a figure that goes
+   * everywhere writes over whatever it is standing on. It keeps clear of the
+   * composer, which says how tall it is, and of anything opened on a layer -
+   * but a screen whose content runs to the bottom will have a cat on it.
+   */
+  boodFloat?: boolean;
 }
 
 /**

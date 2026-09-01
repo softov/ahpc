@@ -2,10 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { renderApp } from '@textui/testing';
 import type { RenderOptions } from '@textui/testing';
 import {
-  BOOD, BOUNDS, FORMS, MOODS, Creature, art, creatureFrames, creatureSize,
-  drawCreature, getCreature, registerCreature,
+  BOOD, BOUNDS, FORMS, MOODS, Creature, WORLD, art, blit, createBody, creatureFrames,
+  creatureMotion, creatureSize, drawCreature, fill, getCreature, livelyNames, metric,
+  poseFrames, poseOf, registerCreature, stepBody,
 } from '../src/view/bood/index.js';
-import type { CreatureProps, CreatureSpec, Form } from '../src/view/bood/index.js';
+import type {
+  CreatureProps, CreatureSpec, Form, Mood, Motion, World,
+} from '../src/view/bood/index.js';
 
 /**
  * The bood, checked rather than eyeballed.
@@ -271,5 +274,398 @@ describe('the figure on screen', () => {
       expect(t.hasText(still)).toBe(true);
       await t.unmount();
     }
+  });
+});
+
+/**
+ * The half that moves, checked without drawing anything.
+ *
+ * All of this is arithmetic over a plain object, which is the point of keeping
+ * `motion.ts` free of JSX: a body can be stepped for ten simulated minutes in
+ * a millisecond, and every bug this shipped with was one that looks fine for
+ * the first four seconds somebody watches it. A creature that walks into the
+ * right-hand wall and falls asleep against it passes every screenshot.
+ */
+
+/** Seeded, so a failure is a failure rather than a bad afternoon. */
+function dice(seed: number): () => number {
+  let at = seed >>> 0;
+  return () => {
+    at = (at * 1664525 + 1013904223) >>> 0;
+    return at / 0x100000000;
+  };
+}
+
+const FIELD: World = { ...WORLD, floor: 9, left: 0, right: 60 };
+const LIVELY = ['bunny', 'cat', 'owl'] as const;
+
+/** One creature, one mood, run for `seconds` and told what it spent them doing. */
+function live(name: string, mood: Mood, seconds: number, seed = 7) {
+  const motion = creatureMotion(name);
+  if (!motion) throw new Error(`${name} has no motion`);
+  const body = createBody(30, FIELD.floor);
+  const random = dice(seed);
+  const poses: Record<string, number> = {};
+  const facings: Record<string, number> = {};
+  let left = 0;
+  let right = 0;
+
+  const ticks = Math.round(seconds * 12);
+  for (let tick = 0; tick < ticks; tick += 1) {
+    stepBody(body, motion, mood, FIELD, 1 / 12, random);
+    const pose = poseOf(body, motion, mood);
+    poses[pose] = (poses[pose] ?? 0) + 1;
+    facings[body.facing] = (facings[body.facing] ?? 0) + 1;
+    if (body.vx < -0.6) left += 1;
+    if (body.vx > 0.6) right += 1;
+  }
+  return { body, poses, facings, left, right, ticks, share: (pose: string) => (poses[pose] ?? 0) / ticks };
+}
+
+describe('a creature with somewhere to be', () => {
+  /**
+   * Both ways, and this is the regression rather than a nicety.
+   *
+   * "When thinking, walk to the right" written as `dir = bias` sends it to the
+   * right-hand wall, where the next target clamps onto its own position, it
+   * arrives instantly, rests - and never moves again. It slept against that
+   * wall for almost all of `thinking`, and the only symptom from the outside
+   * was a mascot that had stopped.
+   */
+  it('goes both ways, in every mood that goes anywhere', () => {
+    for (const name of LIVELY) {
+      for (const mood of ['happy', 'thinking', 'executing'] as const) {
+        const run = live(name, mood, 240);
+        expect(run.left).toBeGreaterThan(0);
+        expect(run.right).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  /** A bias is a lean, not a command: it still goes left, just less often. */
+  it('leans right while it is thinking, without only going right', () => {
+    const run = live('cat', 'thinking', 480);
+    expect(run.right).toBeGreaterThan(run.left);
+    expect(run.left / run.right).toBeGreaterThan(0.1);
+  });
+
+  /**
+   * Awake, mostly.
+   *
+   * One sleep threshold for every mood had `sad` - which dwells six seconds at
+   * a time and barely travels - asleep two thirds of the time, so the drawing
+   * that carries the mood almost never showed. The threshold is per mood now.
+   */
+  it('is not asleep in the moods that are meant to be doing something', () => {
+    for (const name of LIVELY) {
+      for (const mood of MOODS) {
+        const run = live(name, mood, 240);
+        expect(run.share('sleep')).toBeLessThan(0.35);
+      }
+    }
+  });
+
+  /** Rooted, and pinned to the one drawing that says so. */
+  it('freezes when something has gone wrong, and faces you while it does', () => {
+    for (const name of LIVELY) {
+      const run = live(name, 'error', 60);
+      expect(run.share('alarm')).toBe(1);
+      expect(run.body.facing).toBe('front');
+    }
+  });
+
+  /** At rest it turns and looks at you, which is most of what reads as alive. */
+  it('comes back to front when it has been standing still', () => {
+    const run = live('cat', 'sad', 240);
+    expect((run.facings.front ?? 0) / run.ticks).toBeGreaterThan(0.5);
+  });
+
+  /**
+   * The owl decides, and decides both ways.
+   *
+   * Flight used to be derived from already being airborne, so a grounded owl
+   * could never start and a flying one could never stop: it flew for
+   * ninety-nine ticks in a hundred and never once walked.
+   */
+  it('lets the owl choose between walking and flying, and it does both', () => {
+    const run = live('owl', 'happy', 480);
+    expect(run.share('fly')).toBeGreaterThan(0.05);
+    expect(run.share('walk')).toBeGreaterThan(0.02);
+  });
+
+  /** A bunny cannot travel without leaving the ground, so it mostly is not on it. */
+  it('makes the bunny hop rather than walk', () => {
+    const run = live('bunny', 'executing', 120);
+    expect(run.share('jump') + run.share('fall')).toBeGreaterThan(0.5);
+    expect(run.share('walk')).toBeLessThan(0.2);
+  });
+
+  /**
+   * Latched, because a hopping bunny is airborne for almost all of the time it
+   * is travelling - so the instant velocity is a fact about a body in flight
+   * rather than about which way the animal is pointed.
+   */
+  it('keeps a facing through the whole of a hop', () => {
+    const motion = creatureMotion('bunny');
+    const body = createBody(10, FIELD.floor);
+    body.intent = { kind: 'goto', x: 50, until: 999 };
+    const random = dice(3);
+
+    let airborneWithFacing = 0;
+    for (let tick = 0; tick < 200; tick += 1) {
+      stepBody(body, motion as never, 'happy', FIELD, 1 / 12, random);
+      if (!body.grounded && body.facing === 'right') airborneWithFacing += 1;
+    }
+    expect(airborneWithFacing).toBeGreaterThan(20);
+  });
+
+  /** Held beats airborne beats landing beats walking, and the order is the code. */
+  it('reads the pose off the physics, in that order', () => {
+    const motion = creatureMotion('cat');
+    const body = createBody(10, 9);
+    expect(poseOf(body, motion as never, 'happy')).toBe('idle');
+
+    body.sitting = true;
+    expect(poseOf(body, motion as never, 'happy')).toBe('sit');
+
+    body.vx = 4;
+    expect(poseOf(body, motion as never, 'happy')).toBe('walk');
+
+    body.landFor = 0.1;
+    expect(poseOf(body, motion as never, 'happy')).toBe('land');
+
+    body.grounded = false;
+    body.vy = -3;
+    expect(poseOf(body, motion as never, 'happy')).toBe('jump');
+
+    body.held = true;
+    expect(poseOf(body, motion as never, 'happy')).toBe('held');
+  });
+});
+
+describe('the art that moves', () => {
+  /**
+   * A slot is exactly as wide as what fills it.
+   *
+   * A `%` run one cell wider than the face draws a rabbit with a column of its
+   * own head missing - and only in the moods whose token is short, so looking
+   * at the happy one proves nothing. `registerCreature` settles it, and this
+   * is the shipped art actually complying.
+   */
+  it('writes every slot at the width of the token that fills it', () => {
+    for (const name of LIVELY) {
+      const motion = creatureMotion(name);
+      const faces = new Set(MOODS.map((mood) => (motion as never as Motion).faces[mood].length));
+      const tells = new Set(MOODS.map((mood) => (motion as never as Motion).tells[mood].length));
+      expect(faces.size).toBe(1);
+      expect(tells.size).toBe(1);
+
+      for (const frames of Object.values((motion as never as { poses: Record<string, string[][]> }).poses)) {
+        for (const rows of frames) {
+          for (const row of rows) {
+            for (const run of row.match(/%+/g) ?? []) expect(run.length).toBe([...faces][0]);
+            for (const run of row.match(/#+/g) ?? []) expect(run.length).toBe([...tells][0]);
+            expect(row).toMatch(/^[\x20-\x7e]*$/);
+          }
+        }
+      }
+    }
+  });
+
+  it('refuses a slot the mood cannot fill, and says which pose', () => {
+    const spec = specFor('slotty');
+    spec.motion = {
+      ...(creatureMotion('cat') as never as Motion),
+      poses: { 'idle.front': art`(%%%%)` },
+      overrides: {},
+    };
+    expect(() => registerCreature(spec)).toThrow(/creature "slotty" motion\/idle.front: a 4-cell face slot/);
+  });
+
+  /**
+   * The chain, not the first hit.
+   *
+   * A pose a species has no side view of falls through to its front one. The
+   * owl's glide is deliberately front-only, because a bird planing is not
+   * pointed anywhere in particular.
+   */
+  it('falls through to the front view rather than drawing nothing', () => {
+    const front = poseFrames('owl', 'fall', 'front', 'happy');
+    expect(poseFrames('owl', 'fall', 'left', 'happy')).toBe(front);
+    expect(poseFrames('owl', 'fall', 'right', 'happy')).toBe(front);
+    expect(poseFrames('owl', 'fly', 'left', 'happy')).not.toBe(front);
+  });
+
+  /** A mood may change the outline, which no face token can do. */
+  it('lets a mood override a whole pose, and only that mood', () => {
+    const working = poseFrames('cat', 'idle', 'right', 'executing') as string[][];
+    const resting = poseFrames('cat', 'idle', 'right', 'happy') as string[][];
+    expect(working).not.toEqual(resting);
+    expect((working[0] as string[]).join('\n')).toContain('@');
+    expect(poseFrames('bunny', 'idle', 'right', 'executing')).toEqual(poseFrames('bunny', 'idle', 'right', 'happy'));
+  });
+
+  /** Nobody drew the crab a walk cycle, and the crab is not broken. */
+  it('leaves a creature that was never drawn moving without motion', () => {
+    expect(livelyNames()).toEqual(['cat', 'bunny', 'owl']);
+    expect(creatureMotion('crab')).toBeUndefined();
+    expect(poseFrames('crab', 'walk', 'right', 'happy')).toBeUndefined();
+  });
+
+  /**
+   * The feet own the y, and the face owns the x.
+   *
+   * Bottom-aligned because the landing squash is a row shorter than the stand,
+   * and padding underneath sinks the creature through the floor at exactly the
+   * moment it hits it. Anchored on the face because a cat turning side-on is
+   * twice as wide with its head at the far end.
+   */
+  it('places a figure by its feet and its face, not by its corner', () => {
+    const field = ['.....', '.....', '.....'];
+    expect(blit(field, ['ab', 'cd'], 2, 2, 0)).toEqual(['.....', '..ab.', '..cd.']);
+    // One row shorter, same y: it settles onto the floor rather than lifting.
+    expect(blit(field, ['ab'], 2, 2, 0)).toEqual(['.....', '.....', '..ab.']);
+    // Anchored one in: the same x puts the second column where the first was.
+    expect(blit(field, ['ab'], 2, 2, 1)).toEqual(['.....', '.....', '.ab..']);
+    // Off the edge is dropped, not wrapped onto the far side.
+    expect(blit(field, ['abcd'], 4, 2, 0)).toEqual(['.....', '.....', '....a']);
+  });
+
+  it('fills a slot without moving a column', () => {
+    expect(fill(['( %%% )', '(#)'], '^.^', '~')).toEqual(['( ^.^ )', '(~)']);
+    expect(metric(['  %%%  ', 'aaaaaaa']).anchor).toBe(3);
+    expect(metric(['aaaa']).anchor).toBe(2);
+  });
+});
+
+describe('the figure that moves on screen', () => {
+  async function live(props: Partial<CreatureProps>) {
+    const t = await renderApp({
+      width: 100,
+      height: 30,
+      shell: 'plain',
+      onBoot: (app) => {
+        app.components.register({ component: 'Creature', renderer: { kind: 'function', render: Creature } });
+        app.screens.register({ id: 'home', component: { component: 'Creature', lively: true, ...props } });
+        app.screens.reset('home');
+      },
+    });
+    await t.settle();
+    return t;
+  }
+
+  /** Which column the figure is standing in, whatever it is standing in it as. */
+  function at(lines: string[]): number {
+    const drawn = lines.map((row) => row.search(/\S/)).filter((col) => col >= 0);
+    return drawn.length ? Math.min(...drawn) : -1;
+  }
+
+  it('gives the creature a field, and it does not stay where it was put', async () => {
+    const t = await live({ name: 'cat', mood: 'executing', fieldWidth: 60, fieldHeight: 10 });
+    const start = at(t.lines());
+    expect(start).toBeGreaterThanOrEqual(0);
+
+    const seen = new Set<number>();
+    for (let sample = 0; sample < 40; sample += 1) {
+      t.advance(120);
+      await t.settle();
+      seen.add(at(t.lines()));
+    }
+    expect(seen.size).toBeGreaterThan(1);
+    await t.unmount();
+  });
+
+  /** Which row the figure is drawn on, and which column it starts at. */
+  function where(lines: string[]): { row: number; col: number } {
+    for (let row = 0; row < lines.length; row += 1) {
+      const col = (lines[row] as string).search(/\S/);
+      if (col >= 0) return { row, col };
+    }
+    return { row: -1, col: -1 };
+  }
+
+  /**
+   * Called, not moved.
+   *
+   * A press on the field is somewhere to go rather than somewhere to be: the
+   * brain is told and the body walks there in its own gait, which is the whole
+   * difference between a creature and a cursor.
+   */
+  it('walks to where the field was clicked', async () => {
+    // A mood that barely wanders, so what is measured is the call and not a
+    // cat that had somewhere else to be.
+    const t = await live({ name: 'cat', mood: 'sad', fieldWidth: 60, fieldHeight: 10 });
+    const start = where(t.lines());
+    expect(start.col).toBeGreaterThanOrEqual(0);
+
+    // Well to the right of wherever it is standing, on a row it occupies.
+    // Judged by whether the gap closed rather than by where it ended up: the
+    // creature has a will of its own and the assertion is that being called
+    // moves it, not that it is obedient for ever.
+    const target = Math.min(52, start.col + 24);
+    t.click(target, start.row);
+
+    // Judged by which way it turns to go, not by a column: a walking cat is
+    // side-on and twice as wide, so its leftmost cell moves for reasons that
+    // have nothing to do with where it is.
+    let facedRight = false;
+    for (let sample = 0; sample < 20 && !facedRight; sample += 1) {
+      t.advance(120);
+      await t.settle();
+      facedRight = t.hasText('( =T.T)');
+    }
+    expect(facedRight).toBe(true);
+    await t.unmount();
+  });
+
+  /**
+   * Picked up, carried, and put down somewhere else.
+   *
+   * The press claims the gesture, so the rest of it arrives here wherever the
+   * pointer goes - which is what lets the figure be dragged off its own box
+   * rather than being dropped the moment it leaves.
+   */
+  it('can be picked up and carried', async () => {
+    const t = await live({ name: 'cat', mood: 'sad', fieldWidth: 60, fieldHeight: 10 });
+    const start = where(t.lines());
+
+    const grab: [number, number] = [start.col + 3, start.row + 1];
+    t.drag(grab, [grab[0] + 10, grab[1]], [grab[0] + 20, grab[1] - 2], [grab[0] + 24, grab[1] - 3]);
+    await t.settle();
+
+    const carried = where(t.lines());
+    expect(carried.col).toBeGreaterThan(start.col + 12);
+    expect(carried.row).toBeLessThan(start.row);
+    await t.unmount();
+  });
+
+  /**
+   * A creature nobody drew moving keeps the still it always had.
+   *
+   * Worse than not moving would be a figure jittering in place in a ten-row
+   * box, so `lively` on a creature with no motion is simply the old drawing.
+   */
+  it('draws the still for a creature that was never drawn moving', async () => {
+    const t = await live({ name: 'crab', mood: 'happy' });
+    for (const row of drawCreature('crab', 'happy')) expect(t.hasText(row.trim())).toBe(true);
+    await t.unmount();
+  });
+
+  /** The runtime's own switch still wins, the same way it does for the still. */
+  it('stands still when the runtime has said no to animation', async () => {
+    const t = await renderApp({
+      width: 100, height: 30, shell: 'plain', animations: false,
+      onBoot: (app) => {
+        app.components.register({ component: 'Creature', renderer: { kind: 'function', render: Creature } });
+        app.screens.register({ id: 'home', component: { component: 'Creature', name: 'bunny', lively: true } });
+        app.screens.reset('home');
+      },
+    });
+    await t.settle();
+    const before = t.text();
+    t.advance(5000);
+    await t.settle();
+    expect(t.text()).toBe(before);
+    await t.unmount();
   });
 });

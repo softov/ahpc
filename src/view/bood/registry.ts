@@ -1,5 +1,7 @@
-import { framesOf, square } from './art.js';
-import type { Creature, CreatureSpec, Form, Mood } from './types.js';
+import { anchorOf, framesOf, metric, square } from './art.js';
+import type {
+  Creature, CreatureSpec, Facing, Form, Mood, Motion, Pose, PoseKey, RegisteredMotion,
+} from './types.js';
 import { BOUNDS, FORMS, MOODS } from './types.js';
 
 /**
@@ -17,6 +19,14 @@ class BadDrawing extends Error {
   constructor(name: string, form: Form, mood: Mood, said: string) {
     super(`creature "${name}" ${form}/${mood}: ${said}`);
     this.name = 'BadDrawing';
+  }
+}
+
+/** What went wrong in the moving half, and which pose it was. */
+class BadMotion extends Error {
+  constructor(name: string, key: string, said: string) {
+    super(`creature "${name}" motion/${key}: ${said}`);
+    this.name = 'BadMotion';
   }
 }
 
@@ -67,9 +77,78 @@ export function registerCreature(spec: CreatureSpec): Creature {
     size[form] = square(MOODS.map((mood) => byMood[mood]));
   }
 
-  const creature: Creature = { name: spec.name, label: spec.label, about: spec.about ?? '', art, size };
+  const creature: Creature = {
+    name: spec.name, label: spec.label, about: spec.about ?? '', art, size,
+    motion: spec.motion ? registerMotion(spec.name, spec.motion) : undefined,
+  };
   BOOD.set(creature.name, creature);
   return creature;
+}
+
+/**
+ * The moving half, framed and slot-checked.
+ *
+ * The check that matters is the slot width. A `%` run one cell wider than the
+ * face that fills it does not fail, it draws a rabbit with a column of its own
+ * head missing - and only in the moods whose token is short. That is a bug
+ * nobody finds by looking at the happy one, so it is settled here, once, for
+ * every mood against every pose.
+ */
+function registerMotion(name: string, motion: Motion): RegisteredMotion {
+  const faces = MOODS.map((mood) => motion.faces[mood]);
+  const tells = MOODS.map((mood) => motion.tells[mood]);
+  const oneWidth = (tokens: string[], what: string): number => {
+    const widths = new Set(tokens.map((token) => token.length));
+    if (widths.size !== 1) throw new BadMotion(name, what, `${widths.size} different widths, and a slot has one`);
+    return [...widths][0] as number;
+  };
+  const faceWidth = oneWidth([...faces, motion.blink], 'faces');
+  const tellWidth = oneWidth(tells, 'tells');
+
+  const frame = (key: string, cell: NonNullable<Motion['poses'][PoseKey]>): string[][] => {
+    const frames = framesOf(cell).map((rows) => [...rows]);
+    if (frames.length === 0) throw new BadMotion(name, key, 'no frames');
+    for (const rows of frames) {
+      if (rows.length === 0) throw new BadMotion(name, key, 'an empty frame');
+      if (rows.length > BOUNDS.draw.rows) {
+        throw new BadMotion(name, key, `${rows.length} rows, and a figure allows ${BOUNDS.draw.rows}`);
+      }
+      for (const row of rows) {
+        if (!PRINTABLE.test(row)) {
+          throw new BadMotion(name, key, `"${row}" uses a glyph whose width a terminal gets to decide`);
+        }
+        for (const run of row.match(/%+/g) ?? []) {
+          if (run.length !== faceWidth) throw new BadMotion(name, key, `a ${run.length}-cell face slot, and the faces are ${faceWidth}`);
+        }
+        for (const run of row.match(/#+/g) ?? []) {
+          if (run.length !== tellWidth) throw new BadMotion(name, key, `a ${run.length}-cell tell slot, and the tells are ${tellWidth}`);
+        }
+      }
+    }
+    return frames;
+  };
+
+  const poses: RegisteredMotion['poses'] = {};
+  for (const [key, cell] of Object.entries(motion.poses)) poses[key as PoseKey] = frame(key, cell);
+  if (!poses['idle.front'] && !poses.idle) throw new BadMotion(name, 'idle', 'no idle to fall back to');
+
+  const overrides: RegisteredMotion['overrides'] = {};
+  for (const [mood, byPose] of Object.entries(motion.overrides ?? {})) {
+    const framed: Partial<Record<PoseKey, string[][]>> = {};
+    for (const [key, cell] of Object.entries(byPose)) framed[key as PoseKey] = frame(`${mood}/${key}`, cell);
+    overrides[mood as Mood] = framed;
+  }
+
+  const every = [...Object.values(poses), ...Object.values(overrides).flatMap((byPose) => Object.values(byPose))];
+  const reach = { left: 0, right: 0 };
+  for (const frames of every) {
+    const anchor = anchorOf(frames as string[][]);
+    const { width } = metric((frames as string[][])[0] as string[]);
+    reach.left = Math.max(reach.left, anchor);
+    reach.right = Math.max(reach.right, width - 1 - anchor);
+  }
+
+  return { ...motion, poses, overrides, reach };
 }
 
 export function getCreature(name: string): Creature | undefined {
@@ -125,4 +204,39 @@ export function creatureSize(name: string, form: Form = 'draw'): { width: number
 /** The tallest anyone in the bood is, for a caller deciding whether there is room. */
 export function boodHeight(form: Form = 'draw'): number {
   return Math.max(0, ...listCreatures().map((creature) => creature.size[form].height));
+}
+
+/**
+ * The chain, and the chain is the design rather than the first hit.
+ *
+ * A species that has no left view of a pose falls through to its front one and
+ * still reads right; the owl's glide is deliberately front-only, because a
+ * bird planing is not pointed anywhere in particular. Overrides come first at
+ * every step, so a mood that changes the outline rather than the expression -
+ * the cat at a keyboard while a turn is running - wins before a facing does.
+ */
+export function poseFrames(name: string, pose: Pose, facing: Facing, mood: Mood): string[][] | undefined {
+  const motion = resolve(name)?.motion;
+  if (!motion) return undefined;
+
+  const chain: PoseKey[] = [
+    `${pose}.${facing}`, `${pose}.front`, `${pose}.right`, pose,
+    `idle.${facing}`, 'idle.front', 'idle',
+  ];
+  const override = motion.overrides[mood];
+  for (const key of chain) {
+    const hit = override?.[key] ?? motion.poses[key];
+    if (hit) return hit;
+  }
+  return undefined;
+}
+
+/** The moving half of one creature, or nothing if it was never drawn moving. */
+export function creatureMotion(name: string): Creature['motion'] {
+  return resolve(name)?.motion;
+}
+
+/** Which of the bood have been drawn moving, for a picker that offers it. */
+export function livelyNames(): readonly string[] {
+  return listCreatures().filter((creature) => creature.motion).map((creature) => creature.name);
 }

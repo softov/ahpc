@@ -12,8 +12,8 @@ import { CONTROLLER, createController } from './control.js';
 import { fakeHost } from './ahp/fake.js';
 import type { HostConnection } from './ahp/connection.js';
 import {
-  FOCUS, HOST, HOST_ERROR, INPUT, OPEN, RUNNING, SCREEN, SESSIONS, SPLIT_AT, SPLIT_DEFAULT,
-  STATUS, WORKSPACE, openSession, workspaceName,
+  BOOD, BOOD_FLOAT, BOOD_FLOOR, BOOD_INLINE, FOCUS, HOST, HOST_ERROR, INPUT, OPEN, RUNNING, SCREEN, SESSIONS,
+  SPLIT_AT, SPLIT_DEFAULT, STATUS, WORKSPACE, boodFloor, openSession, workspaceName,
 } from './state.js';
 import type { HostState } from './state.js';
 import { decodeStatus } from './ahp/status.js';
@@ -25,6 +25,7 @@ import { ChatBubble, ReasoningBlock, StreamingText } from './view/bubble.js';
 import { ChatComposer } from './view/composer.js';
 import { ChatHitl } from './view/hitl.js';
 import { ChatTranscript } from './view/transcript.js';
+import { BoodSprite, Creature, moodOf, pickBood } from './view/creature.js';
 import { ChangesList } from './view/changes.js';
 import { FileList } from './view/files.js';
 import { AutomationList } from './view/automations.js';
@@ -43,6 +44,64 @@ import { ToolCallRow } from './view/toolcall.js';
  * The application takes a host rather than making one, so a test can mount it
  * against a scripted one and drive time by hand.
  */
+
+/**
+ * The creature, over the whole application.
+ *
+ * Mounted on the `floating` layer rather than inside a screen, so navigating
+ * moves the screen out from under it instead of unmounting it: escape from a
+ * session leaves the figure exactly where it was standing. This is the only
+ * place that knows both the store and the bood, which is what keeps
+ * `view/bood/` from having an opinion about sessions.
+ *
+ * The floor is the top of whatever the screen keeps at the bottom. A screen
+ * with a composer keeps a lot more of it than one with only a status bar, so
+ * the inset follows the screen rather than being one number that is wrong on
+ * half of them.
+ */
+/**
+ * What the bottom keeps when nothing down there has said otherwise.
+ *
+ * The hints row, the shell's own edge, and the closing border of whatever
+ * panel is there. Standing on that border put the figure through it and
+ * through the row above it; a row clear of it is the ground.
+ */
+const BOTTOM_CHROME = 3;
+
+const BoodOverlay = defineComponent<Record<string, never>>('BoodOverlay', () => {
+  const app = useApp();
+  const name = useStoreValue<string>(BOOD);
+  const roaming = useStoreValue<boolean>(BOOD_FLOAT, false) ?? false;
+  useStoreSubtree(BOOD_FLOOR);
+  // Whatever is standing at the bottom says where it starts; the creature gets
+  // the row above the highest of them. Nothing down there and it takes the
+  // bottom of the terminal, less the chrome that is on every screen.
+  const standing = boodFloor(app.store);
+  const status = useStoreValue<number>(STATUS, 1) ?? 1;
+  useStoreSubtree(SESSIONS);
+  const session = openSession(app.store);
+  if (!roaming || !name) return null;
+
+  /*
+   * Out of the way of anything that was opened on purpose.
+   *
+   * A terminal has no per-cell transparency, so the figure writes over
+   * whatever it is standing on - which is a fair price for a mascot wandering
+   * across a list, and not a fair price for a menu. The completion popup is a
+   * layer, the palette is a layer, a dialog is a layer: if anything else is
+   * open, the creature is not on top of it.
+   */
+  if (app.layers.entries().some((entry) => entry.id !== 'bood')) return null;
+
+  return (
+    <BoodSprite
+      name={name}
+      mood={session ? moodOf(decodeStatus(status).activity) : 'happy'}
+      floor={standing !== undefined ? standing - 1 : undefined}
+      inset={BOTTOM_CHROME}
+    />
+  );
+});
 
 const Header = defineComponent<Record<string, never>>('ChatHeader', () => {
   const app = useApp();
@@ -64,6 +123,14 @@ const Header = defineComponent<Record<string, never>>('ChatHeader', () => {
   useStoreSubtree(SESSIONS);
   const session = openSession(app.store);
   const decoded = decodeStatus(status);
+  const bood = useStoreValue<string>(BOOD);
+  const boodInline = useStoreValue<boolean>(BOOD_INLINE, false) ?? false;
+  // Only on a session, because the seven cells are carrying that session's
+  // state - on the catalogue there is no one thing for them to be about, and
+  // a creature that means nothing where the name used to be is a worse trade.
+  // Truthiness, not a comparison with undefined: nothing open is `null` here,
+  // and the row beside this one has always tested it the same way.
+  const wearsBood = boodInline && Boolean(session);
 
   return (
     // Only the title gives way. Everything else on this row is fixed-width and
@@ -73,7 +140,9 @@ const Header = defineComponent<Record<string, never>>('ChatHeader', () => {
     // title, and the status glyph never does: it is one cell and it is the
     // thing the row is scanned for.
     <Row gap={1}>
-      <text content="Assistant" bold fg="accent" shrink={0} />
+      {wearsBood
+        ? <Creature name={bood} form="inline" mood={moodOf(decoded.activity)} shrink={0} />
+        : <text content="Assistant" bold fg="accent" shrink={0} />}
       <text content={theme.glyphs.separator} fg="subtle" shrink={0} />
       {session ? (
         <>
@@ -295,6 +364,22 @@ const Status = defineComponent<Record<string, never>>('ChatStatus', () => {
 
 export interface ChatOptions {
   builtins?: boolean;
+  /**
+   * The header trades its own name for a seven-cell creature, on a session.
+   *
+   * Off unless asked for, and it is the config file that asks - `boodInline`
+   * in `~/.config/ahpc/config.json`.
+   */
+  boodInline?: boolean;
+  /**
+   * The creature roams the whole application, on the floating layer.
+   *
+   * Off unless asked for - `boodFloat` in the config file. A terminal has no
+   * per-cell transparency, so a figure that goes everywhere writes over what
+   * it stands on: it keeps off the composer and off anything opened on a
+   * layer, and a screen whose content runs to the bottom gets a cat on it.
+   */
+  boodFloat?: boolean;
   /** The host. Omit for the scripted one, which is what the tests use. */
   host?: HostConnection & { pump?(): boolean };
   /**
@@ -326,6 +411,11 @@ export function registerChat(app: TextUIApp, options: ChatOptions = {}): Disposa
   const controller = createController(app, host);
   app.store.set(WORKSPACE, options.workspace ?? process.cwd());
   app.store.set(SPLIT_AT, options.splitAt ?? SPLIT_DEFAULT);
+  // Once, here, rather than per mount: two surfaces drawing two different
+  // animals would read as two mascots rather than one that gets about.
+  app.store.set(BOOD, pickBood());
+  app.store.set(BOOD_INLINE, options.boodInline ?? false);
+  app.store.set(BOOD_FLOAT, options.boodFloat ?? false);
   bag.add(controller);
   bag.add(app.services.provide(CONTROLLER, controller));
 
@@ -354,6 +444,7 @@ export function registerChat(app: TextUIApp, options: ChatOptions = {}): Disposa
     ['HostsScreen', HostsScreen],
     ['SkillsScreen', SkillsScreen],
     ['McpScreen', McpScreen],
+    ['BoodOverlay', BoodOverlay],
     ['ChatHeader', Header],
     ['ChatStatus', Status],
     ['ChatHints', Hints],
@@ -365,6 +456,13 @@ export function registerChat(app: TextUIApp, options: ChatOptions = {}): Disposa
     }));
   }
 
+  // Over every screen, for as long as the application is running.
+  bag.add(app.layers.open({
+    id: 'bood',
+    layer: 'floating',
+    node: { component: 'BoodOverlay' },
+    position: { kind: 'screen', rect: { x: 0, y: 0 } },
+  }));
   bag.add(app.surfaces.open({ surface: 'header', key: 'title', target: { component: 'ChatHeader' } }));
   bag.add(app.surfaces.open({ surface: 'status', key: 'status', target: { component: 'ChatStatus' } }));
 
