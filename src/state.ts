@@ -325,7 +325,12 @@ export function applyEvent(store: ReactiveStore, event: HostEvent, model: Turn[]
       writeStatus(store, event.status);
       return model;
     case 'error':
-      store.set(HOST_ERROR, event.message);
+      // Through `reportHostError`, not straight at the path: when this is the
+      // host's answer to an answer just given, the row above the composer is
+      // where the person who gave it is looking. The footer alone left
+      // "Approving..." sitting there over a session that had stopped
+      // listening, with the reason twenty rows below it.
+      reportHostError(store, event.message);
       return model;
     case 'changes':
       store.set(CHANGES, event.changes);
