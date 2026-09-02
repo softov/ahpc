@@ -4,6 +4,7 @@ import { registerChat } from '../src/app.js';
 import { fakeHost } from '../src/ahp/fake.js';
 import { CONTROLLER } from '../src/control.js';
 import { sessions } from '../src/state.js';
+import { activityOf } from '../src/ahp/live.js';
 
 /*
  * A catalogue is only as fresh as what it was last told.
@@ -196,4 +197,44 @@ describe('a turn the host could not finish', () => {
       await t.unmount();
     });
   }
+});
+
+/**
+ * What a live session says it is doing.
+ *
+ * The bits are worked out here rather than read off the session state,
+ * because the protocol has no action that moves them: a host says
+ * `session/activityChanged` and the reducer files that word under `activity`
+ * and leaves `status` alone. The one pair that does move it - input needed,
+ * set and removed - only ever goes one way, so a session that was asked a
+ * question and answered it kept `InProgress` for the rest of its life.
+ */
+describe('the state a live session reports', () => {
+  const READ = 32;
+  const ARCHIVED = 64;
+
+  it('is what the conversation is actually doing', () => {
+    expect(activityOf(1, false, false, false)).toBe(1);
+    expect(activityOf(1, false, true, false)).toBe(8);
+    expect(activityOf(1, true, true, false)).toBe(24);
+    expect(activityOf(1, false, false, true)).toBe(2);
+    // Something wanted beats something happening, the way the host's own
+    // order does: a turn waiting on a person is still a running turn, and the
+    // one state that needs somebody is the one that must not be swallowed.
+    expect(activityOf(1, true, false, false)).toBe(24);
+  });
+
+  /** The one that was wrong: answered, finished, and still saying it works. */
+  it('stops saying a session is working once the turn has ended', () => {
+    // What the reducer leaves behind after a question is answered - the
+    // in-progress bit, with nothing that ever clears it.
+    expect(activityOf(8, false, false, false)).toBe(1);
+    expect(activityOf(24, false, false, false)).toBe(1);
+  });
+
+  /** Read and archived are not about activity, and survive it. */
+  it('carries the session flags through untouched', () => {
+    expect(activityOf(1 | READ | ARCHIVED, false, true, false)).toBe(8 | READ | ARCHIVED);
+    expect(activityOf(2 | READ, false, false, false)).toBe(1 | READ);
+  });
 });

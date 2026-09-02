@@ -13,10 +13,10 @@ import { CLIPBOARD_PATH, layoutMarkdown, wrapRuns } from '@textui/core';
 import { toBlocks } from '../src/blocks.js';
 import {
   CHATS, CHAT_URI, DRAFT, HOST_ERROR, INPUT, INPUT_STATUS, OPEN, OPEN_TERMINAL, PROVIDER, QUEUE,
-  SELECTED, SETTINGS, SIDEBAR, TURNS, WORKSPACE,
+  SELECTED, SETTINGS, SIDEBAR, TURNS, WORKSPACE, writeSessions,
 } from '../src/state.js';
 import type { InputStatus } from '../src/state.js';
-import type { Turn } from '../src/ahp/types.js';
+import type { SessionSummary, Turn } from '../src/ahp/types.js';
 import { PICKER, openPicker } from '../src/view/picker.js';
 
 /**
@@ -77,6 +77,21 @@ function turnsIn(m: Mounted): number {
 }
 
 /** Run the script to where it needs an answer, rendering as it goes. */
+/**
+ * Settle until it is true, or give up and let the assertion say what it saw.
+ *
+ * A fixed count of settles is a wait calibrated on the machine that wrote it:
+ * enough while one test file is running and not enough while thirteen are, so
+ * the test starts reporting how loaded the box is rather than what the client
+ * drew.
+ */
+async function until(m: Mounted, ready: () => boolean, tries = 40): Promise<void> {
+  for (let i = 0; i < tries; i++) {
+    if (ready()) return;
+    await m.t.settle();
+  }
+}
+
 async function run(m: Mounted, steps = 100_000): Promise<void> {
   for (let i = 0; i < steps; i++) if (!m.host.pump()) break;
   for (let i = 0; i < 6; i++) await m.t.settle();
@@ -1285,6 +1300,40 @@ describe('the composer is the front door', () => {
     expect(t.store.get<string>(WORKSPACE)).toBe('/brb_main/src/brb_framework');
     expect(t.hasText('brb_framework')).toBe(true);
     await t.unmount();
+  });
+
+  /**
+   * A state that arrives while the conversation is open.
+   *
+   * `openSession` is a plain read, so a screen that calls it and nothing else
+   * never hears about the summary changing underneath it. The caption carries
+   * the session's own state, and it went on saying whatever the session said
+   * when it was opened - the only way to see the new one was to leave and
+   * come back, which remounts the screen and reads the store again.
+   */
+  it('follows the state of the session it has open', async () => {
+    // Tall enough that the caption is on screen. It is the transcript's first
+    // entry, and a feed collapses what has scrolled away - so on a short
+    // terminal the assertion below would be about virtualisation rather than
+    // about the store.
+    const m = await conversation({ width: 100, height: 60 });
+    const uri = m.t.store.get<string>(OPEN) as string;
+    const record = (m.t.store.get<Record<string, SessionSummary>>(SESSIONS) ?? {})[uri] as SessionSummary;
+    expect(record).toBeTruthy();
+    // Settled until it is on screen rather than a fixed six times: six is
+    // enough on an idle machine and is not enough on a loaded one, which is a
+    // test that passes or fails on how many other files are running.
+    await until(m, () => m.t.getAllByText('waiting on you').length > 0);
+    expect(m.t.getAllByText('waiting on you').length).toBeGreaterThan(0);
+    expect(m.t.getAllByText('error').length).toBe(0);
+
+    // What the controller does when the host says something moved, without
+    // going anywhere: the same session, in a state it was not in before.
+    writeSessions(m.t.app.store, [{ ...record, status: SessionFlag.Error }]);
+    await until(m, () => m.t.getAllByText('error').length > 0);
+
+    expect(m.t.getAllByText('error').length).toBeGreaterThan(0);
+    await m.t.unmount();
   });
 
   /**

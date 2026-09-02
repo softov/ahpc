@@ -7,6 +7,7 @@ import type {
   ResponsePart, SessionConfig, SessionDetail, SessionSummary, SessionUri, ToolCall,
   ToolCallStatus, Turn,
 } from './types.js';
+import { SessionFlag } from './types.js';
 
 /**
  * The other implementation of the seam: a real agent host, over a WebSocket.
@@ -278,6 +279,33 @@ function turn(value: unknown, running: boolean): Turn {
 }
 
 /**
+ * The activity bits, from what this client can see rather than what it was told.
+ *
+ * There is no `session/statusChanged` in the protocol. A subscribed client is
+ * told `session/activityChanged` - a word - and the reducer keeps that word in
+ * `activity` and deliberately leaves `status` alone; the only actions that
+ * move `status` are the input-needed pair and the read and archived flags. So
+ * on a live session the activity bits only ever go up. Answering a question
+ * clears `InputNeeded` and leaves `InProgress` set, which the reducer's own
+ * comment calls falling back to in-progress, and nothing afterwards takes it
+ * off - a session goes on saying it is working through every turn that
+ * follows, until something re-reads the catalogue.
+ *
+ * Everything the bits are about is already here: whether a turn is running,
+ * whether something is waiting on a person, and whether the last turn failed.
+ * The order is the host's own - what is wanted, then what is happening, then
+ * what went wrong - and the session's own flags are carried through untouched,
+ * because read and archived are not about activity at all.
+ */
+export function activityOf(status: number, asked: boolean, running: boolean, failed: boolean): number {
+  const flags = status & (SessionFlag.IsRead | SessionFlag.IsArchived);
+  if (asked) return flags | SessionFlag.InputNeeded;
+  if (running) return flags | SessionFlag.InProgress;
+  if (failed) return flags | SessionFlag.Error;
+  return flags | SessionFlag.Idle;
+}
+
+/**
  * The conversation, as the transcript reads it.
  *
  * A turn on the wire carries both what the person said and what the agent
@@ -332,6 +360,41 @@ function question(value: unknown): Question {
       : {}),
     ...(found.allowFreeformInput === true ? { allowFreeformInput: true } : {}),
   };
+}
+
+/**
+ * Reduce one action, or say so and go on listening.
+ *
+ * A reducer is handed whatever the host sent, and a host that sends a
+ * malformed action throws inside it - `session/inputNeededSet` without its
+ * `request` is `action.request.id` on undefined, which is a `TypeError` and
+ * not an RPC error. Thrown out of a `for await` it rejects the whole loop and
+ * takes the subscription with it, so the session goes deaf: the block waiting
+ * on a person never clears, the status never moves, and the only sign of any
+ * of it is a sentence about a property of undefined on the status bar.
+ *
+ * One word this client cannot read is not a reason to stop reading the rest
+ * of them. The action is dropped, the state it would have changed is left as
+ * it was, and it is said out loud - because a client quietly ignoring what a
+ * host tells it is the other way to be wrong here.
+ */
+export function applyAction<T>(
+  reduce: (state: T, action: never) => unknown,
+  state: T,
+  action: unknown,
+  onBad: (message: string) => void,
+): T {
+  try {
+    return reduce(state, action as never) as T;
+  }
+  catch (error) {
+    const said = error instanceof Error ? error.message : String(error);
+    const type = typeof (action as { type?: unknown } | null)?.type === 'string'
+      ? (action as { type: string }).type
+      : 'an action';
+    onBad(`The host sent ${type} in a shape this client cannot read: ${said}`);
+    return state;
+  }
 }
 
 /**
@@ -1225,6 +1288,11 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
       /** What was last reported, so an unchanged list is not re-sent. */
       let contributed = '';
       let listed = '';
+      /** An action this client could not apply. Said once, and read on. */
+      const bad = (message: string): void => {
+        options.onRefusal?.(uri, message);
+        if (live) observer({ type: 'error', message });
+      };
 
       /** The session's chats, when that has changed. */
       const chatsChanged = (): void => {
@@ -1242,12 +1310,18 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
         if (!live) return;
         const all = transcript(chat);
         const active = all.find((found) => found.state === 'running');
+        const asked = pendingInput(session, chat);
         const event: HostEvent = {
           type: 'snapshot',
           turns: all.filter((found) => found !== active),
           ...(active ? { active } : {}),
-          ...(pendingInput(session, chat) ? { input: pendingInput(session, chat) as PendingInput } : {}),
-          status: typeof session.status === 'number' ? session.status : 1,
+          ...(asked ? { input: asked as PendingInput } : {}),
+          status: activityOf(
+            typeof session.status === 'number' ? session.status : 1,
+            Boolean(asked),
+            active !== undefined,
+            all[all.length - 1]?.state === 'failed',
+          ),
           queued: queued(chat),
         };
         observer(event);
@@ -1274,7 +1348,7 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
           void (async () => {
             for await (const event of talking.subscription) {
               if (event.type !== 'action') continue;
-              chat = bag(ahp.chatReducer(chat, bag(event.params).action));
+              chat = bag(applyAction(ahp.chatReducer, chat, bag(event.params).action, bad));
               emit();
             }
           })();
@@ -1283,7 +1357,7 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
 
         for await (const event of opened.subscription) {
           if (event.type !== 'action') continue;
-          session = bag(ahp.sessionReducer(session, bag(event.params).action));
+          session = bag(applyAction(ahp.sessionReducer, session, bag(event.params).action, bad));
           // Separate from the snapshot below, which is the chat: these are the
           // session's, they change for reasons that have nothing to do with a
           // turn, and a panel that only re-read when it was opened showed a

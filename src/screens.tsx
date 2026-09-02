@@ -565,6 +565,12 @@ export const ChatScreen: (props: Record<string, never>) => RenderOutput =
     // `keepAlive`, and dies with the screen, which is what a scope is for.
     const [cursor, setCursor] = useStore<number>('$/screen.chat/cursor' as BindingPath, 0);
 
+    // Subscribed, because `openSession` is a plain read. The caption carries
+    // the session's own state, and a state arriving from the host while the
+    // conversation is open changed the store and left this screen showing
+    // what it said when the session was opened - so it only caught up when
+    // leaving and coming back remounted it.
+    useStoreSubtree(SESSIONS);
     const session = openSession(app.store);
     const model = useStoreValue<string>(MODEL, '') ?? '';
     const chat = useStoreValue<string | null>(CHAT_URI, null) ?? null;
