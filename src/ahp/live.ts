@@ -1033,9 +1033,18 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
     })),
 
     createSession: async ({ provider, workingDirectory, config: values }) => {
-      // The client chooses the URI, which is what makes the session
-      // addressable before the host has answered.
-      const resource = `ahp-session:/${randomUUID()}`;
+      /*
+       * The client chooses the URI, which is what makes the session
+       * addressable before the host has answered - and it is named after the
+       * provider, because the scheme is how every other client decides which
+       * provider a session belongs to.
+       *
+       * A session created as `ahp-session:/<uuid>` was one no other client
+       * could open: the host echoes the creator's name into its catalogue, and
+       * VS Code's window read the scheme, found no provider called
+       * `ahp-session`, and drew the row without ever loading its conversation.
+       */
+      const resource = `${provider}:/${randomUUID()}`;
       // The channel *is* the new session's URI. `createSession` reads as a
       // root command and is not one: sending it to `ahp-root://` with the URI
       // beside it named a parameter the host has nothing called, so the
