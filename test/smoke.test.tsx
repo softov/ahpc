@@ -1423,13 +1423,21 @@ describe('the composer is the front door', () => {
      * fails. It depends on how loaded the machine is, which is why this failed
      * about one run in four and passed every time it was looked at.
      */
+    /*
+     * Written on every poll, not once.
+     *
+     * This test drives the store by hand while the controller is still
+     * following the host: any catalogue read the host answers puts the
+     * fixture's own status back, and whether one is in flight at this moment
+     * depends on how loaded the machine is. Re-applying is what makes the
+     * assertion about the caption following the store rather than about
+     * winning a race with a refresh.
+     */
     await m.host.flush?.();
-    for (let i = 0; i < 4; i++) await m.t.settle();
-
-    // What the controller does when the host says something moved, without
-    // going anywhere: the same session, in a state it was not in before.
-    writeSessions(m.t.app.store, [{ ...record, status: SessionFlag.Error }]);
-    await until(m, () => m.t.getAllByText('error').length > 0);
+    for (let i = 0; i < 40 && m.t.getAllByText('error').length === 0; i++) {
+      writeSessions(m.t.app.store, [{ ...record, status: SessionFlag.Error }]);
+      await m.t.settle();
+    }
 
     expect(m.t.getAllByText('error').length).toBeGreaterThan(0);
     await m.t.unmount();

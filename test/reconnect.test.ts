@@ -264,7 +264,7 @@ class Scripted {
     }
     if (method === 'createSession') { await reply(null); return; }
     if (method === 'resourceResolve') { await reply(this.resolveWith); return; }
-    if (method.startsWith('resource')) { await reply({}); return; }
+    if (method !== undefined && method.startsWith('resource')) { await reply({}); return; }
     if (method === 'ping') { await reply(null); return; }
     // `unsubscribe` and `dispatchAction` are notifications: recorded above,
     // and answered with the silence the protocol asks for.
