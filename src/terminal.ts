@@ -24,6 +24,19 @@ export interface Terminals {
   read(uri: string): void;
   /** Send what was typed. Nothing comes back but what the shell says. */
   write(data: string): void;
+  /**
+   * Say how big the terminal is being drawn.
+   *
+   * Sent on opening one and whenever the size changes. A host that is never
+   * told wraps its output at its own default, so a wide terminal shows lines
+   * broken at eighty columns and a narrow one shows them running off.
+   * Repeats are dropped: a resize event per frame is a dispatch per frame.
+   */
+  resize(cols: number, rows: number): void;
+  /** Empty the scrollback of the open one. */
+  clear(): void;
+  /** Rename the open one. */
+  rename(title: string): void;
   /** Kill the open one and read whatever is left. */
   close(): Promise<void>;
   /** Let go of the subscription. */
@@ -33,6 +46,8 @@ export interface Terminals {
 export function createTerminals(app: TextUIApp, host: HostConnection, report: (error: unknown) => void): Terminals {
   /** The one being read. Closed and replaced, never two at once. */
   let watching: { uri: string; close(): void } | undefined;
+  /** The last size reported, so an unchanged one is not reported again. */
+  let sized = '';
 
   const list = async (): Promise<TerminalRow[]> => {
     try {
@@ -73,6 +88,30 @@ export function createTerminals(app: TextUIApp, host: HostConnection, report: (e
       const uri = app.store.get<string>(OPEN_TERMINAL);
       if (!uri) return;
       host.writeTerminal(uri, data);
+    },
+
+    resize: (cols, rows) => {
+      const uri = app.store.get<string>(OPEN_TERMINAL);
+      if (!uri) return;
+      // The same size again is not a resize. A screen re-renders for reasons
+      // that have nothing to do with its width, and every one of them would
+      // otherwise be a dispatch.
+      const at = `${uri} ${String(cols)}x${String(rows)}`;
+      if (at === sized) return;
+      sized = at;
+      host.resizeTerminal(uri, cols, rows);
+    },
+
+    clear: () => {
+      const uri = app.store.get<string>(OPEN_TERMINAL);
+      if (!uri) return;
+      host.clearTerminal(uri);
+    },
+
+    rename: (title) => {
+      const uri = app.store.get<string>(OPEN_TERMINAL);
+      if (!uri) return;
+      host.renameTerminal(uri, title);
     },
 
     close: async () => {

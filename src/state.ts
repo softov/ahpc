@@ -33,6 +33,14 @@ export const CHANGES = '$/chat/conv/changes' as BindingPath;
  * cache. Read when a panel that shows them opens.
  */
 export const CUSTOMIZATIONS = '$/chat/conv/customizations' as BindingPath;
+/**
+ * Who else is in the open session.
+ *
+ * Host-kept membership from `SessionState.activeClients`, including this
+ * client, which adds itself on opening the view. A session nobody else is in
+ * is the ordinary case and shows nothing.
+ */
+export const PRESENT = '$/chat/conv/present' as BindingPath;
 /** Which file of the changeset is open, by uri. Null is the list. */
 export const OPEN_FILE = '$/chat/conv/file' as BindingPath;
 /**
@@ -341,6 +349,9 @@ export function applyEvent(store: ReactiveStore, event: HostEvent, model: Turn[]
       // The host's list, replacing whatever this client last read. It is the
       // authority: a switch is answered there, and a server signs in there.
       store.set(CUSTOMIZATIONS, event.items);
+      return model;
+    case 'present':
+      store.set(PRESENT, event.clients);
       return model;
     case 'status':
       writeStatus(store, event.status);

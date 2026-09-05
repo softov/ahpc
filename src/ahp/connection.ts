@@ -124,6 +124,20 @@ export interface HostConnection {
   watchTerminal(uri: string, observer: (state: TerminalState) => void): { close(): void };
   /** Send input. Nothing comes back but what the shell says. */
   writeTerminal(uri: string, data: string): void;
+  /**
+   * Tell the host how big this client is drawing the terminal.
+   *
+   * `terminal-channel.md` lists `terminal/resized` among the client-dispatched
+   * actions and its reducer sets `cols` and `rows`. A host never told wraps
+   * its output at a width nobody chose.
+   */
+  resizeTerminal(uri: string, cols: number, rows: number): void;
+  /** Empty the scrollback. `terminal/cleared` resets `content` to nothing. */
+  clearTerminal(uri: string): void;
+  /** Rename it. `terminal/titleChanged` sets `title`. */
+  renameTerminal(uri: string, title: string): void;
+  /** Take it, or give it up. `terminal/claimed` sets `claim`. */
+  claimTerminal(uri: string, claim: string | null): void;
 
   /**
    * What the host offers to complete what is being typed.
@@ -427,6 +441,14 @@ export type HostEvent =
    * did nothing.
    */
   | { type: 'customizations'; items: Customization[] }
+  /**
+   * Who else is in this session, as the host has it.
+   *
+   * `SessionState.activeClients` is host-kept membership: a client adds itself
+   * with `session/activeClientSet` and the host removes it when the last
+   * subscription goes. Two people on one session is the case this exists for.
+   */
+  | { type: 'present'; clients: { clientId: string; displayName?: string }[] }
   | { type: 'status'; status: number }
   | { type: 'changes'; changes: Changeset }
   /**

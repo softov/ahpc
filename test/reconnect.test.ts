@@ -1529,3 +1529,85 @@ describe('the draft is the host\'s, not this screen\'s', () => {
     await host.close();
   });
 });
+
+describe('the client says it is here, and how wide it is drawing', () => {
+  const dispatched = (scripted: Scripted, type: string): Record<string, unknown> | undefined =>
+    scripted.asked.filter((frame) => frame.method === 'dispatchAction')
+      .map((frame) => frame.params?.action as Record<string, unknown>)
+      .find((action) => action?.type === type);
+
+  it('adds itself to the session it opens', async () => {
+    const { host, scripted } = await connect();
+    scripted.states.set(SESSION, { defaultChat: CHAT, chats: [] });
+    scripted.states.set(CHAT, { turns: [] });
+
+    host.subscribe(SESSION as never, () => undefined);
+    await settle();
+
+    // Host-kept membership: the client adds itself, the host removes it when
+    // the last subscription goes. `tools` is required and empty - this client
+    // contributes none, and absent is not the same answer.
+    const sent = dispatched(scripted, 'session/activeClientSet');
+    expect((sent?.activeClient as Record<string, unknown>)?.clientId).toBe('ahpc-test');
+    expect((sent?.activeClient as Record<string, unknown>)?.tools).toEqual([]);
+
+    await host.close();
+  });
+
+  it('reports who else the host says is there', async () => {
+    const { host, scripted } = await connect();
+    scripted.states.set(SESSION, {
+      defaultChat: CHAT,
+      chats: [],
+      activeClients: [
+        { clientId: 'ahpc-test', displayName: 'ahpc', tools: [] },
+        { clientId: 'somebody', displayName: 'VS Code', tools: [] },
+      ],
+    });
+    scripted.states.set(CHAT, { turns: [] });
+
+    const seen: HostEvent[] = [];
+    host.subscribe(SESSION as never, (event) => seen.push(event));
+    await settle();
+
+    const present = seen.find((event) => event.type === 'present');
+    expect(present?.type === 'present' ? present.clients.map((one) => one.displayName) : [])
+      .toEqual(['ahpc', 'VS Code']);
+
+    await host.close();
+  });
+
+  it('tells the host the terminal size, and the four actions it never sent', async () => {
+    const { host, scripted } = await connect();
+    const uri = 'ahp-terminal:/t1';
+    scripted.states.set(uri, { title: 'bash', content: [] });
+
+    host.resizeTerminal(uri, 132, 40);
+    host.clearTerminal(uri);
+    host.renameTerminal(uri, 'build');
+    host.claimTerminal(uri, 'ahpc');
+    await settle();
+
+    // `terminal-channel.md` lists all four among the client-dispatched set.
+    const resized = dispatched(scripted, 'terminal/resized');
+    expect(resized).toMatchObject({ cols: 132, rows: 40 });
+    expect(dispatched(scripted, 'terminal/cleared')).toBeTruthy();
+    expect(dispatched(scripted, 'terminal/titleChanged')).toMatchObject({ title: 'build' });
+    expect(dispatched(scripted, 'terminal/claimed')).toMatchObject({ claim: 'ahpc' });
+
+    await host.close();
+  });
+
+  it('gives a terminal up with the same action and nothing in it', async () => {
+    const { host, scripted } = await connect();
+    host.claimTerminal('ahp-terminal:/t1', null);
+    await settle();
+
+    const sent = dispatched(scripted, 'terminal/claimed');
+    // The reducer sets `claim` either way, so releasing is this action
+    // carrying nothing rather than a second action.
+    expect(sent).not.toHaveProperty('claim');
+
+    await host.close();
+  });
+});

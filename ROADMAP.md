@@ -16,33 +16,6 @@ specification is what this client follows.
 
 ---
 
-# Batch 3 - Presence and the terminal
-
-## B-01-12 - `session/activeClientSet`
-
-**Clause.** `SessionState.activeClients` and its declaration: membership is host-managed, clients add or refresh themselves with `session/activeClientSet`, and the host removes them on unsubscribe. The reference client sends it on `createSession` as `activeClient`, with its `clientId` and its tools.
-
-**Missing.** Never dispatched, so this client never appears in another client's `activeClients` and the header shows nobody.
-
-**Steps.**
-1. Dispatch on opening a session view, and pass `activeClient` on `createSession`.
-2. Draw the session's `activeClients` in the header.
-3. Test: the dispatch on open, and the header after the list changes.
-
-## B-01-11 - The four terminal actions
-
-**Clause.** `terminal-channel.md:84` lists the client-dispatchable set: `terminal/input`, `terminal/resized`, `terminal/claimed`, `terminal/titleChanged`, `terminal/cleared`. `terminal-channel.md:120-125` gives each one's reduction: `resized` sets `cols`/`rows`, `claimed` sets `claim`, `titleChanged` sets `title`, `cleared` resets `content`. `terminal-channel.md:114`: clients MUST check `supportsCommandDetection` before relying on command boundaries.
-
-**Missing.** Only `terminal/input` is dispatched, so the host is never told how wide this client draws and output wraps at a width nobody chose.
-
-**Steps.**
-1. Dispatch `terminal/resized` on mount and on every resize.
-2. Commands for clear, rename and claim.
-3. Check `supportsCommandDetection` before drawing anything derived from command boundaries.
-4. Test: the frame on mount and on a size change.
-
----
-
 # Batch 4 - Resources, both directions
 
 The `resource*` family is symmetrical. This client serves none of it and sends

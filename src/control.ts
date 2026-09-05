@@ -1522,6 +1522,36 @@ function commands(
       run: () => { controller.terminals.write('\u0003'); },
     },
     {
+      id: 'terminal.clear',
+      title: 'Clear terminal',
+      category: 'Terminal',
+      description: 'Empty the scrollback of the open terminal',
+      slots: ['palette'],
+      when: OPEN_TERMINAL,
+      // The host's own action, not a screen wiping what it drew: every client
+      // watching this terminal sees it emptied, which is what `terminal/cleared`
+      // resetting `content` means.
+      run: () => { controller.terminals.clear(); },
+    },
+    {
+      id: 'terminal.rename',
+      title: 'Rename terminal',
+      category: 'Terminal',
+      description: 'Give the open terminal a name',
+      slots: ['palette'],
+      when: OPEN_TERMINAL,
+      args: [{
+        name: 'title',
+        type: 'string' as const,
+        required: true,
+        description: 'What to call it',
+      }],
+      run: (args: Record<string, unknown>) => {
+        const title = String(args.title ?? '').trim();
+        if (title) controller.terminals.rename(title);
+      },
+    },
+    {
       id: 'terminal.close',
       title: 'Close this terminal',
       category: 'Terminal',

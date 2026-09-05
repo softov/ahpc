@@ -1742,6 +1742,28 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
       } catch (error) { options.onRefusal?.(uri, reason(error)); }
     },
 
+    resizeTerminal: (uri, cols, rows) => {
+      try { client.dispatch(uri, { type: 'terminal/resized', cols, rows }); }
+      catch (error) { options.onRefusal?.(uri, reason(error)); }
+    },
+
+    clearTerminal: (uri) => {
+      try { client.dispatch(uri, { type: 'terminal/cleared' }); }
+      catch (error) { options.onRefusal?.(uri, reason(error)); }
+    },
+
+    renameTerminal: (uri, title) => {
+      try { client.dispatch(uri, { type: 'terminal/titleChanged', title }); }
+      catch (error) { options.onRefusal?.(uri, reason(error)); }
+    },
+
+    claimTerminal: (uri, claim) => {
+      // Null gives it up. The reducer sets `claim` either way, so releasing is
+      // the same action with nothing in it rather than a second one.
+      try { client.dispatch(uri, { type: 'terminal/claimed', ...(claim === null ? {} : { claim }) }); }
+      catch (error) { options.onRefusal?.(uri, reason(error)); }
+    },
+
     completions: async ({ channel, text, offset }) => {
       try {
         const result = await client.request('completions', {
@@ -1880,6 +1902,22 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
         observer(event);
       };
 
+      /** Who the host says is in this session, so an unchanged list is not re-sent. */
+      let present = '';
+      const here = (): void => {
+        const clients = list(session.activeClients).map((one) => {
+          const found = bag(one);
+          return {
+            clientId: str(found.clientId) ?? '',
+            ...(str(found.displayName) ? { displayName: str(found.displayName) as string } : {}),
+          };
+        });
+        const now = JSON.stringify(clients);
+        if (now === present) return;
+        present = now;
+        if (live) observer({ type: 'present', clients });
+      };
+
       /** The chat channel, once the session has said which one it is. */
       let talking: { release(): void } | undefined;
       /**
@@ -1967,6 +2005,24 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
         const held = channels.open(uri, {
           opened: (fresh) => {
             if (fresh) session = fresh;
+            /*
+             * Say this client is here.
+             *
+             * `SessionState.activeClients` is host-kept: a client adds or
+             * refreshes itself with `session/activeClientSet` and the host
+             * removes it when the last subscription goes, which this client
+             * now sends. Without it two people on one session cannot see each
+             * other, which is most of the reason a sessions server exists
+             * rather than a local agent.
+             *
+             * `tools` is empty and required: this client contributes none,
+             * and an absent list is not the same answer as an empty one.
+             */
+            client.dispatch(uri, {
+              type: 'session/activeClientSet',
+              activeClient: { clientId, displayName: 'ahpc', tools: [] },
+            });
+            here();
             chatsChanged();
             followChat();
             emit();
@@ -1978,6 +2034,7 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
             // session's, they change for reasons that have nothing to do with a
             // turn, and a panel that only re-read when it was opened showed a
             // switch that had been answered as though it had not.
+            here();
             const items = customizations(session.customizations);
             const now = JSON.stringify(items);
             if (now !== contributed) {

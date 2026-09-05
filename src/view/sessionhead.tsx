@@ -29,6 +29,14 @@ export interface ChatSessionHeadProps extends BoxProps {
   chat?: string | null;
   /** The settings in force, by the host's own labels. */
   settings?: { label: string; value: string }[];
+  /**
+   * Who else the host says is in this session.
+   *
+   * This client is in the list too - it adds itself on opening the view - so
+   * a session with nobody else in it has one entry and says nothing, which is
+   * the ordinary case.
+   */
+  present?: { clientId: string; displayName?: string }[];
 }
 
 /**
@@ -49,7 +57,7 @@ function when(iso: string | undefined): string {
 
 export const ChatSessionHead: (props: ChatSessionHeadProps) => RenderOutput =
   defineComponent<ChatSessionHeadProps>('ChatSessionHead', (props) => {
-    const { session, model, chat, settings = [], ...rest } = props;
+    const { session, model, chat, settings = [], present = [], ...rest } = props;
     const theme = useTheme();
     const status = decodeStatus(session.status);
     const started = when(session.createdAt);
@@ -75,6 +83,15 @@ export const ChatSessionHead: (props: ChatSessionHeadProps) => RenderOutput =
       // cannot see at all: it looks like the whole thing.
       { label: 'Session', value: session.resource },
       ...(chat ? [{ label: 'Chat', value: chat }] : []),
+      // Only when somebody else is here. One entry is this client, and a row
+      // saying you are the person reading it is a row that tells nobody
+      // anything.
+      ...(present.length > 1
+        ? [{
+          label: 'Here',
+          value: present.map((one) => one.displayName ?? one.clientId).join(`  ${theme.glyphs.separator}  `),
+        }]
+        : []),
     ].filter((row) => row.value !== '');
 
     return (

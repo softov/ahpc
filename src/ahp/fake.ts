@@ -124,6 +124,11 @@ interface Shell {
   /** Input not yet ending in a newline, which a shell has not seen either. */
   pending: string;
   exitCode?: number;
+  /** What the client last said it was drawing at, per `terminal/resized`. */
+  cols?: number;
+  rows?: number;
+  /** Who is holding it, per `terminal/claimed`. */
+  claim?: string | null;
   watchers: Set<(state: TerminalState) => void>;
 }
 
@@ -1427,6 +1432,35 @@ export function fakeHost(): FakeHost {
       held.watchers.add(observer);
       observer(shellState(uri, held));
       return { close: () => { held.watchers.delete(observer); } };
+    },
+
+    resizeTerminal: (uri, cols, rows) => {
+      const held = shells.get(uri);
+      if (!held) return;
+      held.cols = cols;
+      held.rows = rows;
+      for (const watcher of held.watchers) watcher(shellState(uri, held));
+    },
+
+    clearTerminal: (uri) => {
+      const held = shells.get(uri);
+      if (!held) return;
+      held.output = '';
+      for (const watcher of held.watchers) watcher(shellState(uri, held));
+    },
+
+    renameTerminal: (uri, title) => {
+      const held = shells.get(uri);
+      if (!held) return;
+      held.title = title;
+      for (const watcher of held.watchers) watcher(shellState(uri, held));
+    },
+
+    claimTerminal: (uri, claim) => {
+      const held = shells.get(uri);
+      if (!held) return;
+      held.claim = claim;
+      for (const watcher of held.watchers) watcher(shellState(uri, held));
     },
 
     writeTerminal: (uri, data) => {

@@ -23,7 +23,7 @@ import { branchName, branchDrift,
   ARCHIVED, AUTOMATIONS, AUTOMATION_ROW, CHANGES, CUSTOMIZATIONS, DRAFT, EXPANDED, FILTER, FOCUS, HISTORY, HOST, INPUT,
   CHANGE_AT, CHANGE_ROW, CHANGE_SCOPES, FILES_AT, FILES_ENTRIES, FILES_OPEN,
   MODEL, MODEL_CONFIG, OPEN, OPEN_FILE, CHAT_URI, PROVIDER, QUEUE, SELECTED, SESSIONS, SETTINGS, SIDEBAR,
-  CHATS, OPEN_TERMINAL, SPLIT_AT, SPLIT_DEFAULT, TERMINAL, TERMINALS, TURNS, WORKSPACE,
+  CHATS, OPEN_TERMINAL, PRESENT, SPLIT_AT, SPLIT_DEFAULT, TERMINAL, TERMINALS, TURNS, WORKSPACE,
   openSession, visibleSessions, workspaceName,
 } from './state.js';
 import type { HostState } from './state.js';
@@ -395,6 +395,23 @@ export const TerminalScreen: (props: Record<string, never>) => RenderOutput =
     const open = useStoreValue<string | null>(OPEN_TERMINAL, null) ?? null;
     const state = useStoreValue<TerminalState | null>(TERMINAL, null);
     const [draft, setDraft] = useState('');
+    const size = useSize();
+
+    /*
+     * Tell the host how wide this is being drawn.
+     *
+     * `terminal-channel.md` has `terminal/resized` among the actions a client
+     * dispatches, and its reducer sets `cols` and `rows`. A host never told
+     * wraps at its own default - eighty columns on a terminal twice that,
+     * which looks like the shell being wrong rather than like nobody having
+     * said. Sent whenever the size or the open terminal changes; the
+     * controller drops a repeat, so a re-render for any other reason costs
+     * nothing.
+     */
+    useEffect(() => {
+      if (open === null) return;
+      controller.terminals.resize(size.width, size.height);
+    }, [open, size.width, size.height]);
 
     // Asked for on arrival, and only then: a host with no terminals is the
     // ordinary case, and a list polled behind a screen nobody is looking at is
@@ -625,6 +642,7 @@ export const ChatScreen: (props: Record<string, never>) => RenderOutput =
     useStoreSubtree(SESSIONS);
     const session = openSession(app.store);
     const model = useStoreValue<string>(MODEL, '') ?? '';
+    const present = useStoreValue<{ clientId: string; displayName?: string }[]>(PRESENT, []) ?? [];
     const chat = useStoreValue<string | null>(CHAT_URI, null) ?? null;
     const running = turns.some((turn) => turn.state === 'running');
     /*
@@ -662,6 +680,7 @@ export const ChatScreen: (props: Record<string, never>) => RenderOutput =
         {session ? (
           <ChatSessionHead
             session={session}
+            present={present}
             {...(model ? { model } : {})}
             {...(chat ? { chat } : {})}
             settings={chats.length > 1
