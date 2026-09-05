@@ -109,12 +109,13 @@ a host serves everything ahpd serves.
 3. A `--record <file>` flag on `ahpc` writing its own frames, so a capture can be made from a session rather than borrowed.
 4. Fix whatever it finds.
 
----
+## B-01-10 - Writing to the host's filesystem
 
-# Open questions
+**Missing.** `resourceWrite`, `resourceDelete`, `resourceMkdir`, `resourceMove`, `resourceCopy` and `resourceResolve`, at every layer. `resourceList`, `resourceRead` and `resourceRequest` are served, so the browser is a viewer and the grant negotiation this client implements is negotiating for a capability nothing uses.
 
-Answers change what gets built. Everything above is settled.
-
-**B-01-10, the writable filesystem.** `resourceList`, `resourceRead` and `resourceRequest` are served; `resourceWrite`, `resourceDelete`, `resourceMkdir`, `resourceMove`, `resourceCopy` and `resourceResolve` are not. The grant negotiation this client already implements is negotiating for a capability nothing here uses. Whether the file browser should become an editor is a product question, not a protocol one.
-
-**B-01-17, serving a resource to a host.** AHP is symmetrical and this client answers `-32601` to everything a host asks, which is conformant. Serving anything means deciding what, and a client that serves its filesystem to any host it connects to is a mistake rather than a feature. Nothing wants it yet.
+**Plan.**
+1. All six on `HostConnection`, `fake.ts` and `live.ts`.
+2. `ahpc resource write|rm|mkdir|mv|cp|stat`.
+3. Read-modify-write carries `resourceResolve`'s `etag` as `ifMatch`, and `-32011` is drawn as the conflict it is rather than a generic failure.
+4. Rename, delete and new-file keys in the browser, behind the write grant, each asking the operation's own confirmation and the grant separately.
+5. Test: a scripted host refusing on a stale `ifMatch`, and one refusing the grant.
