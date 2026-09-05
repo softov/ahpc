@@ -763,3 +763,69 @@ describe('a channel is not let go the instant a screen closes', () => {
     await host.close();
   });
 });
+
+describe('reading a snapshot and opening the view do not let go in between', () => {
+  it('sends no unsubscribe between the detail read and the subscription', async () => {
+    let scripted!: Scripted;
+    const open = async (): Promise<AhpTransport> => {
+      const [mine, theirs] = InMemoryTransport.pair();
+      scripted = new Scripted(theirs);
+      return mine;
+    };
+    const host = await liveHost({
+      url: 'ws://scripted', clientId: 'ahpc-test', connect: open,
+      backoff: [0], keepaliveMs: 0, lingerMs: 5_000,
+    });
+    scripted.states.set(SESSION, { defaultChat: CHAT, chats: [] });
+    scripted.states.set(CHAT, { turns: [] });
+
+    // What opening a session does: read what the host says about it, then
+    // watch it. The reference host evicts a session when its last subscriber
+    // leaves, so an `unsubscribe` in this gap is the session being torn down
+    // and rebuilt underneath the view that is about to ask for it.
+    await host.detail(SESSION as never);
+    const view = host.subscribe(SESSION as never, () => undefined);
+    await settle();
+
+    expect(scripted.timesAsked('unsubscribe', SESSION)).toBe(0);
+
+    view.close();
+    await host.close();
+  });
+
+  it('tries again when a session that was refused is opened on purpose', async () => {
+    let scripted!: Scripted;
+    const open = async (): Promise<AhpTransport> => {
+      const [mine, theirs] = InMemoryTransport.pair();
+      scripted = new Scripted(theirs);
+      scripted.refuse.set(SESSION, 'Resource not found: ' + SESSION);
+      return mine;
+    };
+    const host = await liveHost({
+      url: 'ws://scripted', clientId: 'ahpc-test', connect: open,
+      backoff: [0], keepaliveMs: 0, lingerMs: 0,
+    });
+
+    const one = host.subscribe(SESSION as never, () => undefined);
+    await settle();
+    one.close();
+    await settle();
+    const refusals = scripted.timesAsked('subscribe', SESSION);
+
+    // The host has changed its mind - which is what a momentary eviction is.
+    scripted.refuse.delete(SESSION);
+    scripted.states.set(SESSION, { defaultChat: CHAT, chats: [] });
+    scripted.states.set(CHAT, { turns: [] });
+
+    const seen: HostEvent[] = [];
+    const two = host.subscribe(SESSION as never, (event) => seen.push(event));
+    await settle();
+
+    // Asked again rather than replaying the refusal it remembered.
+    expect(scripted.timesAsked('subscribe', SESSION)).toBeGreaterThan(refusals);
+    expect(seen.some((event) => event.type === 'snapshot')).toBe(true);
+
+    two.close();
+    await host.close();
+  });
+});

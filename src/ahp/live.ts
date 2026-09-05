@@ -1724,6 +1724,20 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
         closers.push(() => talking?.release());
       };
 
+      /*
+       * Opening a session is somebody asking, so a refusal is not inherited.
+       *
+       * What is remembered is remembered so that *moving the highlight* does
+       * not re-ask a hundred times - and that path reads snapshots rather
+       * than opening views. A person pressing enter on a row has asked, and
+       * some of what a host refuses is momentary: a session it was evicting
+       * when the last question arrived answers the next one.
+       */
+      channels.forget(uri);
+      const previous = chats.get(uri);
+      if (previous !== undefined) channels.forget(previous);
+      if (wanted !== undefined) channels.forget(wanted);
+
       const known = channels.refusal(uri);
       if (known !== undefined) {
         queueMicrotask(() => { if (live) observer({ type: 'error', message: known }); });

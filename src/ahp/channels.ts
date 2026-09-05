@@ -305,27 +305,35 @@ export function openChannels(options: ChannelsOptions): Channels {
     state: async (uri) => {
       const known = refused.get(uri);
       if (known !== undefined) return null;
-      const existing = held.get(uri);
-      // Already being watched: subscribing again would be a second answer to a
-      // question somebody is already holding open.
-      if (existing && existing.uses > 0) {
-        try {
-          const { result } = await client.subscribe(uri);
-          return bag(result.snapshot?.state);
-        }
-        catch (error) { refuse(uri, options.reason(error)); return null; }
-      }
+      /*
+       * A read is a hold that is given up straight away, not a subscribe
+       * followed by an unsubscribe.
+       *
+       * The difference is what the host sees. Reading a session's snapshot
+       * and then opening the view on it are a moment apart, and releasing the
+       * first the instant it is done puts an `unsubscribe` between them - at
+       * which point a host that evicts on the last subscriber leaving is
+       * restoring the session from disk exactly as the view asks for it. Going
+       * through the same counting and the same pause as any other reader means
+       * the two coalesce into one subscription and nothing is let go in the
+       * middle.
+       */
+      const channel = entry(uri);
+      clearTimeout(channel.leaving);
+      channel.leaving = undefined;
+      channel.uses += 1;
       try {
         const { result } = await client.subscribe(uri);
-        const state = bag(result.snapshot?.state);
-        // Nobody asked to keep it. Releasing it is the difference between a
-        // read and a watch the host has to go on serving forever.
-        if (!held.has(uri)) void client.unsubscribe(uri).catch(() => undefined);
-        return state;
+        channel.opened = true;
+        return bag(result.snapshot?.state);
       }
       catch (error) {
         refuse(uri, options.reason(error));
         return null;
+      }
+      finally {
+        channel.uses -= 1;
+        if (channel.uses === 0) drop(uri);
       }
     },
 
