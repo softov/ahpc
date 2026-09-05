@@ -1031,3 +1031,96 @@ describe('one channel is asked for once, however many readers want it', () => {
     await host.close();
   });
 });
+
+describe('a model is read as the catalogue sends it', () => {
+  const thinking = (levels: string[], labels: string[], fallback?: string): Record<string, unknown> => ({
+    type: 'object',
+    properties: {
+      thinkingLevel: {
+        type: 'string',
+        title: 'Thinking Level',
+        description: 'Controls how much reasoning effort Claude uses.',
+        enum: levels,
+        enumLabels: labels,
+        ...(fallback === undefined ? {} : { default: fallback }),
+      },
+    },
+  });
+
+  async function catalogue(): Promise<Awaited<ReturnType<typeof liveHost>>> {
+    const open = async (): Promise<AhpTransport> => {
+      const [mine, theirs] = InMemoryTransport.pair();
+      const scripted = new Scripted(theirs);
+      scripted.states.set(ROOT, {
+        agents: [{
+          provider: 'claude',
+          displayName: 'Claude Code',
+          models: [
+            {
+              id: 'opus[1m]',
+              name: 'Opus',
+              provider: 'claude',
+              configSchema: thinking(
+                ['low', 'medium', 'high', 'xhigh', 'max'],
+                ['Low', 'Medium', 'High', 'Extra High', 'Max'],
+                'high',
+              ),
+            },
+            // One level, and not the one anything defaults to - so the host
+            // sends no `default` at all.
+            { id: 'haiku', name: 'Haiku', provider: 'claude', configSchema: thinking(['low'], ['Low']) },
+            // None: no schema, rather than an empty one.
+            { id: 'sonnet', name: 'Sonnet', provider: 'claude' },
+            // What a host that has not filled the required field in yet
+            // sends. It was missing until recently, and every row of it is
+            // still a model this client has to be able to read.
+            { id: 'default', name: 'Default (recommended)' },
+          ],
+        }],
+        terminals: [],
+      });
+      return mine;
+    };
+    const host = await liveHost({
+      url: 'ws://scripted', clientId: 'ahpc-test', connect: open, backoff: [0], keepaliveMs: 0,
+    });
+    await settle();
+    return host;
+  }
+
+  it('takes the name, the provider and the levels the host named', async () => {
+    const host = await catalogue();
+    const [agent] = await host.agents();
+    const models = agent?.models ?? [];
+
+    // `name`, not the agent's `displayName` - a host's ids are things like
+    // `opus[1m]`.
+    expect(models.map((one) => one.displayName)).toEqual(['Opus', 'Haiku', 'Sonnet', 'Default (recommended)']);
+    // Required by the protocol, and the agent's own where a host left it out.
+    expect(models.every((one) => one.provider === 'claude')).toBe(true);
+
+    // The host's words, by position. Nothing here keeps a list of its own.
+    const levels = models[0]?.options?.[0];
+    expect(levels?.title).toBe('Thinking Level');
+    expect(levels?.values.map((one) => one.label))
+      .toEqual(['Low', 'Medium', 'High', 'Extra High', 'Max']);
+    expect(levels?.default).toBe('high');
+
+    await host.close();
+  });
+
+  it('leaves a level nobody defaulted to without one', async () => {
+    const host = await catalogue();
+    const models = (await host.agents())[0]?.models ?? [];
+
+    // The case a form that fills the gap in from the top of the list gets
+    // wrong: one choice, and the host named no default among it.
+    expect(models[1]?.options?.[0]?.values.map((one) => one.value)).toEqual(['low']);
+    expect(models[1]?.options?.[0]?.default).toBeUndefined();
+    // And a model whose harness reported no levels carries no schema, which
+    // is not the same as carrying an empty one.
+    expect(models[2]?.options).toBeUndefined();
+
+    await host.close();
+  });
+});

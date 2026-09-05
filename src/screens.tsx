@@ -94,7 +94,21 @@ function describe(session: SessionSummary, detail: SessionDetail | null): Detail
     { id: 'activity', label: 'Doing', value: session.activity ?? detail?.activity ?? '', absent: 'nothing it says' },
     { id: 'flags', label: 'Flags', value: [status.read ? 'read' : 'unread', status.archived ? 'archived' : ''].filter(Boolean).join(', ') },
     { id: 'provider', label: 'Harness', value: session.provider },
-    { id: 'model', label: 'Model', value: detail?.model ?? '', absent: 'nothing said yet' },
+    { id: 'model', label: 'Model', value: detail?.model?.displayName ?? '', absent: 'nothing said yet' },
+    // What this model takes, which is not what the harness takes. Three of
+    // Claude's models accept five thinking levels, some accept one and some
+    // accept none, so the session-wide setting below can be a choice this
+    // model will not honour - and the only way to know was to try it.
+    ...(detail?.model?.options ?? []).map((option) => ({
+      id: `model.${option.key}`,
+      label: option.title,
+      // The host's words, positionally. Three implementations spell these
+      // five values three ways, and a client with its own list is one that
+      // disagrees with whichever host it is talking to.
+      value: option.values
+        .map((one) => (one.value === option.default ? `${one.label} (default)` : one.label))
+        .join(', '),
+    })),
     // The host's own questions, in the host's own order. Naming them here is
     // how the pane came to show a blank "Permissions" against a host whose key
     // for it is `autoApprove`.

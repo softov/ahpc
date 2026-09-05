@@ -496,7 +496,10 @@ export function createController(
         if (app.store.get<SessionUri>(OPEN) !== uri) return;
         app.store.set(SETTINGS, detail.config.values);
         app.store.set(CHAT_URI, detail.chat);
-        if (detail.model) app.store.set(MODEL, detail.model);
+        // The id, which is what a turn rides on and what the picker matches
+        // against. The name beside it is the catalogue's, and resolving it is
+        // the chip's job rather than something to store a second copy of.
+        if (detail.model) app.store.set(MODEL, detail.model.id);
         offer(detail.config, uri);
       }).catch(failed);
     },

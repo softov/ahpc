@@ -5,7 +5,7 @@ import type {
   Agent, Answer, Automation, AutomationRun, Changeset, ChangesetOperation, ChangesetOperationTarget, Completion, ConfigProperty, ContentRef, Customization, CustomizationKind,
   TerminalRow, TerminalState,
   FileContent, FileEdit, McpState, PendingInput, QueuedMessage, Question, QuestionKind,
-  ResponsePart, SessionConfig, SessionDetail, SessionSummary, SessionUri, ToolCall,
+  ModelRow, ResponsePart, SessionConfig, SessionDetail, SessionSummary, SessionUri, ToolCall,
   ToolCallStatus, Turn,
 } from './types.js';
 import { SessionFlag } from './types.js';
@@ -666,9 +666,33 @@ function config(value: unknown): SessionConfig {
           ...(str(descriptions[index]) ? { description: str(descriptions[index]) as string } : {}),
         })),
         sessionMutable: property.sessionMutable === true,
+        ...(str(property.default) ? { default: str(property.default) as string } : {}),
       };
     }),
     values: Object.fromEntries(Object.entries(values).map(([key, entry]) => [key, String(entry)])),
+  };
+}
+
+/**
+ * One model, wherever it appears.
+ *
+ * `configSchema` is a schema on its own rather than the `{ schema, values }`
+ * a session's config arrives as, so it is wrapped rather than read a second
+ * way - it is the same document, and a second decoder for it would be a
+ * second set of rules about `enumLabels`.
+ */
+function model(value: unknown): ModelRow {
+  const found = bag(value);
+  const options = config({ schema: found.configSchema }).properties;
+  return {
+    id: str(found.id) ?? '',
+    // `name`, which is what `SessionModelInfo` calls the readable one -
+    // reading `displayName` here (the *agent's* field) meant every model fell
+    // through to its id, and a host's ids are things like
+    // `claude-sonnet-4-5-20250929`.
+    displayName: str(found.name) ?? str(found.displayName) ?? str(found.id) ?? '',
+    provider: str(found.provider) ?? '',
+    ...(options.length > 0 ? { options } : {}),
   };
 }
 
@@ -1012,6 +1036,28 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
     });
   }
 
+  /**
+   * A model id, resolved against what the root channel advertises.
+   *
+   * A turn names an id and nothing else, and the name, the harness and the
+   * model's own options live on the catalogue row. Unresolved is a real
+   * answer rather than a failure - a host whose harness nobody has signed
+   * into advertises no models at all - and an id that matches nothing stands
+   * in for itself rather than disappearing.
+   */
+  const known = (id: string): ModelRow => {
+    for (const entry of list(mirror.root.agents)) {
+      for (const raw of list(bag(entry).models)) {
+        const row = model(raw);
+        if (row.id !== id) continue;
+        return row.provider === ''
+          ? { ...row, provider: str(bag(entry).provider) ?? str(bag(entry).id) ?? '' }
+          : row;
+      }
+    }
+    return { id, displayName: id, provider: '' };
+  };
+
   /** The chat a session dispatches to, remembered so it is asked for once. */
   const chats = new Map<SessionUri, string>();
 
@@ -1317,10 +1363,6 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
         provider: str(agent.provider) ?? str(agent.id) ?? 'unknown',
         displayName: str(agent.displayName) ?? str(agent.provider) ?? 'Agent',
         ...(str(agent.description) ? { description: str(agent.description) as string } : {}),
-        // `name`, which is what `SessionModelInfo` calls the readable one -
-        // reading `displayName` here (the *agent's* field) meant every model
-        // fell through to its id, and a host's ids are things like
-        // `claude-sonnet-4-5-20250929`.
         // A gate, not a hint. Absent means `createChat` must not be called.
         ...(bag(agent.capabilities).multipleChats !== undefined ? { multipleChats: true } : {}),
         // The same decoder a session's list goes through, because it is the
@@ -1330,12 +1372,15 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
         ...(list(agent.customizations).length > 0
           ? { customizations: customizations(agent.customizations) }
           : {}),
+        // The provider a model row carries is required and is always the
+        // agent's own, so a host that has not filled it in yet - it was
+        // missing until recently - is read as belonging to the agent it
+        // arrived under rather than dropped for being incomplete.
         models: list(agent.models).map((raw) => {
-          const model = bag(raw);
-          return {
-            id: str(model.id) ?? '',
-            displayName: str(model.name) ?? str(model.displayName) ?? str(model.id) ?? '',
-          };
+          const row = model(raw);
+          return row.provider === ''
+            ? { ...row, provider: str(agent.provider) ?? str(agent.id) ?? '' }
+            : row;
         }),
       };
     }),
@@ -2050,7 +2095,7 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
           : str(state.lifecycle) ?? 'creating') as SessionDetail['lifecycle'],
         ...(channels.refusal(uri) !== undefined ? { refusal: channels.refusal(uri) as string } : {}),
         config: config(state.config),
-        ...(last ? { model: str(bag(bag(bag(last).message).model).id) as string } : {}),
+        ...(last ? { model: known(str(bag(bag(bag(last).message).model).id) as string) } : {}),
         ...(str(state.activity) ? { activity: str(state.activity) as string } : {}),
       };
     },

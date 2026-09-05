@@ -40,7 +40,15 @@ export interface DetailField {
 export interface SessionDetailsProps extends BoxProps {
   fields: DetailField[];
   focusId?: string;
-  /** Width of the label column. The labels are ours, so this is knowable. */
+  /**
+   * Width of the label column, where a caller wants to fix it.
+   *
+   * Left off, it is the widest label there is. It used to be a constant on
+   * the grounds that the labels were ours, and they are not: a session's
+   * settings and a model's options are named by whichever host is answering,
+   * in words this client does not choose, and the constant was one character
+   * wider than the longest label anybody had thought of.
+   */
   labelWidth?: number;
   /**
    * Take the keyboard on the frame this mounts, out of whatever holds it.
@@ -70,7 +78,11 @@ export interface SessionDetailsProps extends BoxProps {
 
 export const SessionDetails: (props: SessionDetailsProps) => RenderOutput =
   defineComponent<SessionDetailsProps>('SessionDetails', (props) => {
-    const { fields, focusId, labelWidth = 11, claim, values = 'selected', ...rest } = props;
+    const { fields, focusId, labelWidth, claim, values = 'selected', ...rest } = props;
+    // Floored at the eleven this used to be, so nothing that already fitted
+    // moves, and capped so one verbose title cannot take the pane from the
+    // values it is there to label.
+    const column = labelWidth ?? Math.min(20, Math.max(11, ...fields.map((field) => field.label.length)));
     const theme = useTheme();
     const clipboard = useClipboard();
     const focus = useFocus({ ...(focusId ? { id: focusId } : {}) });
@@ -128,7 +140,7 @@ export const SessionDetails: (props: SessionDetailsProps) => RenderOutput =
                   that moves per row is not a column. */}
               <text
                 content={field.label}
-                width={labelWidth}
+                width={column}
                 shrink={0}
                 fg="muted"
                 truncate="end"

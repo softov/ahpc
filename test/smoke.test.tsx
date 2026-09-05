@@ -1122,7 +1122,55 @@ describe('what a session actually is', () => {
     expect(t.hasText('ahp-chat:/6b21')).toBe(true);
     // The host's own wording for its own setting, not the id it stores.
     expect(t.hasText('Accept edits')).toBe(true);
-    expect(t.hasText('claude-sonnet-5')).toBe(true);
+    // The catalogue's name for it, resolved from the id a turn rides on -
+    // a host's ids are things like `claude-sonnet-4-5-20250929`.
+    expect(t.hasText('Sonnet 5')).toBe(true);
+    await t.unmount();
+  });
+
+  /**
+   * What this model takes, which is not what the harness takes.
+   *
+   * The session-wide thinking level is one setting, and the model running
+   * under it accepts some of the levels or none - so a person choosing one had
+   * no way to know whether it would be honoured except by trying it. The
+   * levels are the host's own words and are drawn in the host's own order.
+   */
+  it('says which thinking levels the model it ran on accepts', async () => {
+    const { t } = await catalogue({ width: 140, height: 30 });
+    t.app.store.set(SELECTED, 'ahp-session:/6b21');
+    await t.app.execute('session.openDetails');
+    for (let i = 0; i < 6; i++) await t.settle();
+
+    // The host's own title for its own property, alongside the settings it
+    // asks about - the pane already draws those, and a model's options are
+    // the same document in the same shape.
+    expect(t.hasText('Thinking Level')).toBe(true);
+    // Sonnet takes one level in the fixture, and the host named no default
+    // among it - so nothing is marked, rather than the first one guessed at.
+    expect(t.hasText('Medium')).toBe(true);
+    expect(t.hasText('(default)')).toBe(false);
+    await t.unmount();
+  });
+
+  /**
+   * The same rows on a terminal half as wide.
+   *
+   * Not a duplicate. The label column used to be a constant eleven on the
+   * grounds that the labels were this client's own, which stopped being true
+   * when a host's titles started arriving in it - `Thinking Level` is
+   * fourteen, and it drew as `Thinking L…` at every width there is. What has
+   * to hold on a narrow terminal is that the column grew for the label and
+   * the value is still there beside it.
+   */
+  it('names the property in full on a narrow terminal too', async () => {
+    const { t } = await catalogue({ width: 100, height: 30 });
+    t.app.store.set(SELECTED, 'ahp-session:/6b21');
+    await t.app.execute('session.openDetails');
+    for (let i = 0; i < 6; i++) await t.settle();
+
+    expect(t.hasText('Thinking Level')).toBe(true);
+    expect(t.hasText('Medium')).toBe(true);
     await t.unmount();
   });
 

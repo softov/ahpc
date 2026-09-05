@@ -91,8 +91,16 @@ export interface SessionDetail {
   chats: { resource: string; title: string }[];
   lifecycle: 'creating' | 'ready' | 'failed';
   config: SessionConfig;
-  /** What the last turn ran on. A session has no model; each message has one. */
-  model?: string;
+  /**
+   * What the last turn ran on. A session has no model; each message has one.
+   *
+   * Resolved against the catalogue rather than carried whole: a turn names an
+   * id, and the name, the harness and the options belong to the model row the
+   * root channel advertises. A host whose harness nobody has signed into
+   * advertises no models, so an id that resolves to nothing is a real answer
+   * and stands in for itself.
+   */
+  model?: ModelRow;
   activity?: string;
   /**
    * Why the host would not talk about this session, in its own words.
@@ -338,11 +346,40 @@ export interface ChangesetOperationTarget {
  * into advertises the harness and nothing to run on it. A client that treats
  * an empty list as "still loading" shows a blank panel forever.
  *
- * A model's own options - thinking level, context size - are a `configSchema`
- * on the model, in the same shape as `SessionConfig`. Nothing here reads it
- * yet, and inventing a field for it would be describing a protocol that does
- * not exist.
  */
+
+/**
+ * One model a harness offers.
+ *
+ * The same shape wherever a model appears - what the catalogue advertises and
+ * what a session says it ran on are one protocol object, and two readings of
+ * it would be two answers to "which model is this".
+ *
+ * `options` is the model's own `configSchema`, which the protocol says a
+ * client presents as a form and returns through `ModelSelection.config`. It is
+ * read and shown here and not offered as a control, because the hosts that
+ * send it do not yet consume what comes back - see the roadmap. The labels are
+ * the host's: three implementations spell the same effort levels three
+ * different ways, so a client with its own words is one that disagrees with
+ * whichever host it is connected to.
+ */
+export interface ModelRow {
+  /** What rides on a turn. */
+  id: string;
+  /** The protocol's `name`. Ids are things like `claude-sonnet-4-5-20250929`. */
+  displayName: string;
+  /**
+   * The harness it belongs to.
+   *
+   * Required by the protocol and always the enclosing agent's own, so it
+   * identifies rather than informs: worth carrying, not worth a row of its
+   * own beside a model already listed under its harness.
+   */
+  provider: string;
+  /** The model's own settings, where it has any. */
+  options?: ConfigProperty[];
+}
+
 /**
  * One thing the host offers to complete what is being typed.
  *
@@ -398,8 +435,7 @@ export interface Agent {
   provider: string;
   displayName: string;
   description?: string;
-  /** `displayName` is the protocol's `name`. The id is what rides on a turn. */
-  models: { id: string; displayName: string }[];
+  models: ModelRow[];
   /**
    * Whether this agent can hold more than one chat in a session.
    *
@@ -437,6 +473,15 @@ export interface ConfigProperty {
   description?: string;
   values: { value: string; label: string; description?: string }[];
   sessionMutable: boolean;
+  /**
+   * What the host opens with, where it said.
+   *
+   * Routinely absent, and absent is not "the first one": a model that takes a
+   * single effort level below the one its harness defaults to carries the
+   * choice and no default at all, so a form that filled the gap in from the
+   * top of the list would show a setting the host never named.
+   */
+  default?: string;
 }
 
 export interface SessionConfig {

@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { HostConnection, HostEvent } from './connection.js';
 import type {
   Agent, Answer, Automation, Changeset, ChangesetOperation, ChangesetScope, ChatInputRequest, ContentRef, Customization, FileContent, FileEdit,
-  PendingInput, QueuedMessage, ResourceEntry, ResponsePart, SessionConfig, SessionDetail, SessionSummary,
+  ModelRow, PendingInput, QueuedMessage, ResourceEntry, ResponsePart, SessionConfig, SessionDetail, SessionSummary,
   SessionUri, TerminalState, ToolCall, Turn,
 } from './types.js';
 import { SessionFlag } from './types.js';
@@ -69,6 +69,22 @@ type Step = () => void;
 const WORDS = (text: string): string[] => text.split(/(?<=\s)/);
 
 /** What the host says this provider's sessions can be told to do. */
+/**
+ * The five thinking levels, in the reference client's words.
+ *
+ * Held in one place because they are one host's list rather than a protocol
+ * vocabulary: ahpd and VS Code agree on these five spellings and a third
+ * implementation need not, which is why every reader takes labels from the
+ * host positionally instead of keeping a table like this of its own.
+ */
+const EFFORTS: { value: string; label: string }[] = [
+  { value: 'low', label: 'Low' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'high', label: 'High' },
+  { value: 'xhigh', label: 'Extra High' },
+  { value: 'max', label: 'Max' },
+];
+
 const CONFIG: SessionConfig['properties'] = [
   {
     key: 'permissionMode',
@@ -809,6 +825,76 @@ export function fakeHost(): FakeHost {
     },
   ];
 
+  /** The harnesses this fixture advertises, and what each offers to run on. */
+  const AGENTS: Agent[] = [
+        {
+          provider: 'claude',
+          displayName: 'Claude Code',
+          description: 'Anthropic, in the editor',
+          // The scripted harness holds several chats, so the commands that need
+          // it are offered. A host that does not advertise this is one where
+          // `createChat` MUST NOT be called at all - and the second agent below
+          // deliberately does not, so the gate itself is scripted too.
+          multipleChats: true,
+          // Three shapes, because a real host sends three. A model that takes
+          // every thinking level, one that takes a single level that is not the
+          // one anything defaults to - so it carries no default at all, which is
+          // the case a form filling the gap in from the top of the list gets
+          // wrong - and one that takes none and carries no schema.
+          models: [
+            {
+              id: 'claude-opus-5',
+              displayName: 'Opus 5',
+              provider: 'claude',
+              options: [{
+                key: 'thinkingLevel',
+                title: 'Thinking Level',
+                description: 'Controls how much reasoning effort Claude uses.',
+                values: EFFORTS,
+                sessionMutable: true,
+                default: 'high',
+              }],
+            },
+            {
+              id: 'claude-sonnet-5',
+              displayName: 'Sonnet 5',
+              provider: 'claude',
+              options: [{
+                key: 'thinkingLevel',
+                title: 'Thinking Level',
+                description: 'Controls how much reasoning effort Claude uses.',
+                values: [EFFORTS[1] as { value: string; label: string }],
+                sessionMutable: true,
+              }],
+            },
+            { id: 'claude-haiku-5', displayName: 'Haiku 5', provider: 'claude' },
+          ],
+          // What this harness offers, before any session exists. The same list a
+          // session reports, which is what the protocol says it is: entries here
+          // are propagated into a session's own when one is created with this
+          // agent, so two different lists would be a fixture lying about the
+          // relationship it exists to demonstrate.
+          customizations: CUSTOMIZATIONS.map((entry) => ({ ...entry })),
+        },
+        // No models, on purpose. This is what a real host answers for a harness
+        // nobody has given it a token for: the harness is there, and it will
+        // enumerate nothing to run on until somebody signs in. A fixture where
+        // every harness has models is a client that has never been asked to say
+        // "none", and it says it by showing an empty panel forever.
+        // And no customizations either, for the same reason: a harness nobody
+        // has signed into enumerates neither.
+        { provider: 'copilotcli', displayName: 'Copilot CLI', models: [] },
+  ];
+
+  /** A model id, resolved the way a live host resolves one: against the catalogue. */
+  function modelRow(id: string): ModelRow {
+    for (const agent of AGENTS) {
+      const found = agent.models.find((one) => one.id === id);
+      if (found) return found;
+    }
+    return { id, displayName: id, provider: '' };
+  }
+
   // ------------------------------------------------------------------ scripts
 
   /** Stream one prose part into the running turn, a word per pump. */
@@ -1135,36 +1221,7 @@ export function fakeHost(): FakeHost {
 
     listSessions: async () => [...summaries.values()],
 
-    agents: async (): Promise<Agent[]> => [
-      {
-        provider: 'claude',
-        displayName: 'Claude Code',
-        description: 'Anthropic, in the editor',
-        // The scripted harness holds several chats, so the commands that need
-        // it are offered. A host that does not advertise this is one where
-        // `createChat` MUST NOT be called at all - and the second agent below
-        // deliberately does not, so the gate itself is scripted too.
-        multipleChats: true,
-        models: [
-          { id: 'claude-opus-5', displayName: 'Opus 5' },
-          { id: 'claude-sonnet-5', displayName: 'Sonnet 5' },
-        ],
-        // What this harness offers, before any session exists. The same list a
-        // session reports, which is what the protocol says it is: entries here
-        // are propagated into a session's own when one is created with this
-        // agent, so two different lists would be a fixture lying about the
-        // relationship it exists to demonstrate.
-        customizations: CUSTOMIZATIONS.map((entry) => ({ ...entry })),
-      },
-      // No models, on purpose. This is what a real host answers for a harness
-      // nobody has given it a token for: the harness is there, and it will
-      // enumerate nothing to run on until somebody signs in. A fixture where
-      // every harness has models is a client that has never been asked to say
-      // "none", and it says it by showing an empty panel forever.
-      // And no customizations either, for the same reason: a harness nobody
-      // has signed into enumerates neither.
-      { provider: 'copilotcli', displayName: 'Copilot CLI', models: [] },
-    ],
+    agents: async (): Promise<Agent[]> => AGENTS,
 
     // Iterative, as a real host's is: what has been answered comes back
     // answered. A fixture that returns its defaults every time quietly undoes
@@ -1768,7 +1825,10 @@ export function fakeHost(): FakeHost {
           properties: CONFIG,
           values: { permissionMode: 'default', isolation: 'workspace', ...(configs.get(uri) ?? {}) },
         },
-        ...(last?.model ? { model: last.model } : {}),
+        // The id a turn named, resolved against the catalogue - which is what
+        // the live host does, and a fixture that answered a bare id would be
+        // one where the screens were never asked to resolve anything.
+        ...(last?.model ? { model: modelRow(last.model) } : {}),
         ...(summaries.get(uri)?.activity ? { activity: summaries.get(uri)?.activity as string } : {}),
       };
     },

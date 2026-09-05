@@ -331,8 +331,17 @@ export async function cli(command: string, rest: string[]): Promise<number> {
         // Settled on the models rather than the harnesses: a host advertises a
         // harness at once and its models when it has asked one.
         const found = await settled(host, async () => (await host.agents()).filter((a) => a.models.length > 0));
-        if (wants) { json(found.flatMap((a) => a.models.map((m) => ({ provider: a.provider, ...m })))); break; }
-        table(found.flatMap((a) => a.models.map((m) => [a.provider, m.id, m.displayName])));
+        if (wants) { json(found.flatMap((a) => a.models)); break; }
+        // The levels a model takes, where it says. A model that takes one is
+        // as worth saying as a model that takes five, and a column that is
+        // empty for most rows is what a person scanning for the exception
+        // reads.
+        table(found.flatMap((a) => a.models.map((m) => [
+          m.provider || a.provider,
+          m.id,
+          m.displayName,
+          (m.options ?? []).flatMap((option) => option.values.map((one) => one.value)).join(' '),
+        ])));
         break;
       }
       case 'commands': {
@@ -643,7 +652,7 @@ async function sessions(host: HostConnection, args: Args, wants: boolean): Promi
         ['Project', row ? [project(row), branch(row)].filter(Boolean).join('  ') : ''],
         ['Workspace', (row?.workingDirectories ?? []).map((d) => d.replace(/^file:\/\//, '')).join(', ')],
         ['Chat', detail.chat ?? ''],
-        ['Model', detail.model ?? ''],
+        ['Model', detail.model ? [detail.model.displayName, detail.model.id].filter(Boolean).join('  ') : ''],
         ['Updated', row ? ago(row.modifiedAt) : ''],
       ].filter(([, value]) => value !== ''));
       return 0;
@@ -755,7 +764,7 @@ async function sessions(host: HostConnection, args: Args, wants: boolean): Promi
       line();
       line(`- Session: \`${uri}\``);
       if (row?.provider) line(`- Harness: ${row.provider}`);
-      if (detail.model) line(`- Model: ${detail.model}`);
+      if (detail.model) line(`- Model: ${detail.model.displayName} (\`${detail.model.id}\`)`);
       if (row?.workingDirectories?.length) {
         line(`- Workspace: ${row.workingDirectories.map((d) => d.replace(/^file:\/\//, '')).join(', ')}`);
       }
