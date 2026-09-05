@@ -2065,7 +2065,10 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
     },
 
     automationTriggers: async () => {
-      const result = bag(await client.request('listAutomationTriggerDefinitions', { channel: AUTOMATIONS }));
+      // The *root* channel: "trigger definitions are discovered from the root
+      // channel", because they are a property of the host rather than of the
+      // automations it happens to be holding.
+      const result = bag(await client.request('listAutomationTriggerDefinitions', { channel: ROOT }));
       return list(result.items).map((raw) => {
         const one = bag(raw);
         return {

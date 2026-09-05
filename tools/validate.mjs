@@ -26,16 +26,6 @@ const require = createRequire(import.meta.url);
 const Ajv = require('ajv/dist/2020.js').default ?? require('ajv/dist/2020.js');
 const addFormats = require('ajv-formats').default ?? require('ajv-formats');
 
-const [file] = process.argv.slice(2).filter((one) => !one.startsWith('--'));
-if (!file) {
-  process.stderr.write('usage: node tools/validate.mjs <capture.jsonl> [--limit N] [--verbose]\n');
-  process.exit(2);
-}
-const verbose = process.argv.includes('--verbose');
-const limit = process.argv.includes('--limit')
-  ? Number(process.argv[process.argv.indexOf('--limit') + 1])
-  : Infinity;
-
 const schema = JSON.parse(readFileSync(new URL('./ahp.strict.schema.json', import.meta.url), 'utf8'));
 // `discriminator` is why the generator tags its unions: ajv then reports the
 // branch the sender meant instead of every branch it did not.
@@ -151,7 +141,7 @@ function narrow(errors) {
 }
 
 /** Findings by kind, collapsed: one line per defect, not one per occurrence. */
-const found = new Map();
+let found = new Map();
 function record(def, error, sample) {
   // Array indices collapse, or one bad conversation prints hundreds of lines
   // that are all the same defect.
@@ -167,99 +157,133 @@ function record(def, error, sample) {
   found.set(key, entry);
 }
 
-let frames = 0;
-let checked = 0;
-const unroutable = new Map();
+/**
+ * Every finding in one capture.
+ *
+ * A function rather than a script body so the test suite can run it over the
+ * frames a run just produced, in memory, with no file to commit and nothing
+ * to drift out of date. `tools/validate.mjs <file>` is the same thing over a
+ * recording somebody kept.
+ */
+export function findings(text, options = {}) {
+  const limit = options.limit ?? Infinity;
+  found = new Map();
+  let frames = 0;
+  let checked = 0;
+  const unroutable = new Map();
 
-for (const line of readFileSync(file, 'utf8').split('\n')) {
-  if (!line.trim() || frames >= limit) continue;
-  let record_;
-  try { record_ = JSON.parse(line); } catch { continue; }
-  let frame = record_?.frame ?? record_;
-  if (typeof frame === 'string') {
-    try { frame = JSON.parse(frame); } catch { continue; }
-  }
-  if (typeof frame !== 'object' || frame === null) continue;
-  frames += 1;
+  for (const line of text.split('\n')) {
+      if (!line.trim() || frames >= limit) continue;
+    let record_;
+    try { record_ = JSON.parse(line); } catch { continue; }
+    let frame = record_?.frame ?? record_;
+    if (typeof frame === 'string') {
+      try { frame = JSON.parse(frame); } catch { continue; }
+    }
+    if (typeof frame !== 'object' || frame === null) continue;
+    frames += 1;
 
-  /*
-   * A request this client sent.
-   *
-   * `dispatchAction` is the one that is two payloads: the notification's own
-   * params and the action inside it, which is a `StateAction` and is checked
-   * against its own declaration by type.
-   */
-  if (typeof frame.method === 'string' && frame.params !== undefined) {
-    const def = paramsFor(frame.method);
-    const result = check(def, frame.params);
-    if (result.missing) unroutable.set(def ?? frame.method, (unroutable.get(def ?? frame.method) ?? 0) + 1);
-    else { checked += 1; for (const error of result.errors) record(def, error, frame.method); }
+    /*
+     * A request this client sent.
+     *
+     * `dispatchAction` is the one that is two payloads: the notification's own
+     * params and the action inside it, which is a `StateAction` and is checked
+     * against its own declaration by type.
+     */
+    if (typeof frame.method === 'string' && frame.params !== undefined) {
+      const def = paramsFor(frame.method);
+      const result = check(def, frame.params);
+      if (result.missing) unroutable.set(def ?? frame.method, (unroutable.get(def ?? frame.method) ?? 0) + 1);
+      else { checked += 1; for (const error of result.errors) record(def, error, frame.method); }
 
-    const outbound = frame.params.action?.type;
-    if (typeof outbound === 'string') {
-      const action = `${outbound.split('/').map((part) => part[0].toUpperCase() + part.slice(1)).join('')}Action`;
-      const one = check(action, frame.params.action);
-      if (one.missing) unroutable.set(action, (unroutable.get(action) ?? 0) + 1);
-      else { checked += 1; for (const error of one.errors) record(action, error, outbound); }
+      const outbound = frame.params.action?.type;
+      if (typeof outbound === 'string') {
+        const action = `${outbound.split('/').map((part) => part[0].toUpperCase() + part.slice(1)).join('')}Action`;
+        const one = check(action, frame.params.action);
+        if (one.missing) unroutable.set(action, (unroutable.get(action) ?? 0) + 1);
+        else { checked += 1; for (const error of one.errors) record(action, error, outbound); }
+      }
+    }
+    // A subscribe answer: the snapshot names its own channel.
+    const snapshot = frame.result?.snapshot;
+    if (snapshot?.state !== undefined) {
+      const def = stateFor(snapshot.resource);
+      const result = check(def, snapshot.state);
+      if (result.missing) unroutable.set(def ?? snapshot.resource, (unroutable.get(def ?? snapshot.resource) ?? 0) + 1);
+      else { checked += 1; for (const error of result.errors) record(def, error, snapshot.resource); }
+    }
+    // A reconnect answer carries several at once.
+    for (const one of frame.result?.snapshots ?? []) {
+      if (one?.state === undefined) continue;
+      const def = stateFor(one.resource);
+      const result = check(def, one.state);
+      if (result.missing) unroutable.set(def ?? one.resource, (unroutable.get(def ?? one.resource) ?? 0) + 1);
+      else { checked += 1; for (const error of result.errors) record(def, error, one.resource); }
+    }
+    // A resolved config schema. Answered by `resolveSessionConfig` rather than
+    // carried on a channel, and a schema is a payload like any other - the
+    // isolation and worktree questions live in one and nothing was checking it.
+    if (frame.result?.schema !== undefined && snapshot === undefined) {
+      // The whole result, not the schema alone: `ResolveSessionConfigResult`
+      // declares both halves, and the echoed values are as much a payload as
+      // the questions they answer. Picking the schema out and guessing its type
+      // reported `sessionMutable` as undeclared - it is declared, on the
+      // *session* config schema, which is not the generic one.
+      const result = check('ResolveSessionConfigResult', frame.result);
+      if (result.missing) unroutable.set('ResolveSessionConfigResult', (unroutable.get('ResolveSessionConfigResult') ?? 0) + 1);
+      else {
+        checked += 1;
+        for (const error of result.errors) record('ResolveSessionConfigResult', error, 'resolveSessionConfig');
+      }
+    }
+    // An action, envelope and payload both. The payload's declaration is named
+    // after its action type, which the package spells in PascalCase with the
+    // channel prefix - `chat/delta` is `ChatDeltaAction`.
+    if (frame.method === 'action' && frame.params !== undefined) {
+      const envelope = check('ActionEnvelope', frame.params);
+      if (!envelope.missing) {
+        checked += 1;
+        for (const error of envelope.errors) record('ActionEnvelope', error, frame.params.channel);
+      }
+      const type = frame.params.action?.type;
+      if (typeof type === 'string') {
+        const def = `${type.split('/').map((part) => part[0].toUpperCase() + part.slice(1)).join('')}Action`;
+        const result = check(def, frame.params.action);
+        if (result.missing) unroutable.set(def, (unroutable.get(def) ?? 0) + 1);
+        else { checked += 1; for (const error of result.errors) record(def, error, type); }
+      }
     }
   }
-  // A subscribe answer: the snapshot names its own channel.
-  const snapshot = frame.result?.snapshot;
-  if (snapshot?.state !== undefined) {
-    const def = stateFor(snapshot.resource);
-    const result = check(def, snapshot.state);
-    if (result.missing) unroutable.set(def ?? snapshot.resource, (unroutable.get(def ?? snapshot.resource) ?? 0) + 1);
-    else { checked += 1; for (const error of result.errors) record(def, error, snapshot.resource); }
-  }
-  // A reconnect answer carries several at once.
-  for (const one of frame.result?.snapshots ?? []) {
-    if (one?.state === undefined) continue;
-    const def = stateFor(one.resource);
-    const result = check(def, one.state);
-    if (result.missing) unroutable.set(def ?? one.resource, (unroutable.get(def ?? one.resource) ?? 0) + 1);
-    else { checked += 1; for (const error of result.errors) record(def, error, one.resource); }
-  }
-  // A resolved config schema. Answered by `resolveSessionConfig` rather than
-  // carried on a channel, and a schema is a payload like any other - the
-  // isolation and worktree questions live in one and nothing was checking it.
-  if (frame.result?.schema !== undefined && snapshot === undefined) {
-    // The whole result, not the schema alone: `ResolveSessionConfigResult`
-    // declares both halves, and the echoed values are as much a payload as
-    // the questions they answer. Picking the schema out and guessing its type
-    // reported `sessionMutable` as undeclared - it is declared, on the
-    // *session* config schema, which is not the generic one.
-    const result = check('ResolveSessionConfigResult', frame.result);
-    if (result.missing) unroutable.set('ResolveSessionConfigResult', (unroutable.get('ResolveSessionConfigResult') ?? 0) + 1);
-    else {
-      checked += 1;
-      for (const error of result.errors) record('ResolveSessionConfigResult', error, 'resolveSessionConfig');
-    }
-  }
-  // An action, envelope and payload both. The payload's declaration is named
-  // after its action type, which the package spells in PascalCase with the
-  // channel prefix - `chat/delta` is `ChatDeltaAction`.
-  if (frame.method === 'action' && frame.params !== undefined) {
-    const envelope = check('ActionEnvelope', frame.params);
-    if (!envelope.missing) {
-      checked += 1;
-      for (const error of envelope.errors) record('ActionEnvelope', error, frame.params.channel);
-    }
-    const type = frame.params.action?.type;
-    if (typeof type === 'string') {
-      const def = `${type.split('/').map((part) => part[0].toUpperCase() + part.slice(1)).join('')}Action`;
-      const result = check(def, frame.params.action);
-      if (result.missing) unroutable.set(def, (unroutable.get(def) ?? 0) + 1);
-      else { checked += 1; for (const error of result.errors) record(def, error, type); }
-    }
-  }
+
+  return {
+    frames,
+    checked,
+    declarations: Object.keys(schema.$defs).length,
+    found: [...found].map(([key, entry]) => ({ what: key, count: entry.count, sample: entry.sample })),
+    unroutable: [...unroutable.keys()].sort(),
+  };
 }
 
-process.stdout.write(`${file}: ${frames} frames, ${checked} payloads checked against ${Object.keys(schema.$defs).length} declarations\n`);
-if (found.size === 0) process.stdout.write('nothing undeclared, nothing missing\n');
-for (const [key, entry] of [...found].sort(([, a], [, b]) => b.count - a.count)) {
-  process.stdout.write(`  x${entry.count}  ${key}${verbose ? `   (${entry.sample})` : ''}\n`);
+// Run as a script, and only then. Imported, this file is the function above.
+if (process.argv[1] !== undefined && process.argv[1].endsWith('validate.mjs')) {
+  const [file] = process.argv.slice(2).filter((one) => !one.startsWith('--'));
+  if (file === undefined) {
+    process.stderr.write('usage: node tools/validate.mjs <capture.jsonl> [--limit N] [--verbose]\n');
+    process.exit(2);
+  }
+  const verbose = process.argv.includes('--verbose');
+  const report = findings(readFileSync(file, 'utf8'), {
+    ...(process.argv.includes('--limit')
+      ? { limit: Number(process.argv[process.argv.indexOf('--limit') + 1]) }
+      : {}),
+  });
+  process.stdout.write(`${file}: ${report.frames} frames, ${report.checked} payloads checked against ${report.declarations} declarations\n`);
+  if (report.found.length === 0) process.stdout.write('nothing undeclared, nothing missing\n');
+  for (const one of [...report.found].sort((a, b) => b.count - a.count)) {
+    process.stdout.write(`  x${one.count}  ${one.what}${verbose ? `   (${one.sample})` : ''}\n`);
+  }
+  if (report.unroutable.length > 0 && verbose) {
+    process.stdout.write(`no declaration for: ${report.unroutable.join(', ')}\n`);
+  }
+  process.exit(report.found.length > 0 ? 1 : 0);
 }
-if (unroutable.size > 0 && verbose) {
-  process.stdout.write(`no declaration for: ${[...unroutable.keys()].sort().join(', ')}\n`);
-}
-process.exit(found.size > 0 ? 1 : 0);

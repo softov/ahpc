@@ -16,6 +16,13 @@ declarations - closing every object, which the shipped `state.schema.json`
 never does - and `npm run wire -- <capture>` checks a recording against it.
 `AHPC_RECORD=<file>` makes this client record its own frames, both directions.
 
+`test/conformance.test.ts` is the same checker in the suite, over the frames a
+run just produced, in memory. Not a committed fixture: a recording on disk is
+for reading by hand, and one that a test reads back can go green against
+yesterday's behaviour. This one cannot, because its input is an output. It
+found a third defect on its first run - `listAutomationTriggerDefinitions` sent
+to the automations channel, where the declaration says the root one.
+
 That is the only method here that has found defects in every implementation it
 was pointed at, this one included. Reading the source does not substitute for
 it: a conditional spread (`...(x ? { k } : {})`) is not excess-property-checked
