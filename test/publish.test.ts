@@ -11,7 +11,10 @@ import { describe, expect, it, beforeAll, afterAll } from 'vitest';
 import { mkdtemp, rm, writeFile, readFile, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { publish, PUBLISH_PREFIX } from '../src/ahp/publish.js';
+import { publish, publishedUnder } from '../src/ahp/publish.js';
+
+/** The authority a host routes on is the client's own id. */
+const PUBLISH_PREFIX = publishedUnder('ahpc');
 
 let root = '';
 
@@ -115,5 +118,41 @@ describe('writing is a second decision, not part of publishing', () => {
     // pipe in a script - so the grant is a flag and the refusal says so.
     expect(answer.granted).toBe(false);
     expect(answer.reason).toContain('--publish-writable');
+  });
+});
+
+describe('the authority is the client id a host routes on', () => {
+  it('publishes under the connection\'s own id, not a fixed name', async () => {
+    const served = publish({ root }).as('ahpc-3f2a1b0c');
+    expect(served.prefix).toBe('virtual://ahpc-3f2a1b0c/');
+
+    // And answers for it. A fixed authority reaches nothing: a host reads the
+    // authority out of the URI and matches it against the connection that
+    // sent it, so `virtual://ahpc/` from a client called `ahpc-3f2a1b0c` is
+    // addressed to a client that is not there.
+    const answer = await served.handlers().resourceRead?.({ uri: 'virtual://ahpc-3f2a1b0c/note.txt' });
+    expect(answer).toEqual({ data: 'hello', encoding: 'utf-8' });
+  });
+
+  it('refuses a URI under somebody else\'s id', async () => {
+    const served = publish({ root }).as('ahpc-3f2a1b0c');
+    expect(await refused(() => served.handlers().resourceRead?.({
+      uri: 'virtual://another-client/note.txt',
+    }) as Promise<unknown>)).toBe(-32009);
+  });
+
+  it('lists in URIs addressed the same way, so a host can ask back', async () => {
+    const served = publish({ root }).as('ahpc-3f2a1b0c');
+    const answer = await served.handlers().resourceList?.({ uri: 'virtual://ahpc-3f2a1b0c/' }) as
+      { entries: { uri: string }[] };
+    expect(answer.entries.every((one) => one.uri.startsWith('virtual://ahpc-3f2a1b0c/'))).toBe(true);
+  });
+
+  it('is shaped the way a host parses it', () => {
+    // What the routing actually does: scheme, then authority, and neither
+    // `file:` nor an `ahp-` channel is a client.
+    const found = /^([a-zA-Z][\w+.-]*):\/\/([^/]+)/.exec(publishedUnder('ahpc-3f2a1b0c'));
+    expect(found?.[1]).toBe('virtual');
+    expect(found?.[2]).toBe('ahpc-3f2a1b0c');
   });
 });

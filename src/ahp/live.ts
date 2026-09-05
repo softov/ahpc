@@ -1195,7 +1195,8 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
    * and everything else is refused with the code the specification declares
    * for a refusal instead of the one for a method that does not exist.
    */
-  const serving = options.publish ?? publish();
+  // Under this connection's own id, which is the authority a host routes on.
+  const serving = (options.publish ?? publish()).as(clientId);
   const answering = ahp.createResourceRequestHandler(serving.handlers());
   const mirror = new ahp.Mirror();
   client.setServerRequestHandler(answering);

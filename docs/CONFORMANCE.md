@@ -135,6 +135,11 @@ captures, and none is declared in 0.9.0 or 1.0.0.
 
 # What is not implemented, and why
 
+**A published resource is addressed `virtual://<clientId>/…`.** The authority
+is this connection's own `clientId`, because that is how a host routes one: it
+reads the authority and matches it against the connection that sent it. A fixed
+authority - `virtual://ahpc/` - is addressed to a client that is not there.
+
 **Publishing content to a host is opt-in and empty by default.** The handler
 layer for all ten server-initiated methods exists and answers; without
 `--publish <dir>` every URI is refused with `-32009`, which is the receiver

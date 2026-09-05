@@ -18,8 +18,18 @@
 import { copyFile, mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
-/** The authority this client publishes under. */
-const PREFIX = 'virtual://ahpc/';
+/**
+ * The authority a client publishes under is its own `clientId`.
+ *
+ * `<scheme>://<clientId>/…` is how the reference host addresses a
+ * client-served resource, and a host routes by reading the authority and
+ * matching it against the connection that sent it - so a fixed authority
+ * reaches nothing. The scheme is `virtual:`, which is what the specification's
+ * examples and both conformance suites use.
+ */
+export function publishedUnder(clientId: string): string {
+  return `virtual://${clientId}/`;
+}
 
 /** JSON-RPC codes this answers with, as `commands.ts` declares them. */
 const NOT_FOUND = -32008;
@@ -30,6 +40,10 @@ export interface Published {
   readonly root: string | null;
   /** Whether a host may write into it. Off unless asked for. */
   readonly writable: boolean;
+  /** The prefix this is addressed under, once a client id is known. */
+  readonly prefix: string;
+  /** Say which connection this is, so the URIs a host routes on are right. */
+  as(clientId: string): Published;
   /** Per-method handlers, in the shape the protocol client composes. */
   handlers(): Record<string, (params: unknown) => Promise<unknown>>;
 }
@@ -49,9 +63,18 @@ export class PublishRefusal extends Error {
  * naming what would be needed, which is a refusal rather than an absence - the
  * host asked something this client understands and declined.
  */
-export function publish(options: { root?: string; writable?: boolean } = {}): Published {
+export function publish(options: { root?: string; writable?: boolean; clientId?: string } = {}): Published {
   const root = options.root === undefined ? null : path.resolve(options.root);
   const writable = options.writable === true;
+  /*
+   * Until a connection exists there is no id to publish under.
+   *
+   * `ahpc` is the placeholder and is deliberately one a host will not route:
+   * `as()` is called with the real `clientId` before anything can be asked
+   * for, and a prefix that happened to work without it would hide the day it
+   * was not called.
+   */
+  const PREFIX = publishedUnder(options.clientId ?? 'ahpc');
 
   /**
    * The file a `virtual://ahpc/...` names, or a refusal.
@@ -86,6 +109,12 @@ export function publish(options: { root?: string; writable?: boolean } = {}): Pu
   return {
     root,
     writable,
+    prefix: PREFIX,
+    as: (clientId) => publish({
+      ...(root === null ? {} : { root }),
+      ...(writable ? { writable } : {}),
+      clientId,
+    }),
     handlers: () => ({
       resourceRead: async (params: unknown) => {
         const uri = (params as { uri?: unknown }).uri;
@@ -187,4 +216,4 @@ export function publish(options: { root?: string; writable?: boolean } = {}): Pu
   };
 }
 
-export { PREFIX as PUBLISH_PREFIX };
+
