@@ -18,12 +18,12 @@
   },
   "dependencies": {
     "@microsoft/agent-host-protocol": "^0.9.0",
-    "@textui/core": "^0.3.0",
-    "@textui/terminal": "^0.3.0",
-    "@textui/widgets": "^0.3.0"
+    "@textui/core": "^0.4.0",
+    "@textui/terminal": "^0.4.0",
+    "@textui/widgets": "^0.4.0"
   },
   "devDependencies": {
-    "@textui/testing": "^0.3.0",
+    "@textui/testing": "^0.4.0",
     "@types/node": "^22.10.2",
     "typescript": "^5.9.3",
     "vitest": "^3.0.0"
