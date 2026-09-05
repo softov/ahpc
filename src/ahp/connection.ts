@@ -194,7 +194,21 @@ export interface HostConnection {
    * is neither a file nor a directory, and narrowing it here would be this
    * client deciding something the host already answered.
    */
-  resourceResolve?(uri: string): Promise<{ uri: string; type: string; size?: number; mtime?: string }>;
+  resourceResolve?(uri: string): Promise<{
+    uri: string;
+    type: string;
+    size?: number;
+    mtime?: string;
+    /**
+     * An opaque version token, where the host keeps one.
+     *
+     * Carried back as `ifMatch` on a write: the host MUST fail with
+     * `-32011 Conflict` when its copy has moved on, which is what stops a
+     * read-modify-write losing whatever changed in between. Absent for a
+     * directory, which has no bytes to have been changed under anyone.
+     */
+    etag?: string;
+  }>;
   /**
    * Write one file.
    *
@@ -204,7 +218,20 @@ export interface HostConnection {
    * `createOnly` is the protocol's guard against replacing something that is
    * already there.
    */
-  resourceWrite?(uri: string, data: string, options?: { encoding?: string; createOnly?: boolean }): Promise<void>;
+  /**
+   * Write one file.
+   *
+   * `ifMatch` is the etag a `resourceResolve` returned, and is the guard on a
+   * read-modify-write: without it, a write lands on whatever is there now.
+   * `createOnly` is a different guarantee and not a substitute - it refuses a
+   * file that has appeared, not one that moved between the resolve and the
+   * write.
+   */
+  resourceWrite?(uri: string, data: string, options?: {
+    encoding?: string;
+    createOnly?: boolean;
+    ifMatch?: string;
+  }): Promise<void>;
   resourceDelete?(uri: string, options?: { recursive?: boolean }): Promise<void>;
   resourceMkdir?(uri: string): Promise<void>;
   resourceMove?(from: string, to: string, options?: { failIfExists?: boolean }): Promise<void>;

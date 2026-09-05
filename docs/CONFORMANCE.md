@@ -103,15 +103,18 @@ declaration is `origin: ActionOrigin | undefined` - required, satisfied only by
 sending the key with an undefined value, which no JSON does. Both ahpd and VS
 Code's host omit it.
 
-**`resourceWrite` documents `ifMatch` and nothing declares it.** The prose
-throws `-32011 Conflict` "if `ifMatch` is set and the current `etag` does not
-match"; `ResourceWriteParams` has no `ifMatch` and `ResourceResolveResult` has
-no `etag`. This client sends the declared `createOnly` instead and does not
-invent the pair.
-
 **A tool's `inputSchema` is a closed declaration a real JSON Schema
 overflows.** Both hosts put `$comment` in one, which is a legal keyword the
 type does not allow.
+
+## And one the checker itself was wrong about
+
+`ActionEnvelope.origin` reads as required from the symbol flag alone, so the
+generator marked it required and every capture reported nine "missing required
+`origin`" that were the generator's fault. A property whose *type* includes
+`undefined` is now treated as optional too. Worth remembering as the shape of
+the mistake: a finding a checker is wrong about is the one that gets the
+checker switched off.
 
 ---
 
@@ -145,6 +148,10 @@ layer for all ten server-initiated methods exists and answers; without
 `--publish <dir>` every URI is refused with `-32009`, which is the receiver
 enforcing access exactly as the specification describes. Serving by default
 would hand this machine's disk to whatever host it connected to.
+
+**`createResourceWatch` is not served over a published directory.** Nine of the
+ten reverse methods answer; a host asking this client to watch one of its
+published files gets `-32601`, which is the true answer rather than a stub.
 
 **Traces and metrics are not subscribed to.** `telemetry-channel.md` says
 clients SHOULD subscribe only to signals they can process. Logs are rendered;

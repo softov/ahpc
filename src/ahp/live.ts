@@ -1740,18 +1740,20 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
         type: str(result.type) ?? 'file',
         ...(typeof result.size === 'number' ? { size: result.size } : {}),
         ...(str(result.mtime) ? { mtime: str(result.mtime) as string } : {}),
+        ...(str(result.etag) ? { etag: str(result.etag) as string } : {}),
       };
     },
 
     /*
      * The write half, which is the same family sent the other way.
      *
-     * Exactly the declared parameters and no more. The prose on `resourceWrite`
-     * documents a `-32011 Conflict` "if `ifMatch` is set and the current `etag`
-     * does not match", and neither `ifMatch` on the params nor `etag` on the
-     * resolve result is declared anywhere in the package - so sending one
-     * would be inventing a field, which is the thing this client is not for.
-     * `createOnly` is the guard the protocol does declare.
+     * Exactly the declared parameters and no more.
+     *
+     * `ifMatch` carries the `etag` a `resourceResolve` returned, and the host
+     * MUST answer `-32011 Conflict` when its copy has moved on since - which
+     * is what stops a read-modify-write silently losing somebody else's edit.
+     * `createOnly` is the other guard and a different guarantee: it refuses a
+     * file that has appeared, not one that changed underneath.
      */
     resourceWrite: async (uri, data, opts) => {
       await client.request('resourceWrite', {
@@ -1760,6 +1762,7 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
         data,
         encoding: opts?.encoding ?? 'utf-8',
         ...(opts?.createOnly ? { createOnly: true } : {}),
+        ...(opts?.ifMatch ? { ifMatch: opts.ifMatch } : {}),
       });
     },
 

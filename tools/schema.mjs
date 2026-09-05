@@ -226,8 +226,18 @@ function object(type, seen) {
       ? checker.getTypeOfSymbolAtLocation(symbol, at)
       : checker.getTypeOfSymbol(symbol);
     properties[symbol.getName()] = schemaOf(property, seen);
-    // `?` and `| undefined` are the same answer to "must this be here".
-    const optional = (symbol.flags & ts.SymbolFlags.Optional) !== 0;
+    /*
+     * `?` and `| undefined` are the same answer to "must this be here".
+     *
+     * The symbol flag alone is not: `origin: ActionOrigin | undefined` has no
+     * `?`, so it reads as required, and no JSON can carry an undefined value -
+     * which made every host in existence report nine "missing required
+     * `origin`". A finding the checker is wrong about is the one that gets the
+     * checker switched off.
+     */
+    const optional = (symbol.flags & ts.SymbolFlags.Optional) !== 0
+      || (property.flags & (F.Undefined | F.Void)) !== 0
+      || (property.isUnion() && property.types.some((one) => (one.flags & (F.Undefined | F.Void)) !== 0));
     if (!optional) required.push(symbol.getName());
   }
   return {

@@ -1682,9 +1682,9 @@ describe('the write half of the filesystem, exactly as declared', () => {
     await host.resourceCopy?.('file:///x/b.txt', 'file:///x/c.txt');
     await settle();
 
-    // `data` and `encoding` are required; `createOnly` is the protocol's own
-    // guard. `ifMatch` is documented in the prose on `-32011` and declared
-    // nowhere, so it is not sent.
+    // `data` and `encoding` are required. `createOnly` refuses a file that has
+    // appeared; `ifMatch` refuses one that changed underneath. Two guards, two
+    // different guarantees, and both declared.
     expect(sentTo(scripted, 'resourceWrite')).toEqual({
       channel: ROOT, uri: 'file:///x/a.txt', data: 'body', encoding: 'utf-8', createOnly: true,
     });
@@ -1924,6 +1924,40 @@ describe('a watch instead of a timer', () => {
     watching?.close();
     await settle();
     expect(scripted.timesAsked('unsubscribe', 'ahp-resource-watch:/w1')).toBe(1);
+
+    await host.close();
+  });
+});
+
+describe('a read-modify-write is guarded by what it read', () => {
+  it('carries the etag a resolve returned', async () => {
+    const { host, scripted } = await connect();
+    scripted.resolveWith = { uri: 'file:///x/a.txt', type: 'file', size: 4, etag: 'v7' };
+
+    const found = await host.resourceResolve?.('file:///x/a.txt');
+    expect(found?.etag).toBe('v7');
+
+    await host.resourceWrite?.('file:///x/a.txt', 'next', { ifMatch: found?.etag as string });
+    const sent = scripted.asked.find((frame) => frame.method === 'resourceWrite')?.params;
+    // The host MUST answer `-32011` when its copy has moved on, which is the
+    // whole of what stops this losing somebody else's edit.
+    expect(sent).toMatchObject({ ifMatch: 'v7' });
+
+    await host.close();
+  });
+
+  it('sends none where the host keeps none', async () => {
+    const { host, scripted } = await connect();
+    // A directory has no bytes to have been changed under anyone, and a host
+    // may simply not keep a token. Absent is not an empty one.
+    scripted.resolveWith = { uri: 'file:///x/sub', type: 'directory' };
+
+    const found = await host.resourceResolve?.('file:///x/sub');
+    expect(found).not.toHaveProperty('etag');
+
+    await host.resourceWrite?.('file:///x/a.txt', 'next');
+    const sent = scripted.asked.find((frame) => frame.method === 'resourceWrite')?.params;
+    expect(sent).not.toHaveProperty('ifMatch');
 
     await host.close();
   });

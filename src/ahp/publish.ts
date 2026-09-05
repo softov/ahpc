@@ -77,7 +77,7 @@ export function publish(options: { root?: string; writable?: boolean; clientId?:
   const PREFIX = publishedUnder(options.clientId ?? 'ahpc');
 
   /**
-   * The file a `virtual://ahpc/...` names, or a refusal.
+   * The file a `virtual://<clientId>/...` names, or a refusal.
    *
    * Resolved and then checked to be inside the published directory, because
    * `..` in a URI is a host asking for the rest of the disk. The check is on

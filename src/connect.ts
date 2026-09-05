@@ -21,7 +21,11 @@ export interface Where {
   /** Where the agent works - a path on the *host*, not on this machine. */
   path?: string;
   /**
-   * A directory on *this* machine to serve back, under `virtual://ahpc/`.
+   * A directory on *this* machine to serve back, under `virtual://<clientId>/`.
+   *
+   * The authority is this connection's own id, because that is what a host
+   * routes on: it reads the authority out of the URI and matches it against
+   * the connection that published it.
    *
    * AHP is symmetrical and a host may read from a client-published URI. Absent
    * means nothing is served and every such request is refused, which is the

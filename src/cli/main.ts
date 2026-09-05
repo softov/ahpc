@@ -71,6 +71,7 @@ Changes and files
   resource read <uri>          a file on the host
   resource stat <uri>          what it is, without reading it         [--json]
   resource write <uri> [file]  from a file, or from stdin      [--create-only]
+                               guarded by the file's etag unless      [--force]
   resource rm <uri>            delete it                        [--recursive]
   resource mkdir <uri>         make a directory
   resource mv <uri> <to>       move it                     [--fail-if-exists]
@@ -175,7 +176,7 @@ const SWITCHES = new Set([
   '--reject', '--claude', '--chat',
   // The write half's own flags, which take no value: without them here a
   // positional after one is read as that flag's argument and disappears.
-  '--create-only', '--recursive', '--fail-if-exists', '--publish-writable', '--follow',
+  '--create-only', '--recursive', '--fail-if-exists', '--publish-writable', '--follow', '--force',
 ]);
 
 /** A message for the person, not a stack trace. */
@@ -1016,8 +1017,23 @@ async function files(host: HostConnection, args: Args, wants: boolean): Promise<
     // this gets used, and a second positional is the convenience.
     const from = args.positional(2);
     const data = from === undefined ? await readAll(process.stdin) : await readFile(from, 'utf8');
+    /*
+     * The etag the file has now, unless told not to.
+     *
+     * A write with no `ifMatch` lands on whatever is there, which is how a
+     * read-modify-write loses an edit that arrived in between. Resolved here
+     * rather than asked for, because a person writing a file has no way to
+     * know the token and every write from a shell is a read-modify-write.
+     * `--force` is the way to say the current contents do not matter.
+     */
+    let ifMatch: string | undefined;
+    if (!args.has('--force') && host.resourceResolve) {
+      try { ifMatch = (await host.resourceResolve(uri)).etag; }
+      catch { /* not there yet, so there is nothing to have changed */ }
+    }
     await host.resourceWrite(uri, data, {
       ...(args.has('--create-only') ? { createOnly: true } : {}),
+      ...(ifMatch === undefined ? {} : { ifMatch }),
     });
     return 0;
   }

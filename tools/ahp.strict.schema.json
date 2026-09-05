@@ -332,8 +332,7 @@
    "required": [
     "channel",
     "action",
-    "serverSeq",
-    "origin"
+    "serverSeq"
    ],
    "additionalProperties": false
   },
@@ -504,8 +503,7 @@
     "id",
     "startedAt",
     "message",
-    "responseParts",
-    "usage"
+    "responseParts"
    ],
    "additionalProperties": false
   },
@@ -2728,8 +2726,7 @@
     }
    },
    "required": [
-    "type",
-    "operations"
+    "type"
    ],
    "additionalProperties": false
   },
@@ -12552,8 +12549,7 @@
     }
    },
    "required": [
-    "type",
-    "activity"
+    "type"
    ],
    "additionalProperties": false
   },
@@ -12587,8 +12583,7 @@
     }
    },
    "required": [
-    "type",
-    "changesets"
+    "type"
    ],
    "additionalProperties": false
   },
@@ -13271,8 +13266,7 @@
     }
    },
    "required": [
-    "type",
-    "_meta"
+    "type"
    ],
    "additionalProperties": false
   },
@@ -16550,7 +16544,6 @@
     "id",
     "message",
     "responseParts",
-    "usage",
     "state"
    ],
    "additionalProperties": false
