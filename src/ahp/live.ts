@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { openChannels } from './channels.js';
 import type { HostConnection, HostEvent } from './connection.js';
 import type {
   Agent, Answer, Automation, AutomationRun, Changeset, ChangesetOperation, ChangesetOperationTarget, Completion, ConfigProperty, ContentRef, Customization, CustomizationKind,
@@ -53,6 +54,69 @@ export interface LiveHostOptions {
    * to debug their network over a session whose agent has simply gone.
    */
   onRefusal?(uri: string, message: string): void;
+  /**
+   * Open a transport, in place of a WebSocket to `url`.
+   *
+   * The seam a test drives: a connection is the one thing here that cannot be
+   * scripted from above, because `fakeHost` implements the seam this file
+   * produces rather than the protocol underneath it. Called once per attempt,
+   * so a reconnect asks for a new one.
+   */
+  connect?(): Promise<unknown>;
+  /**
+   * How long to wait before each attempt to come back, in milliseconds.
+   *
+   * The last entry repeats for as long as the host stays away. Given in full
+   * rather than as a formula so a test can ask for no waiting at all, and so
+   * the schedule is a thing that can be read.
+   */
+  backoff?: readonly number[];
+  /** How often to ping an otherwise silent connection. `0` sends none. */
+  keepaliveMs?: number;
+  /**
+   * Told when this client stopped short of everything the host had.
+   *
+   * Not a refusal - the host answered, and answered fully. It is this client
+   * declining to walk a catalogue past the point where walking it is the
+   * wrong thing to be doing, and a person is owed the sentence.
+   */
+  onLimit?(message: string): void;
+}
+
+/**
+ * What to wait before the next attempt, when a host has gone.
+ *
+ * Doubling to half a minute, which is short enough that a daemon restarted by
+ * hand is picked up while the person is still looking at the screen, and long
+ * enough that a host which is gone for the afternoon is not asked about it
+ * eight thousand times.
+ */
+const BACKOFF = [250, 500, 1000, 2000, 5000, 10_000, 30_000] as const;
+
+/** How long a connection may say nothing before this client checks it is there. */
+const KEEPALIVE_MS = 30_000;
+
+/**
+ * How many pages of the catalogue to walk before stopping and saying so.
+ *
+ * A bound rather than a page size: the host picks how big a page is, and this
+ * picks how many of them are worth walking to draw a list somebody is going to
+ * scroll. Twenty is past any catalogue either implementation has produced, and
+ * reaching it is reported rather than passed over in silence.
+ */
+const PAGES = 20;
+
+/**
+ * Whether a host answered, or was not there to answer.
+ *
+ * The difference decides whether coming back is worth trying differently or
+ * only worth trying again: a refusal is a host with an opinion about this
+ * client, and a transport failure is no host at all. JSON-RPC gives a numeric
+ * `code` and a transport error does not, which is the only thing separating
+ * them that does not depend on the library's own class names.
+ */
+function isRpcRefusal(error: unknown): boolean {
+  return typeof (error as { code?: unknown } | null)?.code === 'number';
 }
 
 /**
@@ -93,12 +157,38 @@ interface Subscription extends AsyncIterable<{ type: string; params?: unknown }>
 interface Client {
   connect(): void;
   shutdown(): Promise<void>;
-  initialize(args: { clientId: string; protocolVersions: readonly string[] }): Promise<unknown>;
+  initialize(args: {
+    clientId: string;
+    protocolVersions: readonly string[];
+    initialSubscriptions?: readonly string[];
+    clientInfo?: { name: string; version?: string };
+    locale?: string;
+  }): Promise<unknown>;
+  /**
+   * Take up a dropped connection where it left off.
+   *
+   * Answers either the envelopes missed since `lastSeenServerSeq`, or - when
+   * the gap is longer than the host's buffer - fresh snapshots for the
+   * channels it could restore. `missing` names the ones it could not.
+   */
+  reconnect(args: {
+    clientId: string;
+    lastSeenServerSeq: number;
+    subscriptions: readonly string[];
+  }): Promise<Record<string, unknown>>;
   request(method: string, params: unknown): Promise<Record<string, unknown>>;
   subscribe(uri: string): Promise<{
     result: { snapshot?: { state?: unknown } };
     subscription: Subscription;
   }>;
+  /** Tell the host nobody is reading a channel. Fire-and-forget, by the protocol. */
+  unsubscribe(uri: string): Promise<void>;
+  /** Every channel's traffic in one stream, tagged with the channel it came on. */
+  events(): AsyncIterableIterator<{ channel: string; event: { type: string; params?: unknown } }>;
+  /** Connection transitions, which is how a drop is noticed before a read fails. */
+  stateChanges(): AsyncIterableIterator<{ status: string; reason?: { type: string } }>;
+  /** In-band liveness. A proxy that drops idle sockets never sees the traffic below it. */
+  ping(): Promise<void>;
   dispatch(channel: string, action: unknown): unknown;
 }
 
@@ -758,92 +848,34 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
   let state: 'connecting' | 'connected' | 'offline' = 'connecting';
   const moveTo = (next: typeof state): void => { state = next; options.onState?.(next); };
 
-  const transport = await ahp.connect(endpoint);
-  const client = new ahp.Client(transport, {});
+  /**
+   * This client's name to the host, for the life of the process.
+   *
+   * `reconnect` is addressed by it: a fresh one each time the socket comes
+   * back is a host asked to resume a client it has never heard of, which it
+   * answers by refusing - so the identity has to outlive the connection it
+   * was first used on.
+   */
+  const clientId = options.clientId ?? `ahpc-${randomUUID().slice(0, 8)}`;
+  const openTransport = options.connect ?? (() => ahp.connect(endpoint));
+  const backoff = options.backoff ?? BACKOFF;
+  const keepaliveMs = options.keepaliveMs ?? KEEPALIVE_MS;
+
+  const transport = await openTransport();
+  let client = new ahp.Client(transport, {});
   const mirror = new ahp.Mirror();
   client.connect();
 
   const hello = bag(await client.initialize({
-    clientId: options.clientId ?? `ahpc-${randomUUID().slice(0, 8)}`,
+    clientId,
     protocolVersions: VERSIONS,
+    clientInfo: { name: 'ahpc' },
   }));
   for (const snapshot of list(hello.snapshots)) mirror.applySnapshot(snapshot);
   moveTo('connected');
 
-  // The root channel, for the agents it advertises. Drained rather than
-  // polled: re-subscribing to take a fresh look tears down the stream.
-  /**
-   * Watchers of the catalogue.
-   *
-   * The root channel is already being drained for the agents it advertises,
-   * and every session that appears, finishes or starts waiting arrives on it
-   * as an action. Nothing was told: the catalogue only got fresh when somebody
-   * navigated away and back, which is a reader doing by hand what the host had
-   * already said.
-   */
-  const catalogue = new Set<() => void>();
-
-  const root = await client.subscribe(ROOT);
-  if (root.result.snapshot) mirror.applySnapshot(root.result.snapshot);
-  void (async () => {
-    try {
-      for await (const event of root.subscription) {
-        if (event.type !== 'action') continue;
-        mirror.apply(event.params);
-        // Every action, without inspecting it. What a root action means is the
-        // host's business and it grows new kinds; "something over there moved,
-        // read it again" is true of all of them, and the read is one request.
-        for (const listener of catalogue) listener();
-      }
-    } catch { moveTo('offline'); }
-  })();
-
-  /**
-   * The automations channel, watched for as long as this connection lives.
-   *
-   * Subscribed once at connect rather than when the screen opens, for the same
-   * reason the root channel is: the change worth hearing about is the one
-   * nobody made, and an automation that fires at nine in the morning has to
-   * reach a client that was not looking at the time.
-   *
-   * A host that serves none refuses this, and the refusal is *kept* rather
-   * than retried - it is an answer about what this host is, and it will not
-   * become a different answer on the next keystroke.
-   */
-  const automationWatchers = new Set<() => void>();
-  let automationState: Bag | null = null;
-  let noAutomations: string | undefined;
-  try {
-    const channel = await client.subscribe(AUTOMATIONS);
-    automationState = bag(channel.result.snapshot?.state);
-    void (async () => {
-      try {
-        for await (const event of channel.subscription) {
-          if (event.type !== 'action') continue;
-          // The host's own reducer. Two mutations is not eighty, but a second
-          // answer to "what is the state now" is a second answer at any size.
-          automationState = bag(ahp.automationReducer(automationState, bag(event.params).action));
-          for (const listener of automationWatchers) listener();
-        }
-      } catch { /* the connection going is reported by the root channel */ }
-    })();
-  }
-  catch (error) {
-    const rpc = error as { message?: string } | null;
-    noAutomations = rpc?.message ?? 'This host serves no automations.';
-  }
-
-  /** The chat a session dispatches to, remembered so it is asked for once. */
-  const chats = new Map<SessionUri, string>();
-  /**
-   * Channels this host has refused, and what it said.
-   *
-   * A live catalogue contains sessions whose agent is gone - the host lists
-   * them and then answers `-32001 No agent for session` to anything that tries
-   * to watch one. That is an *answer*, not a failure of the connection, and
-   * asking again on every keystroke turns one refusal into a stream of them.
-   */
-  const refused = new Map<string, string>();
+  /** True once `close` has been called, so a deliberate hang-up is not retried. */
+  let finished = false;
 
   /**
    * The reason a host gave, in the words it used.
@@ -860,6 +892,182 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
   };
 
   /**
+   * Every channel this client is holding open, and who is reading each one.
+   *
+   * Between the protocol client and the screens: it counts the readers of a
+   * channel so the last one leaving is what sends `unsubscribe`, and it holds
+   * the set that has to be named to `reconnect` when the socket comes back.
+   */
+  const channels = openChannels({
+    client,
+    reason,
+    onRefusal: (uri, message) => options.onRefusal?.(uri, message),
+  });
+  channels.drain(client);
+
+  /**
+   * Watchers of the catalogue.
+   *
+   * The root channel is already being drained for the agents it advertises,
+   * and every session that appears, finishes or starts waiting arrives on it
+   * as an action. Nothing was told: the catalogue only got fresh when somebody
+   * navigated away and back, which is a reader doing by hand what the host had
+   * already said.
+   */
+  const catalogue = new Set<() => void>();
+
+  channels.open(ROOT, {
+    opened: (root) => { if (root) mirror.applySnapshot({ resource: ROOT, state: root }); },
+    event: (event) => {
+      // Actions carry root state and the notifications carry the catalogue.
+      // Both mean "something over there moved, read it again", which is true
+      // of every kind of them and is one request either way.
+      if (event.type === 'action') mirror.apply(event.params);
+      else if (event.type !== 'sessionAdded' && event.type !== 'sessionRemoved'
+        && event.type !== 'sessionSummaryChanged') return;
+      for (const listener of catalogue) listener();
+    },
+  });
+
+  /**
+   * The automations channel, watched for as long as this connection lives.
+   *
+   * Subscribed once at connect rather than when the screen opens, for the same
+   * reason the root channel is: the change worth hearing about is the one
+   * nobody made, and an automation that fires at nine in the morning has to
+   * reach a client that was not looking at the time.
+   *
+   * A host that serves none refuses this, and the refusal is *kept* rather
+   * than retried - it is an answer about what this host is, and it will not
+   * become a different answer on the next keystroke.
+   */
+  const automationWatchers = new Set<() => void>();
+  let automationState: Bag | null = null;
+  let noAutomations: string | undefined;
+  channels.open(AUTOMATIONS, {
+    opened: (state) => { automationState = state; },
+    event: (event) => {
+      if (event.type !== 'action') return;
+      // The host's own reducer. Two mutations is not eighty, but a second
+      // answer to "what is the state now" is a second answer at any size.
+      automationState = bag(ahp.automationReducer(automationState, bag(event.params).action));
+      for (const listener of automationWatchers) listener();
+    },
+    refused: (message) => { noAutomations = message; },
+  });
+
+  /** The chat a session dispatches to, remembered so it is asked for once. */
+  const chats = new Map<SessionUri, string>();
+
+  /**
+   * Wait, unless the client is being closed while waiting.
+   *
+   * A backoff of half a minute is half a minute a person can spend quitting,
+   * and a timer nobody cancels holds the process open after they have.
+   */
+  const timers = new Set<ReturnType<typeof setTimeout>>();
+  const pause = (ms: number): Promise<void> => new Promise((resolve) => {
+    const timer = setTimeout(() => { timers.delete(timer); resolve(); }, ms);
+    timers.add(timer);
+  });
+
+  /**
+   * Take the connection back after it drops, and say so while it is gone.
+   *
+   * A dropped socket is a pause rather than an ending: the host holds the
+   * sessions, so what is lost is this client's view of them and not the work.
+   * The identity and the held channels are carried across, `reconnect` asks
+   * for what was missed, and the catalogue is re-read because protocol
+   * notifications are never replayed - a session created while this client
+   * was away is announced once, to a client that was not there to hear it.
+   */
+  void (async () => {
+    for (;;) {
+      let dropped = false;
+      try {
+        for await (const change of client.stateChanges()) {
+          if (change.status !== 'closed') continue;
+          dropped = change.reason?.type !== 'shutdown';
+          break;
+        }
+      }
+      catch { dropped = true; }
+      if (finished || !dropped) return;
+
+      channels.detach();
+      moveTo('connecting');
+
+      for (let attempt = 0; !finished; attempt += 1) {
+        await pause(backoff[Math.min(attempt, backoff.length - 1)] ?? 0);
+        if (finished) return;
+        try {
+          const socket = await openTransport();
+          const fresh = new ahp.Client(socket, {});
+          fresh.connect();
+          const held = channels.held();
+
+          let answer: Bag | null = null;
+          try {
+            answer = bag(await fresh.reconnect({
+              clientId,
+              lastSeenServerSeq: channels.seq(),
+              subscriptions: held,
+            }));
+          }
+          catch (error) {
+            // A host that will not resume this client is the ordinary case
+            // rather than a failure: a daemon restarted between the drop and
+            // now has never heard of this `clientId`, and answers so. What
+            // cannot be resumed is started again - retrying `reconnect` at a
+            // host that has forgotten us is a loop with no end in it.
+            if (!isRpcRefusal(error)) throw error;
+            await fresh.initialize({
+              clientId,
+              protocolVersions: VERSIONS,
+              clientInfo: { name: 'ahpc' },
+              initialSubscriptions: held,
+            });
+          }
+
+          client = fresh;
+          if (answer === null) channels.resume(fresh, {});
+          else {
+            channels.resume(fresh, str(answer.type) === 'replay'
+              ? { replayed: list(answer.actions), missing: list(answer.missing).filter((uri): uri is string => typeof uri === 'string') }
+              : { resumed: list(answer.snapshots) as { resource: string; state?: unknown }[] });
+          }
+          moveTo('connected');
+          // Notifications are not replayed, so what the catalogue missed is
+          // not in the answer above and has to be asked for again.
+          for (const listener of catalogue) listener();
+          break;
+        }
+        catch { /* the host is not back yet, or would not have us back */ }
+      }
+    }
+  })();
+
+  /**
+   * Say something on an otherwise silent connection.
+   *
+   * A proxy between this client and its host drops a socket that has carried
+   * nothing for long enough, and neither end is told - so a session left open
+   * overnight is one whose next keystroke goes nowhere. `ping` is the
+   * protocol's own answer to that, and a failed one is a drop the supervisor
+   * above can act on rather than one nobody has noticed yet.
+   */
+  if (keepaliveMs > 0) {
+    void (async () => {
+      while (!finished) {
+        await pause(keepaliveMs);
+        if (finished) return;
+        try { await client.ping(); }
+        catch { /* the state change is what the supervisor reads */ }
+      }
+    })();
+  }
+
+  /**
    * A snapshot, or nothing.
    *
    * Nothing is a real answer here: a session with no agent still has a row in
@@ -868,22 +1076,7 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
    * unhandled, and an unhandled rejection ends the process - from a terminal
    * in its alternate screen, which is the worst way for anything to end.
    */
-  const snapshotOf = async (uri: string): Promise<Bag | null> => {
-    const known = refused.get(uri);
-    if (known !== undefined) return null;
-    try {
-      const { result, subscription } = await client.subscribe(uri);
-      // Closing drops *this consumer*. `unsubscribe` is channel-wide and would
-      // kill the stream whatever else is reading it depends on.
-      void subscription.close().catch(() => undefined);
-      return bag(result.snapshot?.state);
-    } catch (error) {
-      const said = reason(error);
-      refused.set(uri, said);
-      options.onRefusal?.(uri, said);
-      return null;
-    }
-  };
+  const snapshotOf = async (uri: string): Promise<Bag | null> => channels.state(uri);
 
   const chatOf = async (uri: SessionUri): Promise<string | null> => {
     const known = chats.get(uri);
@@ -916,7 +1109,7 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
     const sending = (async () => {
       const chat = await chatOf(uri);
       if (!chat) {
-        options.onRefusal?.(uri, refused.get(uri) ?? 'this session has no chat to speak to');
+        options.onRefusal?.(uri, channels.refusal(uri) ?? 'this session has no chat to speak to');
         return;
       }
       client.dispatch(chat, action);
@@ -926,7 +1119,11 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
   };
 
   return {
-    id: 'live',
+    // The name the host knows this connection by, not a word meaning "real".
+    // A daemon logs the `clientId` it accepted and the one that went away, so
+    // reporting it here is what lets a run on this side be tied to a run on
+    // that one - `ahpc status --json` prints it, and nothing else could.
+    id: clientId,
     url: options.url,
     state: () => state,
 
@@ -981,13 +1178,41 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
     },
 
     listSessions: async () => {
-      const result = await client.request('listSessions', { channel: ROOT, limit: 100 });
       // Asking again is what a refresh is for. A refusal is remembered so that
       // moving the highlight does not re-ask a hundred times, and forgotten
       // here so that `r` is a way to try - which matters for the refusals that
       // are temporary, like a harness nobody had signed into yet.
-      refused.clear();
-      return list(result.items).map(summary);
+      channels.forget();
+
+      /*
+       * The whole catalogue, in whatever pages the host chooses to give it.
+       *
+       * No `limit` is sent: the page size is the host's to pick, and a number
+       * chosen here is a number only this client can see. What is followed is
+       * `nextCursor`, which is the host saying there is more - this asked for
+       * a hundred rows and dropped that sentence, so a catalogue of 123 showed
+       * 100 and gave no sign the rest existed.
+       */
+      const rows: unknown[] = [];
+      let cursor: string | undefined;
+      let more = false;
+      for (let page = 0; page < PAGES; page += 1) {
+        const result = await client.request('listSessions', {
+          channel: ROOT,
+          ...(cursor === undefined ? {} : { cursor }),
+        });
+        rows.push(...list(result.items));
+        cursor = str(result.nextCursor);
+        if (cursor === undefined) break;
+        more = page === PAGES - 1;
+      }
+      // Said rather than swallowed. Reaching this means a catalogue larger
+      // than this client will walk in one go, and a list that stops without
+      // saying so is the defect this replaced.
+      if (more) {
+        options.onLimit?.(`Showing the first ${rows.length} sessions; this host has more.`);
+      }
+      return rows.map(summary);
     },
 
     agents: async (): Promise<Agent[]> => list(mirror.root.agents).map((entry) => {
@@ -1164,7 +1389,6 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
      */
     watchTerminal: (uri, observer) => {
       let live = true;
-      let closer: (() => void) | undefined;
       const shape = (state: Bag): TerminalState => ({
         title: str(state.title) ?? 'Terminal',
         // The protocol's typed parts, flattened: a command part carries its
@@ -1181,23 +1405,24 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
         isPty: state.isPty === true,
       });
 
-      void (async () => {
-        try {
-          const opened = await client.subscribe(uri);
-          if (!live) { void opened.subscription.close(); return; }
-          closer = () => void opened.subscription.close();
-          let state = bag(opened.result.snapshot?.state);
-          observer(shape(state));
-          for await (const event of opened.subscription) {
-            if (event.type !== 'action') continue;
-            state = bag(ahp.terminalReducer(state, bag(event.params).action));
-            if (live) observer(shape(state));
-          }
-        }
-        catch (error) { options.onRefusal?.(uri, reason(error)); }
-      })();
+      let state: Bag = {};
+      const hold = channels.open(uri, {
+        opened: (fresh) => {
+          // A reconnect too long for replay arrives here as well, which is
+          // why this rebuilds rather than merges: the host's state is the
+          // answer and the one held across the gap is a guess about it.
+          if (fresh) state = fresh;
+          if (live) observer(shape(state));
+        },
+        event: (event) => {
+          if (event.type !== 'action') return;
+          state = bag(ahp.terminalReducer(state, bag(event.params).action));
+          if (live) observer(shape(state));
+        },
+        refused: (message) => options.onRefusal?.(uri, message),
+      });
 
-      return { close: () => { live = false; closer?.(); } };
+      return { close: () => { live = false; hold.release(); } };
     },
 
     writeTerminal: (uri, data) => {
@@ -1258,7 +1483,7 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
     disposeSession: async (uri) => {
       await client.request('disposeSession', { channel: uri });
       chats.delete(uri);
-      refused.delete(uri);
+      channels.forget(uri);
     },
 
     setArchived: (uri, archived) => {
@@ -1336,59 +1561,70 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
         observer(event);
       };
 
-      void (async () => {
-        const known = refused.get(uri);
-        if (known !== undefined) { observer({ type: 'error', message: known }); return; }
-        const opened = await client.subscribe(uri);
-        if (!live) { void opened.subscription.close(); return; }
-        closers.push(() => void opened.subscription.close());
-        session = bag(opened.result.snapshot?.state);
+      /** The chat channel, once the session has said which one it is. */
+      let talking: { release(): void } | undefined;
 
-        chatsChanged();
-        // The one that was asked for, or the session's own. A client watching
-        // a second chat is watching that chat, not the session's first.
+      /**
+       * Follow the session's chat.
+       *
+       * Called once the session state names one, and again after a reconnect
+       * hands back a session state naming a different one - a client watching
+       * a second chat is watching that chat, not the session's first.
+       */
+      const followChat = (): void => {
         const chatUri = wanted ?? str(session.defaultChat);
-        if (chatUri) {
-          chats.set(uri, chatUri);
-          const talking = await client.subscribe(chatUri);
-          if (!live) { void talking.subscription.close(); return; }
-          closers.push(() => void talking.subscription.close());
-          chat = bag(talking.result.snapshot?.state);
-          void (async () => {
-            for await (const event of talking.subscription) {
-              if (event.type !== 'action') continue;
-              chat = bag(applyAction(ahp.chatReducer, chat, bag(event.params).action, bad));
-              emit();
-            }
-          })();
-        }
-        emit();
+        if (!chatUri || !live) return;
+        if (chats.get(uri) === chatUri && talking) return;
+        talking?.release();
+        chats.set(uri, chatUri);
+        talking = channels.open(chatUri, {
+          opened: (fresh) => { if (fresh) chat = fresh; emit(); },
+          event: (event) => {
+            if (event.type !== 'action') return;
+            chat = bag(applyAction(ahp.chatReducer, chat, bag(event.params).action, bad));
+            emit();
+          },
+          refused: (message) => { if (live) observer({ type: 'error', message }); },
+        });
+        closers.push(() => talking?.release());
+      };
 
-        for await (const event of opened.subscription) {
-          if (event.type !== 'action') continue;
-          session = bag(applyAction(ahp.sessionReducer, session, bag(event.params).action, bad));
-          // Separate from the snapshot below, which is the chat: these are the
-          // session's, they change for reasons that have nothing to do with a
-          // turn, and a panel that only re-read when it was opened showed a
-          // switch that had been answered as though it had not.
-          const items = customizations(session.customizations);
-          const now = JSON.stringify(items);
-          if (now !== contributed) {
-            contributed = now;
-            if (live) observer({ type: 'customizations', items });
-          }
-          chatsChanged();
-          emit();
-        }
-      })().catch((error: unknown) => {
-        // The host answering "no" is not the host being gone. Marking the
-        // connection offline over one dead session is how a person is sent to
-        // check their network about a session whose agent simply exited.
-        const said = reason(error);
-        refused.set(uri, said);
-        options.onRefusal?.(uri, said);
-        if (live) observer({ type: 'error', message: said });
-      });
+      const known = channels.refusal(uri);
+      if (known !== undefined) {
+        queueMicrotask(() => { if (live) observer({ type: 'error', message: known }); });
+      }
+      else {
+        const held = channels.open(uri, {
+          opened: (fresh) => {
+            if (fresh) session = fresh;
+            chatsChanged();
+            followChat();
+            emit();
+          },
+          event: (event) => {
+            if (event.type !== 'action') return;
+            session = bag(applyAction(ahp.sessionReducer, session, bag(event.params).action, bad));
+            // Separate from the snapshot below, which is the chat: these are the
+            // session's, they change for reasons that have nothing to do with a
+            // turn, and a panel that only re-read when it was opened showed a
+            // switch that had been answered as though it had not.
+            const items = customizations(session.customizations);
+            const now = JSON.stringify(items);
+            if (now !== contributed) {
+              contributed = now;
+              if (live) observer({ type: 'customizations', items });
+            }
+            chatsChanged();
+            followChat();
+            emit();
+          },
+          // The host answering "no" is not the host being gone. Marking the
+          // connection offline over one dead session is how a person is sent
+          // to check their network about a session whose agent simply exited.
+          refused: (message) => { if (live) observer({ type: 'error', message }); },
+        });
+        closers.push(() => held.release());
+      }
 
       return {
         close: () => {
@@ -1658,7 +1894,7 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
         lifecycle: (str(state.lifecycle) === 'creationFailed'
           ? 'failed'
           : str(state.lifecycle) ?? 'creating') as SessionDetail['lifecycle'],
-        ...(refused.has(uri) ? { refusal: refused.get(uri) as string } : {}),
+        ...(channels.refusal(uri) !== undefined ? { refusal: channels.refusal(uri) as string } : {}),
         config: config(state.config),
         ...(last ? { model: str(bag(bag(bag(last).message).model).id) as string } : {}),
         ...(str(state.activity) ? { activity: str(state.activity) as string } : {}),
@@ -1685,6 +1921,10 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
       // sends somebody to check their network over a program that simply
       // finished.
       state = 'offline';
+      finished = true;
+      for (const timer of timers) clearTimeout(timer);
+      timers.clear();
+      channels.detach();
       await client.shutdown();
     },
   };

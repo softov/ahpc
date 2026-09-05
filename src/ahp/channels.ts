@@ -1,0 +1,362 @@
+/** Who is holding which channel open, and what the host is saying on it. */
+
+/** One thing the host said on a channel: an action, or a protocol notification. */
+export interface ChannelEvent {
+  type: string;
+  params?: unknown;
+}
+
+/** A channel event with the channel it arrived on. */
+export interface AddressedEvent {
+  channel: string;
+  event: ChannelEvent;
+}
+
+/** State as the host holds it, before this client has read anything out of it. */
+export type ChannelState = Record<string, unknown> | null;
+
+/**
+ * One reader of one channel.
+ *
+ * `opened` arrives before any `event`, and arrives *again* after a reconnect
+ * that could not be closed by replay: a consumer rebuilds from the state it is
+ * handed rather than assuming the one it had is still the truth.
+ */
+export interface Consumer {
+  /** The channel's state, as of the moment this reader joined it. */
+  opened(state: ChannelState): void;
+  /** Everything the host sends on the channel, in the order it sent it. */
+  event(event: ChannelEvent): void;
+  /** The host would not serve the channel, in the words it used. */
+  refused?(message: string): void;
+}
+
+/** What this registry needs of a protocol client. */
+export interface ChannelClient {
+  subscribe(uri: string): Promise<{ result: { snapshot?: { state?: unknown } | null } }>;
+  unsubscribe(uri: string): Promise<void>;
+  events(): AsyncIterableIterator<AddressedEvent>;
+}
+
+/** A reader's hold on a channel, given up by calling `release`. */
+export interface Hold {
+  release(): void;
+}
+
+/** A snapshot the host handed back for one channel during a reconnect. */
+export interface ResumedSnapshot {
+  resource: string;
+  state?: unknown;
+}
+
+export interface Channels {
+  /**
+   * Take a hold on a channel and start reading it.
+   *
+   * Synchronous, because every caller is a screen being drawn: the subscribe
+   * happens behind this and the consumer hears about it through `opened`. A
+   * hold released before the subscribe lands never subscribes at all.
+   */
+  open(uri: string, consumer: Consumer): Hold;
+  /**
+   * The channel's state now, without holding it open afterwards.
+   *
+   * A read rather than a watch: this subscribes, takes the state, and
+   * unsubscribes again unless somebody else is holding the channel. A host
+   * has no other way to answer "what is in there" - there is no `getState` -
+   * so the subscription is the question and letting go is the whole point.
+   */
+  state(uri: string): Promise<ChannelState>;
+  /** Every channel held right now, which is what `reconnect` has to be told. */
+  held(): string[];
+  /** The highest `serverSeq` this client has seen on any channel. */
+  seq(): number;
+  /**
+   * Read one channel's refusal, if it was refused.
+   *
+   * A refusal is an answer about what the host is - `-32001` for a session
+   * whose agent has gone - and asking again on every keystroke turns one
+   * refusal into a stream of them.
+   */
+  refusal(uri: string): string | undefined;
+  /**
+   * Let a refusal be asked again: one channel, or every one of them.
+   *
+   * What a host refuses can stop being refused - a session is created, an
+   * agent comes back - and the answer is only worth keeping until something
+   * happens that could have changed it.
+   */
+  forget(uri?: string): void;
+  /** Start reading a connection's event stream. Ends when the stream does. */
+  drain(client: ChannelClient): void;
+  /**
+   * Take up the same channels again on a new connection.
+   *
+   * `replayed` is the branch where the host could name everything missed:
+   * the envelopes go to their consumers in order and nobody is re-opened.
+   * `resumed` is the branch where it could not, and every consumer is handed
+   * a fresh state. `missing` is refused either way.
+   */
+  resume(client: ChannelClient, result: {
+    replayed?: readonly unknown[];
+    resumed?: readonly ResumedSnapshot[];
+    missing?: readonly string[];
+  }): void;
+  /** Forget every subscription without unsubscribing: the socket is already gone. */
+  detach(): void;
+}
+
+interface Held {
+  /** How many readers are holding it. Zero means it is on its way out. */
+  uses: number;
+  consumers: Set<Consumer>;
+  /** True once the host has answered the subscribe for this channel. */
+  opened: boolean;
+  /** What arrived while the subscribe was still in flight. */
+  waiting: ChannelEvent[];
+}
+
+function bag(value: unknown): Record<string, unknown> | null {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+export interface ChannelsOptions {
+  client: ChannelClient;
+  /** Told when a channel is refused, so the reason reaches a person. */
+  onRefusal?(uri: string, message: string): void;
+  /** The host's own words for a failure, as a client would show them. */
+  reason(error: unknown): string;
+}
+
+export function openChannels(options: ChannelsOptions): Channels {
+  const held = new Map<string, Held>();
+  const refused = new Map<string, string>();
+  let client = options.client;
+  let seen = 0;
+  /**
+   * Which connection the current holds belong to.
+   *
+   * A subscribe in flight when the socket dies would otherwise land on the
+   * next connection and open a channel twice; it compares this instead.
+   */
+  let generation = 0;
+
+  const entry = (uri: string): Held => {
+    const found = held.get(uri);
+    if (found) return found;
+    const made: Held = { uses: 0, consumers: new Set(), opened: false, waiting: [] };
+    held.set(uri, made);
+    return made;
+  };
+
+  /** Note the host's counter, which advances with state rather than with messages. */
+  const note = (event: ChannelEvent): void => {
+    if (event.type !== 'action') return;
+    const seq = bag(event.params)?.serverSeq;
+    if (typeof seq === 'number' && seq > seen) seen = seq;
+  };
+
+  const deliver = (uri: string, event: ChannelEvent): void => {
+    note(event);
+    const channel = held.get(uri);
+    if (!channel) return;
+    // Before the snapshot has landed there is nothing to apply this to. The
+    // host starts sending the moment it accepts the subscribe, which is
+    // earlier than it answers one.
+    if (!channel.opened) { channel.waiting.push(event); return; }
+    for (const consumer of channel.consumers) consumer.event(event);
+  };
+
+  const refuse = (uri: string, message: string): void => {
+    refused.set(uri, message);
+    options.onRefusal?.(uri, message);
+    const channel = held.get(uri);
+    if (!channel) return;
+    for (const consumer of channel.consumers) consumer.refused?.(message);
+  };
+
+  /** Read a connection's whole event stream until it ends or is superseded. */
+  const drain = (next: ChannelClient, era: number): void => {
+    client = next;
+    void (async () => {
+      try {
+        for await (const addressed of next.events()) {
+          if (era !== generation) return;
+          deliver(addressed.channel, addressed.event);
+        }
+      }
+      catch { /* the connection going is the supervisor's to notice */ }
+    })();
+  };
+
+  /** Ask the host for a channel, and give what comes back to whoever is waiting. */
+  const start = (uri: string, era: number): void => {
+    void (async () => {
+      try {
+        const { result } = await client.subscribe(uri);
+        if (era !== generation) return;
+        const channel = held.get(uri);
+        if (!channel || channel.uses === 0) return;
+        const state = bag(result.snapshot?.state);
+        channel.opened = true;
+        for (const consumer of channel.consumers) consumer.opened(state);
+        const queued = channel.waiting.splice(0);
+        for (const event of queued) {
+          for (const consumer of channel.consumers) consumer.event(event);
+        }
+      }
+      catch (error) {
+        if (era !== generation) return;
+        refuse(uri, options.reason(error));
+      }
+    })();
+  };
+
+  /** Let the host know nobody is reading, which is the only handle a watch has. */
+  const drop = (uri: string): void => {
+    const channel = held.get(uri);
+    if (!channel || channel.uses > 0) return;
+    held.delete(uri);
+    if (!channel.opened) return;
+    void client.unsubscribe(uri).catch(() => undefined);
+  };
+
+  return {
+    open: (uri, consumer) => {
+      const known = refused.get(uri);
+      if (known !== undefined) {
+        // Answered already. Told on the way out rather than on the way in, so
+        // a caller that only wanted the handle still gets one.
+        queueMicrotask(() => consumer.refused?.(known));
+        return { release: () => undefined };
+      }
+
+      const channel = entry(uri);
+      channel.consumers.add(consumer);
+      const first = channel.uses === 0;
+      channel.uses += 1;
+      if (first) start(uri, generation);
+      else if (channel.opened) {
+        // Somebody is already reading it. This one needs the state as it
+        // stands, and the host will not send a second snapshot for it.
+        queueMicrotask(() => { if (channel.consumers.has(consumer)) consumer.opened(null); });
+      }
+
+      let holding = true;
+      return {
+        release: () => {
+          if (!holding) return;
+          holding = false;
+          channel.consumers.delete(consumer);
+          channel.uses -= 1;
+          if (channel.uses === 0) drop(uri);
+        },
+      };
+    },
+
+    state: async (uri) => {
+      const known = refused.get(uri);
+      if (known !== undefined) return null;
+      const existing = held.get(uri);
+      // Already being watched: subscribing again would be a second answer to a
+      // question somebody is already holding open.
+      if (existing && existing.uses > 0) {
+        try {
+          const { result } = await client.subscribe(uri);
+          return bag(result.snapshot?.state);
+        }
+        catch (error) { refuse(uri, options.reason(error)); return null; }
+      }
+      try {
+        const { result } = await client.subscribe(uri);
+        const state = bag(result.snapshot?.state);
+        // Nobody asked to keep it. Releasing it is the difference between a
+        // read and a watch the host has to go on serving forever.
+        if (!held.has(uri)) void client.unsubscribe(uri).catch(() => undefined);
+        return state;
+      }
+      catch (error) {
+        refuse(uri, options.reason(error));
+        return null;
+      }
+    },
+
+    held: () => [...held.keys()].filter((uri) => (held.get(uri)?.uses ?? 0) > 0),
+    seq: () => seen,
+    refusal: (uri) => refused.get(uri),
+    forget: (uri) => { if (uri === undefined) refused.clear(); else refused.delete(uri); },
+
+    drain: (next) => { drain(next, generation); },
+
+    resume: (next, result) => {
+      generation += 1;
+      client = next;
+      // Before anything is applied, so an action the host sends while this is
+      // still catching up is queued rather than dropped on the floor.
+      drain(next, generation);
+
+      const gone = new Set(result.missing ?? []);
+      for (const uri of gone) {
+        const channel = held.get(uri);
+        if (!channel) continue;
+        held.delete(uri);
+        for (const consumer of channel.consumers) {
+          consumer.refused?.('This session is no longer on the host.');
+        }
+      }
+
+      // Replay: the host could name everything this client missed, so the
+      // mirrors it has are still good and only the gap needs filling.
+      for (const envelope of result.replayed ?? []) {
+        const uri = bag(envelope)?.channel;
+        if (typeof uri !== 'string') continue;
+        const channel = held.get(uri);
+        if (!channel) continue;
+        const event: ChannelEvent = { type: 'action', params: envelope };
+        note(event);
+        for (const consumer of channel.consumers) consumer.event(event);
+      }
+
+      if (result.replayed !== undefined) {
+        // Replay is what the host sends *instead of* a fresh snapshot, so the
+        // subscriptions behind it are ones it restored itself and none of them
+        // needs asking for again.
+        for (const channel of held.values()) {
+          if (channel.uses === 0 || channel.opened) continue;
+          channel.opened = true;
+          const queued = channel.waiting.splice(0);
+          for (const event of queued) {
+            for (const consumer of channel.consumers) consumer.event(event);
+          }
+        }
+      }
+
+      // Snapshot: the gap was longer than the host's buffer, so every mirror
+      // is stale and every reader is handed the state rather than a delta.
+      for (const snapshot of result.resumed ?? []) {
+        const channel = held.get(snapshot.resource);
+        if (!channel) continue;
+        channel.opened = true;
+        channel.waiting.length = 0;
+        for (const consumer of channel.consumers) consumer.opened(bag(snapshot.state));
+      }
+
+      for (const [uri, channel] of held) {
+        if (channel.uses === 0) continue;
+        // A channel the host restored but sent no snapshot for is still being
+        // served; one it never restored has to be asked for again.
+        if (!channel.opened) start(uri, generation);
+      }
+    },
+
+    detach: () => {
+      generation += 1;
+      for (const channel of held.values()) {
+        channel.opened = false;
+        channel.waiting.length = 0;
+      }
+    },
+  };
+}
