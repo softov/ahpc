@@ -69,6 +69,27 @@ Changes and files
   content <uri> <file>         one of them, in full
   resource list <uri>          a directory the host serves            [--json]
   resource read <uri>          a file on the host
+  resource stat <uri>          what it is, without reading it         [--json]
+  resource write <uri> [file]  from a file, or from stdin      [--create-only]
+  resource rm <uri>            delete it                        [--recursive]
+  resource mkdir <uri>         make a directory
+  resource mv <uri> <to>       move it                     [--fail-if-exists]
+  resource cp <uri> <to>       copy it                     [--fail-if-exists]
+
+Automations
+  automation list              what runs on its own                   [--json]
+  automation show <uri>        one of them                            [--json]
+  automation triggers          what this host can trigger on          [--json]
+  automation runs <uri>        its history, every page                [--json]
+  automation run <uri>         start it now
+  automation enable <uri>      switch it on
+  automation disable <uri>     switch it off
+  automation rm <uri>          forget it
+
+Signing in
+  auth                         what this host protects                [--json]
+  auth <resource>              push a token   [--token T] [--expires-in S]
+                               or set AHPC_TOKEN_<RESOURCE>, or pipe one in
 
 Terminals
   terminal list                what is running                        [--json]
@@ -349,6 +370,8 @@ export async function cli(command: string, rest: string[]): Promise<number> {
       case 'resource': return await files(host, args, wants);
 
       case 'auth': return await signIn(host, args, wants);
+
+      case 'automation': return await automation(host, args, wants);
 
       case 'agents': {
         const found = await settled(host, () => host.agents());
@@ -989,6 +1012,93 @@ async function files(host: HostConnection, args: Args, wants: boolean): Promise<
     return 0;
   }
   throw new Fault(`No 'resource ${verb}'. Try 'ahpc help'.`);
+}
+
+/**
+ * Automations, from a script.
+ *
+ * The point of an automation is doing something without a person present, so a
+ * feature only a screen can reach is the wrong shape for it. Every verb here
+ * is one the seam already had; `triggers` and `runs` are the two the screen
+ * never asked for either.
+ */
+async function automation(host: HostConnection, args: Args, wants: boolean): Promise<number> {
+  const verb = args.positional(0) ?? 'list';
+  if (!host.automations) throw new Fault('This host serves no automations.');
+
+  if (verb === 'list') {
+    const found = await host.automations();
+    if (wants) { json(found); return 0; }
+    table(found.map((one) => [
+      one.enabled ? 'on' : 'off',
+      one.title,
+      one.schedule?.expression ?? '',
+      one.nextRunAt ?? '',
+      one.resource,
+    ]));
+    return 0;
+  }
+  if (verb === 'triggers') {
+    if (!host.automationTriggers) throw new Fault('This host does not say which triggers it has.');
+    const found = await host.automationTriggers();
+    if (wants) { json(found); return 0; }
+    table(found.map((one) => [one.kind, one.title ?? '', one.description ?? '']));
+    return 0;
+  }
+
+  const uri = needs(args, 1, 'an automation URI');
+  if (verb === 'show') {
+    const found = (await host.automations()).find((one) => one.resource === uri);
+    if (!found) throw new Fault(`No automation at ${uri}.`);
+    if (wants) { json(found); return 0; }
+    table([
+      ['Title', found.title],
+      ['Enabled', found.enabled ? 'yes' : 'no'],
+      ['Schedule', found.schedule?.expression ?? ''],
+      ['Zone', found.schedule?.timeZone ?? ''],
+      ['Next run', found.nextRunAt ?? ''],
+      ['Operations', found.operations.join(', ')],
+    ].filter(([, value]) => value !== ''));
+    return 0;
+  }
+  if (verb === 'runs') {
+    if (!host.automationRuns) throw new Fault('This host does not page run history.');
+    // Every page, because a cursor is the host's and a caller should not have
+    // to hold one to read a history.
+    const rows: { resource: string; status: string; startedAt?: string }[] = [];
+    let cursor: string | undefined;
+    do {
+      const page = await host.automationRuns(uri, cursor);
+      rows.push(...page.runs);
+      cursor = page.nextCursor;
+    } while (cursor !== undefined && rows.length < 500);
+    if (wants) { json(rows); return 0; }
+    table(rows.map((one) => [one.status, one.startedAt ?? '', one.resource]));
+    return 0;
+  }
+  if (verb === 'run') {
+    if (!host.runAutomation) throw new Fault('This host will not start an automation.');
+    await host.runAutomation(uri);
+    return 0;
+  }
+  if (verb === 'enable' || verb === 'disable') {
+    if (!host.setAutomationEnabled) throw new Fault('This host will not switch an automation.');
+    await host.setAutomationEnabled(uri, verb === 'enable');
+    return 0;
+  }
+  if (verb === 'rm') {
+    if (!host.removeAutomation) throw new Fault('This host will not remove an automation.');
+    // The host revalidates, and asking first is what the specification says a
+    // client SHOULD do: an automation that does not advertise `remove` is one
+    // this refuses rather than one the host refuses.
+    const found = (await host.automations()).find((one) => one.resource === uri);
+    if (found && !found.operations.includes('remove')) {
+      throw new Fault(`${uri} does not offer removal.`);
+    }
+    await host.removeAutomation(uri);
+    return 0;
+  }
+  throw new Fault(`No 'automation ${verb}'. Try list, show, triggers, runs, run, enable, disable, rm.`);
 }
 
 /**

@@ -18,17 +18,6 @@ specification is what this client follows.
 
 # Batch 6 - The rest of the surface
 
-## B-01-18 - Completions, forks and side chats
-
-**Clause.** `sessionConfigCompletions` in `CommandMap`, driven by a property whose schema carries `enumDynamic` - the reference host sets it on `branch` while isolation is `worktree`. `createChat.source` and `capabilities.multipleChats: { fork, sideChat }`, which the reference host advertises.
-
-**Missing.** Neither is called, so a dynamic property renders as free text and a fork cannot be started.
-
-**Steps.**
-1. Call `sessionConfigCompletions` for any property whose schema says `enumDynamic`; draw the result as choices.
-2. Offer fork and side chat exactly where `multipleChats` advertises each.
-3. Test: a scripted host with `enumDynamic` on one property.
-
 ## B-01-15 - Automations from the command line
 
 **Clause.** `automation-channel.md:82`: before dispatching `automation/removed` a client SHOULD verify the target advertises `AutomationOperation.Remove`. `listAutomationTriggerDefinitions` in `CommandMap` is how a client learns which triggers a host has.

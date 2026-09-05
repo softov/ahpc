@@ -1910,6 +1910,30 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
       });
     },
 
+    automationTriggers: async () => {
+      const result = bag(await client.request('listAutomationTriggerDefinitions', { channel: AUTOMATIONS }));
+      return list(result.items).map((raw) => {
+        const one = bag(raw);
+        return {
+          kind: str(one.kind) ?? str(one.type) ?? '',
+          ...(str(one.title) ? { title: str(one.title) as string } : {}),
+          ...(str(one.description) ? { description: str(one.description) as string } : {}),
+        };
+      }).filter((one) => one.kind !== '');
+    },
+
+    automationRuns: async (uri, cursor) => {
+      const result = bag(await client.request('fetchAutomationRuns', {
+        channel: AUTOMATIONS,
+        automation: uri,
+        ...(cursor === undefined ? {} : { cursor }),
+      }));
+      return {
+        runs: list(result.runs).map(automationRun),
+        ...(str(result.nextCursor) ? { nextCursor: str(result.nextCursor) as string } : {}),
+      };
+    },
+
     removeAutomation: async (uri) => {
       // `automation/removed`, in the protocol's own spelling: the client says
       // it is gone and the host revalidates that `remove` is still offered

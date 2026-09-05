@@ -1362,6 +1362,23 @@ export function fakeHost(): FakeHost {
       automationsMoved();
     },
 
+    automationTriggers: async () => [
+      { kind: 'schedule', title: 'On a schedule', description: 'A cron expression in a time zone.' },
+      // What a host that has events advertises. Without asking, only the
+      // first of these could ever be authored.
+      { kind: 'sessionFinished', title: 'When a session finishes' },
+      { kind: 'changesetOpened', title: 'When a changeset opens' },
+    ],
+
+    automationRuns: async (uri, cursor) => {
+      const all = (automations.get(uri)?.runs ?? []);
+      const page = cursor === undefined ? 0 : Number(cursor);
+      const size = 2;
+      const rows = all.slice(page * size, (page + 1) * size);
+      const next = (page + 1) * size < all.length ? String(page + 1) : undefined;
+      return { runs: rows, ...(next === undefined ? {} : { nextCursor: next }) };
+    },
+
     removeAutomation: async (uri) => {
       if (!automations.delete(uri)) return;
       automationsMoved();

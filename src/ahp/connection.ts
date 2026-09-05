@@ -1,5 +1,5 @@
 import type {
-  Agent, Answer, Automation, Changeset, Completion, ContentRef, Customization, FileContent, PendingInput, QueuedMessage,
+  Agent, Answer, Automation, AutomationRun, Changeset, Completion, ContentRef, Customization, FileContent, PendingInput, QueuedMessage,
   ChangesetOperationTarget, ChangesetScope, ChatSource, ModelSelection, ResourceEntry, SessionConfig, SessionDetail, SessionSummary, SessionUri, TerminalRow, TerminalState,
   ToolCall, Turn,
 } from './types.js';
@@ -455,6 +455,19 @@ export interface HostConnection {
   setAutomationEnabled?(uri: string, enabled: boolean): Promise<void>;
   /** Forget one, and everything it has done. */
   removeAutomation?(uri: string): Promise<void>;
+  /**
+   * Which triggers this host has, so one can be offered.
+   *
+   * Without asking, only a schedule can be authored: an event trigger is not
+   * offerable because nothing here knows what events exist. The kinds are the
+   * host's, not a list kept here.
+   */
+  automationTriggers?(): Promise<{ kind: string; title?: string; description?: string }[]>;
+  /** A page of one automation's run history, oldest last, with the host's cursor. */
+  automationRuns?(uri: string, cursor?: string): Promise<{
+    runs: AutomationRun[];
+    nextCursor?: string;
+  }>;
 
   flush?(): Promise<void>;
   close?(): void | Promise<void>;
