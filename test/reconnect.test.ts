@@ -53,6 +53,8 @@ class Scripted {
   readonly slow = new Set<string>();
   /** The held `subscribe` for each slow channel, by request id. */
   private readonly holding = new Map<string, number | string>();
+  /** What `resourceResolve` answers. */
+  resolveWith: Record<string, unknown> = { uri: 'file:///x', type: 'file' };
   /** What the next `reconnect` answers. */
   reconnectWith: Record<string, unknown> = { type: 'replay', actions: [], missing: [] };
   /** An error to answer `reconnect` with instead, as a restarted host does. */
@@ -261,6 +263,8 @@ class Scripted {
       return;
     }
     if (method === 'createSession') { await reply(null); return; }
+    if (method === 'resourceResolve') { await reply(this.resolveWith); return; }
+    if (method.startsWith('resource')) { await reply({}); return; }
     if (method === 'ping') { await reply(null); return; }
     // `unsubscribe` and `dispatchAction` are notifications: recorded above,
     // and answered with the silence the protocol asks for.
@@ -1607,6 +1611,54 @@ describe('the client says it is here, and how wide it is drawing', () => {
     // The reducer sets `claim` either way, so releasing is this action
     // carrying nothing rather than a second action.
     expect(sent).not.toHaveProperty('claim');
+
+    await host.close();
+  });
+});
+
+describe('the write half of the filesystem, exactly as declared', () => {
+  const sentTo = (scripted: Scripted, method: string): Record<string, unknown> | undefined =>
+    scripted.asked.find((frame) => frame.method === method)?.params;
+
+  it('sends the parameters the package declares, and no others', async () => {
+    const { host, scripted } = await connect();
+
+    await host.resourceWrite?.('file:///x/a.txt', 'body', { createOnly: true });
+    await host.resourceDelete?.('file:///x/a.txt', { recursive: true });
+    await host.resourceMkdir?.('file:///x/sub');
+    await host.resourceMove?.('file:///x/a.txt', 'file:///x/b.txt', { failIfExists: true });
+    await host.resourceCopy?.('file:///x/b.txt', 'file:///x/c.txt');
+    await settle();
+
+    // `data` and `encoding` are required; `createOnly` is the protocol's own
+    // guard. `ifMatch` is documented in the prose on `-32011` and declared
+    // nowhere, so it is not sent.
+    expect(sentTo(scripted, 'resourceWrite')).toEqual({
+      channel: ROOT, uri: 'file:///x/a.txt', data: 'body', encoding: 'utf-8', createOnly: true,
+    });
+    expect(sentTo(scripted, 'resourceDelete')).toEqual({ channel: ROOT, uri: 'file:///x/a.txt', recursive: true });
+    expect(sentTo(scripted, 'resourceMkdir')).toEqual({ channel: ROOT, uri: 'file:///x/sub' });
+    // `source` and `destination`, not `sourceUri`/`targetUri`; `failIfExists`,
+    // not an `overwrite` that means the opposite.
+    expect(sentTo(scripted, 'resourceMove')).toEqual({
+      channel: ROOT, source: 'file:///x/a.txt', destination: 'file:///x/b.txt', failIfExists: true,
+    });
+    expect(sentTo(scripted, 'resourceCopy')).toEqual({
+      channel: ROOT, source: 'file:///x/b.txt', destination: 'file:///x/c.txt',
+    });
+
+    await host.close();
+  });
+
+  it('reads a resolve as the host typed it', async () => {
+    const { host, scripted } = await connect();
+    scripted.resolveWith = { uri: 'file:///x/a.txt', type: 'file', size: 4, mtime: '2026-09-05T00:00:00Z' };
+
+    const found = await host.resourceResolve?.('file:///x/a.txt');
+    // `type` is the host's `ResourceType` and is passed through: a symlink is
+    // neither a file nor a directory, and narrowing it here would be this
+    // client answering something the host already did.
+    expect(found).toEqual({ uri: 'file:///x/a.txt', type: 'file', size: 4, mtime: '2026-09-05T00:00:00Z' });
 
     await host.close();
   });

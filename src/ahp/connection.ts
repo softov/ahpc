@@ -180,6 +180,28 @@ export interface HostConnection {
    * PNG to a terminal.
    */
   resourceRead?(uri: string): Promise<{ data: string; encoding: string; contentType?: string }>;
+  /**
+   * What the host knows about one path without reading it.
+   *
+   * `type` is the host's own `ResourceType` rather than a boolean: a symlink
+   * is neither a file nor a directory, and narrowing it here would be this
+   * client deciding something the host already answered.
+   */
+  resourceResolve?(uri: string): Promise<{ uri: string; type: string; size?: number; mtime?: string }>;
+  /**
+   * Write one file.
+   *
+   * The whole `resource*` family is symmetrical and optional: a host that
+   * serves no filesystem answers `-32601`, which is why these are optional
+   * here too. `-32009` is a refusal naming the grant that would lift it, and
+   * `createOnly` is the protocol's guard against replacing something that is
+   * already there.
+   */
+  resourceWrite?(uri: string, data: string, options?: { encoding?: string; createOnly?: boolean }): Promise<void>;
+  resourceDelete?(uri: string, options?: { recursive?: boolean }): Promise<void>;
+  resourceMkdir?(uri: string): Promise<void>;
+  resourceMove?(from: string, to: string, options?: { failIfExists?: boolean }): Promise<void>;
+  resourceCopy?(from: string, to: string, options?: { failIfExists?: boolean }): Promise<void>;
   /** Close one. The last chat in a session is the session; dispose that instead. */
   disposeChat(chat: string): Promise<void>;
 

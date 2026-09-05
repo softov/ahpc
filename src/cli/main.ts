@@ -1,5 +1,6 @@
 /** Every command, and the argv reading that picks one. */
 
+import { readFile } from 'node:fs/promises';
 import { connect } from '../connect.js';
 import { configPath, loadConfig } from '../config.js';
 import type { Where } from '../connect.js';
@@ -144,6 +145,9 @@ class Args {
 const SWITCHES = new Set([
   '--json', '--full', '--all', '--archived', '--unread', '--undo', '--off', '--deny',
   '--reject', '--claude', '--chat',
+  // The write half's own flags, which take no value: without them here a
+  // positional after one is read as that flag's argument and disappears.
+  '--create-only', '--recursive', '--fail-if-exists',
 ]);
 
 /** A message for the person, not a stack trace. */
@@ -936,7 +940,56 @@ async function files(host: HostConnection, args: Args, wants: boolean): Promise<
     else line(found.data);
     return 0;
   }
+  if (verb === 'stat') {
+    if (!host.resourceResolve) throw new Fault('This host does not resolve paths.');
+    const found = await host.resourceResolve(uri);
+    if (wants) { json(found); return 0; }
+    table([
+      ['Uri', found.uri],
+      ['Type', found.type],
+      ...(found.size === undefined ? [] : [['Size', String(found.size)]]),
+      ...(found.mtime === undefined ? [] : [['Modified', found.mtime]]),
+    ]);
+    return 0;
+  }
+  if (verb === 'write') {
+    if (!host.resourceWrite) throw new Fault('This host serves no writable filesystem.');
+    // From a file, or from stdin: `ahpc resource write <uri> < thing` is how
+    // this gets used, and a second positional is the convenience.
+    const from = args.positional(2);
+    const data = from === undefined ? await readAll(process.stdin) : await readFile(from, 'utf8');
+    await host.resourceWrite(uri, data, {
+      ...(args.has('--create-only') ? { createOnly: true } : {}),
+    });
+    return 0;
+  }
+  if (verb === 'rm') {
+    if (!host.resourceDelete) throw new Fault('This host serves no writable filesystem.');
+    await host.resourceDelete(uri, { ...(args.has('--recursive') ? { recursive: true } : {}) });
+    return 0;
+  }
+  if (verb === 'mkdir') {
+    if (!host.resourceMkdir) throw new Fault('This host serves no writable filesystem.');
+    await host.resourceMkdir(uri);
+    return 0;
+  }
+  if (verb === 'mv' || verb === 'cp') {
+    const move = host.resourceMove;
+    const copy = host.resourceCopy;
+    if (!move || !copy) throw new Fault('This host serves no writable filesystem.');
+    const to = needs(args, 2, 'somewhere to put it');
+    const options = { ...(args.has('--fail-if-exists') ? { failIfExists: true } : {}) };
+    await (verb === 'mv' ? move(uri, to, options) : copy(uri, to, options));
+    return 0;
+  }
   throw new Fault(`No 'resource ${verb}'. Try 'ahpc help'.`);
+}
+
+/** Everything on a stream, for the write that takes its content from a pipe. */
+async function readAll(stream: NodeJS.ReadableStream): Promise<string> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) chunks.push(Buffer.from(chunk as Buffer));
+  return Buffer.concat(chunks).toString('utf8');
 }
 
 /** Prompts, approvals, and the escape hatch. */

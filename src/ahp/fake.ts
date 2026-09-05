@@ -1820,6 +1820,80 @@ export function fakeHost(): FakeHost {
       return { data: body, encoding: 'utf-8', contentType: 'text/plain' };
     },
 
+    resourceResolve: async (uri) => {
+      const at = inTree(uri);
+      if (at === undefined) throw new Error(`${uri} is not something this host serves`);
+      const directory = FILES[at.inside] !== undefined;
+      const body = SOURCES[at.inside];
+      if (!directory && body === undefined) throw new Error(`${uri} is not a file this host serves`);
+      return {
+        uri,
+        type: directory ? 'directory' : 'file',
+        ...(directory ? {} : { size: (body ?? '').length }),
+      };
+    },
+
+    /*
+     * The write half, over the same tree.
+     *
+     * Written into `SOURCES` rather than pretended: a fake that accepted a
+     * write and forgot it is one where a screen that saves and re-reads looks
+     * correct while doing nothing. `createOnly` is the protocol's guard and
+     * refuses rather than replacing.
+     */
+    resourceWrite: async (uri, data, opts) => {
+      const at = inTree(uri);
+      if (at === undefined) throw new Error(`${uri} is not somewhere this host serves`);
+      if (opts?.createOnly && SOURCES[at.inside] !== undefined) {
+        throw new Error(`${uri} already exists`);
+      }
+      SOURCES[at.inside] = data;
+      return undefined;
+    },
+
+    resourceDelete: async (uri) => {
+      const at = inTree(uri);
+      if (at === undefined || SOURCES[at.inside] === undefined) {
+        throw new Error(`${uri} is not a file this host serves`);
+      }
+      delete SOURCES[at.inside];
+      return undefined;
+    },
+
+    resourceMkdir: async (uri) => {
+      const at = inTree(uri);
+      if (at === undefined) throw new Error(`${uri} is not somewhere this host serves`);
+      FILES[at.inside] ??= [];
+      return undefined;
+    },
+
+    resourceMove: async (from, to, opts) => {
+      const source = inTree(from);
+      const target = inTree(to);
+      if (source === undefined || target === undefined) throw new Error('not somewhere this host serves');
+      const body = SOURCES[source.inside];
+      if (body === undefined) throw new Error(`${from} is not a file this host serves`);
+      if (opts?.failIfExists && SOURCES[target.inside] !== undefined) {
+        throw new Error(`${to} already exists`);
+      }
+      SOURCES[target.inside] = body;
+      delete SOURCES[source.inside];
+      return undefined;
+    },
+
+    resourceCopy: async (from, to, opts) => {
+      const source = inTree(from);
+      const target = inTree(to);
+      if (source === undefined || target === undefined) throw new Error('not somewhere this host serves');
+      const body = SOURCES[source.inside];
+      if (body === undefined) throw new Error(`${from} is not a file this host serves`);
+      if (opts?.failIfExists && SOURCES[target.inside] !== undefined) {
+        throw new Error(`${to} already exists`);
+      }
+      SOURCES[target.inside] = body;
+      return undefined;
+    },
+
     /**
      * One action, verbatim, without this fake knowing what most of them mean.
      *

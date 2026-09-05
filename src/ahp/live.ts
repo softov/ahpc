@@ -1463,6 +1463,72 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
       };
     },
 
+    resourceResolve: async (uri) => {
+      const result = bag(await client.request('resourceResolve', { channel: ROOT, uri }));
+      return {
+        uri: str(result.uri) ?? uri,
+        // `ResourceType`, the host's own word for what is there. Passed
+        // through rather than narrowed to a boolean: a symlink is neither a
+        // file nor a directory and this client is not the thing that decides.
+        type: str(result.type) ?? 'file',
+        ...(typeof result.size === 'number' ? { size: result.size } : {}),
+        ...(str(result.mtime) ? { mtime: str(result.mtime) as string } : {}),
+      };
+    },
+
+    /*
+     * The write half, which is the same family sent the other way.
+     *
+     * Exactly the declared parameters and no more. The prose on `resourceWrite`
+     * documents a `-32011 Conflict` "if `ifMatch` is set and the current `etag`
+     * does not match", and neither `ifMatch` on the params nor `etag` on the
+     * resolve result is declared anywhere in the package - so sending one
+     * would be inventing a field, which is the thing this client is not for.
+     * `createOnly` is the guard the protocol does declare.
+     */
+    resourceWrite: async (uri, data, opts) => {
+      await client.request('resourceWrite', {
+        channel: ROOT,
+        uri,
+        data,
+        encoding: opts?.encoding ?? 'utf-8',
+        ...(opts?.createOnly ? { createOnly: true } : {}),
+      });
+    },
+
+    resourceDelete: async (uri, opts) => {
+      await client.request('resourceDelete', {
+        channel: ROOT,
+        uri,
+        ...(opts?.recursive ? { recursive: true } : {}),
+      });
+    },
+
+    resourceMkdir: async (uri) => {
+      await client.request('resourceMkdir', { channel: ROOT, uri });
+    },
+
+    // `source` and `destination`, and `failIfExists` rather than an
+    // `overwrite` that reads the other way round. Both spellings were guessed
+    // at here before the declarations were read.
+    resourceMove: async (from, to, opts) => {
+      await client.request('resourceMove', {
+        channel: ROOT,
+        source: from,
+        destination: to,
+        ...(opts?.failIfExists ? { failIfExists: true } : {}),
+      });
+    },
+
+    resourceCopy: async (from, to, opts) => {
+      await client.request('resourceCopy', {
+        channel: ROOT,
+        source: from,
+        destination: to,
+        ...(opts?.failIfExists ? { failIfExists: true } : {}),
+      });
+    },
+
     /*
      * Raw, and deliberately unvalidated.
      *
