@@ -17,12 +17,12 @@ import {
 import { Badge, Column, Divider, EmptyState, Field, Form, FormActions, Marquee, Panel, RadioGroup, Row, SearchBox, Select, TextInput, argumentOf, useForm } from '@textui/widgets';
 import { PRESETS, presetFor, scheduleProblem, zoneIsKnownHere } from './schedule.js';
 import {
-  AUTOMATIONS_SCOPE, CHANGES_SCOPE, CHAT_SCOPE, CONTROLLER, MCP_SCOPE, SESSIONS_SCOPE, SKILLS_SCOPE, settingCommand,
+  AUTOMATIONS_SCOPE, CHANGES_SCOPE, CHAT_SCOPE, CONTROLLER, MCP_SCOPE, SESSIONS_SCOPE, SKILLS_SCOPE, modelCommand, settingCommand,
 } from './control.js';
 import { branchName, branchDrift,
   ARCHIVED, AUTOMATIONS, AUTOMATION_ROW, CHANGES, CUSTOMIZATIONS, DRAFT, EXPANDED, FILTER, FOCUS, HISTORY, HOST, INPUT,
   CHANGE_AT, CHANGE_ROW, CHANGE_SCOPES, FILES_AT, FILES_ENTRIES, FILES_OPEN,
-  MODEL, OPEN, OPEN_FILE, CHAT_URI, PROVIDER, QUEUE, SELECTED, SESSIONS, SETTINGS, SIDEBAR,
+  MODEL, MODEL_CONFIG, OPEN, OPEN_FILE, CHAT_URI, PROVIDER, QUEUE, SELECTED, SESSIONS, SETTINGS, SIDEBAR,
   CHATS, OPEN_TERMINAL, SPLIT_AT, SPLIT_DEFAULT, TERMINAL, TERMINALS, TURNS, WORKSPACE,
   openSession, visibleSessions, workspaceName,
 } from './state.js';
@@ -446,6 +446,7 @@ function useComposerOptions(): ComposerOption[] {
   const open = useStoreValue<string | null>(OPEN, null) ?? null;
   const provider = useStoreValue<string>(PROVIDER, 'claude') ?? 'claude';
   const model = useStoreValue<string>(MODEL, '') ?? '';
+  const modelConfig = useStoreValue<Record<string, string>>(MODEL_CONFIG, {}) ?? {};
   const settings = useStoreValue<Record<string, string>>(SETTINGS, {}) ?? {};
   const workspace = useStoreValue<string>(WORKSPACE, '') ?? '';
 
@@ -487,8 +488,40 @@ function useComposerOptions(): ComposerOption[] {
         ?? (model || (models !== null && models.length === 0 ? 'no models' : 'default')),
       ...(models !== null && models.length === 0 ? {} : { commandId: 'compose.model' }),
     },
+    /*
+     * The chosen model's own questions.
+     *
+     * The protocol says a client presents a model's `configSchema` as a form
+     * and returns the answers in `ModelSelection.config`. These are that form:
+     * they sit beside the session's questions because a person reads one row,
+     * and they are answered separately because they go out on the message
+     * rather than at the session.
+     */
+    ...(models?.find((found) => found.id === model)?.options ?? [])
+      .filter((property) => property.values.length > 0)
+      .map((property): ComposerOption => {
+        // What the host said it opens with, until somebody chooses.
+        const value = modelConfig[property.key] ?? property.default;
+        const chosen = property.values.find((found) => found.value === value);
+        return {
+          id: `model.${property.key}`,
+          icon: (value !== undefined
+            ? valueIcon(unicode, value, chosen?.label)
+            : undefined)
+            ?? settingIcon(unicode, property.key, property.title),
+          label: chosen?.label ?? value ?? property.title,
+          title: property.title,
+          commandId: modelCommand(property.key),
+        };
+      }),
     ...(config?.properties ?? [])
       .filter((property) => property.values.length > 0)
+      // A key the model also asks about is the model's to answer: the session
+      // key is the whole harness's default and the model's is what this
+      // message runs at, and drawing both put two controls on one row
+      // disagreeing about the same setting.
+      .filter((property) => !(models?.find((found) => found.id === model)?.options ?? [])
+        .some((one) => one.key === property.key))
       .map((property): ComposerOption => {
         const value = settings[property.key];
         const chosen = property.values.find((found) => found.value === value);
@@ -733,8 +766,12 @@ export const ChatScreen: (props: Record<string, never>) => RenderOutput =
           }}
           commands={slashCommands(app, skills)}
           paths={paths}
-          onPath={(path) => app.store.set(DRAFT, splice(draft, path))}
-          onChange={(value: string) => app.store.set(DRAFT, value)}
+          onPath={(path) => {
+            const next = splice(draft, path);
+            app.store.set(DRAFT, next);
+            controller.draft(next);
+          }}
+          onChange={(value: string) => { app.store.set(DRAFT, value); controller.draft(value); }}
           onCommand={(picked: SlashCommand) => {
             /*
              * A skill is typed, not run.

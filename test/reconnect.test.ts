@@ -1430,3 +1430,102 @@ describe('work the host is doing gets said out loud', () => {
     await host.close();
   });
 });
+
+describe('a message carries the model it was asked for', () => {
+  it('sends `ModelSelection` whole, config and all', async () => {
+    const { host, scripted } = await connect();
+    scripted.states.set(SESSION, { defaultChat: CHAT, chats: [] });
+    scripted.states.set(CHAT, { turns: [] });
+    host.subscribe(SESSION as never, () => undefined);
+    await settle();
+
+    // `chat-channel.md` puts the selection on the message, and the schema
+    // says a model's `configSchema` form comes back in `ModelSelection.config`.
+    host.say(SESSION as never, 'hello', { id: 'opus[1m]', config: { thinkingLevel: 'max' } });
+    await settle();
+
+    const sent = scripted.asked.filter((frame) => frame.method === 'dispatchAction')
+      .map((frame) => frame.params?.action as Record<string, unknown>)
+      .find((action) => action?.type === 'chat/turnStarted');
+    const message = (sent?.message ?? {}) as Record<string, unknown>;
+    expect(message.model).toEqual({ id: 'opus[1m]', config: { thinkingLevel: 'max' } });
+
+    await host.close();
+  });
+
+  it('leaves the config off a model that was given no answers', async () => {
+    const { host, scripted } = await connect();
+    scripted.states.set(SESSION, { defaultChat: CHAT, chats: [] });
+    scripted.states.set(CHAT, { turns: [] });
+    host.subscribe(SESSION as never, () => undefined);
+    await settle();
+
+    host.queue(SESSION as never, 'later', { id: 'haiku' });
+    await settle();
+
+    const sent = scripted.asked.filter((frame) => frame.method === 'dispatchAction')
+      .map((frame) => frame.params?.action as Record<string, unknown>)
+      .find((action) => action?.type === 'chat/pendingMessageSet');
+    const message = (sent?.message ?? {}) as Record<string, unknown>;
+    // Absent rather than empty: a host cannot tell an empty answer from an
+    // unanswered question, and nothing here should make it guess.
+    expect(message.model).toEqual({ id: 'haiku' });
+
+    await host.close();
+  });
+});
+
+describe('the draft is the host\'s, not this screen\'s', () => {
+  it('takes the draft the host was holding when the chat opens', async () => {
+    const { host, scripted } = await connect();
+    scripted.states.set(SESSION, { defaultChat: CHAT, chats: [] });
+    // What another client typed here, or what this one typed before it was
+    // restarted. `chat-channel.md`: clients SHOULD use it to initialise input.
+    scripted.states.set(CHAT, { turns: [], draft: { text: 'half a thought', origin: { kind: 'user' } } });
+
+    const seen: HostEvent[] = [];
+    host.subscribe(SESSION as never, (event) => seen.push(event));
+    await settle();
+
+    const snapshot = seen.find((event) => event.type === 'snapshot');
+    expect(snapshot?.type === 'snapshot' ? snapshot.draft : undefined).toBe('half a thought');
+
+    await host.close();
+  });
+
+  it('says the host holds none, rather than saying nothing', async () => {
+    const { host, scripted } = await connect();
+    scripted.states.set(SESSION, { defaultChat: CHAT, chats: [] });
+    scripted.states.set(CHAT, { turns: [] });
+
+    const seen: HostEvent[] = [];
+    host.subscribe(SESSION as never, (event) => seen.push(event));
+    await settle();
+
+    const snapshot = seen.find((event) => event.type === 'snapshot');
+    expect(snapshot?.type === 'snapshot' ? snapshot.draft : undefined).toBe('');
+
+    await host.close();
+  });
+
+  it('clears the field rather than holding an empty message', async () => {
+    const { host, scripted } = await connect();
+    scripted.states.set(SESSION, { defaultChat: CHAT, chats: [] });
+    scripted.states.set(CHAT, { turns: [] });
+    host.subscribe(SESSION as never, () => undefined);
+    await settle();
+
+    host.setDraft(SESSION as never, 'typing');
+    host.setDraft(SESSION as never, '');
+    await settle();
+
+    const sent = scripted.asked.filter((frame) => frame.method === 'dispatchAction')
+      .map((frame) => frame.params?.action as Record<string, unknown>)
+      .filter((action) => action?.type === 'chat/draftChanged');
+    expect((sent[0]?.draft as Record<string, unknown>)?.text).toBe('typing');
+    // `undefined` clears it. An empty message is a message.
+    expect(sent[1]).not.toHaveProperty('draft');
+
+    await host.close();
+  });
+});

@@ -771,6 +771,14 @@ function selection(value: unknown, usage?: unknown): ModelSelection | undefined 
   };
 }
 
+/** A selection as it goes out: the id, and the answers it was given. */
+function selectionOf(model: ModelSelection): Record<string, unknown> {
+  return {
+    id: model.id,
+    ...(model.config && Object.keys(model.config).length > 0 ? { config: model.config } : {}),
+  };
+}
+
 /**
  * One model, wherever it appears.
  *
@@ -1864,6 +1872,10 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
             all[all.length - 1]?.state === 'failed',
           ),
           queued: queued(chat),
+          // What the host is holding as the message being composed. Shared
+          // state: another client typing here is visible, and it outlives
+          // this one being restarted.
+          draft: str(bag(chat.draft).text) ?? '',
         };
         observer(event);
       };
@@ -1992,6 +2004,24 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
       };
     },
 
+    /*
+     * The model selection rides on the message, whole.
+     *
+     * `chat-channel.md` puts it there - a draft carries "its model/agent
+     * selection" and `createChat`'s `initialMessage` carries "its own" - and
+     * the schema says a client presents a model's `configSchema` as a form and
+     * passes the resolved values in `ModelSelection.config`. Sending the id
+     * alone made every one of those answers unsendable.
+     */
+    setDraft: (uri, text) => {
+      // An empty draft is `undefined`, not an empty message: the protocol
+      // clears the field rather than holding a message with nothing in it.
+      dispatch(uri, {
+        type: 'chat/draftChanged',
+        ...(text === '' ? {} : { draft: { text, origin: { kind: 'user' } } }),
+      });
+    },
+
     say: (uri, text, model) => {
       dispatch(uri, {
         type: 'chat/turnStarted',
@@ -2000,7 +2030,7 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
         message: {
           text,
           origin: { kind: 'user' },
-          ...(model ? { model: { id: model } } : {}),
+          ...(model ? { model: selectionOf(model) } : {}),
         },
       });
     },
@@ -2022,7 +2052,7 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
         message: {
           text,
           origin: { kind: 'user' },
-          ...(model ? { model: { id: model } } : {}),
+          ...(model ? { model: selectionOf(model) } : {}),
         },
       });
     },

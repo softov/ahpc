@@ -16,37 +16,6 @@ specification is what this client follows.
 
 ---
 
-# Batch 2 - The message
-
-The model selection and the draft both live on `Message`, and this client
-carries neither outbound.
-
-## B-01-20 - `Message.model` carries the selection, and the form that resolves it
-
-**Clause.** `chat-channel.md:38`: `ChatState.draft` is the message being composed "including its model/agent selection". `chat-channel.md:66`: `createChat`'s `initialMessage` carries "its own `model` / `agent` selection". `state.schema.json` on `configSchema`: "Clients present this as a form and pass the resolved values in `ModelSelection.config`."
-
-**Missing.** `say` and `queue` send `{ id }` with no `config`, so a model's own options can be read and never chosen. The specification puts the selection on the message; that is what gets built, whether or not another client exercises it.
-
-**Steps.**
-1. Carry `ModelSelection` whole outbound: `say`, `queue`, and `createChat`'s `initialMessage`.
-2. Build the form from the open model's `configSchema` - the `ConfigProperty` decoder already reads it - and send the resolved values as `ModelSelection.config`.
-3. Where a session config property and the model's schema name the same key, take the values from the model and the title and words from the host's schema.
-4. Test: a scripted host receiving `model: { id, config }`, and a model whose schema offers one value.
-
-## B-01-24 - `ChatState.draft`
-
-**Clause.** `chat-channel.md:38` and `ChatState.draft`'s own declaration: "Clients MAY periodically sync their local input state into this field so a draft survives reloads and is visible to other clients viewing the same chat. Eager syncing is **not** required — clients SHOULD debounce and MAY sync only at convenient points. When presenting input UI for an existing chat, clients SHOULD use any `draft` to initialize their input state. Cleared (set to `undefined`) once the message is sent."
-
-**Missing.** The composer neither reads the draft when opening a chat nor writes one. A message half-typed here is invisible everywhere else and lost on restart.
-
-**Steps.**
-1. Initialise the composer from `ChatState.draft` when a chat opens.
-2. Dispatch `chat/draftChanged`, debounced, and on leaving the screen.
-3. Clear it when the message is sent.
-4. Test: a draft in the opening snapshot reaches the composer; typing produces one debounced dispatch, not one per key.
-
----
-
 # Batch 3 - Presence and the terminal
 
 ## B-01-12 - `session/activeClientSet`

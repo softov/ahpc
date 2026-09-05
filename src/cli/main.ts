@@ -6,7 +6,7 @@ import type { Where } from '../connect.js';
 import { ago, archived, branch, json, line, mark, project, table } from './render.js';
 import type { HostConnection, HostEvent } from '../ahp/connection.js';
 import { operate } from '../ahp/operate.js';
-import type { Answer, SessionUri, Turn } from '../ahp/types.js';
+import type { Answer, ModelSelection, SessionUri, Turn } from '../ahp/types.js';
 
 export const HELP = `ahpc - drive an agent host from a shell
 
@@ -168,6 +168,25 @@ const where = (args: Args): Where => {
 };
 
 /** A URI the command needs, said plainly when it is missing. */
+/**
+ * The model a command was told to run on, and what it was told to run it at.
+ *
+ * `--model sonnet --model-config thinkingLevel=high`, repeatable. The second
+ * is `ModelSelection.config`, which is where the protocol says the answers to
+ * a model's own `configSchema` go - so a level chosen on the command line
+ * reaches the host the same way one chosen in the screen does.
+ */
+const selected = (args: Args): ModelSelection | undefined => {
+  const id = args.value('--model');
+  if (id === undefined) return undefined;
+  const config: Record<string, string> = {};
+  for (const pair of args.every('--model-config')) {
+    const at = pair.indexOf('=');
+    if (at > 0) config[pair.slice(0, at)] = pair.slice(at + 1);
+  }
+  return { id, ...(Object.keys(config).length > 0 ? { config } : {}) };
+};
+
 const needs = (args: Args, index: number, what: string): string => {
   const found = args.positional(index);
   if (!found) throw new Fault(`This wants ${what}.`);
@@ -974,7 +993,7 @@ async function turns(host: HostConnection, command: string, args: Args, wants: b
       return true;
     }, { timeoutSeconds: Number(args.value('--timeout') ?? 900) });
 
-    host.say(uri, text, args.value('--model'));
+    host.say(uri, text, selected(args));
     await finished;
     if (!wants && printed > 0) line();
     return answer;
@@ -1009,7 +1028,7 @@ async function turns(host: HostConnection, command: string, args: Args, wants: b
     case 'cancel': host.stopTurn(needs(args, 0, 'a session URI') as SessionUri); return 0;
     case 'queue': {
       const uri = needs(args, 0, 'a session URI') as SessionUri;
-      host.queue(uri, needs(args, 1, 'something to say'), args.value('--model'));
+      host.queue(uri, needs(args, 1, 'something to say'), selected(args));
       return 0;
     }
     case 'unqueue': {

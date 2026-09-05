@@ -89,6 +89,16 @@ export const RUNNING = '$/chat/conv/running' as BindingPath;
 export const PROVIDER = '$/chat/compose/provider' as BindingPath;
 export const MODEL = '$/chat/compose/model' as BindingPath;
 /**
+ * The answers to the chosen model's own questions.
+ *
+ * A model carries a `configSchema` and the protocol says a client presents it
+ * as a form and returns the resolved values in `ModelSelection.config`. Kept
+ * beside the model rather than in `SETTINGS`, because they are two different
+ * documents answered separately: the session's schema is the host's, this one
+ * is the model's, and a model that changes takes its answers with it.
+ */
+export const MODEL_CONFIG = '$/chat/compose/modelConfig' as BindingPath;
+/**
  * The chat the open session dispatches to.
  *
  * A session is not a conversation - it holds chats - and the uri of the one
@@ -270,6 +280,17 @@ export function applyEvent(store: ReactiveStore, event: HostEvent, model: Turn[]
       store.set(INPUT, event.input ?? null);
       store.set(QUEUE, event.queued);
       writeStatus(store, event.status);
+      /*
+       * The host's draft, taken only when this client has nothing typed.
+       *
+       * `chat-channel.md` says a client SHOULD use any `draft` to initialise
+       * its input state - initialise, not follow: every keystroke here
+       * produces a debounced dispatch, and every dispatch comes back as a
+       * snapshot a moment later, so taking it always would put the cursor
+       * back where the round trip started. What is empty here has nothing to
+       * lose, which is the case the specification is describing.
+       */
+      if (event.draft !== '' && !(store.get<string>(DRAFT) ?? '')) store.set(DRAFT, event.draft);
       // A snapshot arrived, so whatever the host last refused is not what is
       // on screen any more.
       store.set(HOST_ERROR, null);

@@ -12,14 +12,14 @@ import type { HostConnection } from './ahp/connection.js';
 import type { Terminals } from './terminal.js';
 import { createTerminals } from './terminal.js';
 import type {
-  Agent, Answer, Automation, Changeset, ChangesetScope, Completion, ContentRef, Customization, FileContent, ResourceEntry, SessionConfig, SessionDetail,
+  Agent, Answer, Automation, Changeset, ChangesetScope, Completion, ConfigProperty, ContentRef, Customization, FileContent, ResourceEntry, SessionConfig, SessionDetail,
   SessionUri, Turn,
 } from './ahp/types.js';
 import { SessionFlag } from './ahp/types.js';
 import { valueIcon } from './view/icons.js';
 import {
   ARCHIVED, BOOD_FLOAT, CAN_ADD_CHAT, CHAT_URI, CHATS, CUSTOMIZATIONS, DRAFT, EXPANDED, FILTER, HAS_CHATS,
-  HOST, HOST_ERROR, INPUT, MODEL, OPEN_TERMINAL,
+  HOST, HOST_ERROR, INPUT, MODEL, MODEL_CONFIG, OPEN_TERMINAL,
   AUTOMATIONS, AUTOMATION_ROW,
   CHANGES as CHANGES_AT_PATH, CHANGE_AT, CHANGE_ROW, CHANGE_SCOPES, FILES_AT, FILES_OPEN,
   OPEN, OPEN_FILE, PROVIDER, MARKDOWN, QUEUE, RUNNING, SCREEN, SELECTED, SETTINGS, SIDEBAR,
@@ -76,6 +76,10 @@ export interface Controller {
   /** The session channel's own state: its chat, its lifecycle, its settings. */
   detail(uri: SessionUri): Promise<SessionDetail>;
   config(uri: SessionUri): Promise<SessionConfig>;
+  /** Register a command per question the chosen model asks about itself. */
+  offerModel(properties: ConfigProperty[]): void;
+  /** Put what is being typed where other clients on this chat can see it. */
+  draft(text: string): void;
   /** What the host handed this session: plugins, skills, MCP servers. */
   customizations(uri: SessionUri): Promise<Customization[]>;
   /**
@@ -175,7 +179,17 @@ export interface Controller {
 export const CONTROLLER: ServiceKey<Controller> = serviceKey<Controller>('chat.controller');
 
 /** The command that asks about one config key. Registered when a host offers it. */
+/**
+ * How long to wait before telling the host what is being typed.
+ *
+ * Long enough that a sentence is one dispatch rather than forty, short enough
+ * that leaving the screen mid-word does not lose the word.
+ */
+const DRAFT_DEBOUNCE_MS = 600;
+
 export const settingCommand = (key: string): string => `compose.set.${key}`;
+/** One per property of the chosen model's own schema. */
+export const modelCommand = (key: string): string => `compose.model.${key}`;
 
 /**
  * The two focus scopes, and why single-letter keys need them.
@@ -238,7 +252,58 @@ export function createController(
    * a new chip and a new palette entry, and this file does not change.
    */
   const offered = new Map<string, Disposable>();
+  /** The same, for the chosen model's own schema, which is a separate document. */
+  const modelOffered = new Map<string, Disposable>();
   const unicode = app.capabilities.unicode;
+
+  /**
+   * One command per question the chosen model asks.
+   *
+   * The protocol says a client presents a model's `configSchema` as a form and
+   * returns the answers in `ModelSelection.config`, so these write to
+   * `MODEL_CONFIG` and ride out on the next message rather than being
+   * dispatched at the session. The two documents are kept apart on purpose:
+   * the session's schema is the host's and outlives any model, this one goes
+   * when the model does.
+   */
+  const offerModel = (properties: ConfigProperty[]): void => {
+    for (const [id, disposable] of modelOffered) { disposable.dispose(); modelOffered.delete(id); }
+    for (const property of properties) {
+      if (property.values.length === 0) continue;
+      const id = modelCommand(property.key);
+      modelOffered.set(id, app.commands.register({
+        id,
+        title: property.title,
+        category: 'Compose',
+        slots: ['palette'],
+        args: [{
+          name: 'value',
+          type: 'string' as const,
+          required: true,
+          description: property.description ?? `Choose ${property.title.toLowerCase()}`,
+          get default(): string | undefined {
+            const answers = app.store.get<Record<string, string>>(MODEL_CONFIG) ?? {};
+            // What the host said it opens with, where nothing has been chosen.
+            return answers[property.key] ?? property.default;
+          },
+          ...(property.values.some((value) => value.description)
+            ? { descriptions: 'below' as const }
+            : {}),
+          choices: () => property.values.map((value) => ({
+            value: value.value,
+            label: value.label,
+            ...(value.description ? { description: value.description } : {}),
+          })),
+        }],
+        run: (args: Record<string, unknown>) => {
+          const chosen = property.values.find((value) => value.value === String(args.value));
+          if (!chosen) return;
+          const answers = app.store.get<Record<string, string>>(MODEL_CONFIG) ?? {};
+          app.store.set(MODEL_CONFIG, { ...answers, [property.key]: chosen.value });
+        },
+      }));
+    }
+  };
 
   const offer = (config: SessionConfig, uri: SessionUri | null): void => {
     const keep = new Set<string>();
@@ -392,7 +457,27 @@ export function createController(
 
   const terminals = createTerminals(app, host, failed);
 
+  /**
+   * The draft, on its way to the host, debounced.
+   *
+   * `chat-channel.md`: clients SHOULD debounce and MAY sync only at
+   * convenient points - eager syncing is explicitly not required. A dispatch
+   * per keystroke would be one round trip per character and a snapshot back
+   * for each.
+   */
+  let draftTimer: ReturnType<typeof setTimeout> | undefined;
+  bag.add({ dispose: () => clearTimeout(draftTimer) });
+
   const controller: Controller = {
+    offerModel,
+
+    draft(text) {
+      const uri = app.store.get<SessionUri>(OPEN);
+      if (!uri) return;
+      clearTimeout(draftTimer);
+      draftTimer = setTimeout(() => { host.setDraft(uri, text); }, DRAFT_DEBOUNCE_MS);
+    },
+
     async refresh() {
       try {
         writeSessions(app.store, await host.listSessions());
@@ -533,6 +618,12 @@ export function createController(
       // message, so the composer's choice is applied here rather than being
       // set on the session once.
       const chosen = app.store.get<string>(MODEL);
+      // The model's own answers go with it, in `ModelSelection.config` - the
+      // field the schema says a client returns a `configSchema` form in.
+      const answers = app.store.get<Record<string, string>>(MODEL_CONFIG) ?? {};
+      const selection = chosen
+        ? { id: chosen, ...(Object.keys(answers).length > 0 ? { config: answers } : {}) }
+        : undefined;
 
       // A turn is already running: this is a queued message, not a second
       // turn. Sending it anyway is how two turns end up interleaved in one
@@ -545,10 +636,10 @@ export function createController(
       // closed. The host starts the next turn from the head as soon as it goes
       // idle, and every client watching this chat sees the same queue.
       if (turns(app.store).some((turn) => turn.state === 'running')) {
-        host.queue(uri, trimmed, chosen || undefined);
+        host.queue(uri, trimmed, selection);
         return;
       }
-      host.say(uri, trimmed, chosen || undefined);
+      host.say(uri, trimmed, selection);
     },
 
     unqueue(id) {
@@ -1335,7 +1426,13 @@ function commands(
         // The id, not the label. AHP hangs the model on the message, so this
         // is what rides on the next `chat/turnStarted`.
         const chosen = agent()?.models.find((model) => model.id === String(args.id));
-        if (chosen) app.store.set(MODEL, chosen.id);
+        if (!chosen) return;
+        app.store.set(MODEL, chosen.id);
+        // A model's answers belong to that model. Carrying them across would
+        // send a level the new model may not accept, in a field the host
+        // reads without asking whether it fits.
+        app.store.set(MODEL_CONFIG, {});
+        controller.offerModel(chosen.options ?? []);
       },
     },
     /*

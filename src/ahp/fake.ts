@@ -194,6 +194,8 @@ export function fakeHost(): FakeHost {
    * it for the same reason, or a queue is a list that only ever grows.
    */
   const queues = new Map<SessionUri, QueuedMessage[]>();
+  /** What each chat is holding as a draft, which is host state and not a screen's. */
+  const drafts = new Map<SessionUri, string>();
   const configs = new Map<SessionUri, Record<string, string>>();
   const observers = new Map<SessionUri, Set<(event: HostEvent) => void>>();
   const chats = new Map<SessionUri, string>();
@@ -1488,7 +1490,7 @@ export function fakeHost(): FakeHost {
       const held = wanted === undefined ? undefined : extra.get(wanted);
       if (held) {
         held.watchers.add(observer);
-        observer({ type: 'snapshot', turns: held.turns, status: SessionFlag.Idle, queued: [] });
+        observer({ type: 'snapshot', turns: held.turns, status: SessionFlag.Idle, queued: [], draft: '' });
         observer({ type: 'chats', items: chatsOf(uri), defaultChat: chats.get(uri) ?? '' });
         return { close: () => { held.watchers.delete(observer); } };
       }
@@ -1502,6 +1504,7 @@ export function fakeHost(): FakeHost {
         ...(inputs.get(uri) ? { input: inputs.get(uri) as PendingInput } : {}),
         status: statusOf(uri),
         queued: queues.get(uri) ?? [],
+        draft: drafts.get(uri) ?? '',
       });
       observer({ type: 'chats', items: chatsOf(uri), defaultChat: chats.get(uri) ?? '' });
       const changes = changesets.get(uri);
@@ -1526,11 +1529,26 @@ export function fakeHost(): FakeHost {
         ...(inputs.get(uri) ? { input: inputs.get(uri) as PendingInput } : {}),
         status: statusOf(uri),
         queued: queues.get(uri) ?? [],
+        draft: drafts.get(uri) ?? '',
       });
       return behind.length > 0;
     },
 
-    say: (uri, text) => { reply(uri, text); },
+    setDraft: (uri, text) => {
+      if (text === '') drafts.delete(uri); else drafts.set(uri, text);
+      emit(uri, {
+        type: 'snapshot',
+        turns: turns.get(uri) ?? [],
+        ...(active.get(uri) ? { active: active.get(uri) as Turn } : {}),
+        ...(inputs.get(uri) ? { input: inputs.get(uri) as PendingInput } : {}),
+        status: statusOf(uri),
+        queued: queues.get(uri) ?? [],
+        draft: drafts.get(uri) ?? '',
+      });
+    },
+
+    // Sending clears the draft, which is what the host does.
+    say: (uri, text) => { drafts.delete(uri); reply(uri, text); },
 
     queue: (uri, text) => {
       const waiting = [...(queues.get(uri) ?? []), { id: nextId('q'), text }];

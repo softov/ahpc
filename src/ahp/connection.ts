@@ -1,6 +1,6 @@
 import type {
   Agent, Answer, Automation, Changeset, Completion, ContentRef, Customization, FileContent, PendingInput, QueuedMessage,
-  ChangesetOperationTarget, ChangesetScope, ResourceEntry, SessionConfig, SessionDetail, SessionSummary, SessionUri, TerminalRow, TerminalState,
+  ChangesetOperationTarget, ChangesetScope, ModelSelection, ResourceEntry, SessionConfig, SessionDetail, SessionSummary, SessionUri, TerminalRow, TerminalState,
   ToolCall, Turn,
 } from './types.js';
 
@@ -184,7 +184,16 @@ export interface HostConnection {
   onSessions(observer: () => void): { close(): void };
 
   /** Begin a turn. Any turn - this is not only how the first one starts. */
-  say(uri: SessionUri, text: string, model?: string): void;
+  /**
+   * Put the message being composed where other clients can see it.
+   *
+   * `chat-channel.md`: clients MAY sync their input into `ChatState.draft` so
+   * it survives a reload and is visible to other clients on the same chat,
+   * SHOULD debounce rather than sync eagerly, and the host clears it when the
+   * message is sent. An empty string is the clear.
+   */
+  setDraft(uri: SessionUri, text: string): void;
+  say(uri: SessionUri, text: string, model?: ModelSelection): void;
   stopTurn(uri: SessionUri): void;
   /**
    * Say it *after* the turn that is running.
@@ -195,7 +204,7 @@ export interface HostConnection {
    * itself would be the only thing that could ever send it, and would not,
    * because nothing in a client is watching for the turn to end.
    */
-  queue(uri: SessionUri, text: string, model?: string): void;
+  queue(uri: SessionUri, text: string, model?: ModelSelection): void;
   /** Take one back, while it is still waiting. */
   unqueue(uri: SessionUri, id: string): void;
 
@@ -381,7 +390,18 @@ export interface HostConnection {
  * `chat/delta` to `appendToBubble` would have written the UI into the wire.
  */
 export type HostEvent =
-  | { type: 'snapshot'; turns: Turn[]; active?: Turn; input?: PendingInput; status: number; queued: QueuedMessage[] }
+  | {
+    type: 'snapshot'; turns: Turn[]; active?: Turn; input?: PendingInput; status: number; queued: QueuedMessage[];
+    /**
+     * The message being composed, as the host is holding it.
+     *
+     * `ChatState.draft` is shared: another client typing into this chat is
+     * visible here, and a draft survives this client being restarted. Present
+     * on every snapshot so a screen can take it when it opens; empty is a real
+     * answer, meaning the host holds no draft.
+     */
+    draft: string;
+  }
   | { type: 'turnStarted'; turn: Turn }
   | { type: 'delta'; partId: string; kind: 'markdown' | 'reasoning'; text: string }
   | { type: 'toolCall'; call: ToolCall }
