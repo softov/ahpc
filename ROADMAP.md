@@ -24,19 +24,21 @@ The host's roadmap says a gap is found by diffing the protocol's sources on ever
 
 **Drive the protocol layer, not the seam.** Every test in this repository but one drives `fakeHost`, which implements the seam `live.ts` produces rather than the protocol underneath it. That is a good seam and a bad net: a defect between `HostConnection` and the wire is invisible to all of it, which is how this client came to leak every subscription it ever opened and to treat a dropped socket as the end of the session. `test/reconnect.test.ts` is the first test that drives `liveHost` itself, over an in-memory transport against a host scripted frame by frame, and it exists because that is the only place those defects were visible.
 
-**Read what the host actually answers, not what the seam asked for.** `listSessions` has asked for a hundred rows since it was written, and the number was invisible from every screen: the catalogue looked complete because a hundred is more than anybody had. It stopped being invisible when the host on the other side grew a catalogue bigger than that. A limit this client sets is a limit only this client can see.
+**Read what the host actually answers, not what the seam asked for.** `listSessions` asked for a hundred rows for the life of this client, and the number was invisible from every screen: the catalogue looked complete because a hundred was more than anybody had. It stopped being invisible when the catalogue on the other side grew past it. A limit this client sets is a limit only this client can see.
+
+**Point it at a host that is not ours.** One evening against VS Code's agent host produced more findings than any amount of reading did: an expected refusal printing on every command, a protocol version negotiated that this client has no implementation of, and a transcript that comes back empty because the snapshot carries no turns. Two of those are entries below and none of them was visible against ahpd, because ahpd and ahpc agree with each other by construction.
 
 ---
 
-## B-02-01 - The catalogue stops at a hundred and does not say so
+## B-01-08 - Against a VS Code host, no conversation can be read at all
 
-`listSessions` is sent with `limit: 100` and the `nextCursor` that comes back is never read, so a host with more sessions than that answers in full and this client shows the first hundred as though they were all of them.
+`fetchTurns` is not called anywhere in this client, and no screen offers to load more. History is whatever arrived in the subscription snapshot.
 
-**This is live, not theoretical.** ahpd now pages: a `limit` it is given is honoured, and a `limit` it is *not* given means the whole catalogue up to a bound of a thousand, decided that way precisely because neither client that connects to it follows a cursor. So the one thing truncating the list against ahpd is this client asking for a hundred. A catalogue of 123 sessions shows 100, and the 23 are not marked, counted or reachable - there is no scroll that fetches them and no line that says they exist.
+**How big that is depends on the host, and one of them sends none.** ahpd puts the newest fifty turns in the snapshot, which made this look like a paging entry: the fifty-first turn back was unreachable and the rest was fine. Against VS Code's agent host, `session history` on three different sessions printed no turns and no fault - the channel resolved and the snapshot carried nothing. So on that host the snapshot is not a short history, it is no history, and `fetchTurns` is not the way to read *more* of a conversation but the only way to read *any* of it.
 
-**What it costs today.** A session that is not in the first hundred cannot be opened from this client at all. It is not slow to reach or awkward to find: it is absent, and nothing on the screen distinguishes that from not existing.
+**What it costs today.** Against ahpd, a session's own beginning - the message that started it, the one a person scrolls up to find - is the first thing to fall off. Against a host that sends no turns in the snapshot, the transcript is empty and this client has no way to fill it.
 
-**Suggestions.** (1) Follow `nextCursor` to a bound and say plainly when the bound was hit, which is what the spec's pagination is for and what every other reader of a paginated list does. (2) Drop the `limit` entirely and take what the host gives, which is one word and correct against ahpd today - but it is a client trusting a host to have a sane catalogue, and against a host with fifty thousand sessions it is a frame that never arrives. (3) Page, and keep a bound, and put the count on the screen: `100 of 123` is a truthful list where `100` silently is not.
+**Suggestions.** (1) `loadOlderTurns(uri)` on the seam, driven by a scroll to the top of the transcript and by `session history --all` on the command line. The turns come back as `chat/turnsLoaded`, which is an action, so the reducer path that already exists handles them and no second way of getting a turn onto the screen is invented. (2) The same, plus one automatic fetch when a chat opens on a host whose snapshot was empty - which is what makes it work against VS Code rather than merely better against ahpd. (3) Fetch the whole history whenever a session is opened, which is simpler and is a client deciding to download a year of somebody's conversation because they clicked on it.
 
 ## B-02-02 - This client offers a protocol version it cannot speak
 
@@ -44,19 +46,11 @@ The host's roadmap says a gap is found by diffing the protocol's sources on ever
 
 **Revalidated, because the reason it is there turns out to be right.** The comment above the list says a VS Code host accepts `^1.0.0` and nothing 0.x, and that reads like an excuse until you check it. `negotiateProtocolVersion` in the reference tree takes the client's list and keeps only entries where `isCompatibleProtocolVersion(offered, current)` holds, and that function's first test is that the **majors must match**. A host running `current = '1.0.0'` therefore rejects `0.9.0`, `0.8.0` and `0.7.0` outright - not as too old, but as a different major. So against VS Code's host, `1.0.0` is not this client's preference: it is the only entry of the four that can be accepted at all, and removing it does not make this client conformant-and-compatible, it makes it conformant-and-unable-to-connect.
 
-**So the decision stands and the exposure is real.** If a 1.0.0 host answers `1.0.0`, this client proceeds under a version whose wire format it has never seen, using a library built for 0.9.0. Nothing has broken yet because nothing has tested it - and "it has not broken" is not the same as "it works", which is the whole reason this entry is written down rather than left in a comment.
+**So the decision stands and the exposure is real.** If a 1.0.0 host answers `1.0.0`, this client proceeds under a version whose wire format it has never seen, using a library built for 0.9.0.
 
-**What it costs today.** Nothing observed. What it risks is a class of failure that will not look like a version problem when it arrives: a field that moved between 0.9.0 and 1.0.0 is decoded as absent, and the screen is simply wrong.
+**What it costs today, now that it has been run.** This was written as a risk with nothing observed behind it. It has since been exercised: connected to VS Code's agent host, this client negotiated `1.0.0` and read every answer with 0.9.0 code. The catalogue came back and rendered; the transcripts came back empty (`B-01-08`). Whether those empty transcripts are a host that expects `fetchTurns` or a field that moved between the two versions cannot be told apart from here, and that is exactly the failure mode this entry predicted - it does not look like a version problem, it looks like a screen that is wrong.
 
 **Suggestions.** (1) Find out what 1.0.0 actually changed and either implement it or stop offering it - the delta is readable in the local MIT-licensed checkout, and this is the host roadmap's `Q-001` seen from the other side. Until somebody reads it, every other option here is a guess. (2) Keep offering it and *say so*: record in this file and in the comment that the claim being made is "we believe 0.9.0 and 1.0.0 differ in nothing this client reads", which is a claim somebody can check rather than a list somebody can misread. (3) Drop `1.0.0` and accept `-32005` from VS Code's host, which is honest, conformant, and gives up the only third-party host in existence.
-
-## B-01-08 - A conversation cannot be read to its beginning
-
-`fetchTurns` is not called anywhere in this client, and no screen offers to load more. History is whatever arrived in the subscription snapshot, which against ahpd is the newest fifty turns.
-
-**What it costs today.** The fifty-first turn back does not exist as far as this client is concerned, and a session's own beginning - the message that started it, which is the one a person scrolls up to find - is exactly the part that falls off first. The turns are on the host and the command to fetch them is served; nothing here asks.
-
-**Suggestions.** (1) `loadOlderTurns(uri)` on the seam, driven by a scroll to the top of the transcript and by `session history --all` on the command line. The turns come back as `chat/turnsLoaded`, which is an action, so the reducer path that already exists handles them and no second way of getting a turn onto the screen is invented. (2) Fetch the whole history when a session is opened, which is simpler and is a client deciding to download a year of somebody's conversation because they clicked on it. (3) Leave it and say on the screen that the transcript starts where it starts, which is at least not a client pretending fifty is all there was.
 
 ## B-01-09 - A host that wants signing in cannot be signed into
 
@@ -102,13 +96,13 @@ What is wrong is smaller and is not about reconciliation at all. A host that ref
 
 **Suggestions.** (1) Read `rejectionReason` and show it, and leave the optimistic half alone - that is the whole defect, and it is a branch in the event handler. (2) Take the optimistic path as well, for the small safe set only - draft, queue order, read and archive flags, review ticks - matching the echo by `origin.clientSeq` and reverting on a rejection. Not turn content. (3) Leave it, and accept that a refusal is silent.
 
-## B-01-14 - The handshake is three round trips and does not say who is calling
+## B-01-14 - The handshake is more round trips than it needs
 
-`initialize` now sends `clientId`, `protocolVersions` and `clientInfo`. It does not send `initialSubscriptions`, so the root and automations channels are each a separate `subscribe` afterwards, and it does not send `locale`. `capabilities` is deliberately absent - see the decisions below.
+`initialize` sends `clientId`, `protocolVersions` and `clientInfo`, and the automations channel is now asked for only where `InitializeResult.automations` advertised it. What is left is that `initialSubscriptions` is not sent, so the root channel is a separate `subscribe` afterwards, and neither is `locale`. `capabilities` is deliberately absent - see the decisions below.
 
-**What it costs today.** Three round trips where one would do, on every connection and every reconnect. The automations channel is subscribed speculatively and the refusal is caught, where `InitializeResult.automations` says in advance whether it is there at all - so a host with no automations answers a request this client should not have sent.
+**What it costs today.** A round trip that could have been folded into the handshake, on every connection and every reconnect. Small, and the reason it is still written down is that the reconnect path now does the same thing twice a day rather than once a launch.
 
-**Suggestions.** (1) Pass `initialSubscriptions: [root, automations]` and apply the snapshots that come back, and read `InitializeResult.automations` instead of subscribing to find out. (2) The same plus `locale`, which costs one field and is the only way a host can localise anything it sends. (3) Leave it: it is three round trips once per connection, and nobody has felt them.
+**Suggestions.** (1) Pass `initialSubscriptions` and apply the snapshots that come back - the supervisor already does exactly this on the `initialize` fallback, so the shape exists and only the first connection does not use it. (2) The same plus `locale`, which costs one field and is the only way a host can localise anything it sends. (3) Leave it: it is one round trip, and nobody has felt it.
 
 ## B-01-15 - Automations are a screen and not a command
 
