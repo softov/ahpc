@@ -40,6 +40,8 @@ class Scripted {
   readonly refuse = new Map<string, string>();
   /** The catalogue this host answers `listSessions` from, in pages of fifty. */
   catalogue: Record<string, unknown>[] = [];
+  /** Whether `initialize` advertises the automations capability. */
+  automations = false;
   /** What the next `reconnect` answers. */
   reconnectWith: Record<string, unknown> = { type: 'replay', actions: [], missing: [] };
   /** An error to answer `reconnect` with instead, as a restarted host does. */
@@ -108,7 +110,12 @@ class Scripted {
     };
 
     if (method === 'initialize') {
-      await reply({ protocolVersion: '0.9.0', serverSeq: this.seq, snapshots: [] });
+      await reply({
+        protocolVersion: '0.9.0',
+        serverSeq: this.seq,
+        snapshots: [],
+        ...(this.automations ? { automations: {} } : {}),
+      });
       return;
     }
     if (method === 'reconnect') {
@@ -456,6 +463,70 @@ describe('the catalogue is walked to its end', () => {
     expect(rows.length).toBe(1000);
     expect(said.length).toBe(1);
     expect(said[0]).toContain('has more');
+
+    await host.close();
+  });
+});
+
+describe('an expected answer is not reported as a fault', () => {
+  it('does not ask for automations a host never advertised', async () => {
+    const { host, scripted } = await connect();
+    await settle();
+
+    // Presence of `InitializeResult.automations` is what permits the channel,
+    // so its absence is the answer and asking anyway is a known refusal.
+    expect(scripted.timesAsked('subscribe', AUTOMATIONS)).toBe(0);
+
+    await host.close();
+  });
+
+  it('asks where the host did advertise them', async () => {
+    let scripted!: Scripted;
+    const open = async (): Promise<AhpTransport> => {
+      const [mine, theirs] = InMemoryTransport.pair();
+      scripted = new Scripted(theirs);
+      scripted.automations = true;
+      return mine;
+    };
+    const host = await liveHost({
+      url: 'ws://scripted', clientId: 'ahpc-test', connect: open, backoff: [0], keepaliveMs: 0,
+    });
+    await settle();
+
+    expect(scripted.timesAsked('subscribe', AUTOMATIONS)).toBe(1);
+
+    await host.close();
+  });
+
+  it('keeps a refusal a reader claimed out of the connection report', async () => {
+    const reported: string[] = [];
+    let scripted!: Scripted;
+    const open = async (): Promise<AhpTransport> => {
+      const [mine, theirs] = InMemoryTransport.pair();
+      scripted = new Scripted(theirs);
+      // A session in the catalogue whose channel the host will not serve -
+      // which is the ordinary case against a host that lists more than it
+      // will open.
+      scripted.refuse.set(SESSION, 'No agent for session: ' + SESSION);
+      return mine;
+    };
+    const host = await liveHost({
+      url: 'ws://scripted',
+      clientId: 'ahpc-test',
+      connect: open,
+      backoff: [0],
+      keepaliveMs: 0,
+      onRefusal: (_uri, message) => reported.push(message),
+    });
+
+    const seen: HostEvent[] = [];
+    host.subscribe(SESSION as never, (event) => seen.push(event));
+    await settle();
+
+    // The transcript says so, because that is where a person is looking.
+    expect(seen.some((event) => event.type === 'error')).toBe(true);
+    // The connection does not, because it was not the connection's to report.
+    expect(reported).toEqual([]);
 
     await host.close();
   });

@@ -169,12 +169,25 @@ export function openChannels(options: ChannelsOptions): Channels {
     for (const consumer of channel.consumers) consumer.event(event);
   };
 
+  /**
+   * Record a refusal, and give it to whoever is entitled to it.
+   *
+   * A reader that supplied `refused` has an opinion about what the refusal
+   * means to it - a session draws it in the transcript, an automations
+   * channel takes it as "this host serves none" - and reporting it to the
+   * connection as well makes an expected answer look like a fault. Only a
+   * refusal nobody claimed goes to `onRefusal`.
+   */
   const refuse = (uri: string, message: string): void => {
     refused.set(uri, message);
-    options.onRefusal?.(uri, message);
     const channel = held.get(uri);
-    if (!channel) return;
-    for (const consumer of channel.consumers) consumer.refused?.(message);
+    let claimed = false;
+    for (const consumer of channel?.consumers ?? []) {
+      if (!consumer.refused) continue;
+      consumer.refused(message);
+      claimed = true;
+    }
+    if (!claimed) options.onRefusal?.(uri, message);
   };
 
   /** Read a connection's whole event stream until it ends or is superseded. */

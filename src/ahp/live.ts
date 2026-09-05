@@ -944,17 +944,32 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
   const automationWatchers = new Set<() => void>();
   let automationState: Bag | null = null;
   let noAutomations: string | undefined;
-  channels.open(AUTOMATIONS, {
-    opened: (state) => { automationState = state; },
-    event: (event) => {
-      if (event.type !== 'action') return;
-      // The host's own reducer. Two mutations is not eighty, but a second
-      // answer to "what is the state now" is a second answer at any size.
-      automationState = bag(ahp.automationReducer(automationState, bag(event.params).action));
-      for (const listener of automationWatchers) listener();
-    },
-    refused: (message) => { noAutomations = message; },
-  });
+  /*
+   * Asked for only where the host said it had them.
+   *
+   * `InitializeResult.automations` is what *permits* a client to use the
+   * channel and the three commands, so its absence is the answer and asking
+   * anyway is a request with a known reply. It is not a harmless one either:
+   * a host that routes an unknown channel to its session table answers
+   * `-32001` about a session nobody named, which is a refusal a person then
+   * has to be told to ignore.
+   */
+  if (hello.automations === undefined || hello.automations === null) {
+    noAutomations = 'This host serves no automations.';
+  }
+  else {
+    channels.open(AUTOMATIONS, {
+      opened: (state) => { automationState = state; },
+      event: (event) => {
+        if (event.type !== 'action') return;
+        // The host's own reducer. Two mutations is not eighty, but a second
+        // answer to "what is the state now" is a second answer at any size.
+        automationState = bag(ahp.automationReducer(automationState, bag(event.params).action));
+        for (const listener of automationWatchers) listener();
+      },
+      refused: (message) => { noAutomations = message; },
+    });
+  }
 
   /** The chat a session dispatches to, remembered so it is asked for once. */
   const chats = new Map<SessionUri, string>();
