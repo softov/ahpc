@@ -28,6 +28,8 @@ The host's roadmap says a gap is found by diffing the protocol's sources on ever
 
 **Point it at a host that is not ours.** One evening against VS Code's agent host produced more findings than any amount of reading did: an expected refusal printing on every command, a transcript that came back empty because the snapshot carried no turns and this client never read the cursor offering them, and a protocol version negotiated that this client does not build against. None was visible against ahpd, because ahpd and ahpc agree with each other by construction - the first two are fixed and the third is the entry below.
 
+**Read the other host's handler, not only its types.** Three attempts at one bug went into the eviction path because the error said `-32001 Resource not found` and that is what a missing session sounds like. It was not that. The reference host's `subscribe` writes a pending marker under the channel while it restores, a subscribe arriving before that one resolves replaces the marker, and the first is answered `Resource not found` naming a channel it is serving - a *race*, reported as an absence. No amount of reading the protocol's declarations would have found it, and the symptom pointed away from it. When a refusal does not match what the client asked for, the answer is in the code that composed the refusal.
+
 **Diff the two versions rather than reasoning about them.** "We do not know what 1.0.0 changed" stood for as long as nobody spent an hour on it. Comparing the declarations of 54 file pairs answered it in one pass and the answer was one renamed field, which is both smaller than the fear and precise enough to act on. A question that has been open for a while is worth checking is still a question.
 
 ---
@@ -56,6 +58,8 @@ That field is now read under both spellings, normalised once at the edge so the 
 **What is left, and why this entry stays open.** The literal rule is still broken: this client offers first a version whose package it does not build against. What has changed is that the risk is no longer unknown - it is one enumerated difference, handled, with a test either side of it. Anything 1.0.0 grows *after* this reading is the live exposure, and the reading has to be redone when the next version publishes.
 
 It also clears a suspect, and the real answer was closer to home. The empty transcripts against VS Code's host were blamed on this entry, then on a snapshot carrying no turns. Neither: `ChatState.turnsNextCursor` is present and unchanged in both versions, and the host's snapshot did carry the conversation - the TUI drew it. What was empty was the *first* snapshot this client emitted, sent when the session channel opened and before the chat channel had answered. A screen redraws past that and `session history`, which takes the first snapshot and stops, does not.
+
+**When the reading goes stale, and how to tell cheaply.** `npm view @microsoft/agent-host-protocol versions time dist-tags --json`. While `time.modified` reads `2026-08-28T21:40:46Z` nothing has been published since 0.9.0 and the comparison above cannot have gone stale. Checked on 2026-09-05: the published versions stop at 0.9.0, `latest` points at it, and there is no prerelease or `next` tag - so 1.0.0 exists only as the copy the reference vendors, and there is still nothing on npm to build the offered major against. The five releases before it landed 11, 17, 12 and 10 days apart, which puts the next one around the middle of September rather than now.
 
 **Suggestions.** (1) Leave it as it is - offered, handled, and written down - and redo the comparison when 1.0.0 or its successor publishes to npm. That is the only moment the answer can change. (2) Move `1.0.0` behind a flag, so a person connecting to a 1.0.0 host opts into it and everybody else is strictly conformant; honest, and it makes the common case need a flag nobody will know to pass. (3) Drop `1.0.0` and accept `-32005` from VS Code's host, which is conformant and gives up the only third-party host there is.
 
@@ -90,18 +94,6 @@ It also clears a suspect, and the real answer was closer to home. The empty tran
 **What it costs today.** Two people on one session cannot see each other. That is most of the reason a sessions server exists rather than a local agent, and this client is invisible in it.
 
 **Suggestions.** (1) Dispatch on opening a session view and let the host remove it - membership is host-kept, and removal already happens on unsubscribe, which this client now sends. (2) The same, and draw the session's own `activeClients` in the header, which is the half a person can see. (3) Leave it, and be a client that watches without being watchable.
-
-## B-01-13 - A dispatch the host refuses looks like one that did nothing
-
-`ActionEnvelope.rejectionReason` is never read. Neither is `origin`.
-
-**Revalidated, because the audit's framing of this one was wrong for this client.** The specification's reconcile loop is: apply optimistically, match the echo by `origin.clientSeq`, revert on `rejectionReason`. This client applies nothing optimistically - it waits for the host's echo for everything - so there is no prediction to revert and **nothing here is out of spec**. Write-ahead is a thing a client may do, not a thing it must.
-
-What is wrong is smaller and is not about reconciliation at all. A host that refuses an action now says so, in words, in an envelope this client drops on the floor. So the flag does not move, the screen does not change, and nobody is told why. Before ahpd emitted rejections that was invisible; it emits them now.
-
-**What it costs today.** An action the host will not take is indistinguishable from one that worked and changed nothing.
-
-**Suggestions.** (1) Read `rejectionReason` and show it, and leave the optimistic half alone - that is the whole defect, and it is a branch in the event handler. (2) Take the optimistic path as well, for the small safe set only - draft, queue order, read and archive flags, review ticks - matching the echo by `origin.clientSeq` and reverting on a rejection. Not turn content. (3) Leave it, and accept that a refusal is silent.
 
 ## B-01-14 - The handshake is more round trips than it needs
 
@@ -145,6 +137,26 @@ AHP is symmetrical, and the package answers a host-initiated request with `-3260
 
 **Suggestions.** (1) Read the agent's capabilities and offer fork and side chat exactly where they are advertised, which is the rule the rest of this client already follows. (2) Wait until a host advertises one, and take both then. (3) Take `sessionConfigCompletions` only alongside the first property that needs it, which is the host's `A-01-03c` seen from here.
 
+## B-01-19 - A session says which model, and nothing about it
+
+`AgentInfo.models` carries `{ id, name, provider }` and, for a model whose harness reports effort levels, a `configSchema` describing a `thinkingLevel` property. The session info view shows an id.
+
+**What it costs today.** `opus[1m]` is what a person reads where the host sent a display name beside it. The model's own options - which thinking levels it takes, and which one it opens at - are on the wire and are not drawn anywhere, so the only way to know what a model can be asked for is to try it.
+
+**Two things that shape this, both checked against the hosts rather than assumed.** The per-model `thinkingLevel` is a *fact*, not a control: ahpd's turn path reads `model.id` and drops `ModelSelection.config`, and the key that takes effect is the session-wide `effortLevel`. A picker wired to it would write a field nothing reads. And `enumLabels` is read positionally and never mapped here - ahpd, VS Code's SDK projection and its own agent spell the same five effort values three different ways, so a client with its own word list is a client that disagrees with whatever host it is connected to. The one-value schema with no `default` is real and only happens when that single level is not `high`, which is the case a naive "show the default" row renders blank.
+
+`provider` is required by the protocol and equals the enclosing agent's, so it is a field to satisfy rather than a fact to show twice. Everything else the audit might expect - `maxContextWindow`, `maxOutputTokens`, `maxPromptTokens`, `supportsVision`, `policyState` - is absent from both ahpd and VS Code's SDK transport, and appears only in VS Code's Copilot-routed projection. Nothing here should draw a control for them.
+
+**Suggestions.** (1) Name and id in the info view, with the model's effort levels listed from `enumLabels` and the default marked where the schema has one, resolved against `RootState.agents[].models`. (2) The same, and mark the session-wide `effortLevel` beside them so the fact and the control that exists are visibly different things. (3) Name only, and leave the options until a host honours them.
+
+## B-01-20 - What a turn ran at is thrown away on the way in
+
+`ModelSelection` on a chat message carries `id` and `config`. This client keeps `message.model.id` and discards the rest, and `say` and `queue` send `{ id }` with nothing beside it.
+
+**What it costs today.** A turn's model is an id with no name, no provider and no chosen thinking level, so nothing here can say what a past turn actually ran at - only which model was named. It also means a per-model option can never be *sent*, whatever a host does with it, because the field is dropped before it reaches the wire.
+
+**Suggestions.** (1) Carry `ModelSelection` whole, in and out, and let the screens decide what to show - the field is on the chat channel, and `say` and `queue` are the two places that send it. (2) Carry it inbound only, which makes the transcript truthful and leaves sending for whenever a host honours the config. (3) Leave it, and accept that a model is a string here.
+
 ## B-01-05 - A diff is drawn from scratch here, and will stay that way
 
 Closed as **not viable**, and the reasoning is worth keeping so nobody re-opens it.
@@ -165,7 +177,7 @@ Four were checked against the protocol's own declarations and the reference impl
 
 **Showing a truncated catalogue as a whole one.** Real in effect if not in letter, and it is `B-02-01`. Nothing in the specification forbids asking for a hundred rows. What it forbids is nothing - `nextCursor` is offered and this client drops it - and the result is a screen that is confidently wrong, which is the class of defect the host's audit was written about.
 
-**Not reconciling against `origin`.** Checked and **conformant**. Write-ahead is what a client *may* do; this one applies nothing optimistically and so has nothing to revert. The real gap is that it never reads `rejectionReason`, which is `B-01-13` and is about telling a person, not about reconciling state.
+**Not reconciling against `origin`.** Checked and **conformant**. Write-ahead is what a client *may* do; this one applies nothing optimistically and so has nothing to revert. What was wrong was next to it and worse than the audit's framing: a rejected envelope carries the action the host *declined*, and reducing it made the refused change anyway. That is read and dropped now, and `origin` decides whose refusal is worth showing a person.
 
 **Declaring no `ClientCapabilities`.** Checked and **conformant**. The field is a set of presence flags and absence means unsupported - which is exactly true here: `mcpApps` is the only flag defined, a terminal cannot host a View sandbox, and claiming it would invite traffic this client could not answer. Keep it absent, and keep it absent deliberately.
 
