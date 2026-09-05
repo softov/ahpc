@@ -86,6 +86,9 @@ Automations
   automation disable <uri>     switch it off
   automation rm <uri>          forget it
 
+The host's own log
+  logs                         what the daemon is saying  [--level L] [--follow]
+
 Signing in
   auth                         what this host protects                [--json]
   auth <resource>              push a token   [--token T] [--expires-in S]
@@ -168,7 +171,7 @@ const SWITCHES = new Set([
   '--reject', '--claude', '--chat',
   // The write half's own flags, which take no value: without them here a
   // positional after one is read as that flag's argument and disappears.
-  '--create-only', '--recursive', '--fail-if-exists', '--publish-writable',
+  '--create-only', '--recursive', '--fail-if-exists', '--publish-writable', '--follow',
 ]);
 
 /** A message for the person, not a stack trace. */
@@ -372,6 +375,28 @@ export async function cli(command: string, rest: string[]): Promise<number> {
       case 'auth': return await signIn(host, args, wants);
 
       case 'automation': return await automation(host, args, wants);
+
+      case 'logs': {
+        if (!host.watchLogs) throw new Fault('This host emits no logs.');
+        const follow = args.has('--follow');
+        const watching = await host.watchLogs((record) => {
+          if (wants) { json(record); return; }
+          line([
+            record.at?.slice(11, 19) ?? '',
+            record.severity ?? '',
+            record.body,
+          ].filter(Boolean).join('  '));
+        }, { ...(args.value('--level') ? { level: args.value('--level') as string } : {}) });
+        // Without `--follow` this is a tail of whatever arrives in the next
+        // moment, which is what a stateless channel can offer: telemetry is
+        // live-edge only and is not replayed.
+        if (!follow) {
+          await new Promise((resolve) => { setTimeout(resolve, 1500); });
+          watching.close();
+        }
+        else await new Promise(() => undefined);
+        return 0;
+      }
 
       case 'agents': {
         const found = await settled(host, () => host.agents());

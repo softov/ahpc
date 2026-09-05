@@ -104,6 +104,14 @@ export interface LiveHostOptions {
    */
   onAuthRequired?(resources: { resource: string; description?: string }[], reason?: string): void;
   /**
+   * One log record the host emitted, flattened out of OTLP.
+   *
+   * `telemetry-channel.md` is a thin pass-through: the payload is an
+   * OTLP/JSON `ExportLogsServiceRequest` verbatim, nested resource by scope by
+   * record. What a reader wants is a line, so the nesting is walked here.
+   */
+  onLog?(record: { at?: string; severity?: string; body: string; attributes: Record<string, string> }): void;
+  /**
    * What this client serves back, when it was told to serve anything.
    *
    * Absent means a `publish()` that refuses everything, which is the default
@@ -316,6 +324,76 @@ function tee(inner: Framed, heard: (method: string, params: Bag) => void): Frame
       return frame;
     },
   };
+}
+
+/**
+ * An OTLP value, as a string.
+ *
+ * OTLP wraps every attribute in a one-key object naming its type -
+ * `{ stringValue: "x" }`, `{ intValue: "3" }` - so a reader that took
+ * `value` would print `[object Object]` for all of them.
+ */
+function otlpValue(value: unknown): string {
+  const found = bag(value);
+  for (const key of ['stringValue', 'intValue', 'doubleValue', 'boolValue']) {
+    if (found[key] !== undefined) return String(found[key]);
+  }
+  return '';
+}
+
+/** Every log record in one OTLP batch, flattened out of resource and scope. */
+function logsOf(payload: unknown): {
+  at?: string;
+  severity?: string;
+  body: string;
+  attributes: Record<string, string>;
+}[] {
+  const out: { at?: string; severity?: string; body: string; attributes: Record<string, string> }[] = [];
+  for (const resource of list(bag(payload).resourceLogs)) {
+    const shared: Record<string, string> = {};
+    for (const attribute of list(bag(bag(resource).resource).attributes)) {
+      const one = bag(attribute);
+      if (str(one.key) !== undefined) shared[str(one.key) as string] = otlpValue(one.value);
+    }
+    for (const scope of list(bag(resource).scopeLogs)) {
+      for (const raw of list(bag(scope).logRecords)) {
+        const record = bag(raw);
+        const attributes = { ...shared };
+        for (const attribute of list(record.attributes)) {
+          const one = bag(attribute);
+          if (str(one.key) !== undefined) attributes[str(one.key) as string] = otlpValue(one.value);
+        }
+        // Nanoseconds since the epoch, as a string because it does not fit in
+        // a double. Divided down rather than parsed as a number.
+        const nanos = str(record.timeUnixNano);
+        out.push({
+          ...(nanos !== undefined ? { at: new Date(Number(nanos.slice(0, -6))).toISOString() } : {}),
+          ...(str(record.severityText) ? { severity: str(record.severityText) as string } : {}),
+          body: otlpValue(record.body),
+          attributes,
+        });
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * The advertised telemetry URI, with `{level}` filled in.
+ *
+ * RFC 6570 in the general case; `{level}` is the only variable this
+ * specification defines, so only that one is expanded - `telemetry-channel.md`
+ * says the URI is otherwise opaque, and a client that started rewriting the
+ * rest of it would be parsing something it was told not to. The form-style
+ * `{?level}` expands to a query and the bare `{level}` to the value itself;
+ * with no level, both expand to nothing, which is what RFC 6570 says of an
+ * undefined variable.
+ */
+function expandLevel(template: string, level?: string): string {
+  const value = level === undefined ? '' : encodeURIComponent(level);
+  return template
+    .replace(/\{\?level\}/g, value === '' ? '' : `?level=${value}`)
+    .replace(/\{level\}/g, value);
 }
 
 async function load(): Promise<Loaded> {
@@ -1039,6 +1117,13 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
    * is not known and a client SHOULD show an indeterminate indicator.
    */
   const working = new Map<string, string>();
+  /** Whoever is following the host's log, which arrives past the protocol client. */
+  const logReaders = new Set<(record: {
+    at?: string;
+    severity?: string;
+    body: string;
+    attributes: Record<string, string>;
+  }) => void>();
   const notified = (method: string, params: Bag): void => {
     if (method === 'auth/required') {
       const one = bag(params.resource);
@@ -1048,6 +1133,14 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
         [{ resource, ...(str(one.description) ? { description: str(one.description) as string } : {}) }],
         str(params.reason),
       );
+      return;
+    }
+    if (method === 'otlp/exportLogs') {
+      if (options.onLog === undefined && logReaders.size === 0) return;
+      for (const one of logsOf(params.payload)) {
+        options.onLog?.(one);
+        for (const reader of logReaders) reader(one);
+      }
       return;
     }
     if (method !== 'root/progress') return;
@@ -1908,6 +2001,29 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
         resource: uri,
         changes: { enabled },
       });
+    },
+
+    /*
+     * The host's own log, on the channel it advertised.
+     *
+     * `telemetry-channel.md`: the URI is opaque apart from the well-known
+     * template variables, and `{level}` is the only one defined - so this
+     * expands that and nothing else, and subscribes with whatever comes out.
+     * A host that emits no logs omits the field, and then there is nothing to
+     * follow rather than a channel to guess at.
+     */
+    watchLogs: async (observer, opts) => {
+      const advertisedUri = str(bag(hello.telemetry).logs);
+      if (advertisedUri === undefined) throw new Error('This host emits no logs.');
+      const uri = expandLevel(advertisedUri, opts?.level);
+      logReaders.add(observer);
+      const hold = channels.open(uri, { opened: () => undefined, event: () => undefined });
+      return {
+        close: () => {
+          logReaders.delete(observer);
+          hold.release();
+        },
+      };
     },
 
     automationTriggers: async () => {

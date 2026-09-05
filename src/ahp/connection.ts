@@ -463,6 +463,19 @@ export interface HostConnection {
    * host's, not a list kept here.
    */
   automationTriggers?(): Promise<{ kind: string; title?: string; description?: string }[]>;
+  /**
+   * Follow the host's own log.
+   *
+   * Absent where the host advertised no `telemetry.logs`, which the
+   * specification says is how a host that emits none says so. `level` expands
+   * the `{level}` template variable, the only one defined.
+   */
+  watchLogs?(observer: (record: {
+    at?: string;
+    severity?: string;
+    body: string;
+    attributes: Record<string, string>;
+  }) => void, options?: { level?: string }): Promise<{ close(): void }>;
   /** A page of one automation's run history, oldest last, with the host's cursor. */
   automationRuns?(uri: string, cursor?: string): Promise<{
     runs: AutomationRun[];

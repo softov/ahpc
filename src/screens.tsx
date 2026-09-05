@@ -1456,16 +1456,31 @@ export const FilesScreen: (props: Record<string, never>) => RenderOutput =
     useEffect(() => {
       if (!at) return;
       let live = true;
-      setLoading(true);
-      setFailure(null);
-      void controller.files(at)
-        .then((found) => { if (live) { app.store.set(FILES_ENTRIES, found); setLoading(false); } })
-        .catch((error: unknown) => {
-          if (!live) return;
-          setLoading(false);
-          setFailure(error instanceof Error ? error.message : String(error));
-        });
-      return () => { live = false; };
+      const read = (): void => {
+        setLoading(true);
+        setFailure(null);
+        void controller.files(at)
+          .then((found) => { if (live) { app.store.set(FILES_ENTRIES, found); setLoading(false); } })
+          .catch((error: unknown) => {
+            if (!live) return;
+            setLoading(false);
+            setFailure(error instanceof Error ? error.message : String(error));
+          });
+      };
+      read();
+      /*
+       * And again when the host says it changed.
+       *
+       * A watch rather than a timer: the protocol has one, and a screen that
+       * re-read on a schedule was asking a question the host had already
+       * offered to answer. Released on leaving, which is the only way a watch
+       * closes - the specification has no dispose command and the receiver
+       * lets the watcher go when the last subscriber unsubscribes.
+       */
+      let watching: { close(): void } | undefined;
+      void controller.watchFiles(at, () => { if (live) read(); })
+        .then((held) => { if (live) watching = held; else held.close(); });
+      return () => { live = false; watching?.close(); };
     }, [at]);
 
     useEffect(() => {

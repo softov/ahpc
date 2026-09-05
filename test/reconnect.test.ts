@@ -53,6 +53,10 @@ class Scripted {
   readonly slow = new Set<string>();
   /** The held `subscribe` for each slow channel, by request id. */
   private readonly holding = new Map<string, number | string>();
+  /** The channel a `createResourceWatch` is answered with. Receiver-assigned. */
+  watchChannel = 'ahp-resource-watch:/default';
+  /** What `initialize` advertises under `telemetry`, if anything. */
+  telemetry: Record<string, string> | null = null;
   /** An error to refuse a subscribe with, in place of the plain `-32001`. */
   refuseWith: Record<string, unknown> | null = null;
   /** What `resourceResolve` answers. */
@@ -78,6 +82,32 @@ class Scripted {
   timesAsked(method: string, channel?: string): number {
     return this.asked.filter((frame) => frame.method === method
       && (channel === undefined || frame.params?.channel === channel)).length;
+  }
+
+  /** Emit one OTLP log batch, in the shape the specification's example has. */
+  async logs(): Promise<void> {
+    await this.send({
+      jsonrpc: '2.0',
+      method: 'otlp/exportLogs',
+      params: {
+        channel: 'ahp-otlp://logs',
+        payload: {
+          resourceLogs: [{
+            resource: { attributes: [{ key: 'service.name', value: { stringValue: 'ahp-agent-host' } }] },
+            scopeLogs: [{
+              scope: { name: 'agent-host.tools' },
+              logRecords: [{
+                timeUnixNano: '1736870400000000000',
+                severityNumber: 9,
+                severityText: 'INFO',
+                body: { stringValue: 'tool call started' },
+                attributes: [{ key: 'tool.name', value: { stringValue: 'read_file' } }],
+              }],
+            }],
+          }],
+        },
+      },
+    });
   }
 
   /** Say a protected resource needs a token, as `auth/required` does. */
@@ -199,6 +229,7 @@ class Scripted {
           fromSeq: this.seq,
         })),
         ...(this.automations ? { automations: {} } : {}),
+        ...(this.telemetry === null ? {} : { telemetry: this.telemetry }),
       });
       return;
     }
@@ -279,6 +310,7 @@ class Scripted {
     }
     if (method === 'createSession') { await reply(null); return; }
     if (method === 'authenticate') { await reply({}); return; }
+    if (method === 'createResourceWatch') { await reply({ channel: this.watchChannel }); return; }
     if (method === 'resourceResolve') { await reply(this.resolveWith); return; }
     if (method !== undefined && method.startsWith('resource')) { await reply({}); return; }
     if (method === 'ping') { await reply(null); return; }
@@ -1770,6 +1802,123 @@ describe('signing in to what a host protects', () => {
     // MUST acquire a new credential; MUST NOT blindly replay the challenged
     // token. The reason is carried so the layer above can tell them apart.
     expect(asked[asked.length - 1]?.why).toBe('expired');
+
+    await host.close();
+  });
+});
+
+describe('the host\'s own log, which the protocol client also drops', () => {
+  it('flattens an OTLP batch into records a reader can print', async () => {
+    const seen: { severity?: string; body: string; attributes: Record<string, string> }[] = [];
+    let scripted!: Scripted;
+    const open = async (): Promise<AhpTransport> => {
+      const [mine, theirs] = InMemoryTransport.pair();
+      scripted = new Scripted(theirs);
+      return mine;
+    };
+    const host = await liveHost({
+      url: 'ws://scripted', clientId: 'ahpc-test', connect: open, backoff: [0], keepaliveMs: 0,
+      onLog: (record) => seen.push(record),
+    });
+    await settle();
+
+    await scripted.logs();
+    await settle(2);
+
+    // OTLP nests resource by scope by record, and wraps every attribute value
+    // in a one-key object naming its type. A reader wants a line.
+    expect(seen[0]?.body).toBe('tool call started');
+    expect(seen[0]?.severity).toBe('INFO');
+    // Resource attributes and record attributes, merged - which is what makes
+    // a line say which session it came from.
+    expect(seen[0]?.attributes).toEqual({ 'service.name': 'ahp-agent-host', 'tool.name': 'read_file' });
+
+    await host.close();
+  });
+
+  it('subscribes with the template expanded, and only where it was advertised', async () => {
+    let scripted!: Scripted;
+    const open = async (): Promise<AhpTransport> => {
+      const [mine, theirs] = InMemoryTransport.pair();
+      scripted = new Scripted(theirs);
+      scripted.telemetry = { logs: 'ahp-otlp://logs{?level}' };
+      return mine;
+    };
+    const host = await liveHost({
+      url: 'ws://scripted', clientId: 'ahpc-test', connect: open, backoff: [0], keepaliveMs: 0,
+    });
+    await settle();
+
+    const watching = await host.watchLogs?.(() => undefined, { level: 'warn' });
+    await settle();
+    // `{?level}` is form-style and expands to a query. Nothing else in the URI
+    // is touched: the specification says it is opaque apart from the
+    // well-known variables, of which this is the only one.
+    expect(scripted.timesAsked('subscribe', 'ahp-otlp://logs?level=warn')).toBe(1);
+
+    watching?.close();
+    await host.close();
+  });
+
+  it('expands to nothing where no level was asked for', async () => {
+    let scripted!: Scripted;
+    const open = async (): Promise<AhpTransport> => {
+      const [mine, theirs] = InMemoryTransport.pair();
+      scripted = new Scripted(theirs);
+      scripted.telemetry = { logs: 'ahp-otlp://logs{?level}' };
+      return mine;
+    };
+    const host = await liveHost({
+      url: 'ws://scripted', clientId: 'ahpc-test', connect: open, backoff: [0], keepaliveMs: 0,
+    });
+    await settle();
+
+    const watching = await host.watchLogs?.(() => undefined);
+    await settle();
+    // An undefined variable expands to nothing, which RFC 6570 says and which
+    // leaves the URI the host advertised.
+    expect(scripted.timesAsked('subscribe', 'ahp-otlp://logs')).toBe(1);
+
+    watching?.close();
+    await host.close();
+  });
+
+  it('says a host that emits none emits none', async () => {
+    const { host } = await connect();
+    // `telemetry` omitted entirely is how a host says it emits nothing, and
+    // guessing a channel would be subscribing to something nobody advertised.
+    await expect(host.watchLogs?.(() => undefined)).rejects.toThrow(/no logs/);
+    await host.close();
+  });
+});
+
+describe('a watch instead of a timer', () => {
+  it('creates one on the channel the host allocates, and releases it', async () => {
+    const { host, scripted } = await connect();
+    scripted.watchChannel = 'ahp-resource-watch:/w1';
+
+    const seen: { uri: string; kind: string }[][] = [];
+    const watching = await host.watchResource?.('file:///x', (changes) => seen.push(changes));
+    await settle();
+
+    // Receiver-assigned and opaque: whatever the host called it is what is
+    // subscribed to.
+    expect(scripted.timesAsked('subscribe', 'ahp-resource-watch:/w1')).toBe(1);
+
+    await scripted.act('ahp-resource-watch:/w1', {
+      type: 'resourceWatch/changed',
+      // Wrapped in `items` for forward compatibility, so a reader that took
+      // `changes` as the array gets nothing.
+      changes: { items: [{ uri: 'file:///x/a.txt', kind: 'changed' }] },
+    });
+    await settle();
+    expect(seen[0]).toEqual([{ uri: 'file:///x/a.txt', kind: 'changed' }]);
+
+    // There is no dispose command: releasing the last subscriber is what makes
+    // the host let the watcher go.
+    watching?.close();
+    await settle();
+    expect(scripted.timesAsked('unsubscribe', 'ahp-resource-watch:/w1')).toBe(1);
 
     await host.close();
   });

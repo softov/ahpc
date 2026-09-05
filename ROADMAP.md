@@ -18,18 +18,6 @@ specification is what this client follows.
 
 # Batch 6 - The rest of the surface
 
-## B-01-15 - Automations from the command line
-
-**Clause.** `automation-channel.md:82`: before dispatching `automation/removed` a client SHOULD verify the target advertises `AutomationOperation.Remove`. `listAutomationTriggerDefinitions` in `CommandMap` is how a client learns which triggers a host has.
-
-**Missing.** No `ahpc automation`. Trigger definitions are never fetched, so only a schedule can be authored. Run history is never paged.
-
-**Steps.**
-1. `ahpc automation list|show|new|run|enable|disable|rm|runs`.
-2. Call `listAutomationTriggerDefinitions` before drawing the trigger form.
-3. Verify `Remove` is advertised before dispatching a removal.
-4. Page run history with the host's cursor.
-
 ## B-01-16b - The host's log
 
 **Clause.** `telemetry-channel.md:13`: clients MUST treat the telemetry URI as opaque apart from expanding the well-known template variables, and subscribe with the value advertised on `InitializeResult.telemetry` after expansion. `:39`: a host that emits none omits `telemetry`; clients SHOULD subscribe only to signals they can process.

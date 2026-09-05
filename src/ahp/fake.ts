@@ -1362,6 +1362,31 @@ export function fakeHost(): FakeHost {
       automationsMoved();
     },
 
+    /*
+     * A log this fixture emits on a timer.
+     *
+     * Enough to drive a reader: the shape a record arrives in, and the fact
+     * that closing stops it. A fixture with no logs at all would let a screen
+     * ship that never rendered one.
+     */
+    watchLogs: async (observer) => {
+      let stopped = false;
+      let n = 0;
+      const tick = (): void => {
+        if (stopped) return;
+        n += 1;
+        observer({
+          at: AT,
+          severity: n % 3 === 0 ? 'WARN' : 'INFO',
+          body: `scripted log record ${String(n)}`,
+          attributes: { 'service.name': 'fake-agent-host' },
+        });
+        setTimeout(tick, 200);
+      };
+      setTimeout(tick, 50);
+      return { close: () => { stopped = true; } };
+    },
+
     automationTriggers: async () => [
       { kind: 'schedule', title: 'On a schedule', description: 'A cron expression in a time zone.' },
       // What a host that has events advertises. Without asking, only the

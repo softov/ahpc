@@ -114,6 +114,8 @@ export interface Controller {
    * to browse rather than as a failure.
    */
   files(uri: string): Promise<ResourceEntry[]>;
+  /** Watch a directory, where the host serves watches. Releasing closes it. */
+  watchFiles(uri: string, changed: () => void): Promise<{ close(): void }>;
   /**
    * Every automation the host holds.
    *
@@ -804,6 +806,21 @@ export function createController(
     content: (ref) => host.content(ref),
     loadOlderTurns: (uri) => host.loadOlderTurns(uri),
     files: async (uri) => (await host.resourceList?.(uri)) ?? [],
+
+    /*
+     * Be told when a directory changes, instead of asking again.
+     *
+     * `resource-watch-channel.md` is explicit that there is no dispose
+     * command: releasing the last subscriber is what makes the host let the
+     * watcher go, so the returned handle is the whole of closing one. A host
+     * that will not serve a watch is not a failure - it answers `-32601` or
+     * refuses with `-32009`, and the screen goes on reading when it opens.
+     */
+    watchFiles: async (uri, changed) => {
+      if (!host.watchResource) return { close: () => undefined };
+      try { return await host.watchResource(uri, changed, { recursive: false }); }
+      catch { return { close: () => undefined }; }
+    },
     file: async (uri) => {
       if (!host.resourceRead) throw new Error('This host serves no files.');
       return await host.resourceRead(uri);
