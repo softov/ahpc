@@ -195,6 +195,7 @@ async function connect(): Promise<{
     connect: open,
     backoff: [0],
     keepaliveMs: 0,
+    lingerMs: 0,
   });
   return { host, scripted, reopen: () => scripted };
 }
@@ -606,6 +607,158 @@ describe('history is read past the window a host opened with', () => {
 
     // Reading further back is the person's business, not this client's.
     expect(scripted.fetched).toEqual([]);
+
+    await host.close();
+  });
+});
+
+describe('the one thing that moved between 0.9.0 and 1.0.0', () => {
+  /*
+   * Everything else this client reads is byte-identical across the two
+   * versions - 96 action types, 41 method names, and the fields of
+   * `ChatState`, `Turn`, `ActiveTurn`, `SessionState` and `RootState`. What
+   * moved is the automations catalogue: `entries` under 0.9.0 and
+   * `automations` under 1.0.0, holding the very same automation shape.
+   */
+  const one = {
+    resource: 'ahp-automation:/a1',
+    definition: { name: 'Nightly', enabled: true, trigger: { kind: 'schedule', expression: '0 2 * * *' } },
+    runs: [],
+    createdAt: new Date().toISOString(),
+    modifiedAt: new Date().toISOString(),
+  };
+
+  const open = (state: Record<string, unknown>) => async (): Promise<AhpTransport> => {
+    const [mine, theirs] = InMemoryTransport.pair();
+    const scripted = new Scripted(theirs);
+    scripted.automations = true;
+    scripted.states.set(AUTOMATIONS, state);
+    return mine;
+  };
+
+  it('reads a 0.9.0 catalogue', async () => {
+    const host = await liveHost({
+      url: 'ws://scripted', clientId: 'ahpc-test', connect: open({ entries: [one] }),
+      backoff: [0], keepaliveMs: 0,
+    });
+    await settle();
+    expect((await host.automations?.() ?? []).length).toBe(1);
+    await host.close();
+  });
+
+  it('reads a 1.0.0 catalogue, which is the one this client negotiates with VS Code', async () => {
+    const host = await liveHost({
+      url: 'ws://scripted', clientId: 'ahpc-test', connect: open({ automations: [one] }),
+      backoff: [0], keepaliveMs: 0,
+    });
+    await settle();
+    expect((await host.automations?.() ?? []).length).toBe(1);
+    await host.close();
+  });
+});
+
+describe('the first snapshot is not sent before the conversation is in it', () => {
+  const turn = (n: number): Record<string, unknown> => ({
+    id: `t${n}`,
+    startedAt: new Date().toISOString(),
+    message: { text: `turn ${n}`, origin: { kind: 'user' } },
+  });
+
+  it('carries the turns, because a reader that takes the first one and stops gets them', async () => {
+    const { host, scripted } = await connect();
+    scripted.states.set(SESSION, { defaultChat: CHAT, chats: [] });
+    scripted.states.set(CHAT, { turns: [turn(1), turn(2)] });
+
+    // A session and its chat are two channels and the session answers first.
+    // `session history` takes the first snapshot and closes, so a snapshot
+    // emitted in between is one that reports an empty conversation.
+    const first = await new Promise<HostEvent>((resolve) => {
+      const view = host.subscribe(SESSION as never, (event) => {
+        if (event.type === 'snapshot') { resolve(event); view.close(); }
+      });
+    });
+
+    expect(first.type).toBe('snapshot');
+    // Not a count: the transcript splits a turn into what was said and what
+    // answered. What matters is that it is not empty, which is what it was.
+    expect(first.type === 'snapshot' && first.turns.length > 0).toBe(true);
+
+    await host.close();
+  });
+
+  it('still answers for a session that has no chat to wait for', async () => {
+    const { host, scripted } = await connect();
+    scripted.states.set(SESSION, { chats: [] });
+
+    const first = await new Promise<HostEvent>((resolve) => {
+      const view = host.subscribe(SESSION as never, (event) => {
+        if (event.type === 'snapshot') { resolve(event); view.close(); }
+      });
+    });
+    expect(first.type).toBe('snapshot');
+
+    await host.close();
+  });
+});
+
+describe('a channel is not let go the instant a screen closes', () => {
+  it('keeps it across a close and a reopen, so no unsubscribe lands in between', async () => {
+    let scripted!: Scripted;
+    const open = async (): Promise<AhpTransport> => {
+      const [mine, theirs] = InMemoryTransport.pair();
+      scripted = new Scripted(theirs);
+      return mine;
+    };
+    const host = await liveHost({
+      url: 'ws://scripted', clientId: 'ahpc-test', connect: open,
+      backoff: [0], keepaliveMs: 0, lingerMs: 5_000,
+    });
+    scripted.states.set(SESSION, { defaultChat: CHAT, chats: [] });
+    scripted.states.set(CHAT, { turns: [] });
+
+    const first = host.subscribe(SESSION as never, () => undefined);
+    await settle();
+    first.close();
+    await settle();
+
+    /*
+     * The reference host evicts a session from memory when its last
+     * subscriber leaves and restores it from disk on the next subscribe, so a
+     * client that unsubscribes and immediately subscribes again is racing
+     * that restore - and losing it looks like `-32001` on a session that was
+     * open a moment ago.
+     */
+    expect(scripted.timesAsked('unsubscribe', SESSION)).toBe(0);
+
+    const second = host.subscribe(SESSION as never, () => undefined);
+    await settle();
+    expect(scripted.timesAsked('unsubscribe', SESSION)).toBe(0);
+
+    second.close();
+    await host.close();
+  });
+
+  it('lets it go once nobody has come back for it', async () => {
+    let scripted!: Scripted;
+    const open = async (): Promise<AhpTransport> => {
+      const [mine, theirs] = InMemoryTransport.pair();
+      scripted = new Scripted(theirs);
+      return mine;
+    };
+    const host = await liveHost({
+      url: 'ws://scripted', clientId: 'ahpc-test', connect: open,
+      backoff: [0], keepaliveMs: 0, lingerMs: 20,
+    });
+    scripted.states.set(SESSION, { defaultChat: CHAT, chats: [] });
+    scripted.states.set(CHAT, { turns: [] });
+
+    const view = host.subscribe(SESSION as never, () => undefined);
+    await settle();
+    view.close();
+    await new Promise((resolve) => { setTimeout(resolve, 60); });
+
+    // Waiting is a pause before letting go, not a refusal to.
+    expect(scripted.timesAsked('unsubscribe', SESSION)).toBe(1);
 
     await host.close();
   });

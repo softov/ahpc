@@ -73,6 +73,8 @@ export interface LiveHostOptions {
   backoff?: readonly number[];
   /** How often to ping an otherwise silent connection. `0` sends none. */
   keepaliveMs?: number;
+  /** How long to hold a channel nobody is reading before letting it go. */
+  lingerMs?: number;
   /**
    * Told when this client stopped short of everything the host had.
    *
@@ -95,6 +97,16 @@ const BACKOFF = [250, 500, 1000, 2000, 5000, 10_000, 30_000] as const;
 
 /** How long a connection may say nothing before this client checks it is there. */
 const KEEPALIVE_MS = 30_000;
+
+/**
+ * How long a channel nobody is reading is kept before it is given up.
+ *
+ * Long enough to cover reading a snapshot and then opening the view on the
+ * same session, and closing a screen and going back to it - which are the two
+ * places an immediate release put an `unsubscribe` in the middle of what a
+ * person experienced as one thing.
+ */
+const LINGER_MS = 5_000;
 
 /**
  * How many pages of the catalogue to walk before stopping and saying so.
@@ -901,6 +913,7 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
   const channels = openChannels({
     client,
     reason,
+    lingerMs: options.lingerMs ?? LINGER_MS,
     onRefusal: (uri, message) => options.onRefusal?.(uri, message),
   });
   channels.drain(client);
@@ -941,6 +954,29 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
    * than retried - it is an answer about what this host is, and it will not
    * become a different answer on the next keystroke.
    */
+  /**
+   * The automations catalogue, under whichever name the host's version gives it.
+   *
+   * This is the whole of what changed between protocol 0.9.0 and 1.0.0 in
+   * anything this client reads. 0.9.0 calls the catalogue `AutomationState`
+   * and puts the automations in `entries`; 1.0.0 renames the catalogue to
+   * `AutomationCatalogState` and the field to `automations`, and moves the
+   * name `AutomationState` onto a single automation. The automations
+   * themselves did not move - 0.9.0's `AutomationEntry` and 1.0.0's
+   * `AutomationState` have the same fields, and every action on the channel
+   * kept its name and its shape.
+   *
+   * So one field is normalised here, at the edge, and everything past this
+   * point - the reducer included, which is the 0.9.0 one and reads `entries` -
+   * carries on unaware there was ever a second spelling.
+   */
+  const automationCatalogue = (state: Bag | null): Bag | null => {
+    if (state === null) return null;
+    if (state.entries !== undefined || state.automations === undefined) return state;
+    const { automations, ...rest } = state;
+    return { ...rest, entries: automations };
+  };
+
   const automationWatchers = new Set<() => void>();
   let automationState: Bag | null = null;
   let noAutomations: string | undefined;
@@ -959,7 +995,7 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
   }
   else {
     channels.open(AUTOMATIONS, {
-      opened: (state) => { automationState = state; },
+      opened: (state) => { automationState = automationCatalogue(state); },
       event: (event) => {
         if (event.type !== 'action') return;
         // The host's own reducer. Two mutations is not eighty, but a second
@@ -1599,6 +1635,11 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
 
       const emit = (): void => {
         if (!live) return;
+        // Nothing is claimed about a conversation until the channel carrying
+        // it has spoken. A session with no chat to follow has nothing to wait
+        // for and emits at once.
+        const following = wanted ?? str(session.defaultChat);
+        if (following !== undefined && following !== '' && !listening) return;
         const all = transcript(chat);
         const active = all.find((found) => found.state === 'running');
         const asked = pendingInput(session, chat);
@@ -1620,6 +1661,17 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
 
       /** The chat channel, once the session has said which one it is. */
       let talking: { release(): void } | undefined;
+      /**
+       * Whether the chat this view follows has handed over its state.
+       *
+       * A session and its chat are two channels, and the session answers
+       * first. Reporting a snapshot in between says "here is the
+       * conversation" while holding none of it - which a screen survives,
+       * because the chat arrives a moment later and it redraws, and a reader
+       * that takes the first snapshot and stops does not. `session history`
+       * is exactly that reader, and it printed nothing.
+       */
+      let listening = false;
 
       /**
        * Follow the session's chat.
@@ -1637,6 +1689,7 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
         talking = channels.open(chatUri, {
           opened: (fresh) => {
             if (fresh) chat = fresh;
+            listening = true;
             emit();
             /*
              * A window with nothing in it, and a cursor saying there is more.
@@ -1661,7 +1714,12 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
             chat = bag(applyAction(ahp.chatReducer, chat, bag(event.params).action, bad));
             emit();
           },
-          refused: (message) => { if (live) observer({ type: 'error', message }); },
+          refused: (message) => {
+            // The conversation is not coming. Saying so is better than a
+            // reader that waits for a snapshot which will never be emitted.
+            listening = true;
+            if (live) observer({ type: 'error', message });
+          },
         });
         closers.push(() => talking?.release());
       };

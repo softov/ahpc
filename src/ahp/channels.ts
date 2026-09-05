@@ -114,6 +114,8 @@ interface Held {
   opened: boolean;
   /** What arrived while the subscribe was still in flight. */
   waiting: ChannelEvent[];
+  /** The release waiting to happen, if the last reader has gone. */
+  leaving?: ReturnType<typeof setTimeout>;
 }
 
 function bag(value: unknown): Record<string, unknown> | null {
@@ -128,6 +130,19 @@ export interface ChannelsOptions {
   onRefusal?(uri: string, message: string): void;
   /** The host's own words for a failure, as a client would show them. */
   reason(error: unknown): string;
+  /**
+   * How long to keep a channel nobody is reading, in milliseconds.
+   *
+   * Not laziness about letting go - a pause before it. Reading a snapshot and
+   * opening a view are two holds on the same channel a moment apart, and
+   * navigating away and back is two more, so releasing on the instant the
+   * count reaches zero puts an `unsubscribe` between every pair of them. A
+   * host is entitled to act on that: the reference one evicts a session from
+   * memory when its last subscriber leaves and restores it from disk on the
+   * next subscribe, and a client that unsubscribes and immediately subscribes
+   * again is racing that restore. `0` releases at once.
+   */
+  lingerMs?: number;
 }
 
 export function openChannels(options: ChannelsOptions): Channels {
@@ -142,6 +157,7 @@ export function openChannels(options: ChannelsOptions): Channels {
    * next connection and open a channel twice; it compares this instead.
    */
   let generation = 0;
+  const linger = options.lingerMs ?? 0;
 
   const entry = (uri: string): Held => {
     const found = held.get(uri);
@@ -228,12 +244,22 @@ export function openChannels(options: ChannelsOptions): Channels {
   };
 
   /** Let the host know nobody is reading, which is the only handle a watch has. */
+  /** Let the host know nobody is reading, once nobody has been for a while. */
   const drop = (uri: string): void => {
     const channel = held.get(uri);
     if (!channel || channel.uses > 0) return;
-    held.delete(uri);
-    if (!channel.opened) return;
-    void client.unsubscribe(uri).catch(() => undefined);
+    const release = (): void => {
+      const now = held.get(uri);
+      // Somebody took it back while this was waiting, which is the whole
+      // reason for waiting.
+      if (!now || now.uses > 0) return;
+      held.delete(uri);
+      if (!now.opened) return;
+      void client.unsubscribe(uri).catch(() => undefined);
+    };
+    if (linger <= 0) { release(); return; }
+    clearTimeout(channel.leaving);
+    channel.leaving = setTimeout(() => { channel.leaving = undefined; release(); }, linger);
   };
 
   return {
@@ -247,7 +273,14 @@ export function openChannels(options: ChannelsOptions): Channels {
       }
 
       const channel = entry(uri);
+      // Taking it back before the release fired is what keeps the
+      // subscription alive across a screen closing and opening again.
+      clearTimeout(channel.leaving);
+      channel.leaving = undefined;
       channel.consumers.add(consumer);
+      // Still a fresh subscribe, even when the channel was only lingering:
+      // asking again is how this reader gets a snapshot, and the host is
+      // still holding the channel because no `unsubscribe` went out.
       const first = channel.uses === 0;
       channel.uses += 1;
       if (first) start(uri, generation);
