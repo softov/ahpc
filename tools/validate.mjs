@@ -188,18 +188,16 @@ for (const line of readFileSync(file, 'utf8').split('\n')) {
   // carried on a channel, and a schema is a payload like any other - the
   // isolation and worktree questions live in one and nothing was checking it.
   if (frame.result?.schema !== undefined && snapshot === undefined) {
-    const result = check('SessionConfigSchema', { schema: frame.result.schema, values: frame.result.values ?? {} });
-    if (result.missing) {
-      const one = check('ConfigSchema', frame.result.schema);
-      if (!one.missing) {
-        checked += 1;
-        for (const error of one.errors) record('ConfigSchema', error, 'resolveSessionConfig');
-      }
-      else unroutable.set('ConfigSchema', (unroutable.get('ConfigSchema') ?? 0) + 1);
-    }
+    // The whole result, not the schema alone: `ResolveSessionConfigResult`
+    // declares both halves, and the echoed values are as much a payload as
+    // the questions they answer. Picking the schema out and guessing its type
+    // reported `sessionMutable` as undeclared - it is declared, on the
+    // *session* config schema, which is not the generic one.
+    const result = check('ResolveSessionConfigResult', frame.result);
+    if (result.missing) unroutable.set('ResolveSessionConfigResult', (unroutable.get('ResolveSessionConfigResult') ?? 0) + 1);
     else {
       checked += 1;
-      for (const error of result.errors) record('SessionConfigSchema', error, 'resolveSessionConfig');
+      for (const error of result.errors) record('ResolveSessionConfigResult', error, 'resolveSessionConfig');
     }
   }
   // An action, envelope and payload both. The payload's declaration is named

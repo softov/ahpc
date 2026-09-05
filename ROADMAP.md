@@ -34,6 +34,8 @@ The host's roadmap says a gap is found by diffing the protocol's sources on ever
 
 Two cautions that came out of getting this one wrong. **Check whose capture it is** - `serverInfo` on the initialize response says, and the session config's key set says again. Reading one host's bug as the other host's design produced a confident and completely inverted account of both, and the fix was right for reasons that were not. And a field being absent is not evidence that a host chose to omit it: `Message.model` was empty there because the host it came from was reading a `ModelSelection` as a string, which is a defect and has since been fixed.
 
+**Run a capture through a strict schema.** `tools/` generates one from the package's own declarations - closing every object, which the published `state.schema.json` never does - and checks a recording against it. This is the only method here that has found defects in *both* implementations, and it found the one that three readings had missed: `SessionState.model`, which a grep over construction sites structurally cannot see, because `model` is a legal property name somewhere and grep does not know which interface is being built. It also found what nobody was looking for - undeclared `resource`, `changes` and `modifiedAt` beside it. Two of its findings are the protocol's rather than a host's, and are in the notes below.
+
 **Diff the two versions rather than reasoning about them.** "We do not know what 1.0.0 changed" stood for as long as nobody spent an hour on it. Comparing the declarations of 54 file pairs answered it in one pass and the answer was one renamed field, which is both smaller than the fear and precise enough to act on. A question that has been open for a while is worth checking is still a question.
 
 ---
@@ -153,6 +155,16 @@ AHP is symmetrical, and the package answers a host-initiated request with `-3260
 
 **Suggestions.** (1) A chip on the control row beside the model chip, built from the selected model's `options` and sent as `ModelSelection.config` - which is what the schema says a client does with a `configSchema`, and it reads the session's `effortLevel` back for what is in force. (2) The same, but drive the existing session config control from the model's options instead of adding a second chip, so there is one place to change it and the model only narrows the choices. (3) Leave it, and let the session-wide setting be the only way.
 
+## B-01-21 - Everything this client sends is unchecked
+
+`tools/validate.mjs` reads what a host sent. Nothing reads what this client sends, and the captures it has been run against are somebody else's client talking - `vscode-agents-window`, in both of them. So every `dispatchAction`, `createSession`, `resolveSessionConfig` and `fetchTurns` this client has ever put on a wire has been checked by nothing but the type system, and the type system is exactly what a conditional spread walks past.
+
+**What it costs today.** Unknown, which is the point. Both hosts turned out to be sending undeclared fields, and there is no reason to think a client is different in kind - this one builds its outbound payloads with the same `...(x ? { k } : {})` that put `model` on `SessionState`.
+
+**What is missing is a recording, not a checker.** The checker already validates anything with a declaration; the client half of a capture is right there in the same files and is simply not being read. What has to be decided is which declaration each outbound frame is - a request's params are typed per method, so the router needs a method-to-type map where it currently has a URI-to-state map.
+
+**Suggestions.** (1) Route client frames by method into the package's `*Params` declarations and run it over the same captures, which needs no new recording at all. (2) The same, plus a flag on this client that writes its own frames to a file, so a capture can be made from a session rather than borrowed from another client. (3) Leave it, and rely on the host to refuse what it cannot read - which it does, silently, as `-32602`.
+
 ## B-01-05 - A diff is drawn from scratch here, and will stay that way
 
 Closed as **not viable**, and the reasoning is worth keeping so nobody re-opens it.
@@ -180,6 +192,8 @@ Four were checked against the protocol's own declarations and the reference impl
 ---
 
 # Notes
+
+**Two findings that belong to the protocol, not to a host.** Both implementations do these, which is what makes them the specification's rather than anybody's bug, and neither is work for this client. `ActionEnvelope.origin` is declared `ActionOrigin | undefined` - *required*, and satisfied only by sending the key with an undefined value, which no JSON does - so every host omitting it is out of conformance on a technicality. And a tool's `inputSchema` is a closed declaration that a real JSON Schema overflows: both hosts put `$comment` in one, which is a legal keyword the type does not allow. A client should read neither as a fault.
 
 **On depending on nothing.** This client depends on no agent SDK and on no particular host. Anything added here that names one harness is a mistake, and `--claude` was one: it made a client that could talk to any host need one specific host installed to talk to any of them.
 
