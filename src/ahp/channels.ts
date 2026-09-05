@@ -110,12 +110,16 @@ interface Held {
   /** How many readers are holding it. Zero means it is on its way out. */
   uses: number;
   consumers: Set<Consumer>;
-  /** True once the host has answered the subscribe for this channel. */
+  /** True once the host has answered a subscribe for this channel. */
   opened: boolean;
+  /** True once consumers have been handed the snapshot that answer carried. */
+  told: boolean;
   /** What arrived while the subscribe was still in flight. */
   waiting: ChannelEvent[];
   /** The release waiting to happen, if the last reader has gone. */
   leaving?: ReturnType<typeof setTimeout>;
+  /** The `subscribe` already out for this channel, which a second reader waits on. */
+  pending?: Promise<ChannelState>;
 }
 
 function bag(value: unknown): Record<string, unknown> | null {
@@ -171,7 +175,7 @@ export function openChannels(options: ChannelsOptions): Channels {
   const entry = (uri: string): Held => {
     const found = held.get(uri);
     if (found) return found;
-    const made: Held = { uses: 0, consumers: new Set(), opened: false, waiting: [] };
+    const made: Held = { uses: 0, consumers: new Set(), opened: false, told: false, waiting: [] };
     held.set(uri, made);
     return made;
   };
@@ -259,16 +263,46 @@ export function openChannels(options: ChannelsOptions): Channels {
     })();
   };
 
+  /**
+   * One `subscribe` per channel at a time, however many readers arrive.
+   *
+   * Not an optimisation, and specifically about two being *in flight*. The
+   * reference host puts a pending marker under the channel while it restores
+   * the session; a subscribe arriving while that marker is unresolved
+   * replaces it, and the first then finds itself no longer current and is
+   * answered `-32001 Resource not found`, naming a channel that exists. A
+   * re-subscribe to a channel already open is idempotent there - it is only
+   * the overlap that collides. Reading a row's detail and opening the view on
+   * it are two readers a keystroke apart, which is exactly that overlap, and
+   * each was sending its own. They share this instead.
+   *
+   * The promise is dropped once it settles rather than kept: it is here to
+   * make concurrent readers into one request, not to hand the second reader
+   * an answer from before it asked.
+   */
+  const ask = (uri: string): Promise<ChannelState> => {
+    const channel = entry(uri);
+    if (channel.pending) return channel.pending;
+    channel.told = false;
+    const asking = client.subscribe(uri).then(({ result }) => {
+      channel.opened = true;
+      return bag(result.snapshot?.state);
+    });
+    channel.pending = asking;
+    const done = (): void => { if (channel.pending === asking) channel.pending = undefined; };
+    asking.then(done, done);
+    return asking;
+  };
+
   /** Ask the host for a channel, and give what comes back to whoever is waiting. */
   const start = (uri: string, era: number): void => {
     void (async () => {
       try {
-        const { result } = await client.subscribe(uri);
+        const state = await ask(uri);
         if (era !== generation) return;
         const channel = held.get(uri);
-        if (!channel || channel.uses === 0) return;
-        const state = bag(result.snapshot?.state);
-        channel.opened = true;
+        if (!channel || channel.uses === 0 || channel.told) return;
+        channel.told = true;
         for (const consumer of channel.consumers) consumer.opened(state);
         const queued = channel.waiting.splice(0);
         for (const event of queued) {
@@ -317,13 +351,24 @@ export function openChannels(options: ChannelsOptions): Channels {
       clearTimeout(channel.leaving);
       channel.leaving = undefined;
       channel.consumers.add(consumer);
-      // Still a fresh subscribe, even when the channel was only lingering:
-      // asking again is how this reader gets a snapshot, and the host is
-      // still holding the channel because no `unsubscribe` went out.
-      const first = channel.uses === 0;
+      /*
+       * Alone, rather than the only hold. A snapshot read holds the channel
+       * too, and counting it as a reader left a view opened during one with
+       * nobody to hand it the state: `state` does not deliver to consumers,
+       * and the view was not first, so nothing did. What arrived was a pane
+       * with a session's name on it and none of the session in it.
+       *
+       * Still a fresh subscribe, even when the channel was only lingering:
+       * asking again is how this reader gets a snapshot, and the host is
+       * still holding the channel because no `unsubscribe` went out. Where a
+       * subscribe is already out, `ask` hands back that one instead of
+       * sending a second - which is the request the host answers by
+       * cancelling the first.
+       */
+      const alone = channel.consumers.size === 1;
       channel.uses += 1;
-      if (first) start(uri, generation);
-      else if (channel.opened) {
+      if (alone) { channel.told = false; start(uri, generation); }
+      else if (channel.told) {
         // Somebody is already reading it. This one needs the state as it
         // stands, and the host will not send a second snapshot for it.
         queueMicrotask(() => { if (channel.consumers.has(consumer)) consumer.opened(null); });
@@ -362,9 +407,7 @@ export function openChannels(options: ChannelsOptions): Channels {
       channel.leaving = undefined;
       channel.uses += 1;
       try {
-        const { result } = await client.subscribe(uri);
-        channel.opened = true;
-        return bag(result.snapshot?.state);
+        return await ask(uri);
       }
       catch (error) {
         refuse(uri, options.reason(error));
@@ -386,6 +429,10 @@ export function openChannels(options: ChannelsOptions): Channels {
     resume: (next, result) => {
       generation += 1;
       client = next;
+      // Whatever was in flight belonged to the socket that went. Kept, it
+      // would be handed to the first reader on the new one as an answer that
+      // is never coming.
+      for (const channel of held.values()) channel.pending = undefined;
       // Before anything is applied, so an action the host sends while this is
       // still catching up is queued rather than dropped on the floor.
       drain(next, generation);
@@ -419,6 +466,7 @@ export function openChannels(options: ChannelsOptions): Channels {
         for (const channel of held.values()) {
           if (channel.uses === 0 || channel.opened) continue;
           channel.opened = true;
+          channel.told = true;
           const queued = channel.waiting.splice(0);
           for (const event of queued) {
             for (const consumer of channel.consumers) consumer.event(event);
@@ -432,6 +480,7 @@ export function openChannels(options: ChannelsOptions): Channels {
         const channel = held.get(snapshot.resource);
         if (!channel) continue;
         channel.opened = true;
+        channel.told = true;
         channel.waiting.length = 0;
         for (const consumer of channel.consumers) consumer.opened(bag(snapshot.state));
       }
@@ -448,7 +497,9 @@ export function openChannels(options: ChannelsOptions): Channels {
       generation += 1;
       for (const channel of held.values()) {
         channel.opened = false;
+        channel.told = false;
         channel.waiting.length = 0;
+        channel.pending = undefined;
       }
     },
   };

@@ -46,6 +46,13 @@ class Scripted {
   behind: unknown[] = [];
   /** The cursor sent with each `fetchTurns`, in order. */
   readonly fetched: string[] = [];
+  /**
+   * Channels whose `subscribe` is held until `release`, as a restore from
+   * disk is, and which cancel one another the way the reference host does.
+   */
+  readonly slow = new Set<string>();
+  /** The held `subscribe` for each slow channel, by request id. */
+  private readonly holding = new Map<string, number | string>();
   /** What the next `reconnect` answers. */
   reconnectWith: Record<string, unknown> = { type: 'replay', actions: [], missing: [] };
   /** An error to answer `reconnect` with instead, as a restarted host does. */
@@ -107,6 +114,19 @@ class Scripted {
   /** The counter this host has reached, which a reconnect is measured against. */
   get serverSeq(): number { return this.seq; }
 
+  /** Answer every `subscribe` this host is holding. */
+  async release(): Promise<void> {
+    const waiting = [...this.holding];
+    this.holding.clear();
+    for (const [channel, id] of waiting) {
+      await this.send({
+        jsonrpc: '2.0',
+        id,
+        result: { snapshot: { resource: channel, state: this.states.get(channel) ?? {}, fromSeq: this.seq } },
+      });
+    }
+  }
+
   /** Hang up, the way a daemon that has been killed does. */
   async drop(): Promise<void> {
     this.running = false;
@@ -164,6 +184,28 @@ class Scripted {
       if (said !== undefined) {
         if (id !== undefined) {
           await this.send({ jsonrpc: '2.0', id, error: { code: -32001, message: said } });
+        }
+        return;
+      }
+      if (this.slow.has(channel) && id !== undefined) {
+        /*
+         * What the reference host does with two subscribes to one channel.
+         *
+         * It puts a pending marker under the channel while it restores, and a
+         * subscribe arriving before that one resolves replaces the marker - so
+         * the first finds itself no longer current and is answered `Resource
+         * not found`, naming a channel that is there. Held here for the same
+         * reason: it is the overlap that collides, and a re-subscribe to a
+         * channel already open is idempotent there.
+         */
+        const earlier = this.holding.get(channel);
+        this.holding.set(channel, id);
+        if (earlier !== undefined) {
+          await this.send({
+            jsonrpc: '2.0',
+            id: earlier,
+            error: { code: -32001, message: `Resource not found: ${channel}` },
+          });
         }
         return;
       }
@@ -929,6 +971,62 @@ describe('an action the host refuses is not an action that happened', () => {
 
     expect(reported).toEqual([]);
     expect(counted(seen)).toBe(0);
+
+    await host.close();
+  });
+});
+
+describe('one channel is asked for once, however many readers want it', () => {
+  it('shares a subscribe between a detail read and the view opened on it', async () => {
+    const { host, scripted } = await connect();
+    scripted.states.set(SESSION, { defaultChat: CHAT, chats: [], lifecycle: 'ready' });
+    scripted.states.set(CHAT, { turns: [] });
+    // The session restores from disk rather than answering at once, which is
+    // the window both readers land in.
+    scripted.slow.add(SESSION);
+
+    const reading = host.detail(SESSION as never);
+    const seen: HostEvent[] = [];
+    host.subscribe(SESSION as never, (event) => seen.push(event));
+    await settle(3);
+
+    // Two would be one refused. This is the whole defect: the host answers a
+    // superseded subscribe with `-32001` naming a channel it is serving.
+    expect(scripted.timesAsked('subscribe', SESSION)).toBe(1);
+
+    await scripted.release();
+    await settle();
+
+    // Both readers are answered from the one subscribe: the pane has the
+    // session, and the view has been handed its state rather than left to
+    // wait for a snapshot nobody was going to send it.
+    expect((await reading).lifecycle).toBe('ready');
+    expect(seen.some((event) => event.type === 'snapshot')).toBe(true);
+    expect(seen.some((event) => event.type === 'error')).toBe(false);
+
+    await host.close();
+  });
+
+  it('reads the same row twice without refusing itself', async () => {
+    const { host, scripted } = await connect();
+    scripted.states.set(SESSION, { defaultChat: CHAT, chats: [], lifecycle: 'ready' });
+    scripted.states.set(CHAT, { turns: [] });
+    scripted.slow.add(SESSION);
+
+    // A highlight moved off a row and back while the first read is still out.
+    const first = host.detail(SESSION as never);
+    const second = host.detail(SESSION as never);
+    await settle(3);
+    expect(scripted.timesAsked('subscribe', SESSION)).toBe(1);
+
+    await scripted.release();
+    await settle();
+
+    expect((await first).lifecycle).toBe('ready');
+    expect((await second).lifecycle).toBe('ready');
+    // And nothing was cached as refused, which is what made the pane stay
+    // broken for the rest of the connection.
+    expect((await first).refusal).toBeUndefined();
 
     await host.close();
   });
