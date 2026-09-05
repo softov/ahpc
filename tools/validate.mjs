@@ -44,6 +44,20 @@ addFormats(ajv);
 ajv.addSchema(schema, 'ahp');
 
 /**
+ * The declaration a client's own request is.
+ *
+ * A request's params are typed per method - `subscribe` is `SubscribeParams`,
+ * `resourceWrite` is `ResourceWriteParams` - so this is a name transform
+ * rather than a table. Everything this client sends goes through it, which is
+ * the half nothing was checking: a conditional spread walks past the type
+ * checker on the way out exactly as it does on the way in.
+ */
+function paramsFor(method) {
+  if (typeof method !== 'string' || method === '') return undefined;
+  return `${method[0].toUpperCase()}${method.slice(1)}Params`;
+}
+
+/**
  * Which declaration a channel's state is.
  *
  * By URI scheme, because that is what the protocol routes on. A chat is the
@@ -168,6 +182,27 @@ for (const line of readFileSync(file, 'utf8').split('\n')) {
   if (typeof frame !== 'object' || frame === null) continue;
   frames += 1;
 
+  /*
+   * A request this client sent.
+   *
+   * `dispatchAction` is the one that is two payloads: the notification's own
+   * params and the action inside it, which is a `StateAction` and is checked
+   * against its own declaration by type.
+   */
+  if (typeof frame.method === 'string' && frame.params !== undefined) {
+    const def = paramsFor(frame.method);
+    const result = check(def, frame.params);
+    if (result.missing) unroutable.set(def ?? frame.method, (unroutable.get(def ?? frame.method) ?? 0) + 1);
+    else { checked += 1; for (const error of result.errors) record(def, error, frame.method); }
+
+    const outbound = frame.params.action?.type;
+    if (typeof outbound === 'string') {
+      const action = `${outbound.split('/').map((part) => part[0].toUpperCase() + part.slice(1)).join('')}Action`;
+      const one = check(action, frame.params.action);
+      if (one.missing) unroutable.set(action, (unroutable.get(action) ?? 0) + 1);
+      else { checked += 1; for (const error of one.errors) record(action, error, outbound); }
+    }
+  }
   // A subscribe answer: the snapshot names its own channel.
   const snapshot = frame.result?.snapshot;
   if (snapshot?.state !== undefined) {
@@ -203,7 +238,7 @@ for (const line of readFileSync(file, 'utf8').split('\n')) {
   // An action, envelope and payload both. The payload's declaration is named
   // after its action type, which the package spells in PascalCase with the
   // channel prefix - `chat/delta` is `ChatDeltaAction`.
-  if (frame.method === 'action' && frame.params) {
+  if (frame.method === 'action' && frame.params !== undefined) {
     const envelope = check('ActionEnvelope', frame.params);
     if (!envelope.missing) {
       checked += 1;

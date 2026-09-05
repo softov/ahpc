@@ -887,7 +887,7 @@ export function fakeHost(): FakeHost {
         chatSources: { fork: true, sideChat: true },
         // What a real host advertises for a harness that needs signing in.
         // `authenticate` may only name one of these.
-        protectedResources: [{ resource: 'https://api.anthropic.com', description: 'Anthropic API' }],
+        protectedResources: [{ resource: 'https://api.anthropic.com', name: 'Anthropic API' }],
           // Three shapes, because a real host sends three. A model that takes
           // every thinking level, one that takes a single level that is not the
           // one anything defaults to - so it carries no default at all, which is
@@ -1519,10 +1519,10 @@ export function fakeHost(): FakeHost {
       for (const watcher of held.watchers) watcher(shellState(uri, held));
     },
 
-    claimTerminal: (uri, claim) => {
+    claimTerminal: (uri) => {
       const held = shells.get(uri);
       if (!held) return;
-      held.claim = claim;
+      held.claim = 'fake-client';
       for (const watcher of held.watchers) watcher(shellState(uri, held));
     },
 

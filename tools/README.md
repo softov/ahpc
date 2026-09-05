@@ -32,6 +32,28 @@ was written to find. Tightening it needs the target type at each site, which
 grep does not have and the checker does - which is the other reason this is
 generated rather than grepped.
 
+## Recording this client's own frames
+
+`AHPC_RECORD=<file>` makes `ahpc` append every frame it sends and receives, in
+the same JSON-lines shape the host-side captures use. Both directions, because
+the check runs on both: a request's params are typed per method, so
+`resourceWrite` is `ResourceWriteParams` and the routing is a name transform
+rather than a table.
+
+The test suite is a capture too, and a cheaper one than a live host:
+
+```bash
+AHPC_RECORD=/tmp/ahpc.jsonl npx vitest run test/reconnect.test.ts
+npm run wire -- /tmp/ahpc.jsonl
+```
+
+That found two fields invented in this client within minutes of existing: a
+resource watch reading `kind` where `ResourceChange` declares `type`, and a
+terminal claim sent as a name where `TerminalClaim` is an object and required.
+Both were written from memory of what the field "should" be called, both
+typechecked, and both were invisible to every test until the frames themselves
+were read.
+
 ## What it reports
 
 Undeclared keys and missing required fields together, collapsed to one line per

@@ -1637,7 +1637,7 @@ describe('the client says it is here, and how wide it is drawing', () => {
     host.resizeTerminal(uri, 132, 40);
     host.clearTerminal(uri);
     host.renameTerminal(uri, 'build');
-    host.claimTerminal(uri, 'ahpc');
+    host.claimTerminal(uri);
     await settle();
 
     // `terminal-channel.md` lists all four among the client-dispatched set.
@@ -1645,20 +1645,24 @@ describe('the client says it is here, and how wide it is drawing', () => {
     expect(resized).toMatchObject({ cols: 132, rows: 40 });
     expect(dispatched(scripted, 'terminal/cleared')).toBeTruthy();
     expect(dispatched(scripted, 'terminal/titleChanged')).toMatchObject({ title: 'build' });
-    expect(dispatched(scripted, 'terminal/claimed')).toMatchObject({ claim: 'ahpc' });
+    // Required, and an object: `TerminalClaim` is a client claim carrying the
+    // connection's own id, or a session claim. Not a name, and not omittable.
+    expect(dispatched(scripted, 'terminal/claimed'))
+      .toMatchObject({ claim: { kind: 'client', clientId: 'ahpc-test' } });
 
     await host.close();
   });
 
-  it('gives a terminal up with the same action and nothing in it', async () => {
+  it('has no way to give a terminal back, because the protocol declares none', async () => {
     const { host, scripted } = await connect();
-    host.claimTerminal('ahp-terminal:/t1', null);
+    host.claimTerminal('ahp-terminal:/t1');
     await settle();
 
-    const sent = dispatched(scripted, 'terminal/claimed');
-    // The reducer sets `claim` either way, so releasing is this action
-    // carrying nothing rather than a second action.
-    expect(sent).not.toHaveProperty('claim');
+    // `claim` is required on the action and there is no release action, so a
+    // client that omitted it would be sending something no host can read.
+    // This was invented here and a capture of this client's own frames caught
+    // it - which is what that check exists for.
+    expect(dispatched(scripted, 'terminal/claimed')).toHaveProperty('claim');
 
     await host.close();
   });
@@ -1722,7 +1726,7 @@ describe('signing in to what a host protects', () => {
       scripted.states.set(ROOT, {
         agents: [{
           provider: 'claude',
-          protectedResources: [{ resource: 'https://api.anthropic.com', description: 'Anthropic API' }],
+            protectedResources: [{ resource: 'https://api.anthropic.com', resource_name: 'Anthropic API' }],
           models: [],
         }],
         terminals: [],
@@ -1779,7 +1783,7 @@ describe('signing in to what a host protects', () => {
     scripted.refuseWith = {
       code: -32007,
       message: 'Authentication required',
-      data: { resources: [{ resource: 'https://api.anthropic.com', description: 'Anthropic API' }] },
+      data: { resources: [{ resource: 'https://api.anthropic.com', resource_name: 'Anthropic API' }] },
     };
 
     host.subscribe(SESSION as never, () => undefined);
@@ -1909,7 +1913,8 @@ describe('a watch instead of a timer', () => {
       type: 'resourceWatch/changed',
       // Wrapped in `items` for forward compatibility, so a reader that took
       // `changes` as the array gets nothing.
-      changes: { items: [{ uri: 'file:///x/a.txt', kind: 'changed' }] },
+      // `type`, which is what `ResourceChange` declares.
+      changes: { items: [{ uri: 'file:///x/a.txt', type: 'changed' }] },
     });
     await settle();
     expect(seen[0]).toEqual([{ uri: 'file:///x/a.txt', kind: 'changed' }]);

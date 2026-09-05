@@ -18,16 +18,6 @@ specification is what this client follows.
 
 # Batch 6 - The rest of the surface
 
-## B-01-16b - The host's log
-
-**Clause.** `telemetry-channel.md:13`: clients MUST treat the telemetry URI as opaque apart from expanding the well-known template variables, and subscribe with the value advertised on `InitializeResult.telemetry` after expansion. `:39`: a host that emits none omits `telemetry`; clients SHOULD subscribe only to signals they can process.
-
-**Missing.** Nothing expands the template, so a host's own log is unreadable from here.
-
-**Steps.**
-1. `ahpc logs [--level L] [--follow]`, expanding `InitializeResult.telemetry.logs` and subscribing to signals this client renders.
-2. Draw nothing where `telemetry` is absent.
-
 ## B-01-21 - Checking what this client sends
 
 **Not a clause - the tool that checks the clauses.** `tools/validate.mjs` reads what a host sent; nothing reads what this client sends, and both captures it has run against are another client's traffic.

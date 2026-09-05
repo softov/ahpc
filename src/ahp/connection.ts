@@ -136,8 +136,15 @@ export interface HostConnection {
   clearTerminal(uri: string): void;
   /** Rename it. `terminal/titleChanged` sets `title`. */
   renameTerminal(uri: string, title: string): void;
-  /** Take it, or give it up. `terminal/claimed` sets `claim`. */
-  claimTerminal(uri: string, claim: string | null): void;
+  /**
+   * Take it for this client.
+   *
+   * `TerminalClaimedAction.claim` is required and is a `TerminalClaim` - a
+   * client claim carrying this connection's `clientId`, or a session claim.
+   * There is no release: the protocol declares no action for giving one up,
+   * so this client takes and never pretends to hand back.
+   */
+  claimTerminal(uri: string): void;
 
   /**
    * What the host offers to complete what is being typed.
@@ -243,7 +250,7 @@ export interface HostConnection {
    * A `resource` this client invents is one the host MUST refuse, so this is
    * what any token push has to name.
    */
-  protectedResources?(): Promise<{ resource: string; description?: string }[]>;
+  protectedResources?(): Promise<{ resource: string; name?: string; scopes?: string[] }[]>;
   /** Close one. The last chat in a session is the session; dispose that instead. */
   disposeChat(chat: string): Promise<void>;
 

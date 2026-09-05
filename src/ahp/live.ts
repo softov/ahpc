@@ -1,3 +1,4 @@
+import { appendFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { openChannels } from './channels.js';
 import { publish } from './publish.js';
@@ -305,12 +306,34 @@ interface Framed {
 }
 
 function tee(inner: Framed, heard: (method: string, params: Bag) => void): Framed {
+  /*
+   * Every frame, to a file, when `AHPC_RECORD` names one.
+   *
+   * Both directions: `tools/validate.mjs` checks what a host sent *and* what
+   * this client sent, and until this existed the only captures to check were
+   * another client's traffic. Appended synchronously and deliberately - a
+   * recording that lost the frame a crash happened on would be a recording of
+   * everything except the interesting part.
+   */
+  const recording = process.env.AHPC_RECORD;
+  const write = (from: 'client' | 'host', frame: unknown): void => {
+    if (recording === undefined || recording === '') return;
+    try {
+      appendFileSync(recording, `${JSON.stringify({ at: new Date().toISOString(), from, frame })}\n`);
+    }
+    catch { /* a recording is a convenience, never a reason to fail a call */ }
+  };
+
   return {
-    send: (message: unknown) => inner.send(message),
+    send: (message: unknown) => {
+      write('client', typeof message === 'string' ? message : JSON.stringify(message));
+      return inner.send(message);
+    },
     close: () => inner.close(),
     recv: async () => {
       const frame = await inner.recv();
       if (frame === null) return null;
+      write('host', frame.kind === 'text' ? frame.text : JSON.stringify(frame.message));
       try {
         const message = frame.kind === 'parsed'
           ? bag(frame.message)
@@ -1383,8 +1406,8 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
    * may come from; the other half is a live MCP challenge, which arrives as
    * `auth/required` rather than being listable.
    */
-  const advertised = async (): Promise<{ resource: string; description?: string }[]> => {
-    const found = new Map<string, { resource: string; description?: string }>();
+  const advertised = async (): Promise<{ resource: string; name?: string; scopes?: string[] }[]> => {
+    const found = new Map<string, { resource: string; name?: string; scopes?: string[] }>();
     for (const entry of list(mirror.root.agents)) {
       for (const raw of list(bag(entry).protectedResources)) {
         const one = bag(raw);
@@ -1392,7 +1415,10 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
         if (resource === undefined) continue;
         found.set(resource, {
           resource,
-          ...(str(one.description) ? { description: str(one.description) as string } : {}),
+          ...(str(one.resource_name) ? { name: str(one.resource_name) as string } : {}),
+          ...(list(one.scopes_supported).length > 0
+            ? { scopes: list(one.scopes_supported).filter((x): x is string => typeof x === 'string') }
+            : {}),
         });
       }
     }
@@ -1789,7 +1815,9 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
           // is read through rather than treated as the array itself.
           observer(list(bag(action.changes).items).map((raw) => {
             const change = bag(raw);
-            return { uri: str(change.uri) ?? '', kind: str(change.kind) ?? str(change.type) ?? 'changed' };
+            // `type`, which is what `ResourceChange` declares. `kind` was a
+            // guess and matched nothing either host sends.
+            return { uri: str(change.uri) ?? '', kind: str(change.type) ?? 'changed' };
           }));
         },
       });
@@ -1861,7 +1889,13 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
               const one = bag(raw);
               return {
                 resource: str(one.resource) ?? '',
-                ...(str(one.description) ? { description: str(one.description) as string } : {}),
+                // `resource_name`, in the OAuth metadata's own snake_case -
+                // `ProtectedResourceMetadata` is RFC 9728's shape and carries
+                // no `description`.
+                ...(str(one.resource_name) ? { name: str(one.resource_name) as string } : {}),
+                ...(list(one.scopes_supported).length > 0
+                  ? { scopes: list(one.scopes_supported).filter((x): x is string => typeof x === 'string') }
+                  : {}),
               };
             }).filter((one) => one.resource !== ''),
           }
@@ -2162,10 +2196,15 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
       catch (error) { options.onRefusal?.(uri, reason(error)); }
     },
 
-    claimTerminal: (uri, claim) => {
-      // Null gives it up. The reducer sets `claim` either way, so releasing is
-      // the same action with nothing in it rather than a second one.
-      try { client.dispatch(uri, { type: 'terminal/claimed', ...(claim === null ? {} : { claim }) }); }
+    claimTerminal: (uri) => {
+      // The claim is required and is an object, not a name: a client claim is
+      // this connection's `clientId` under `kind: 'client'`.
+      try {
+        client.dispatch(uri, {
+          type: 'terminal/claimed',
+          claim: { kind: 'client', clientId },
+        });
+      }
       catch (error) { options.onRefusal?.(uri, reason(error)); }
     },
 

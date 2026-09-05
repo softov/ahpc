@@ -478,7 +478,7 @@ export interface Agent {
    * the host advertised, so a client that invents a name is one the host is
    * obliged to refuse.
    */
-  protectedResources?: { resource: string; description?: string }[];
+  protectedResources?: { resource: string; name?: string; scopes?: string[] }[];
   /**
    * Whether this agent can hold more than one chat in a session.
    *

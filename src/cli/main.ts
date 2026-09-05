@@ -101,6 +101,10 @@ Terminals
   terminal send <uri> <text>   type into it
   terminal watch <uri>         follow its output   [--timeout S]
 
+Recording
+  AHPC_RECORD=<file>           append every frame, both directions, for
+                               'npm run wire' to check against the protocol
+
 Anything else
   dispatch <uri> <type>        send one action verbatim  [--field k=v]… [--chat]
   status                       what this client is connected to       [--json]
@@ -1144,7 +1148,7 @@ async function signIn(host: HostConnection, args: Args, wants: boolean): Promise
   if (resource === undefined) {
     if (wants) { json(known); return 0; }
     if (known.length === 0) { line('This host protects nothing.'); return 0; }
-    table(known.map((one) => [one.resource, one.description ?? '']));
+    table(known.map((one) => [one.resource, one.name ?? '', (one.scopes ?? []).join(' ')]));
     return 0;
   }
   const token = args.value('--token')
