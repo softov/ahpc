@@ -26,21 +26,38 @@ The host's roadmap says a gap is found by diffing the protocol's sources on ever
 
 **Read what the host actually answers, not what the seam asked for.** `listSessions` asked for a hundred rows for the life of this client, and the number was invisible from every screen: the catalogue looked complete because a hundred was more than anybody had. It stopped being invisible when the catalogue on the other side grew past it. A limit this client sets is a limit only this client can see.
 
-**Point it at a host that is not ours.** One evening against VS Code's agent host produced more findings than any amount of reading did: an expected refusal printing on every command, a transcript that came back empty because the snapshot carried no turns and this client never read the cursor offering them, and a protocol version negotiated that this client has no implementation of. Two are fixed and one is the entry below; none of the three was visible against ahpd, because ahpd and ahpc agree with each other by construction.
+**Point it at a host that is not ours.** One evening against VS Code's agent host produced more findings than any amount of reading did: an expected refusal printing on every command, a transcript that came back empty because the snapshot carried no turns and this client never read the cursor offering them, and a protocol version negotiated that this client does not build against. None was visible against ahpd, because ahpd and ahpc agree with each other by construction - the first two are fixed and the third is the entry below.
+
+**Diff the two versions rather than reasoning about them.** "We do not know what 1.0.0 changed" stood for as long as nobody spent an hour on it. Comparing the declarations of 54 file pairs answered it in one pass and the answer was one renamed field, which is both smaller than the fear and precise enough to act on. A question that has been open for a while is worth checking is still a question.
 
 ---
 
-## B-02-02 - This client offers a protocol version it cannot speak
+## B-02-02 - This client offers a protocol version it does not build against
 
-`VERSIONS` in `src/ahp/live.ts` is `['1.0.0', '0.9.0', '0.8.0', '0.7.0']`, and the package this client is built from declares `PROTOCOL_VERSION = '0.9.0'`. The registry that declares it is explicit about what the first entry means: *"The first entry MUST equal `PROTOCOL_VERSION` - the version 'new code speaks' is by definition the most preferred one."* This client's first entry is a version it has no implementation of.
+`VERSIONS` in `src/ahp/live.ts` is `['1.0.0', '0.9.0', '0.8.0', '0.7.0']`, and the package this client is built from declares `PROTOCOL_VERSION = '0.9.0'`. The registry that declares it is explicit about what the first entry means: *"The first entry MUST equal `PROTOCOL_VERSION` - the version 'new code speaks' is by definition the most preferred one."* This client's first entry is not that.
 
-**Revalidated, because the reason it is there turns out to be right.** The comment above the list says a VS Code host accepts `^1.0.0` and nothing 0.x, and that reads like an excuse until you check it. `negotiateProtocolVersion` in the reference tree takes the client's list and keeps only entries where `isCompatibleProtocolVersion(offered, current)` holds, and that function's first test is that the **majors must match**. A host running `current = '1.0.0'` therefore rejects `0.9.0`, `0.8.0` and `0.7.0` outright - not as too old, but as a different major. So against VS Code's host, `1.0.0` is not this client's preference: it is the only entry of the four that can be accepted at all, and removing it does not make this client conformant-and-compatible, it makes it conformant-and-unable-to-connect.
+**Why removing it is not the fix.** `negotiateProtocolVersion` in the reference tree keeps only offered versions where `isCompatibleProtocolVersion(offered, current)` holds, and that function's first test is that the **majors must match**. A host running `current = '1.0.0'` therefore rejects `0.9.0`, `0.8.0` and `0.7.0` outright - not as too old, but as a different major. So against VS Code's host, `1.0.0` is not this client's preference: it is the only entry of the four that can be accepted at all.
 
-**So the decision stands and the exposure is real.** If a 1.0.0 host answers `1.0.0`, this client proceeds under a version whose wire format it has never seen, using a library built for 0.9.0.
+**What the difference actually is, now that it has been read rather than guessed at.** The two versions were compared declaration by declaration, 54 file pairs of the published 0.9.0 package against the 1.0.0 the reference vendors:
 
-**What it costs today, now that it has been run.** This was written as a risk with nothing observed behind it. It has since been exercised: connected to VS Code's agent host, this client negotiated `1.0.0` and read every answer with 0.9.0 code. The catalogue came back and rendered; the transcripts came back empty. That second symptom is now believed to be a snapshot carrying no turns and a `turnsNextCursor` nobody read, and `fetchTurns` has since shipped - but *believed* is the word, because it has not been run against that host since. If the transcripts are still empty, the remaining explanation is this entry, and that is exactly the failure mode it predicted: it does not look like a version problem, it looks like a screen that is wrong.
+| | 0.9.0 | 1.0.0 |
+| --- | --- | --- |
+| action types | 96 | the same 96, no additions or removals |
+| method names | 41 | the same 41 |
+| `ChatState`, `Turn`, `ActiveTurn` | | identical field sets |
+| `SessionState`, `RootState` | | identical field sets |
+| the automations catalogue | `AutomationState { entries }` | `AutomationCatalogState { automations }` |
+| one automation | `AutomationEntry` | `AutomationState` - **the same fields** |
 
-**Suggestions.** (1) Find out what 1.0.0 actually changed and either implement it or stop offering it - the delta is readable in the local MIT-licensed checkout, and this is the host roadmap's `Q-001` seen from the other side. Until somebody reads it, every other option here is a guess. (2) Keep offering it and *say so*: record in this file and in the comment that the claim being made is "we believe 0.9.0 and 1.0.0 differ in nothing this client reads", which is a claim somebody can check rather than a list somebody can misread. (3) Drop `1.0.0` and accept `-32005` from VS Code's host, which is honest, conformant, and gives up the only third-party host in existence.
+So the entire delta, in everything this client reads, is **one renamed field on one channel's catalogue**. The automations did not move; the container did, and the name `AutomationState` moved with it from the catalogue onto a single automation. Two capability fields were added - `AutomationCreateCapability.minIntervalMinutes` and `AutomationRunCancellationCapability.channel` - and nothing this client reads was removed.
+
+That field is now read under both spellings, normalised once at the edge so the 0.9.0 reducer downstream never sees the second one. Tested against a catalogue in each shape.
+
+**What is left, and why this entry stays open.** The literal rule is still broken: this client offers first a version whose package it does not build against. What has changed is that the risk is no longer unknown - it is one enumerated difference, handled, with a test either side of it. Anything 1.0.0 grows *after* this reading is the live exposure, and the reading has to be redone when the next version publishes.
+
+It also clears a suspect, and the real answer was closer to home. The empty transcripts against VS Code's host were blamed on this entry, then on a snapshot carrying no turns. Neither: `ChatState.turnsNextCursor` is present and unchanged in both versions, and the host's snapshot did carry the conversation - the TUI drew it. What was empty was the *first* snapshot this client emitted, sent when the session channel opened and before the chat channel had answered. A screen redraws past that and `session history`, which takes the first snapshot and stops, does not.
+
+**Suggestions.** (1) Leave it as it is - offered, handled, and written down - and redo the comparison when 1.0.0 or its successor publishes to npm. That is the only moment the answer can change. (2) Move `1.0.0` behind a flag, so a person connecting to a 1.0.0 host opts into it and everybody else is strictly conformant; honest, and it makes the common case need a flag nobody will know to pass. (3) Drop `1.0.0` and accept `-32005` from VS Code's host, which is conformant and gives up the only third-party host there is.
 
 ## B-01-09 - A host that wants signing in cannot be signed into
 
