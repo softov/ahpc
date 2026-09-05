@@ -270,17 +270,64 @@ describe('every command that declares its channel is sent on that channel', () =
      * silently wins over the declared one. No caller passes one, which is why
      * it survives review: what is wrong is that the site permits it at all.
      * `{ ...params, channel: ROOT }` cannot.
+     *
+     * Matched by walking braces rather than by scanning a window. A window has
+     * to stop somewhere, and wherever it stops is a place to hide the bug: a
+     * call argument in the middle of the payload - `{ channel: ROOT, x: f({}),
+     * ...params }` - ends a window bounded at `})` before it reaches the
+     * spread. Walking from the spread back to the brace that opens its own
+     * literal has no such edge.
      */
-    const live = await readFile('src/ahp/live.ts', 'utf8');
-    // A spread of a *name* - somebody's object, whose keys are not visible
-    // here. `...(cond ? { k: v } : {})` is a literal and carries only what is
-    // written next to it, so it is not the shape this is about.
-    // Bounded at `})`, the end of the object literal. That bound carries two
-    // guarantees, not one: a spread in the *next* statement is not read as
-    // being in this one, and a rest-destructure - `const { a, ...b } = c`,
-    // which this pattern cannot tell apart from a literal - stays outside the
-    // window. Widening it drops both.
-    const sites = [...live.matchAll(/channel: (?:ROOT|AUTOMATIONS)(?:(?!\}\))[\s\S]){0,200}?\.\.\.[A-Za-z_$]/g)];
-    expect(sites.map((one) => one[0].split('\n')[0])).toEqual([]);
+    const suspect = (source: string): string[] => {
+      const found: string[] = [];
+      for (const hit of source.matchAll(/\.\.\.[A-Za-z_$]/g)) {
+        const at = hit.index;
+        // Back to the `{` that opens the literal this spread is written in,
+        // counting nested braces so an inner one is not mistaken for it.
+        let depth = 0;
+        let open = -1;
+        for (let i = at - 1; i >= 0; i -= 1) {
+          const ch = source[i];
+          if (ch === '}') depth += 1;
+          else if (ch === '{') {
+            if (depth === 0) { open = i; break; }
+            depth -= 1;
+          }
+        }
+        if (open === -1) continue;
+        // A binding pattern is not an object literal. `const { a: b, ...rest }
+        // = x` renames rather than assigns, so it reads like a fixed key and
+        // is not one.
+        if (/\b(?:const|let|var)$/.test(source.slice(0, open).trimEnd())) continue;
+        // Only this literal's own top level, and only what precedes the
+        // spread: a `channel` nested inside some other object is a different
+        // object's field, and one written after the spread is not overridden.
+        let level = 0;
+        let top = '';
+        for (const ch of source.slice(open + 1, at)) {
+          if ('{(['.includes(ch)) level += 1;
+          else if ('})]'.includes(ch)) level -= 1;
+          else if (level === 0) top += ch;
+        }
+        if (/channel:\s*(?:ROOT|AUTOMATIONS)/.test(top)) {
+          found.push(source.slice(open, at + 4).split('\n')[0] as string);
+        }
+      }
+      return found;
+    };
+
+    /*
+     * The checker, checked - because a checker that is quiet for the wrong
+     * reason passes exactly like one that has nothing to report.
+     */
+    expect(suspect('r("m", { channel: ROOT, ...params });')).toHaveLength(1);
+    expect(suspect('r("m", { channel: ROOT, action: { type: "x" }, ...params });')).toHaveLength(1);
+    expect(suspect('r("m", { channel: ROOT, x: f({ a: 1 }), ...params });')).toHaveLength(1);
+    expect(suspect('r("m", { ...params, channel: ROOT, uri });')).toEqual([]);
+    expect(suspect('r("m", { channel: ROOT, ...(x ? { k: 1 } : {}) });')).toEqual([]);
+    expect(suspect('r("m", { channel: ROOT, uri });\n rows.push(...list);')).toEqual([]);
+    expect(suspect('const { channel: ROOT, ...rest } = x;')).toEqual([]);
+
+    expect(suspect(await readFile('src/ahp/live.ts', 'utf8'))).toEqual([]);
   });
 });
