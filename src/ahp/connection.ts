@@ -1,6 +1,6 @@
 import type {
   Agent, Answer, Automation, Changeset, Completion, ContentRef, Customization, FileContent, PendingInput, QueuedMessage,
-  ChangesetOperationTarget, ChangesetScope, ModelSelection, ResourceEntry, SessionConfig, SessionDetail, SessionSummary, SessionUri, TerminalRow, TerminalState,
+  ChangesetOperationTarget, ChangesetScope, ChatSource, ModelSelection, ResourceEntry, SessionConfig, SessionDetail, SessionSummary, SessionUri, TerminalRow, TerminalState,
   ToolCall, Turn,
 } from './types.js';
 
@@ -106,7 +106,7 @@ export interface HostConnection {
    * Only where the agent advertises it: a host that does not is one where
    * `createChat` MUST NOT be called at all.
    */
-  createChat(uri: SessionUri, first?: string): Promise<string>;
+  createChat(uri: SessionUri, first?: string, source?: ChatSource): Promise<string>;
 
   /**
    * The terminals the host is running.
@@ -223,6 +223,20 @@ export interface HostConnection {
    * omitted where the expiry is unknown. An empty token revokes.
    */
   authenticate?(resource: string, token: string, options?: { scopes?: string[]; expiresIn?: number }): Promise<void>;
+  /**
+   * Ask the host for a config property's values.
+   *
+   * For a property whose schema says `enumDynamic`: the `enum` on it is not
+   * the answer and the host has to be queried. Optional, because a host that
+   * marks nothing dynamic never needs it.
+   */
+  configCompletions?(request: {
+    property: string;
+    provider?: string;
+    workingDirectory?: string;
+    values?: Record<string, string>;
+    query?: string;
+  }): Promise<{ value: string; label: string; description?: string }[]>;
   /**
    * The protected resources this host says it has, from `AgentInfo`.
    *

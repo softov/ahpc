@@ -12,13 +12,13 @@ import type { HostConnection } from './ahp/connection.js';
 import type { Terminals } from './terminal.js';
 import { createTerminals } from './terminal.js';
 import type {
-  Agent, Answer, Automation, Changeset, ChangesetScope, Completion, ConfigProperty, ContentRef, Customization, FileContent, ResourceEntry, SessionConfig, SessionDetail,
+  Agent, Answer, Automation, Changeset, ChangesetScope, ChatSource, Completion, ConfigProperty, ContentRef, Customization, FileContent, ResourceEntry, SessionConfig, SessionDetail,
   SessionUri, Turn,
 } from './ahp/types.js';
 import { SessionFlag } from './ahp/types.js';
 import { valueIcon } from './view/icons.js';
 import {
-  ARCHIVED, BOOD_FLOAT, CAN_ADD_CHAT, CHAT_URI, CHATS, CUSTOMIZATIONS, DRAFT, EXPANDED, FILTER, HAS_CHATS,
+  ARCHIVED, BOOD_FLOAT, CAN_ADD_CHAT, CAN_FORK, CAN_SIDE_CHAT, CHAT_URI, CHATS, CUSTOMIZATIONS, DRAFT, EXPANDED, FILTER, HAS_CHATS,
   HOST, HOST_ERROR, INPUT, MODEL, MODEL_CONFIG, OPEN_TERMINAL,
   AUTOMATIONS, AUTOMATION_ROW,
   CHANGES as CHANGES_AT_PATH, CHANGE_AT, CHANGE_ROW, CHANGE_SCOPES, FILES_AT, FILES_OPEN,
@@ -95,7 +95,7 @@ export interface Controller {
   /** Read a different chat in the session already open. */
   openChat(chat: string): void;
   /** Open another chat in it, and read that. */
-  createChat(first?: string): Promise<void>;
+  createChat(first?: string, source?: ChatSource): Promise<void>;
   /** Close one, and read whatever is left. */
   disposeChat(chat: string): Promise<void>;
   /** What a slash offers before any session exists. */
@@ -309,8 +309,11 @@ export function createController(
     const keep = new Set<string>();
     for (const property of config.properties) {
       // Nothing to choose from is nothing to ask: a host's `permissions` key
-      // is an object the agent maintains, not a question with answers.
-      if (property.values.length === 0) continue;
+      // is an object the agent maintains, not a question with answers. Unless
+      // the host said to ask - `enumDynamic` is a schema whose values are a
+      // query, and an empty `enum` beside it means "not listed here", not
+      // "none".
+      if (property.values.length === 0 && property.enumDynamic !== true) continue;
       // A session that exists can only be changed where the host says so, and
       // offering the rest produces a refusal instead of an edit.
       if (uri && !property.sessionMutable) continue;
@@ -355,15 +358,46 @@ export function createController(
           ...(property.values.some((value) => value.description)
             ? { descriptions: 'below' as const }
             : {}),
-          choices: () => property.values.map((value) => ({
-            value: value.value,
-            label: value.label,
-            ...(marked ? { icon: valueIcon(unicode, value.value, value.label, { fallback: true }) } : {}),
-            ...(value.description ? { description: value.description } : {}),
-          })),
+          /*
+           * Asked for where the host said to ask, listed where it did not.
+           *
+           * `enumDynamic` means the values are a query rather than a schema -
+           * a branch list on a large repository is exactly that - so this
+           * calls `sessionConfigCompletions` and falls back to whatever the
+           * schema did carry if the host will not answer.
+           */
+          choices: property.enumDynamic === true && host.configCompletions
+            ? async () => {
+              try {
+                const found = await host.configCompletions?.({
+                  property: property.key,
+                  provider: app.store.get<string>(PROVIDER) ?? '',
+                  ...(app.store.get<string>(WORKSPACE) ? { workingDirectory: app.store.get<string>(WORKSPACE) as string } : {}),
+                  values: app.store.get<Record<string, string>>(SETTINGS) ?? {},
+                });
+                return (found ?? []).map((one) => ({
+                  value: one.value,
+                  label: one.label,
+                  ...(one.description ? { description: one.description } : {}),
+                }));
+              }
+              catch { return property.values.map((value) => ({ value: value.value, label: value.label })); }
+            }
+            : () => property.values.map((value) => ({
+              value: value.value,
+              label: value.label,
+              ...(marked ? { icon: valueIcon(unicode, value.value, value.label, { fallback: true }) } : {}),
+              ...(value.description ? { description: value.description } : {}),
+            })),
         }],
         run: (args: Record<string, unknown>) => {
-          const chosen = property.values.find((value) => value.value === String(args.value));
+          // A dynamic property's values were never in the schema, so there is
+          // nothing here to check one against: what the host offered is what
+          // came back, and rejecting it would reject every answer.
+          const value = String(args.value);
+          const chosen = property.enumDynamic === true
+            ? { value }
+            : property.values.find((one) => one.value === value);
           if (!chosen) return;
           const current = app.store.get<Record<string, string>>(SETTINGS) ?? {};
           app.store.set(SETTINGS, { ...current, [property.key]: chosen.value });
@@ -448,11 +482,22 @@ export function createController(
     const found = sessions(app.store).find((row) => row.resource === uri)?.provider;
     return found !== undefined && capable.get(found) === true;
   };
+  /** The two chat sources, each gated on the agent advertising that one. */
+  const sources = new Map<string, { fork?: boolean; sideChat?: boolean }>();
+  const canSource = (uri: SessionUri, kind: 'fork' | 'sideChat'): boolean => {
+    const found = sessions(app.store).find((row) => row.resource === uri)?.provider;
+    return found !== undefined && sources.get(found)?.[kind] === true;
+  };
   void host.agents().then((found) => {
     for (const entry of found) capable.set(entry.provider, entry.multipleChats === true);
+    for (const entry of found) sources.set(entry.provider, entry.chatSources ?? {});
     // A session may already be open by the time this lands.
     const uri = app.store.get<SessionUri>(OPEN);
     if (uri) app.store.set(CAN_ADD_CHAT, canAddChat(uri));
+    if (uri) {
+      app.store.set(CAN_FORK, canSource(uri, 'fork'));
+      app.store.set(CAN_SIDE_CHAT, canSource(uri, 'sideChat'));
+    }
   }).catch(() => undefined);
 
   const terminals = createTerminals(app, host, failed);
@@ -516,11 +561,11 @@ export function createController(
       }, chat);
     },
 
-    async createChat(first) {
+    async createChat(first, source) {
       const uri = app.store.get<SessionUri>(OPEN);
       if (!uri) return;
       try {
-        const chat = await host.createChat(uri, first);
+        const chat = await host.createChat(uri, first, source);
         controller.openChat(chat);
       } catch (error) { failed(error); }
     },
@@ -557,6 +602,8 @@ export function createController(
       app.store.set(CHATS, []);
       app.store.set(HAS_CHATS, false);
       app.store.set(CAN_ADD_CHAT, canAddChat(uri));
+      app.store.set(CAN_FORK, canSource(uri, 'fork'));
+      app.store.set(CAN_SIDE_CHAT, canSource(uri, 'sideChat'));
       app.store.set(OPEN_FILE, null);
       subscription = host.subscribe(uri, (event) => {
         model = applyEvent(app.store, event, model);
@@ -599,6 +646,8 @@ export function createController(
       app.store.set(CHATS, []);
       app.store.set(HAS_CHATS, false);
       app.store.set(CAN_ADD_CHAT, false);
+      app.store.set(CAN_FORK, false);
+      app.store.set(CAN_SIDE_CHAT, false);
       app.store.set(OPEN_FILE, null);
       // Idle, because nothing is open. A status that outlived the conversation
       // it described is a header saying "running" over an empty screen.
@@ -1450,6 +1499,41 @@ function commands(
       slots: ['palette'],
       when: CAN_ADD_CHAT,
       run: () => void controller.createChat(),
+    },
+    /*
+     * The two ways a chat comes from another one.
+     *
+     * Offered only where the agent advertises each: `capabilities.multipleChats`
+     * carries `fork` and `sideChat` separately and a host may have one and not
+     * the other, so this is two commands rather than one with a mode.
+     */
+    {
+      id: 'chat.fork',
+      title: 'Fork from this turn',
+      category: 'Session',
+      description: 'A new chat carrying this conversation up to the turn under the cursor',
+      slots: ['palette'],
+      when: CAN_FORK,
+      run: () => {
+        const from = app.store.get<string>(CHAT_URI);
+        const turn = [...turns(app.store)].reverse().find((one) => one.state !== 'running');
+        if (!from || !turn) return;
+        void controller.createChat(undefined, { kind: 'fork', chat: from, turnId: turn.id });
+      },
+    },
+    {
+      id: 'chat.side',
+      title: 'Side chat from this turn',
+      category: 'Session',
+      description: 'A new chat with this turn as context, without copying it in',
+      slots: ['palette'],
+      when: CAN_SIDE_CHAT,
+      run: () => {
+        const from = app.store.get<string>(CHAT_URI);
+        const turn = [...turns(app.store)].reverse().find((one) => one.state !== 'running');
+        if (!from || !turn) return;
+        void controller.createChat(undefined, { kind: 'sideChat', chat: from, turnId: turn.id });
+      },
     },
     {
       id: 'chat.switch',

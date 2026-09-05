@@ -137,6 +137,16 @@ export const OPEN_TERMINAL = '$/chat/term/open' as BindingPath;
 /** Its state. Null while nothing has been read yet, which is not the same as empty. */
 export const TERMINAL = '$/chat/term/state' as BindingPath;
 export const CAN_ADD_CHAT = '$/chat/conv/canAddChat' as BindingPath;
+/**
+ * Whether this session's agent can fork a chat, and whether it can hold a side
+ * chat.
+ *
+ * Two paths rather than one, because `capabilities.multipleChats` carries the
+ * two separately and a host may advertise one without the other. A command
+ * offered where the host will refuse it is worse than one that is not there.
+ */
+export const CAN_FORK = '$/chat/conv/canFork' as BindingPath;
+export const CAN_SIDE_CHAT = '$/chat/conv/canSideChat' as BindingPath;
 /** Whether the open session has more than one chat to move between. */
 export const HAS_CHATS = '$/chat/conv/hasChats' as BindingPath;
 export const WORKSPACE = '$/chat/compose/workspace' as BindingPath;

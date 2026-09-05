@@ -757,6 +757,7 @@ function config(value: unknown): SessionConfig {
           ...(str(descriptions[index]) ? { description: str(descriptions[index]) as string } : {}),
         })),
         sessionMutable: property.sessionMutable === true,
+        ...(property.enumDynamic === true ? { enumDynamic: true } : {}),
         ...(str(property.default) ? { default: str(property.default) as string } : {}),
       };
     }),
@@ -1582,6 +1583,33 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
 
     protectedResources: async () => advertised(),
 
+    /*
+     * The values for a property the schema would not list.
+     *
+     * `enumDynamic` is the host saying its `enum` is not the answer - a branch
+     * list on a large repository belongs in a query rather than in a schema.
+     * Without this a property marked that way rendered as free text, which is
+     * a person typing a branch name the host was offering to complete.
+     */
+    configCompletions: async ({ provider, workingDirectory, values, property, query }) => {
+      const result = bag(await client.request('sessionConfigCompletions', {
+        channel: ROOT,
+        property,
+        ...(provider ? { provider } : {}),
+        ...(workingDirectory ? { workingDirectory: `file://${workingDirectory}` } : {}),
+        ...(values && Object.keys(values).length > 0 ? { config: values } : {}),
+        ...(query ? { query } : {}),
+      }));
+      return list(result.items).map((raw) => {
+        const item = bag(raw);
+        return {
+          value: str(item.value) ?? '',
+          label: str(item.label) ?? str(item.value) ?? '',
+          ...(str(item.description) ? { description: str(item.description) as string } : {}),
+        };
+      }).filter((item) => item.value !== '');
+    },
+
     resourceResolve: async (uri) => {
       const result = bag(await client.request('resourceResolve', { channel: ROOT, uri }));
       return {
@@ -1747,6 +1775,18 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
           : {}),
         // A gate, not a hint. Absent means `createChat` must not be called.
         ...(bag(agent.capabilities).multipleChats !== undefined ? { multipleChats: true } : {}),
+        // Which of the two it can do. The reference host advertises both; a
+        // host that advertises the capability as a bare presence flag says
+        // neither, and neither is offered.
+        ...(bag(bag(agent.capabilities).multipleChats).fork === true
+          || bag(bag(agent.capabilities).multipleChats).sideChat === true
+          ? {
+            chatSources: {
+              ...(bag(bag(agent.capabilities).multipleChats).fork === true ? { fork: true } : {}),
+              ...(bag(bag(agent.capabilities).multipleChats).sideChat === true ? { sideChat: true } : {}),
+            },
+          }
+          : {}),
         // The same decoder a session's list goes through, because it is the
         // same shape - the protocol says these entries are augmented and
         // propagated into a session's own when one is created with this agent,
@@ -2021,7 +2061,7 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
 
     loadOlderTurns: loadOlder,
 
-    createChat: async (uri, first) => {
+    createChat: async (uri, first, source) => {
       // The client picks the URI, as it does for a session, so it can be
       // subscribed to without a round trip in between.
       const chat = `ahp-chat:/${randomUUID()}`;
@@ -2029,6 +2069,10 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
         channel: uri,
         chat,
         ...(first ? { initialMessage: { text: first, origin: { kind: 'user' } } } : {}),
+        // Where it came from, when it came from somewhere. A fork copies the
+        // source's history through a turn; a side chat carries the context
+        // without copying it into what a person reads.
+        ...(source ? { source } : {}),
       });
       return chat;
     },

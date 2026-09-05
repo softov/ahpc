@@ -378,6 +378,19 @@ export interface ChangesetOperationTarget {
  * `ModelRow.options` asked. Distinct from the catalogue row - this is the
  * choice, that is what there was to choose from.
  */
+/**
+ * Where a new chat comes from, when it comes from an existing one.
+ *
+ * A fork copies the source's history through a completed turn into the new
+ * chat's visible turns; a side chat supplies the same context without copying
+ * it into what a person reads. Both are gated on the agent advertising them -
+ * `capabilities.multipleChats: { fork, sideChat }` - and a host that does not
+ * is one where the option is not offered rather than offered and refused.
+ */
+export type ChatSource =
+  | { kind: 'fork'; chat: string; turnId: string }
+  | { kind: 'sideChat'; chat: string; turnId: string };
+
 export interface ModelSelection {
   id: string;
   /** Answers by property key, in the host's own vocabulary. */
@@ -473,6 +486,8 @@ export interface Agent {
    * `createChat` MUST NOT be called, so the command is not offered either.
    */
   multipleChats?: boolean;
+  /** Whether it can fork a chat, and whether it can hold a side chat. */
+  chatSources?: { fork?: boolean; sideChat?: boolean };
   /**
    * What this harness offers, before any session exists.
    *
@@ -503,6 +518,14 @@ export interface ConfigProperty {
   description?: string;
   values: { value: string; label: string; description?: string }[];
   sessionMutable: boolean;
+  /**
+   * Whether the host has to be asked for the values rather than sending them.
+   *
+   * The reference host sets this on `branch` while isolation is `worktree`: a
+   * branch list on a large repository is not something to put in a schema, so
+   * the schema says "ask me" and `sessionConfigCompletions` is the asking.
+   */
+  enumDynamic?: boolean;
   /**
    * What the host opens with, where it said.
    *

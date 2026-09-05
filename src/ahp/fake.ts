@@ -89,6 +89,16 @@ const EFFORTS: { value: string; label: string }[] = [
 
 const CONFIG: SessionConfig['properties'] = [
   {
+    key: 'branch',
+    title: 'Branch',
+    description: 'What to base a worktree on.',
+    // The host saying "ask me": a branch list is a query, not a schema. The
+    // reference host marks exactly this property this way.
+    values: [],
+    enumDynamic: true,
+    sessionMutable: false,
+  },
+  {
     key: 'permissionMode',
     title: 'Permissions',
     description: 'How much the agent may do before it asks.',
@@ -873,6 +883,8 @@ export function fakeHost(): FakeHost {
           // `createChat` MUST NOT be called at all - and the second agent below
           // deliberately does not, so the gate itself is scripted too.
           multipleChats: true,
+        // Both, as the reference host advertises them.
+        chatSources: { fork: true, sideChat: true },
         // What a real host advertises for a harness that needs signing in.
         // `authenticate` may only name one of these.
         protectedResources: [{ resource: 'https://api.anthropic.com', description: 'Anthropic API' }],
@@ -1507,9 +1519,22 @@ export function fakeHost(): FakeHost {
         }));
     },
 
-    createChat: async (uri, first) => {
+    createChat: async (uri, first, source) => {
       const chat = `ahp-chat:/${randomUUID()}`;
-      extra.set(chat, { session: uri, title: 'Chat', turns: [], watchers: new Set() });
+      // A fork copies the source's visible history through the named turn; a
+      // side chat carries the context without copying it into what a person
+      // reads. A fixture that treated them alike would let a screen ship that
+      // could not tell them apart either.
+      const from = source === undefined ? [] : (turns.get(source.chat as SessionUri) ?? extra.get(source.chat)?.turns ?? []);
+      const carried = source?.kind === 'fork'
+        ? [...from.slice(0, Math.max(1, from.findIndex((one) => one.id === source.turnId) + 1))]
+        : [];
+      extra.set(chat, {
+        session: uri,
+        title: source?.kind === 'sideChat' ? 'Side chat' : 'Chat',
+        turns: carried.map((one) => ({ ...one })),
+        watchers: new Set(),
+      });
       emit(uri, { type: 'chats', items: chatsOf(uri), defaultChat: chats.get(uri) ?? '' });
       if (first) {
         const held = extra.get(chat);
@@ -1847,6 +1872,25 @@ export function fakeHost(): FakeHost {
     },
 
     protectedResources: async () => AGENTS.flatMap((agent) => agent.protectedResources ?? []),
+
+    /*
+     * Values a schema would not carry.
+     *
+     * Filtered by the query, because that is what the host does with it - a
+     * fixture that returned the whole list whatever was typed would let a
+     * screen ship that never sent one.
+     */
+    configCompletions: async ({ property, query }) => {
+      const all = property === 'branch'
+        ? [
+          { value: 'main', label: 'main' },
+          { value: 'softov/spec-batches', label: 'softov/spec-batches' },
+          { value: 'softov/reconnect', label: 'softov/reconnect' },
+        ]
+        : [];
+      const at = (query ?? '').toLowerCase();
+      return at === '' ? all : all.filter((one) => one.value.toLowerCase().includes(at));
+    },
 
     resourceResolve: async (uri) => {
       const at = inTree(uri);
