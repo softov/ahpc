@@ -97,6 +97,23 @@ a host serves everything ahpd serves.
 2. Leave the model's row as it is where nothing matches.
 3. Test: a model accepting one level, against a session schema offering five.
 
+## B-01-17 - Answering what a host asks
+
+**Missing.** All ten of `ServerCommandMap` - `resourceRead`, `resourceWrite`, `resourceList`, `resourceCopy`, `resourceDelete`, `resourceMove`, `resourceResolve`, `resourceMkdir`, `resourceRequest`, `createResourceWatch`. The package installs a default that answers `-32601`, so nothing hangs, and refusing is a legal answer - the registry says the receiver decides whether to allow, deny or prompt. But zero of ten implemented is zero of the protocol's reverse half.
+
+**Blocks.** Nothing today: the reverse direction exists so a host can read URIs the client *published*, and this client publishes none. Neither capture contains a single host-initiated request. It is the one part of the protocol this client has no implementation of at all.
+
+**Serving anything by default would be a mistake**, so the content is opt-in and the refusal is the default rather than the gap.
+
+**Plan.**
+1. A request handler layer on the connection, so a host-initiated method is routed rather than falling through to the package's default. Refuse every URI with `-32009` until something opts in.
+2. `--publish <dir>`, serving that directory and nothing else under `virtual://ahpc/`, with every path resolved and checked to be inside it.
+3. Implement the read half against it - `resourceRead`, `resourceList`, `resourceResolve`, `resourceRequest` - and refuse the write half unless `--publish-writable` is given.
+4. `createResourceWatch` over the same directory, so a host is told rather than polling.
+5. Test: a scripted host reading a published file, and being refused a path outside the directory and a scheme that is not ours.
+
+**One thing this cannot settle.** The protocol has no way for a client to register a URI scheme, so a host talking to two clients cannot tell whose `virtual://` is whose. `virtual://ahpc/` is a convention this client is choosing. The host's roadmap has the same question from its side.
+
 ## B-01-21 - Checking what this client sends
 
 **Missing.** `tools/validate.mjs` reads what a host sent. Nothing reads what this client sends, and both captures it has run against are another client's traffic.
