@@ -275,8 +275,11 @@ describe('every command that declares its channel is sent on that channel', () =
     // A spread of a *name* - somebody's object, whose keys are not visible
     // here. `...(cond ? { k: v } : {})` is a literal and carries only what is
     // written next to it, so it is not the shape this is about.
-    // Stopped at the end of the object literal, so a spread in the *next*
-    // statement is not read as being in this one.
+    // Bounded at `})`, the end of the object literal. That bound carries two
+    // guarantees, not one: a spread in the *next* statement is not read as
+    // being in this one, and a rest-destructure - `const { a, ...b } = c`,
+    // which this pattern cannot tell apart from a literal - stays outside the
+    // window. Widening it drops both.
     const sites = [...live.matchAll(/channel: (?:ROOT|AUTOMATIONS)(?:(?!\}\))[\s\S]){0,200}?\.\.\.[A-Za-z_$]/g)];
     expect(sites.map((one) => one[0].split('\n')[0])).toEqual([]);
   });
