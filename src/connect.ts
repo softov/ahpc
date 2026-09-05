@@ -48,6 +48,10 @@ export async function connect(options: Where): Promise<HostConnection & { pump?(
       ...(options.token ? { token: options.token } : {}),
       onRefusal: (_uri, message) => sink.report(message),
       onLimit: (message) => sink.report(message),
+      // Work the host is doing under a token of its own. Reported while it
+      // runs and not on the frame that closes it - the finish is the thing
+      // that happened, and it is what the screen shows next.
+      onProgress: (_token, message) => { if (message !== null) sink.report(message); },
       onState: (state) => { if (state === 'offline') sink.report('The host stopped answering'); },
     });
   }

@@ -16,44 +16,6 @@ specification is what this client follows.
 
 ---
 
-# Batch 1 - The handshake and the catalogue
-
-Smallest, and everything after it connects through this.
-
-## B-01-14 - `initialSubscriptions` and `locale`
-
-**Clause.** `lifecycle.md:10` gives the handshake as `initialize(protocolVersions[], clientId, clientInfo?, initialSubscriptions?, locale?)`. `lifecycle.md:36`: `initialSubscriptions` subscribes in the same round trip, "typically `ahp-root://` plus any previously-open session URIs". `root-channel.md:13`: "Clients SHOULD subscribe to it during the handshake via `initialSubscriptions`". `lifecycle.md:38`: `locale` is an IETF BCP 47 tag the server uses to localise user-facing strings.
-
-**Missing.** Neither is sent. The root channel is a separate `subscribe` afterwards.
-
-**Steps.**
-1. Send `initialSubscriptions: ['ahp-root://', ...held]` on the first connection and apply the returned snapshots. The reconnect supervisor already does this on its `initialize` fallback.
-2. Send `locale` from `LANG`/`LC_ALL`, normalised to BCP 47.
-3. Test: one round trip, not two, and the root snapshot applied from the handshake.
-
-## B-01-22 - Re-fetch the catalogue after a reconnect
-
-**Clause.** `root-channel.md:166`: "the `root/*` events are ephemeral and are **not** replayed on reconnect. After reconnecting, clients SHOULD re-fetch the catalogue via `listSessions`."
-
-**Missing.** The supervisor resumes subscriptions and applies replay or snapshots, and never re-fetches. Sessions added or removed while the socket was down are absent until something else asks.
-
-**Steps.**
-1. Call `listSessions` after every successful resume, replay branch included.
-2. Test: a scripted host that adds a session while disconnected, and a catalogue containing it after reconnect.
-
-## B-01-23 - `root/progress`
-
-**Clause.** `root-channel.md:186`: `progress` is monotonically non-decreasing per `progressToken`; complete when `progress === total`; the server MUST emit a final frame satisfying this; when `total` is absent clients SHOULD show an indeterminate indicator; a generic client MAY display `message` verbatim. Ephemeral, not replayed.
-
-**Missing.** `progressToken` appears nowhere in this client. `createSession` accepts one and none is sent, so a slow session creation shows nothing.
-
-**Steps.**
-1. Send a `progressToken` with `createSession` and any other command that accepts one.
-2. Route `root/progress` to the screen that started the work; indeterminate where `total` is absent; clear on the final frame.
-3. Test: progress frames with and without `total`.
-
----
-
 # Batch 2 - The message
 
 The model selection and the draft both live on `Message`, and this client

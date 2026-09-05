@@ -76,6 +76,21 @@ class Scripted {
       && (channel === undefined || frame.params?.channel === channel)).length;
   }
 
+  /** Say how far along a piece of work is, against the token a client sent. */
+  async progress(token: string, progress: number, total?: number, message?: string): Promise<void> {
+    await this.send({
+      jsonrpc: '2.0',
+      method: 'root/progress',
+      params: {
+        channel: ROOT,
+        progressToken: token,
+        progress,
+        ...(total === undefined ? {} : { total }),
+        ...(message === undefined ? {} : { message }),
+      },
+    });
+  }
+
   /** Push a state action at the client, as a host does between requests. */
   async act(channel: string, action: Record<string, unknown>): Promise<void> {
     this.seq += 1;
@@ -159,10 +174,17 @@ class Scripted {
     };
 
     if (method === 'initialize') {
+      // What `lifecycle.md` says the handshake answers with: a snapshot for
+      // every channel named in `initialSubscriptions`, in the same round trip.
+      const asked = (message.params?.initialSubscriptions as string[] | undefined) ?? [];
       await reply({
         protocolVersion: '0.9.0',
         serverSeq: this.seq,
-        snapshots: [],
+        snapshots: asked.map((channel) => ({
+          resource: channel,
+          state: this.states.get(channel) ?? {},
+          fromSeq: this.seq,
+        })),
         ...(this.automations ? { automations: {} } : {}),
       });
       return;
@@ -238,6 +260,7 @@ class Scripted {
       await reply({ items: rows, ...(next === undefined ? {} : { nextCursor: next }) });
       return;
     }
+    if (method === 'createSession') { await reply(null); return; }
     if (method === 'ping') { await reply(null); return; }
     // `unsubscribe` and `dispatchAction` are notifications: recorded above,
     // and answered with the silence the protocol asks for.
@@ -1281,6 +1304,128 @@ describe('the model a host actually reports, rather than the one it declares', (
       ? [...snapshot.turns, ...(snapshot.active ? [snapshot.active] : [])].find((one) => one.model)
       : undefined;
     expect(turn?.model?.config).toEqual({ thinkingLevel: 'max' });
+
+    await host.close();
+  });
+});
+
+describe('the handshake asks for what it needs in one round trip', () => {
+  it('subscribes to the root channel in `initialize`, and not again after', async () => {
+    const { host, scripted } = await connect();
+    await settle();
+
+    const hello = scripted.asked.find((frame) => frame.method === 'initialize');
+    // `lifecycle.md`: the client MAY name channels on `initialize` and the
+    // root channel's own page says it SHOULD be one of them.
+    expect(hello?.params?.initialSubscriptions).toEqual([ROOT]);
+    // And having been answered, it is not asked for a second time - which is
+    // the round trip this exists to save.
+    expect(scripted.timesAsked('subscribe', ROOT)).toBe(0);
+
+    await host.close();
+  });
+
+  it('sends a language tag the server can read', async () => {
+    const was = process.env.LANG;
+    process.env.LANG = 'pt_BR.UTF-8';
+    try {
+      const { host, scripted } = await connect();
+      await settle();
+      const hello = scripted.asked.find((frame) => frame.method === 'initialize');
+      // POSIX spells it `pt_BR.UTF-8`; BCP 47 wants `pt-BR`.
+      expect(hello?.params?.locale).toBe('pt-BR');
+      await host.close();
+    }
+    finally { process.env.LANG = was; }
+  });
+
+  it('says nothing where the environment names no language', async () => {
+    const was = { lang: process.env.LANG, all: process.env.LC_ALL, messages: process.env.LC_MESSAGES };
+    process.env.LANG = 'C';
+    delete process.env.LC_ALL;
+    delete process.env.LC_MESSAGES;
+    try {
+      const { host, scripted } = await connect();
+      await settle();
+      const hello = scripted.asked.find((frame) => frame.method === 'initialize');
+      // `C` and `POSIX` name no language. A tag no server can read is worse
+      // than no tag at all.
+      expect(hello?.params?.locale).toBeUndefined();
+      await host.close();
+    }
+    finally {
+      if (was.lang === undefined) delete process.env.LANG; else process.env.LANG = was.lang;
+      if (was.all !== undefined) process.env.LC_ALL = was.all;
+      if (was.messages !== undefined) process.env.LC_MESSAGES = was.messages;
+    }
+  });
+});
+
+describe('work the host is doing gets said out loud', () => {
+  it('reads `root/progress`, which the protocol client drops on the floor', async () => {
+    const said: (string | null)[] = [];
+    let scripted!: Scripted;
+    const open = async (): Promise<AhpTransport> => {
+      const [mine, theirs] = InMemoryTransport.pair();
+      scripted = new Scripted(theirs);
+      return mine;
+    };
+    const host = await liveHost({
+      url: 'ws://scripted',
+      clientId: 'ahpc-test',
+      connect: open,
+      backoff: [0],
+      keepaliveMs: 0,
+      onProgress: (_token, message) => said.push(message),
+    });
+    await settle();
+
+    // The package's own notification handler models five methods and
+    // discards the rest, `root/progress` among them - so this arrives only
+    // because the transport is read on the way past.
+    await scripted.progress('t1', 5, 10, 'Downloading Claude agent');
+    await settle(2);
+    expect(said).toEqual(['Downloading Claude agent 50%']);
+
+    // `progress === total` is the frame that closes a token, and the host
+    // MUST send one. Nothing further references it.
+    await scripted.progress('t1', 10, 10, 'Downloading Claude agent');
+    await settle(2);
+    expect(said[said.length - 1]).toBeNull();
+
+    await host.close();
+  });
+
+  it('shows no share where the host named no total', async () => {
+    const said: (string | null)[] = [];
+    let scripted!: Scripted;
+    const open = async (): Promise<AhpTransport> => {
+      const [mine, theirs] = InMemoryTransport.pair();
+      scripted = new Scripted(theirs);
+      return mine;
+    };
+    const host = await liveHost({
+      url: 'ws://scripted', clientId: 'ahpc-test', connect: open, backoff: [0], keepaliveMs: 0,
+      onProgress: (_token, message) => said.push(message),
+    });
+    await settle();
+
+    // `total` is present only when the magnitude is known up front. A
+    // percentage invented from a number nobody gave is worse than none.
+    await scripted.progress('t2', 900, undefined, 'Indexing');
+    await settle(2);
+    expect(said).toEqual(['Indexing']);
+
+    await host.close();
+  });
+
+  it('sends a token with `createSession`, so there is something to report against', async () => {
+    const { host, scripted } = await connect();
+    await host.createSession({ provider: 'claude' });
+    await settle();
+
+    const made = scripted.asked.find((frame) => frame.method === 'createSession');
+    expect(typeof made?.params?.progressToken).toBe('string');
 
     await host.close();
   });

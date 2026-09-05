@@ -102,6 +102,16 @@ export interface Channels {
     resumed?: readonly ResumedSnapshot[];
     missing?: readonly string[];
   }): void;
+  /**
+   * Take a channel the handshake already opened, with the state it answered.
+   *
+   * `initialize` accepts `initialSubscriptions` and answers with a snapshot
+   * for each, which leaves the channel subscribed at the host before anything
+   * here has asked for it. Without this the first reader would subscribe again
+   * - the round trip the handshake exists to save, and a second `subscribe`
+   * for a channel this connection already holds.
+   */
+  adopt(uri: string, state: ChannelState): void;
   /** Forget every subscription without unsubscribing: the socket is already gone. */
   detach(): void;
 }
@@ -120,6 +130,8 @@ interface Held {
   leaving?: ReturnType<typeof setTimeout>;
   /** The `subscribe` already out for this channel, which a second reader waits on. */
   pending?: Promise<ChannelState>;
+  /** A snapshot the handshake answered with, waiting for its first reader. */
+  initial?: ChannelState;
 }
 
 function bag(value: unknown): Record<string, unknown> | null {
@@ -367,7 +379,19 @@ export function openChannels(options: ChannelsOptions): Channels {
        */
       const alone = channel.consumers.size === 1;
       channel.uses += 1;
-      if (alone) { channel.told = false; start(uri, generation); }
+      if (alone && channel.initial !== undefined) {
+        // The handshake already asked, and this is the answer it got.
+        const opening = channel.initial;
+        channel.initial = undefined;
+        channel.told = true;
+        queueMicrotask(() => {
+          if (!channel.consumers.has(consumer)) return;
+          consumer.opened(opening);
+          const queued = channel.waiting.splice(0);
+          for (const event of queued) for (const one of channel.consumers) one.event(event);
+        });
+      }
+      else if (alone) { channel.told = false; start(uri, generation); }
       else if (channel.told) {
         // Somebody is already reading it. This one needs the state as it
         // stands, and the host will not send a second snapshot for it.
@@ -491,6 +515,13 @@ export function openChannels(options: ChannelsOptions): Channels {
         // served; one it never restored has to be asked for again.
         if (!channel.opened) start(uri, generation);
       }
+    },
+
+    adopt: (uri, state) => {
+      const channel = entry(uri);
+      channel.opened = true;
+      channel.told = false;
+      channel.initial = state;
     },
 
     detach: () => {

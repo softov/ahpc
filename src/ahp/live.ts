@@ -83,6 +83,14 @@ export interface LiveHostOptions {
    * wrong thing to be doing, and a person is owed the sentence.
    */
   onLimit?(message: string): void;
+  /**
+   * Work the host is doing, by its own token.
+   *
+   * `null` means that token is finished. The specification's own example is a
+   * harness being downloaded before a session can start, which is exactly the
+   * wait that looked like nothing happening.
+   */
+  onProgress?(token: string, message: string | null): void;
 }
 
 /**
@@ -227,6 +235,64 @@ export class MissingProtocolPackage extends Error {
       + 'Or leave --host off and drive the scripted one.');
     this.name = 'MissingProtocolPackage';
   }
+}
+
+/**
+ * The client's preferred language, as a BCP 47 tag.
+ *
+ * `lifecycle.md` says a server SHOULD use this to localise the strings a
+ * person reads - confirmation option labels among them. POSIX spells a locale
+ * `en_US.UTF-8`; BCP 47 wants `en-US`, so the encoding is dropped and the
+ * underscore becomes a hyphen. `C` and `POSIX` name no language and are sent
+ * as nothing rather than as a tag no server can read.
+ */
+function locale(): string | undefined {
+  const found = process.env.LC_ALL ?? process.env.LC_MESSAGES ?? process.env.LANG;
+  if (found === undefined || found === '') return undefined;
+  const tag = found.split('.')[0]?.replace(/_/g, '-');
+  if (tag === undefined || tag === '' || tag === 'C' || tag === 'POSIX') return undefined;
+  return tag;
+}
+
+/**
+ * A transport that also hands every inbound notification to a listener.
+ *
+ * The protocol's own client models five notifications and *drops the rest* -
+ * its handler has a default branch that discards anything it does not
+ * recognise, `root/progress` and `otlp/exportLogs` among them, so neither
+ * reaches `events()` and neither can be read through the client at all.
+ *
+ * Both are in the specification, so the answer is not to do without them. The
+ * frames arrive here on their way in and are read on the way past: nothing is
+ * intercepted, nothing is answered, and the client below sees exactly what it
+ * would have seen.
+ */
+interface Framed {
+  send(message: unknown): Promise<void> | void;
+  recv(): Promise<{ kind: string; message?: unknown; text?: string } | null>;
+  close(): Promise<void> | void;
+}
+
+function tee(inner: Framed, heard: (method: string, params: Bag) => void): Framed {
+  return {
+    send: (message: unknown) => inner.send(message),
+    close: () => inner.close(),
+    recv: async () => {
+      const frame = await inner.recv();
+      if (frame === null) return null;
+      try {
+        const message = frame.kind === 'parsed'
+          ? bag(frame.message)
+          : frame.kind === 'text' ? bag(JSON.parse(frame.text ?? 'null')) : null;
+        // A notification is a message with a method and no id.
+        if (message === null) return frame;
+        const method = str(message.method);
+        if (method !== undefined && message.id === undefined) heard(method, bag(message.params));
+      }
+      catch { /* the client below reports a frame it cannot read */ }
+      return frame;
+    },
+  };
 }
 
 async function load(): Promise<Loaded> {
@@ -929,15 +995,57 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
   const backoff = options.backoff ?? BACKOFF;
   const keepaliveMs = options.keepaliveMs ?? KEEPALIVE_MS;
 
-  const transport = await openTransport();
+  /**
+   * Work a host is doing that has been given a token to report against.
+   *
+   * `root-channel.md`: `progress` is monotonically non-decreasing for a token,
+   * the operation is complete when `progress === total`, and the host MUST
+   * send a final frame satisfying that - so a token is forgotten on the frame
+   * that closes it rather than on a timer. `total` absent means the magnitude
+   * is not known and a client SHOULD show an indeterminate indicator.
+   */
+  const working = new Map<string, string>();
+  const notified = (method: string, params: Bag): void => {
+    if (method !== 'root/progress') return;
+    const token = str(params.progressToken);
+    if (token === undefined) return;
+    const done = typeof params.total === 'number' && params.progress === params.total;
+    if (done) { working.delete(token); options.onProgress?.(token, null); return; }
+    // The host's own words, which `root-channel.md` says a generic client MAY
+    // show verbatim - this client has no label of its own for work it did not
+    // name. The share is left out where no total was given rather than
+    // guessed at.
+    const said = str(params.message) ?? 'Working';
+    const share = typeof params.total === 'number' && params.total > 0
+      ? ` ${Math.round((Number(params.progress) / params.total) * 100)}%`
+      : '';
+    working.set(token, `${said}${share}`);
+    options.onProgress?.(token, `${said}${share}`);
+  };
+
+  const transport = tee(await openTransport() as Framed, notified);
   let client = new ahp.Client(transport, {});
   const mirror = new ahp.Mirror();
   client.connect();
+
+  /*
+   * The root channel, asked for in the handshake rather than after it.
+   *
+   * `lifecycle.md` gives `initialSubscriptions` as part of `initialize` and
+   * the root channel's own page says a client SHOULD subscribe to it that way.
+   * It saves a round trip on every connection, and the reconnect path already
+   * had to do this on its `initialize` fallback - only the first connection
+   * was still asking twice.
+   */
+  /** Channels the handshake opened, with the state it answered. */
+  const adopted = new Map<string, Bag | null>();
 
   const hello = bag(await client.initialize({
     clientId,
     protocolVersions: VERSIONS,
     clientInfo: { name: 'ahpc' },
+    initialSubscriptions: [ROOT],
+    ...(locale() !== undefined ? { locale: locale() as string } : {}),
   }));
   for (const snapshot of list(hello.snapshots)) mirror.applySnapshot(snapshot);
   moveTo('connected');
@@ -966,6 +1074,14 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
    * channel so the last one leaving is what sends `unsubscribe`, and it holds
    * the set that has to be named to `reconnect` when the socket comes back.
    */
+  // What the handshake already answered for, so the first reader of the root
+  // channel is handed that snapshot instead of asking for a second one.
+  for (const snapshot of list(hello.snapshots)) {
+    const one = bag(snapshot);
+    const uri = str(one.resource);
+    if (uri !== undefined) adopted.set(uri, bag(one.state));
+  }
+
   const channels = openChannels({
     client,
     reason,
@@ -977,6 +1093,7 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
     // here to be dressed up as one.
     onRejection: (uri, message) => options.onRefusal?.(uri, message),
   });
+  for (const [uri, state] of adopted) channels.adopt(uri, state);
   channels.drain(client);
 
   /**
@@ -1135,7 +1252,7 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
         await pause(backoff[Math.min(attempt, backoff.length - 1)] ?? 0);
         if (finished) return;
         try {
-          const socket = await openTransport();
+          const socket = tee(await openTransport() as Framed, notified);
           const fresh = new ahp.Client(socket, {});
           fresh.connect();
           const held = channels.held();
@@ -1448,9 +1565,19 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
       // beside it named a parameter the host has nothing called, so the
       // session was created - somewhere - and never at the URI we then went
       // on to subscribe to.
+      /*
+       * A token to report against.
+       *
+       * `root-channel.md` gives downloading an agent as the example, which is
+       * exactly the wait this command can sit in: a harness that is not on the
+       * machine yet is fetched before the session exists, and without a token
+       * the host has nowhere to say so.
+       */
+      const progressToken = randomUUID();
       await client.request('createSession', {
         channel: resource,
         provider,
+        progressToken,
         ...(workingDirectory ? { workingDirectories: [`file://${workingDirectory}`] } : {}),
         ...(values && Object.keys(values).length > 0 ? { config: values } : {}),
       });
