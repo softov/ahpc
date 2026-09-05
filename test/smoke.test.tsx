@@ -1129,6 +1129,26 @@ describe('what a session actually is', () => {
   });
 
   /**
+   * The branch, under whichever name the host gives it.
+   *
+   * `_meta.git` is convention rather than specification - an open map with a
+   * well-known key - so the names in it are not declared anywhere and there
+   * are two of them in the wild. Reading only the one this client met first
+   * made the row say "the host does not say" against hosts that were saying
+   * it in the other spelling.
+   */
+  it('reads the branch under either name a host uses for it', async () => {
+    const { t } = await catalogue({ width: 140, height: 30 });
+    t.app.store.set(SELECTED, 'ahp-session:/6b21');
+    await t.app.execute('session.openDetails');
+    for (let i = 0; i < 6; i++) await t.settle();
+
+    expect(t.hasText('main')).toBe(true);
+    expect(t.hasText('not a repository')).toBe(false);
+    await t.unmount();
+  });
+
+  /**
    * What this model takes, which is not what the harness takes.
    *
    * The session-wide thinking level is one setting, and the model running
@@ -1393,6 +1413,18 @@ describe('the composer is the front door', () => {
     await until(m, () => m.t.getAllByText('waiting on you').length > 0);
     expect(m.t.getAllByText('waiting on you').length).toBeGreaterThan(0);
     expect(m.t.getAllByText('error').length).toBe(0);
+
+    /*
+     * Everything the host still owes, before the store is written by hand.
+     *
+     * `writeSessions` replaces the catalogue, and a `listSessions` still in
+     * flight from the mount lands afterwards and puts the host's answer back -
+     * so the caption reverts to what the fixture says and the assertion below
+     * fails. It depends on how loaded the machine is, which is why this failed
+     * about one run in four and passed every time it was looked at.
+     */
+    await m.host.flush?.();
+    for (let i = 0; i < 4; i++) await m.t.settle();
 
     // What the controller does when the host says something moved, without
     // going anywhere: the same session, in a state it was not in before.

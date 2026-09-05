@@ -139,7 +139,7 @@ AHP is symmetrical, and the package answers a host-initiated request with `-3260
 
 `createChat.source` is never sent, so a fork or a side chat cannot be started from here even where an agent advertises `capabilities.multipleChats`. `sessionConfigCompletions` is never called, so a config property whose values are dynamic renders as free text.
 
-**What it costs today.** Little, and only against a host that advertises them - ahpd advertises neither today. It is here so that a capability a host does grow is not unreachable by accident.
+**What it costs today.** For the fork and side chat, little, and only against a host that advertises them. For the completions, no longer hypothetical: the reference host's `branch` property carries `enumDynamic`, true while isolation is `worktree` and false otherwise, and that flag is exactly how a host says "ask me for the values". So against that host, choosing a branch to base a worktree on is a free-text field where the host was offering to list them - and on a large repository that list is the whole reason the command exists. This was written up as a capability nobody had grown yet; one of the two hosts has grown it.
 
 **Suggestions.** (1) Read the agent's capabilities and offer fork and side chat exactly where they are advertised, which is the rule the rest of this client already follows. (2) Wait until a host advertises one, and take both then. (3) Take `sessionConfigCompletions` only alongside the first property that needs it, which is the host's `A-01-03c` seen from here.
 

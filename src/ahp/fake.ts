@@ -460,6 +460,10 @@ export function fakeHost(): FakeHost {
     active?: Turn;
     input?: PendingInput;
     changes?: Changeset;
+    /** The branch its directory is on, as `_meta.git.branchName`. */
+    branch?: string;
+    /** Ahead, behind and uncommitted, in that order. */
+    drift?: [number, number, number];
   }): void => {
     const { id } = options;
     flags.set(id, (options.read === false ? 0 : SessionFlag.IsRead)
@@ -551,6 +555,26 @@ export function fakeHost(): FakeHost {
       createdAt: AT,
       modifiedAt: AT,
       workingDirectories: [options.dir],
+      /*
+       * What a host says about git, in the vocabulary the reference host uses.
+       *
+       * `_meta` is an open map and `git` is convention rather than
+       * specification, so the names here are copied from a capture rather than
+       * from a declaration - `branchName`, not `branch`. A fixture spelling it
+       * the other way is a fixture that agrees with a client reading it wrong,
+       * which is exactly what happened: the branch row said "the host does not
+       * say" against hosts that were saying it.
+       */
+      _meta: {
+        git: {
+          branchName: options.branch ?? 'main',
+          upstreamBranchName: `origin/${options.branch ?? 'main'}`,
+          hasGitHubRemote: true,
+          incomingChanges: options.drift?.[1] ?? 0,
+          outgoingChanges: options.drift?.[0] ?? 0,
+          uncommittedChanges: options.drift?.[2] ?? 0,
+        },
+      },
       ...(options.activity ? { activity: options.activity } : {}),
       ...(options.origin ? { origin: options.origin } : {}),
       ...(options.changes

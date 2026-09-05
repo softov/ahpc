@@ -452,15 +452,57 @@ export function projectName(session: SessionSummary): string {
 }
 
 /**
+ * What a host said about git, under the well-known key in `_meta`.
+ *
+ * `_meta` is an open map, so every step down is checked: a host may put
+ * anything here, including a `git` that is not an object.
+ */
+function git(session: SessionSummary): Record<string, unknown> {
+  const found = session._meta?.git;
+  return typeof found === 'object' && found !== null && !Array.isArray(found)
+    ? found as Record<string, unknown>
+    : {};
+}
+
+function count(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+}
+
+/**
  * The branch a session's directory is on, if its host says.
  *
- * `_meta` is an open map and `git` is the protocol's well-known key in it, so
- * every step down is checked: a host may put anything here, including a `git`
- * that is not an object.
+ * Two spellings, because there are two vocabularies and only one of them is
+ * written down anywhere. `branchName` is what the reference host sends and is
+ * the one to prefer; `branch` is what one other host sent until it adopted the
+ * reference's names. Neither is in the specification - `git` is a well-known
+ * key in an open map and its contents are convention - so reading only the
+ * name this client happened to meet first is how the branch row came to say
+ * "the host does not say" against a host that was saying it all along.
  */
 export function branchName(session: SessionSummary): string | undefined {
-  const git = session._meta?.git;
-  if (typeof git !== 'object' || git === null) return undefined;
-  const branch = (git as { branch?: unknown }).branch;
-  return typeof branch === 'string' && branch !== '' ? branch : undefined;
+  const found = git(session);
+  for (const key of ['branchName', 'branch']) {
+    const name = found[key];
+    if (typeof name === 'string' && name !== '') return name;
+  }
+  return undefined;
+}
+
+/**
+ * How far the branch has drifted, where the host counted.
+ *
+ * Ahead, behind and uncommitted, in the arrows a person reads without a
+ * legend. Zeroes are left out rather than drawn as zeroes: the interesting
+ * state is the one that is not clean, and three noughts beside every branch is
+ * three columns of nothing.
+ */
+export function branchDrift(session: SessionSummary): string | undefined {
+  const found = git(session);
+  const marks = [
+    ['\u2191', count(found.outgoingChanges)],
+    ['\u2193', count(found.incomingChanges)],
+    ['\u2022', count(found.uncommittedChanges)],
+  ] as const;
+  const said = marks.filter(([, n]) => n > 0).map(([mark, n]) => `${mark}${n}`);
+  return said.length > 0 ? said.join(' ') : undefined;
 }
