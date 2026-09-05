@@ -1,0 +1,1033 @@
+/*
+ * What happens to a client when the socket goes.
+ *
+ * Everything else in this suite drives `fakeHost`, which implements the seam
+ * `live.ts` produces rather than the protocol underneath it - so a defect in
+ * the protocol half is invisible to all of it. These tests drive `liveHost`
+ * itself over an in-memory transport, with a host scripted frame by frame, and
+ * assert on the frames rather than on the screen.
+ */
+
+import { describe, expect, it } from 'vitest';
+import { InMemoryTransport, type AhpTransport } from '@microsoft/agent-host-protocol/client';
+import { liveHost } from '../src/ahp/live.js';
+import type { HostEvent } from '../src/ahp/connection.js';
+
+const ROOT = 'ahp-root://';
+const AUTOMATIONS = 'ahp-automations://';
+const SESSION = 'ahp-session:/s1';
+const CHAT = 'ahp-chat:/s1';
+
+interface Frame {
+  id?: number | string;
+  method?: string;
+  params?: Record<string, unknown>;
+}
+
+/**
+ * A host, scripted frame by frame.
+ *
+ * It answers only what these tests need and records everything it was asked,
+ * which is the point: `unsubscribe` is a notification with no reply, so the
+ * only way to know it was sent is to have been the thing it was sent to.
+ */
+class Scripted {
+  /** Every request and notification this host was sent, in order. */
+  readonly asked: Frame[] = [];
+  /** The state each channel answers a `subscribe` with. */
+  readonly states = new Map<string, Record<string, unknown>>();
+  /** Channels to refuse, and the words to refuse them in. */
+  readonly refuse = new Map<string, string>();
+  /** The catalogue this host answers `listSessions` from, in pages of fifty. */
+  catalogue: Record<string, unknown>[] = [];
+  /** Whether `initialize` advertises the automations capability. */
+  automations = false;
+  /** Turns this host is holding behind the window, oldest last. */
+  behind: unknown[] = [];
+  /** The cursor sent with each `fetchTurns`, in order. */
+  readonly fetched: string[] = [];
+  /**
+   * Channels whose `subscribe` is held until `release`, as a restore from
+   * disk is, and which cancel one another the way the reference host does.
+   */
+  readonly slow = new Set<string>();
+  /** The held `subscribe` for each slow channel, by request id. */
+  private readonly holding = new Map<string, number | string>();
+  /** What the next `reconnect` answers. */
+  reconnectWith: Record<string, unknown> = { type: 'replay', actions: [], missing: [] };
+  /** An error to answer `reconnect` with instead, as a restarted host does. */
+  refuseReconnect: { code: number; message: string } | null = null;
+  /** Resolved once a `reconnect` has been answered. */
+  reconnected: Promise<Frame>;
+  private announceReconnect!: (frame: Frame) => void;
+  private seq = 10;
+  private running = true;
+
+  constructor(private readonly transport: AhpTransport) {
+    this.reconnected = new Promise((resolve) => { this.announceReconnect = resolve; });
+    this.states.set(ROOT, { agents: [], terminals: [] });
+    this.states.set(AUTOMATIONS, { entries: [] });
+    void this.run();
+  }
+
+  /** Every frame of one method, for asserting how many times it was sent. */
+  timesAsked(method: string, channel?: string): number {
+    return this.asked.filter((frame) => frame.method === method
+      && (channel === undefined || frame.params?.channel === channel)).length;
+  }
+
+  /** Push a state action at the client, as a host does between requests. */
+  async act(channel: string, action: Record<string, unknown>): Promise<void> {
+    this.seq += 1;
+    await this.send({
+      jsonrpc: '2.0',
+      method: 'action',
+      params: { channel, action, serverSeq: this.seq },
+    });
+  }
+
+  /**
+   * Refuse an action a client dispatched, the way a host answers one it will
+   * not take: the action it did *not* apply, and its words for why.
+   *
+   * `serverSeq` deliberately does not move, because no state did.
+   */
+  async reject(
+    channel: string,
+    action: Record<string, unknown>,
+    reason: string,
+    clientId = 'ahpc-test',
+  ): Promise<void> {
+    await this.send({
+      jsonrpc: '2.0',
+      method: 'action',
+      params: {
+        channel,
+        action,
+        serverSeq: this.seq,
+        origin: { clientId, clientSeq: 1 },
+        rejectionReason: reason,
+      },
+    });
+  }
+
+  /** The counter this host has reached, which a reconnect is measured against. */
+  get serverSeq(): number { return this.seq; }
+
+  /** Answer every `subscribe` this host is holding. */
+  async release(): Promise<void> {
+    const waiting = [...this.holding];
+    this.holding.clear();
+    for (const [channel, id] of waiting) {
+      await this.send({
+        jsonrpc: '2.0',
+        id,
+        result: { snapshot: { resource: channel, state: this.states.get(channel) ?? {}, fromSeq: this.seq } },
+      });
+    }
+  }
+
+  /** Hang up, the way a daemon that has been killed does. */
+  async drop(): Promise<void> {
+    this.running = false;
+    await this.transport.close();
+  }
+
+  private async send(message: Record<string, unknown>): Promise<void> {
+    await this.transport.send(JSON.stringify(message));
+  }
+
+  private async run(): Promise<void> {
+    while (this.running) {
+      let frame: Awaited<ReturnType<AhpTransport['recv']>>;
+      try { frame = await this.transport.recv(); }
+      catch { return; }
+      if (frame === null) return;
+      const text = frame.kind === 'text' ? frame.text
+        : frame.kind === 'parsed' ? JSON.stringify(frame.message) : '';
+      const message = JSON.parse(text) as Frame;
+      this.asked.push(message);
+      await this.answer(message);
+    }
+  }
+
+  private async answer(message: Frame): Promise<void> {
+    const { id, method } = message;
+    const reply = async (result: unknown): Promise<void> => {
+      if (id === undefined) return;
+      await this.send({ jsonrpc: '2.0', id, result });
+    };
+
+    if (method === 'initialize') {
+      await reply({
+        protocolVersion: '0.9.0',
+        serverSeq: this.seq,
+        snapshots: [],
+        ...(this.automations ? { automations: {} } : {}),
+      });
+      return;
+    }
+    if (method === 'reconnect') {
+      this.announceReconnect(message);
+      if (this.refuseReconnect !== null) {
+        if (id !== undefined) {
+          await this.send({ jsonrpc: '2.0', id, error: this.refuseReconnect });
+        }
+        return;
+      }
+      await reply(this.reconnectWith);
+      return;
+    }
+    if (method === 'subscribe') {
+      const channel = String(message.params?.channel ?? '');
+      const said = this.refuse.get(channel);
+      if (said !== undefined) {
+        if (id !== undefined) {
+          await this.send({ jsonrpc: '2.0', id, error: { code: -32001, message: said } });
+        }
+        return;
+      }
+      if (this.slow.has(channel) && id !== undefined) {
+        /*
+         * What the reference host does with two subscribes to one channel.
+         *
+         * It puts a pending marker under the channel while it restores, and a
+         * subscribe arriving before that one resolves replaces the marker - so
+         * the first finds itself no longer current and is answered `Resource
+         * not found`, naming a channel that is there. Held here for the same
+         * reason: it is the overlap that collides, and a re-subscribe to a
+         * channel already open is idempotent there.
+         */
+        const earlier = this.holding.get(channel);
+        this.holding.set(channel, id);
+        if (earlier !== undefined) {
+          await this.send({
+            jsonrpc: '2.0',
+            id: earlier,
+            error: { code: -32001, message: `Resource not found: ${channel}` },
+          });
+        }
+        return;
+      }
+      await reply({ snapshot: { resource: channel, state: this.states.get(channel) ?? {}, fromSeq: this.seq } });
+      return;
+    }
+    if (method === 'fetchTurns') {
+      this.fetched.push(String(message.params?.cursor ?? ''));
+      const chat = this.states.get(CHAT) ?? {};
+      const loaded = (chat.turns as unknown[] | undefined) ?? [];
+      const page = this.behind.splice(-2);
+      // A host inserts the turns into state and updates the cursor *before*
+      // it answers, which is the whole reason the result is empty.
+      // Rebuilt rather than spread over: the host MUST *clear* the cursor when
+      // the last page has gone, and spreading the old state carries it.
+      const { turnsNextCursor: _gone, ...rest } = chat as Record<string, unknown>;
+      this.states.set(CHAT, {
+        ...rest,
+        turns: [...page, ...loaded],
+        ...(this.behind.length > 0 ? { turnsNextCursor: `c${this.behind.length}` } : {}),
+      });
+      await reply({});
+      return;
+    }
+    if (method === 'listSessions') {
+      const cursor = message.params?.cursor as string | undefined;
+      const page = cursor === undefined ? 0 : Number(cursor);
+      const rows = this.catalogue.slice(page * 50, (page + 1) * 50);
+      const next = (page + 1) * 50 < this.catalogue.length ? String(page + 1) : undefined;
+      await reply({ items: rows, ...(next === undefined ? {} : { nextCursor: next }) });
+      return;
+    }
+    if (method === 'ping') { await reply(null); return; }
+    // `unsubscribe` and `dispatchAction` are notifications: recorded above,
+    // and answered with the silence the protocol asks for.
+  }
+}
+
+/** A live client against a scripted host, with the waiting turned off. */
+async function connect(): Promise<{
+  host: Awaited<ReturnType<typeof liveHost>>;
+  scripted: Scripted;
+  reopen(): Scripted;
+}> {
+  let scripted!: Scripted;
+  const open = async (): Promise<AhpTransport> => {
+    const [mine, theirs] = InMemoryTransport.pair();
+    scripted = new Scripted(theirs);
+    return mine;
+  };
+  const host = await liveHost({
+    url: 'ws://scripted',
+    clientId: 'ahpc-test',
+    connect: open,
+    backoff: [0],
+    keepaliveMs: 0,
+    lingerMs: 0,
+  });
+  return { host, scripted, reopen: () => scripted };
+}
+
+/** Let the microtasks and the zero-delay timers behind a reconnect run out. */
+async function settle(times = 12): Promise<void> {
+  for (let i = 0; i < times; i += 1) await new Promise((resolve) => { setTimeout(resolve, 1); });
+}
+
+describe('a channel is let go when the last reader leaves', () => {
+  it('unsubscribes the session and its chat once the view closes', async () => {
+    const { host, scripted } = await connect();
+    scripted.states.set(SESSION, { defaultChat: CHAT, chats: [{ resource: CHAT, title: 'Chat' }] });
+    scripted.states.set(CHAT, { turns: [] });
+
+    // What the host logs on accept and on departure, so a run on each side
+    // names the same connection.
+    expect(host.id).toBe('ahpc-test');
+
+    const view = host.subscribe(SESSION as never, () => undefined);
+    await settle();
+    expect(scripted.timesAsked('subscribe', SESSION)).toBe(1);
+    expect(scripted.timesAsked('subscribe', CHAT)).toBe(1);
+    expect(scripted.timesAsked('unsubscribe', SESSION)).toBe(0);
+
+    view.close();
+    await settle();
+    expect(scripted.timesAsked('unsubscribe', SESSION)).toBe(1);
+    expect(scripted.timesAsked('unsubscribe', CHAT)).toBe(1);
+
+    await host.close();
+  });
+
+  it('holds the channel while a second reader still has it', async () => {
+    const { host, scripted } = await connect();
+    scripted.states.set(SESSION, { defaultChat: CHAT, chats: [] });
+    scripted.states.set(CHAT, { turns: [] });
+
+    const one = host.subscribe(SESSION as never, () => undefined);
+    const two = host.subscribe(SESSION as never, () => undefined);
+    await settle();
+    // One subscribe for two readers: a second is a second answer to a
+    // question that is already being answered.
+    expect(scripted.timesAsked('subscribe', SESSION)).toBe(1);
+
+    one.close();
+    await settle();
+    expect(scripted.timesAsked('unsubscribe', SESSION)).toBe(0);
+
+    two.close();
+    await settle();
+    expect(scripted.timesAsked('unsubscribe', SESSION)).toBe(1);
+
+    await host.close();
+  });
+});
+
+describe('a dropped socket is a pause, not an ending', () => {
+  it('asks to resume where it left off, under the same name', async () => {
+    const states: string[] = [];
+    let scripted!: Scripted;
+    const open = async (): Promise<AhpTransport> => {
+      const [mine, theirs] = InMemoryTransport.pair();
+      scripted = new Scripted(theirs);
+      return mine;
+    };
+    const host = await liveHost({
+      url: 'ws://scripted',
+      clientId: 'ahpc-test',
+      connect: open,
+      backoff: [0],
+      keepaliveMs: 0,
+      onState: (state) => states.push(state),
+    });
+    const first = scripted;
+    first.states.set(SESSION, { defaultChat: CHAT, chats: [] });
+    first.states.set(CHAT, { turns: [] });
+    host.subscribe(SESSION as never, () => undefined);
+    await settle();
+    await first.act(SESSION, { type: 'session/isReadChanged', isRead: true });
+    await settle();
+
+    await first.drop();
+    await settle(40);
+
+    const asked = await scripted.reconnected;
+    expect(asked.params?.clientId).toBe('ahpc-test');
+    // The counter it had reached, not the one it started at: a resume that
+    // asks from zero is a client asking to be told everything again.
+    expect(asked.params?.lastSeenServerSeq).toBe(first.serverSeq);
+    expect(asked.params?.subscriptions).toContain(SESSION);
+    expect(asked.params?.subscriptions).toContain(ROOT);
+    expect(states).toContain('connecting');
+    expect(host.state()).toBe('connected');
+
+    await host.close();
+  });
+
+  it('applies what it missed, and does not subscribe again', async () => {
+    let scripted!: Scripted;
+    const open = async (): Promise<AhpTransport> => {
+      const [mine, theirs] = InMemoryTransport.pair();
+      scripted = new Scripted(theirs);
+      // The second connection answers with the turn that happened while the
+      // client was away.
+      if (scripted.asked.length === 0 && theirs) {
+        scripted.reconnectWith = {
+          type: 'replay',
+          actions: [{
+            channel: CHAT,
+            action: { type: 'chat/turnStarted', turnId: 't1', startedAt: new Date().toISOString(), message: { text: 'while you were out', origin: { kind: 'user' } } },
+            serverSeq: 99,
+          }],
+          missing: [],
+        };
+      }
+      return mine;
+    };
+    const host = await liveHost({
+      url: 'ws://scripted', clientId: 'ahpc-test', connect: open, backoff: [0], keepaliveMs: 0,
+    });
+    const first = scripted;
+    first.states.set(SESSION, { defaultChat: CHAT, chats: [] });
+    first.states.set(CHAT, { turns: [] });
+
+    const seen: HostEvent[] = [];
+    host.subscribe(SESSION as never, (event) => seen.push(event));
+    await settle();
+    const before = scripted.timesAsked('subscribe', CHAT);
+
+    await first.drop();
+    await settle(40);
+    await scripted.reconnected;
+    await settle();
+
+    // Replay is what a host sends *instead of* a snapshot, so the channels
+    // behind it are ones it restored itself.
+    expect(scripted.timesAsked('subscribe', CHAT)).toBe(0);
+    expect(before).toBe(1);
+    expect(seen.length).toBeGreaterThan(0);
+
+    await host.close();
+  });
+
+  it('rebuilds from a snapshot when the gap was too long to replay', async () => {
+    let scripted!: Scripted;
+    const open = async (): Promise<AhpTransport> => {
+      const [mine, theirs] = InMemoryTransport.pair();
+      scripted = new Scripted(theirs);
+      scripted.reconnectWith = {
+        type: 'snapshot',
+        snapshots: [
+          { resource: ROOT, state: { agents: [], terminals: [] }, fromSeq: 500 },
+          { resource: SESSION, state: { defaultChat: CHAT, chats: [], status: 2 }, fromSeq: 500 },
+        ],
+      };
+      return mine;
+    };
+    const host = await liveHost({
+      url: 'ws://scripted', clientId: 'ahpc-test', connect: open, backoff: [0], keepaliveMs: 0,
+    });
+    const first = scripted;
+    first.states.set(SESSION, { defaultChat: CHAT, chats: [] });
+    first.states.set(CHAT, { turns: [] });
+
+    const seen: HostEvent[] = [];
+    host.subscribe(SESSION as never, (event) => seen.push(event));
+    await settle();
+    seen.length = 0;
+
+    await first.drop();
+    await settle(40);
+    await scripted.reconnected;
+    await settle();
+
+    // The session came back in the snapshot; the chat did not, so it is the
+    // one channel that has to be asked for again.
+    expect(seen.length).toBeGreaterThan(0);
+    expect(scripted.timesAsked('subscribe', CHAT)).toBe(1);
+
+    await host.close();
+  });
+
+  it('starts again when the host has never heard of it', async () => {
+    let scripted!: Scripted;
+    const open = async (): Promise<AhpTransport> => {
+      const [mine, theirs] = InMemoryTransport.pair();
+      scripted = new Scripted(theirs);
+      // A daemon restarted between the drop and now: it holds no state for
+      // this client, and says so rather than resuming something it lost.
+      scripted.refuseReconnect = { code: -32008, message: 'Unknown client' };
+      return mine;
+    };
+    const host = await liveHost({
+      url: 'ws://scripted', clientId: 'ahpc-test', connect: open, backoff: [0], keepaliveMs: 0,
+    });
+    const first = scripted;
+    first.states.set(SESSION, { defaultChat: CHAT, chats: [] });
+    first.states.set(CHAT, { turns: [] });
+    host.subscribe(SESSION as never, () => undefined);
+    await settle();
+
+    await first.drop();
+    await settle(40);
+    await scripted.reconnected;
+    await settle();
+
+    // A refused resume is not a dead end: the connection is made again from
+    // the beginning, carrying the channels that were being held.
+    const hello = scripted.asked.find((frame) => frame.method === 'initialize');
+    expect(hello).toBeDefined();
+    expect(hello?.params?.initialSubscriptions).toContain(SESSION);
+    expect(host.state()).toBe('connected');
+
+    await host.close();
+  });
+
+  it('stops trying once it has been closed on purpose', async () => {
+    let opened = 0;
+    let scripted!: Scripted;
+    const open = async (): Promise<AhpTransport> => {
+      opened += 1;
+      const [mine, theirs] = InMemoryTransport.pair();
+      scripted = new Scripted(theirs);
+      return mine;
+    };
+    const host = await liveHost({
+      url: 'ws://scripted', clientId: 'ahpc-test', connect: open, backoff: [50], keepaliveMs: 0,
+    });
+    await settle();
+    expect(opened).toBe(1);
+
+    await host.close();
+    await settle(40);
+
+    // Hanging up is not a drop. A client that reconnects after being closed
+    // is one that will not let a person quit.
+    expect(opened).toBe(1);
+    expect(host.state()).toBe('offline');
+  });
+});
+
+describe('the catalogue is walked to its end', () => {
+  /** One row in the shape `summary()` reads. */
+  const row = (n: number): Record<string, unknown> => ({
+    resource: `ahp-session:/s${n}`,
+    provider: 'claude',
+    title: `Session ${n}`,
+    status: 1,
+    workingDirectories: ['file:///tmp'],
+    createdAt: new Date().toISOString(),
+    modifiedAt: new Date().toISOString(),
+  });
+
+  it('follows nextCursor instead of stopping at the first page', async () => {
+    const { host, scripted } = await connect();
+    // 123 is Softov's own catalogue, and the number this used to show 100 of.
+    scripted.catalogue = Array.from({ length: 123 }, (_, i) => row(i));
+
+    const rows = await host.listSessions();
+    expect(rows.length).toBe(123);
+    // Three pages of fifty, so three requests and no fourth.
+    expect(scripted.timesAsked('listSessions')).toBe(3);
+
+    await host.close();
+  });
+
+  it('says so when it stops short rather than showing a short list', async () => {
+    const said: string[] = [];
+    let scripted!: Scripted;
+    const open = async (): Promise<AhpTransport> => {
+      const [mine, theirs] = InMemoryTransport.pair();
+      scripted = new Scripted(theirs);
+      scripted.catalogue = Array.from({ length: 5000 }, (_, i) => row(i));
+      return mine;
+    };
+    const host = await liveHost({
+      url: 'ws://scripted',
+      clientId: 'ahpc-test',
+      connect: open,
+      backoff: [0],
+      keepaliveMs: 0,
+      onLimit: (message) => said.push(message),
+    });
+
+    const rows = await host.listSessions();
+    // Twenty pages of fifty, and a sentence about the rest.
+    expect(rows.length).toBe(1000);
+    expect(said.length).toBe(1);
+    expect(said[0]).toContain('has more');
+
+    await host.close();
+  });
+});
+
+describe('an expected answer is not reported as a fault', () => {
+  it('does not ask for automations a host never advertised', async () => {
+    const { host, scripted } = await connect();
+    await settle();
+
+    // Presence of `InitializeResult.automations` is what permits the channel,
+    // so its absence is the answer and asking anyway is a known refusal.
+    expect(scripted.timesAsked('subscribe', AUTOMATIONS)).toBe(0);
+
+    await host.close();
+  });
+
+  it('asks where the host did advertise them', async () => {
+    let scripted!: Scripted;
+    const open = async (): Promise<AhpTransport> => {
+      const [mine, theirs] = InMemoryTransport.pair();
+      scripted = new Scripted(theirs);
+      scripted.automations = true;
+      return mine;
+    };
+    const host = await liveHost({
+      url: 'ws://scripted', clientId: 'ahpc-test', connect: open, backoff: [0], keepaliveMs: 0,
+    });
+    await settle();
+
+    expect(scripted.timesAsked('subscribe', AUTOMATIONS)).toBe(1);
+
+    await host.close();
+  });
+
+  it('keeps a refusal a reader claimed out of the connection report', async () => {
+    const reported: string[] = [];
+    let scripted!: Scripted;
+    const open = async (): Promise<AhpTransport> => {
+      const [mine, theirs] = InMemoryTransport.pair();
+      scripted = new Scripted(theirs);
+      // A session in the catalogue whose channel the host will not serve -
+      // which is the ordinary case against a host that lists more than it
+      // will open.
+      scripted.refuse.set(SESSION, 'No agent for session: ' + SESSION);
+      return mine;
+    };
+    const host = await liveHost({
+      url: 'ws://scripted',
+      clientId: 'ahpc-test',
+      connect: open,
+      backoff: [0],
+      keepaliveMs: 0,
+      onRefusal: (_uri, message) => reported.push(message),
+    });
+
+    const seen: HostEvent[] = [];
+    host.subscribe(SESSION as never, (event) => seen.push(event));
+    await settle();
+
+    // The transcript says so, because that is where a person is looking.
+    expect(seen.some((event) => event.type === 'error')).toBe(true);
+    // The connection does not, because it was not the connection's to report.
+    expect(reported).toEqual([]);
+
+    await host.close();
+  });
+});
+
+describe('history is read past the window a host opened with', () => {
+  const turn = (n: number): Record<string, unknown> => ({
+    id: `t${n}`,
+    startedAt: new Date().toISOString(),
+    message: { text: `turn ${n}`, origin: { kind: 'user' } },
+  });
+
+  it('asks for the page behind the window, carrying the host cursor', async () => {
+    const { host, scripted } = await connect();
+    scripted.states.set(SESSION, { defaultChat: CHAT, chats: [] });
+    scripted.states.set(CHAT, { turns: [turn(9)], turnsNextCursor: 'c4' });
+    scripted.behind = [turn(5), turn(6), turn(7), turn(8)];
+
+    // Two behind remain after one page of two, so it says there is more.
+    expect(await host.loadOlderTurns(SESSION as never)).toBe(true);
+    expect(scripted.fetched).toEqual(['c4']);
+
+    // And nothing remains after the second, so it says so.
+    expect(await host.loadOlderTurns(SESSION as never)).toBe(false);
+    expect(scripted.fetched.length).toBe(2);
+
+    await host.close();
+  });
+
+  it('asks once on opening when the host sent an empty window', async () => {
+    const { host, scripted } = await connect();
+    scripted.states.set(SESSION, { defaultChat: CHAT, chats: [] });
+    // What VS Code's host does: the channel resolves, the window is empty,
+    // and a cursor says the conversation is there for the asking.
+    scripted.states.set(CHAT, { turns: [], turnsNextCursor: 'c2' });
+    scripted.behind = [turn(1), turn(2)];
+
+    host.subscribe(SESSION as never, () => undefined);
+    await settle();
+
+    // Without this the transcript is blank and no amount of waiting fills it.
+    expect(scripted.fetched).toEqual(['c2']);
+
+    await host.close();
+  });
+
+  it('leaves a chat that arrived with turns alone', async () => {
+    const { host, scripted } = await connect();
+    scripted.states.set(SESSION, { defaultChat: CHAT, chats: [] });
+    scripted.states.set(CHAT, { turns: [turn(9)], turnsNextCursor: 'c1' });
+    scripted.behind = [turn(8)];
+
+    host.subscribe(SESSION as never, () => undefined);
+    await settle();
+
+    // Reading further back is the person's business, not this client's.
+    expect(scripted.fetched).toEqual([]);
+
+    await host.close();
+  });
+});
+
+describe('the one thing that moved between 0.9.0 and 1.0.0', () => {
+  /*
+   * Everything else this client reads is byte-identical across the two
+   * versions - 96 action types, 41 method names, and the fields of
+   * `ChatState`, `Turn`, `ActiveTurn`, `SessionState` and `RootState`. What
+   * moved is the automations catalogue: `entries` under 0.9.0 and
+   * `automations` under 1.0.0, holding the very same automation shape.
+   */
+  const one = {
+    resource: 'ahp-automation:/a1',
+    definition: { name: 'Nightly', enabled: true, trigger: { kind: 'schedule', expression: '0 2 * * *' } },
+    runs: [],
+    createdAt: new Date().toISOString(),
+    modifiedAt: new Date().toISOString(),
+  };
+
+  const open = (state: Record<string, unknown>) => async (): Promise<AhpTransport> => {
+    const [mine, theirs] = InMemoryTransport.pair();
+    const scripted = new Scripted(theirs);
+    scripted.automations = true;
+    scripted.states.set(AUTOMATIONS, state);
+    return mine;
+  };
+
+  it('reads a 0.9.0 catalogue', async () => {
+    const host = await liveHost({
+      url: 'ws://scripted', clientId: 'ahpc-test', connect: open({ entries: [one] }),
+      backoff: [0], keepaliveMs: 0,
+    });
+    await settle();
+    expect((await host.automations?.() ?? []).length).toBe(1);
+    await host.close();
+  });
+
+  it('reads a 1.0.0 catalogue, which is the one this client negotiates with VS Code', async () => {
+    const host = await liveHost({
+      url: 'ws://scripted', clientId: 'ahpc-test', connect: open({ automations: [one] }),
+      backoff: [0], keepaliveMs: 0,
+    });
+    await settle();
+    expect((await host.automations?.() ?? []).length).toBe(1);
+    await host.close();
+  });
+});
+
+describe('the first snapshot is not sent before the conversation is in it', () => {
+  const turn = (n: number): Record<string, unknown> => ({
+    id: `t${n}`,
+    startedAt: new Date().toISOString(),
+    message: { text: `turn ${n}`, origin: { kind: 'user' } },
+  });
+
+  it('carries the turns, because a reader that takes the first one and stops gets them', async () => {
+    const { host, scripted } = await connect();
+    scripted.states.set(SESSION, { defaultChat: CHAT, chats: [] });
+    scripted.states.set(CHAT, { turns: [turn(1), turn(2)] });
+
+    // A session and its chat are two channels and the session answers first.
+    // `session history` takes the first snapshot and closes, so a snapshot
+    // emitted in between is one that reports an empty conversation.
+    const first = await new Promise<HostEvent>((resolve) => {
+      const view = host.subscribe(SESSION as never, (event) => {
+        if (event.type === 'snapshot') { resolve(event); view.close(); }
+      });
+    });
+
+    expect(first.type).toBe('snapshot');
+    // Not a count: the transcript splits a turn into what was said and what
+    // answered. What matters is that it is not empty, which is what it was.
+    expect(first.type === 'snapshot' && first.turns.length > 0).toBe(true);
+
+    await host.close();
+  });
+
+  it('still answers for a session that has no chat to wait for', async () => {
+    const { host, scripted } = await connect();
+    scripted.states.set(SESSION, { chats: [] });
+
+    const first = await new Promise<HostEvent>((resolve) => {
+      const view = host.subscribe(SESSION as never, (event) => {
+        if (event.type === 'snapshot') { resolve(event); view.close(); }
+      });
+    });
+    expect(first.type).toBe('snapshot');
+
+    await host.close();
+  });
+});
+
+describe('a channel is not let go the instant a screen closes', () => {
+  it('keeps it across a close and a reopen, so no unsubscribe lands in between', async () => {
+    let scripted!: Scripted;
+    const open = async (): Promise<AhpTransport> => {
+      const [mine, theirs] = InMemoryTransport.pair();
+      scripted = new Scripted(theirs);
+      return mine;
+    };
+    const host = await liveHost({
+      url: 'ws://scripted', clientId: 'ahpc-test', connect: open,
+      backoff: [0], keepaliveMs: 0, lingerMs: 5_000,
+    });
+    scripted.states.set(SESSION, { defaultChat: CHAT, chats: [] });
+    scripted.states.set(CHAT, { turns: [] });
+
+    const first = host.subscribe(SESSION as never, () => undefined);
+    await settle();
+    first.close();
+    await settle();
+
+    /*
+     * The reference host evicts a session from memory when its last
+     * subscriber leaves and restores it from disk on the next subscribe, so a
+     * client that unsubscribes and immediately subscribes again is racing
+     * that restore - and losing it looks like `-32001` on a session that was
+     * open a moment ago.
+     */
+    expect(scripted.timesAsked('unsubscribe', SESSION)).toBe(0);
+
+    const second = host.subscribe(SESSION as never, () => undefined);
+    await settle();
+    expect(scripted.timesAsked('unsubscribe', SESSION)).toBe(0);
+
+    second.close();
+    await host.close();
+  });
+
+  it('lets it go once nobody has come back for it', async () => {
+    let scripted!: Scripted;
+    const open = async (): Promise<AhpTransport> => {
+      const [mine, theirs] = InMemoryTransport.pair();
+      scripted = new Scripted(theirs);
+      return mine;
+    };
+    const host = await liveHost({
+      url: 'ws://scripted', clientId: 'ahpc-test', connect: open,
+      backoff: [0], keepaliveMs: 0, lingerMs: 20,
+    });
+    scripted.states.set(SESSION, { defaultChat: CHAT, chats: [] });
+    scripted.states.set(CHAT, { turns: [] });
+
+    const view = host.subscribe(SESSION as never, () => undefined);
+    await settle();
+    view.close();
+    await new Promise((resolve) => { setTimeout(resolve, 60); });
+
+    // Waiting is a pause before letting go, not a refusal to.
+    expect(scripted.timesAsked('unsubscribe', SESSION)).toBe(1);
+
+    await host.close();
+  });
+});
+
+describe('reading a snapshot and opening the view do not let go in between', () => {
+  it('sends no unsubscribe between the detail read and the subscription', async () => {
+    let scripted!: Scripted;
+    const open = async (): Promise<AhpTransport> => {
+      const [mine, theirs] = InMemoryTransport.pair();
+      scripted = new Scripted(theirs);
+      return mine;
+    };
+    const host = await liveHost({
+      url: 'ws://scripted', clientId: 'ahpc-test', connect: open,
+      backoff: [0], keepaliveMs: 0, lingerMs: 5_000,
+    });
+    scripted.states.set(SESSION, { defaultChat: CHAT, chats: [] });
+    scripted.states.set(CHAT, { turns: [] });
+
+    // What opening a session does: read what the host says about it, then
+    // watch it. The reference host evicts a session when its last subscriber
+    // leaves, so an `unsubscribe` in this gap is the session being torn down
+    // and rebuilt underneath the view that is about to ask for it.
+    await host.detail(SESSION as never);
+    const view = host.subscribe(SESSION as never, () => undefined);
+    await settle();
+
+    expect(scripted.timesAsked('unsubscribe', SESSION)).toBe(0);
+
+    view.close();
+    await host.close();
+  });
+
+  it('tries again when a session that was refused is opened on purpose', async () => {
+    let scripted!: Scripted;
+    const open = async (): Promise<AhpTransport> => {
+      const [mine, theirs] = InMemoryTransport.pair();
+      scripted = new Scripted(theirs);
+      scripted.refuse.set(SESSION, 'Resource not found: ' + SESSION);
+      return mine;
+    };
+    const host = await liveHost({
+      url: 'ws://scripted', clientId: 'ahpc-test', connect: open,
+      backoff: [0], keepaliveMs: 0, lingerMs: 0,
+    });
+
+    const one = host.subscribe(SESSION as never, () => undefined);
+    await settle();
+    one.close();
+    await settle();
+    const refusals = scripted.timesAsked('subscribe', SESSION);
+
+    // The host has changed its mind - which is what a momentary eviction is.
+    scripted.refuse.delete(SESSION);
+    scripted.states.set(SESSION, { defaultChat: CHAT, chats: [] });
+    scripted.states.set(CHAT, { turns: [] });
+
+    const seen: HostEvent[] = [];
+    const two = host.subscribe(SESSION as never, (event) => seen.push(event));
+    await settle();
+
+    // Asked again rather than replaying the refusal it remembered.
+    expect(scripted.timesAsked('subscribe', SESSION)).toBeGreaterThan(refusals);
+    expect(seen.some((event) => event.type === 'snapshot')).toBe(true);
+
+    two.close();
+    await host.close();
+  });
+});
+
+describe('an action the host refuses is not an action that happened', () => {
+  const started = (id: string): Record<string, unknown> => ({
+    type: 'chat/turnStarted',
+    turnId: id,
+    startedAt: new Date().toISOString(),
+    message: { text: `turn ${id}`, origin: { kind: 'user' } },
+  });
+
+  /** How much conversation the last snapshot had, which is what a rejection must not change. */
+  const counted = (events: HostEvent[]): number => {
+    const last = [...events].reverse().find((event) => event.type === 'snapshot');
+    if (last?.type !== 'snapshot') return 0;
+    return last.turns.length + (last.active === undefined ? 0 : 1);
+  };
+
+  async function watching(): Promise<{
+    host: Awaited<ReturnType<typeof liveHost>>;
+    scripted: Scripted;
+    seen: HostEvent[];
+    reported: string[];
+  }> {
+    const reported: string[] = [];
+    let scripted!: Scripted;
+    const open = async (): Promise<AhpTransport> => {
+      const [mine, theirs] = InMemoryTransport.pair();
+      scripted = new Scripted(theirs);
+      scripted.states.set(SESSION, { defaultChat: CHAT, chats: [] });
+      scripted.states.set(CHAT, { turns: [] });
+      return mine;
+    };
+    const host = await liveHost({
+      url: 'ws://scripted',
+      clientId: 'ahpc-test',
+      connect: open,
+      backoff: [0],
+      keepaliveMs: 0,
+      lingerMs: 0,
+      onRefusal: (_uri, message) => reported.push(message),
+    });
+    const seen: HostEvent[] = [];
+    host.subscribe(SESSION as never, (event) => seen.push(event));
+    await settle();
+    return { host, scripted, seen, reported };
+  }
+
+  it('says why, and leaves the state where the host left it', async () => {
+    const { host, scripted, seen, reported } = await watching();
+
+    // The same action twice: once refused, once not. Without the second half
+    // this asserts nothing - an action that would not have applied anyway
+    // looks exactly like one that was correctly dropped.
+    await scripted.reject(CHAT, started('t1'), 'This chat is busy.');
+    await settle();
+    expect(reported).toEqual(['This chat is busy.']);
+    expect(counted(seen)).toBe(0);
+
+    await scripted.act(CHAT, started('t2'));
+    await settle();
+    expect(counted(seen)).toBeGreaterThan(0);
+
+    await host.close();
+  });
+
+  it('keeps somebody else\'s refusal to itself', async () => {
+    const { host, scripted, seen, reported } = await watching();
+
+    // A host that sends a rejection to everyone watching rather than to the
+    // client that dispatched it. Still not applied - it is an action nobody
+    // took - and still not shown, because nobody here asked for it.
+    await scripted.reject(CHAT, started('t1'), 'This chat is busy.', 'somebody-else');
+    await settle();
+
+    expect(reported).toEqual([]);
+    expect(counted(seen)).toBe(0);
+
+    await host.close();
+  });
+});
+
+describe('one channel is asked for once, however many readers want it', () => {
+  it('shares a subscribe between a detail read and the view opened on it', async () => {
+    const { host, scripted } = await connect();
+    scripted.states.set(SESSION, { defaultChat: CHAT, chats: [], lifecycle: 'ready' });
+    scripted.states.set(CHAT, { turns: [] });
+    // The session restores from disk rather than answering at once, which is
+    // the window both readers land in.
+    scripted.slow.add(SESSION);
+
+    const reading = host.detail(SESSION as never);
+    const seen: HostEvent[] = [];
+    host.subscribe(SESSION as never, (event) => seen.push(event));
+    await settle(3);
+
+    // Two would be one refused. This is the whole defect: the host answers a
+    // superseded subscribe with `-32001` naming a channel it is serving.
+    expect(scripted.timesAsked('subscribe', SESSION)).toBe(1);
+
+    await scripted.release();
+    await settle();
+
+    // Both readers are answered from the one subscribe: the pane has the
+    // session, and the view has been handed its state rather than left to
+    // wait for a snapshot nobody was going to send it.
+    expect((await reading).lifecycle).toBe('ready');
+    expect(seen.some((event) => event.type === 'snapshot')).toBe(true);
+    expect(seen.some((event) => event.type === 'error')).toBe(false);
+
+    await host.close();
+  });
+
+  it('reads the same row twice without refusing itself', async () => {
+    const { host, scripted } = await connect();
+    scripted.states.set(SESSION, { defaultChat: CHAT, chats: [], lifecycle: 'ready' });
+    scripted.states.set(CHAT, { turns: [] });
+    scripted.slow.add(SESSION);
+
+    // A highlight moved off a row and back while the first read is still out.
+    const first = host.detail(SESSION as never);
+    const second = host.detail(SESSION as never);
+    await settle(3);
+    expect(scripted.timesAsked('subscribe', SESSION)).toBe(1);
+
+    await scripted.release();
+    await settle();
+
+    expect((await first).lifecycle).toBe('ready');
+    expect((await second).lifecycle).toBe('ready');
+    // And nothing was cached as refused, which is what made the pane stay
+    // broken for the rest of the connection.
+    expect((await first).refusal).toBeUndefined();
+
+    await host.close();
+  });
+});

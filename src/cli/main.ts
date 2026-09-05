@@ -17,7 +17,7 @@ Sessions
   session show <uri>           what the host says about one  [--full] [--json]
   session new                  start one   [--agent P] [--cwd DIR] [--set k=v]… [--json]
   session rm <uri>             dispose it
-  session history <uri>        its turns                     [--full] [--json]
+  session history <uri>        its turns               [--all] [--full] [--json]
   session config <uri>         the schema and what is in force        [--json]
   session set <uri> <k> <v>    change one config key
   session read <uri>           mark read                     [--unread]
@@ -142,7 +142,7 @@ class Args {
 
 /** Flags that take no value, so a positional after one is still a positional. */
 const SWITCHES = new Set([
-  '--json', '--full', '--archived', '--unread', '--undo', '--off', '--deny',
+  '--json', '--full', '--all', '--archived', '--unread', '--undo', '--off', '--deny',
   '--reject', '--claude', '--chat',
 ]);
 
@@ -253,6 +253,15 @@ async function settled<T>(
     });
   });
 }
+
+/**
+ * How many pages of history `--all` will walk.
+ *
+ * A bound rather than a promise: a conversation somebody has been having for
+ * a year is one this would otherwise read to the end of before printing a
+ * line, and stopping is better than appearing to hang.
+ */
+const PAGES = 100;
 
 /** One session's snapshot, and nothing after it. */
 const snapshot = async (host: HostConnection, uri: SessionUri): Promise<Extract<HostEvent, { type: 'snapshot' }> | undefined> => {
@@ -655,6 +664,20 @@ async function sessions(host: HostConnection, args: Args, wants: boolean): Promi
       return 0;
     }
     case 'history': {
+      /*
+       * Everything the host will give, when asked for it.
+       *
+       * A snapshot is a tail window on one host and nothing at all on
+       * another, so without this the command prints whatever happened to
+       * arrive - which against a host that sends no turns is an empty list
+       * and no sign that a conversation is there. Bounded, because `--all` is
+       * a person asking for a long read and not for an unbounded one.
+       */
+      if (args.has('--all')) {
+        for (let page = 0; page < PAGES; page += 1) {
+          if (!await host.loadOlderTurns(uri)) break;
+        }
+      }
       const shot = await snapshot(host, uri);
       if (!shot) throw new Fault('The host sent no snapshot for that session.');
       const all = [...shot.turns, ...(shot.active ? [shot.active] : [])];

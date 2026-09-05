@@ -152,9 +152,21 @@ const SOURCES: Record<string, string> = {
   'test/smoke.test.tsx': "import { it } from 'vitest';\n\nit('draws something', () => {});\n",
 };
 
+/** How many held-back turns the scripted host hands over at a time. */
+const PAGE = 10;
+
 export function fakeHost(): FakeHost {
   const summaries = new Map<SessionUri, SessionSummary>();
   const turns = new Map<SessionUri, Turn[]>();
+  /**
+   * Turns this host has but has not handed over, oldest last.
+   *
+   * A real host sends a tail window and a cursor for the rest, so a client
+   * that never asks sees a conversation that starts partway through. Holding
+   * some back here is what lets that be tested against the scripted host
+   * rather than only against a daemon.
+   */
+  const older = new Map<SessionUri, Turn[]>();
   const active = new Map<SessionUri, Turn>();
   const inputs = new Map<SessionUri, PendingInput>();
   const changesets = new Map<SessionUri, Changeset>();
@@ -427,6 +439,8 @@ export function fakeHost(): FakeHost {
     /** What started it, when it was not a person. */
     origin?: { kind: 'automation'; automation: string; run: string };
     turns?: Turn[];
+    /** Turns behind the window, oldest last, fetched a page at a time. */
+    older?: Turn[];
     active?: Turn;
     input?: PendingInput;
     changes?: Changeset;
@@ -436,6 +450,7 @@ export function fakeHost(): FakeHost {
       | (options.archived ? SessionFlag.IsArchived : 0));
     if (options.failed) failed.add(id);
     turns.set(id, options.turns ?? []);
+    older.set(id, options.older ?? []);
     if (options.active) active.set(id, options.active);
     if (options.input) inputs.set(id, options.input);
     if (options.changes) {
@@ -1414,6 +1429,24 @@ export function fakeHost(): FakeHost {
       // doing that to shed a duplicate is what kills the stream everything
       // else is reading.
       return { close: () => { set?.delete(observer); } };
+    },
+
+    loadOlderTurns: async (uri) => {
+      const behind = older.get(uri) ?? [];
+      if (behind.length === 0) return false;
+      // A page, oldest last: the ones nearest the loaded window come first,
+      // which is the order a host hands them back in.
+      const page = behind.splice(-PAGE);
+      turns.set(uri, [...page, ...(turns.get(uri) ?? [])]);
+      emit(uri, {
+        type: 'snapshot',
+        turns: turns.get(uri) ?? [],
+        ...(active.get(uri) ? { active: active.get(uri) as Turn } : {}),
+        ...(inputs.get(uri) ? { input: inputs.get(uri) as PendingInput } : {}),
+        status: statusOf(uri),
+        queued: queues.get(uri) ?? [],
+      });
+      return behind.length > 0;
     },
 
     say: (uri, text) => { reply(uri, text); },

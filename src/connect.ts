@@ -47,6 +47,7 @@ export async function connect(options: Where): Promise<HostConnection & { pump?(
       url: options.host,
       ...(options.token ? { token: options.token } : {}),
       onRefusal: (_uri, message) => sink.report(message),
+      onLimit: (message) => sink.report(message),
       onState: (state) => { if (state === 'offline') sink.report('The host stopped answering'); },
     });
   }
