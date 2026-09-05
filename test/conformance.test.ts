@@ -263,4 +263,21 @@ describe('every command that declares its channel is sent on that channel', () =
     }
     expect(wrong).toEqual([]);
   });
+
+  it('never lets a spread land after the constant it would override', async () => {
+    /*
+     * `{ channel: ROOT, ...params }` is a shape where a caller's own `channel`
+     * silently wins over the declared one. No caller passes one, which is why
+     * it survives review: what is wrong is that the site permits it at all.
+     * `{ ...params, channel: ROOT }` cannot.
+     */
+    const live = await readFile('src/ahp/live.ts', 'utf8');
+    // A spread of a *name* - somebody's object, whose keys are not visible
+    // here. `...(cond ? { k: v } : {})` is a literal and carries only what is
+    // written next to it, so it is not the shape this is about.
+    // Stopped at the end of the object literal, so a spread in the *next*
+    // statement is not read as being in this one.
+    const sites = [...live.matchAll(/channel: (?:ROOT|AUTOMATIONS)(?:(?!\}\))[\s\S]){0,200}?\.\.\.[A-Za-z_$]/g)];
+    expect(sites.map((one) => one[0].split('\n')[0])).toEqual([]);
+  });
 });

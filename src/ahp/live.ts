@@ -2655,7 +2655,16 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
     },
 
     requestResource: async (uri, access) => {
-      await client.request('resourceRequest', { channel: ROOT, uri, ...access });
+      /*
+       * The spread first, so it cannot be the thing that gets this wrong.
+       *
+       * `resourceRequest` declares `channel` as the literal `ahp-root://`, and
+       * a spread *after* a constant is a shape where a caller's own `channel`
+       * silently wins. No caller passes one today; the ordering is what stops
+       * the day one does from being a wrong constant that a lenient host
+       * answers happily.
+       */
+      await client.request('resourceRequest', { ...access, channel: ROOT, uri });
     },
 
     /**
