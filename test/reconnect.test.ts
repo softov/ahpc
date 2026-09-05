@@ -42,6 +42,10 @@ class Scripted {
   catalogue: Record<string, unknown>[] = [];
   /** Whether `initialize` advertises the automations capability. */
   automations = false;
+  /** Turns this host is holding behind the window, oldest last. */
+  behind: unknown[] = [];
+  /** The cursor sent with each `fetchTurns`, in order. */
+  readonly fetched: string[] = [];
   /** What the next `reconnect` answers. */
   reconnectWith: Record<string, unknown> = { type: 'replay', actions: [], missing: [] };
   /** An error to answer `reconnect` with instead, as a restarted host does. */
@@ -139,6 +143,24 @@ class Scripted {
         return;
       }
       await reply({ snapshot: { resource: channel, state: this.states.get(channel) ?? {}, fromSeq: this.seq } });
+      return;
+    }
+    if (method === 'fetchTurns') {
+      this.fetched.push(String(message.params?.cursor ?? ''));
+      const chat = this.states.get(CHAT) ?? {};
+      const loaded = (chat.turns as unknown[] | undefined) ?? [];
+      const page = this.behind.splice(-2);
+      // A host inserts the turns into state and updates the cursor *before*
+      // it answers, which is the whole reason the result is empty.
+      // Rebuilt rather than spread over: the host MUST *clear* the cursor when
+      // the last page has gone, and spreading the old state carries it.
+      const { turnsNextCursor: _gone, ...rest } = chat as Record<string, unknown>;
+      this.states.set(CHAT, {
+        ...rest,
+        turns: [...page, ...loaded],
+        ...(this.behind.length > 0 ? { turnsNextCursor: `c${this.behind.length}` } : {}),
+      });
+      await reply({});
       return;
     }
     if (method === 'listSessions') {
@@ -527,6 +549,63 @@ describe('an expected answer is not reported as a fault', () => {
     expect(seen.some((event) => event.type === 'error')).toBe(true);
     // The connection does not, because it was not the connection's to report.
     expect(reported).toEqual([]);
+
+    await host.close();
+  });
+});
+
+describe('history is read past the window a host opened with', () => {
+  const turn = (n: number): Record<string, unknown> => ({
+    id: `t${n}`,
+    startedAt: new Date().toISOString(),
+    message: { text: `turn ${n}`, origin: { kind: 'user' } },
+  });
+
+  it('asks for the page behind the window, carrying the host cursor', async () => {
+    const { host, scripted } = await connect();
+    scripted.states.set(SESSION, { defaultChat: CHAT, chats: [] });
+    scripted.states.set(CHAT, { turns: [turn(9)], turnsNextCursor: 'c4' });
+    scripted.behind = [turn(5), turn(6), turn(7), turn(8)];
+
+    // Two behind remain after one page of two, so it says there is more.
+    expect(await host.loadOlderTurns(SESSION as never)).toBe(true);
+    expect(scripted.fetched).toEqual(['c4']);
+
+    // And nothing remains after the second, so it says so.
+    expect(await host.loadOlderTurns(SESSION as never)).toBe(false);
+    expect(scripted.fetched.length).toBe(2);
+
+    await host.close();
+  });
+
+  it('asks once on opening when the host sent an empty window', async () => {
+    const { host, scripted } = await connect();
+    scripted.states.set(SESSION, { defaultChat: CHAT, chats: [] });
+    // What VS Code's host does: the channel resolves, the window is empty,
+    // and a cursor says the conversation is there for the asking.
+    scripted.states.set(CHAT, { turns: [], turnsNextCursor: 'c2' });
+    scripted.behind = [turn(1), turn(2)];
+
+    host.subscribe(SESSION as never, () => undefined);
+    await settle();
+
+    // Without this the transcript is blank and no amount of waiting fills it.
+    expect(scripted.fetched).toEqual(['c2']);
+
+    await host.close();
+  });
+
+  it('leaves a chat that arrived with turns alone', async () => {
+    const { host, scripted } = await connect();
+    scripted.states.set(SESSION, { defaultChat: CHAT, chats: [] });
+    scripted.states.set(CHAT, { turns: [turn(9)], turnsNextCursor: 'c1' });
+    scripted.behind = [turn(8)];
+
+    host.subscribe(SESSION as never, () => undefined);
+    await settle();
+
+    // Reading further back is the person's business, not this client's.
+    expect(scripted.fetched).toEqual([]);
 
     await host.close();
   });

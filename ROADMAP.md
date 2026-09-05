@@ -26,19 +26,9 @@ The host's roadmap says a gap is found by diffing the protocol's sources on ever
 
 **Read what the host actually answers, not what the seam asked for.** `listSessions` asked for a hundred rows for the life of this client, and the number was invisible from every screen: the catalogue looked complete because a hundred was more than anybody had. It stopped being invisible when the catalogue on the other side grew past it. A limit this client sets is a limit only this client can see.
 
-**Point it at a host that is not ours.** One evening against VS Code's agent host produced more findings than any amount of reading did: an expected refusal printing on every command, a protocol version negotiated that this client has no implementation of, and a transcript that comes back empty because the snapshot carries no turns. Two of those are entries below and none of them was visible against ahpd, because ahpd and ahpc agree with each other by construction.
+**Point it at a host that is not ours.** One evening against VS Code's agent host produced more findings than any amount of reading did: an expected refusal printing on every command, a transcript that came back empty because the snapshot carried no turns and this client never read the cursor offering them, and a protocol version negotiated that this client has no implementation of. Two are fixed and one is the entry below; none of the three was visible against ahpd, because ahpd and ahpc agree with each other by construction.
 
 ---
-
-## B-01-08 - Against a VS Code host, no conversation can be read at all
-
-`fetchTurns` is not called anywhere in this client, and no screen offers to load more. History is whatever arrived in the subscription snapshot.
-
-**How big that is depends on the host, and one of them sends none.** ahpd puts the newest fifty turns in the snapshot, which made this look like a paging entry: the fifty-first turn back was unreachable and the rest was fine. Against VS Code's agent host, `session history` on three different sessions printed no turns and no fault - the channel resolved and the snapshot carried nothing. So on that host the snapshot is not a short history, it is no history, and `fetchTurns` is not the way to read *more* of a conversation but the only way to read *any* of it.
-
-**What it costs today.** Against ahpd, a session's own beginning - the message that started it, the one a person scrolls up to find - is the first thing to fall off. Against a host that sends no turns in the snapshot, the transcript is empty and this client has no way to fill it.
-
-**Suggestions.** (1) `loadOlderTurns(uri)` on the seam, driven by a scroll to the top of the transcript and by `session history --all` on the command line. The turns come back as `chat/turnsLoaded`, which is an action, so the reducer path that already exists handles them and no second way of getting a turn onto the screen is invented. (2) The same, plus one automatic fetch when a chat opens on a host whose snapshot was empty - which is what makes it work against VS Code rather than merely better against ahpd. (3) Fetch the whole history whenever a session is opened, which is simpler and is a client deciding to download a year of somebody's conversation because they clicked on it.
 
 ## B-02-02 - This client offers a protocol version it cannot speak
 
@@ -48,7 +38,7 @@ The host's roadmap says a gap is found by diffing the protocol's sources on ever
 
 **So the decision stands and the exposure is real.** If a 1.0.0 host answers `1.0.0`, this client proceeds under a version whose wire format it has never seen, using a library built for 0.9.0.
 
-**What it costs today, now that it has been run.** This was written as a risk with nothing observed behind it. It has since been exercised: connected to VS Code's agent host, this client negotiated `1.0.0` and read every answer with 0.9.0 code. The catalogue came back and rendered; the transcripts came back empty (`B-01-08`). Whether those empty transcripts are a host that expects `fetchTurns` or a field that moved between the two versions cannot be told apart from here, and that is exactly the failure mode this entry predicted - it does not look like a version problem, it looks like a screen that is wrong.
+**What it costs today, now that it has been run.** This was written as a risk with nothing observed behind it. It has since been exercised: connected to VS Code's agent host, this client negotiated `1.0.0` and read every answer with 0.9.0 code. The catalogue came back and rendered; the transcripts came back empty. That second symptom is now believed to be a snapshot carrying no turns and a `turnsNextCursor` nobody read, and `fetchTurns` has since shipped - but *believed* is the word, because it has not been run against that host since. If the transcripts are still empty, the remaining explanation is this entry, and that is exactly the failure mode it predicted: it does not look like a version problem, it looks like a screen that is wrong.
 
 **Suggestions.** (1) Find out what 1.0.0 actually changed and either implement it or stop offering it - the delta is readable in the local MIT-licensed checkout, and this is the host roadmap's `Q-001` seen from the other side. Until somebody reads it, every other option here is a guess. (2) Keep offering it and *say so*: record in this file and in the comment that the claim being made is "we believe 0.9.0 and 1.0.0 differ in nothing this client reads", which is a claim somebody can check rather than a list somebody can misread. (3) Drop `1.0.0` and accept `-32005` from VS Code's host, which is honest, conformant, and gives up the only third-party host in existence.
 

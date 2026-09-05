@@ -150,6 +150,13 @@ export interface Controller {
   /** One file out of a changeset, fetched. Nothing calls it until a row opens. */
   content(ref: ContentRef): Promise<FileContent>;
   /**
+   * Pull the page of history before the turns on screen.
+   *
+   * Answers whether there is still more behind it, so a transcript that has
+   * reached the beginning stops asking.
+   */
+  loadOlderTurns(uri: SessionUri): Promise<boolean>;
+  /**
    * What the host will answer questions about, here and now.
    *
    * One call, because "here and now" has two answers and the caller should not
@@ -652,6 +659,7 @@ export function createController(
     harnessCommands: () => host.harnessCommands(),
     setCustomizationEnabled: (uri, id, enabled) => host.setCustomizationEnabled(uri, id, enabled),
     content: (ref) => host.content(ref),
+    loadOlderTurns: (uri) => host.loadOlderTurns(uri),
     files: async (uri) => (await host.resourceList?.(uri)) ?? [],
     file: async (uri) => {
       if (!host.resourceRead) throw new Error('This host serves no files.');

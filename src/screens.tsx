@@ -633,9 +633,33 @@ export const ChatScreen: (props: Record<string, never>) => RenderOutput =
       app.store.set(EXPANDED, { ...expanded, [id]: !expanded[id] });
     }, [expanded, controller, app]);
 
+    /*
+     * Reaching the top of the transcript asks for what is above it.
+     *
+     * The cursor arriving at the first block is the only "scrolled to the
+     * beginning" signal there is here - `Feed` owns the viewport and reports
+     * the selection, not the offset - and it is a good enough one: a person
+     * at the oldest turn on screen is a person looking for the one before it.
+     *
+     * `busy` keeps a second request from going out while the first is in
+     * flight, and `done` stops asking once the host has said there is nothing
+     * behind what is loaded. Both are per open session, which is what the
+     * dependency is for.
+     */
+    const uri = session?.resource ?? null;
+    const paging = useMemo(() => ({ busy: false, done: false }), [uri]);
+
     // `useStore` hands back a fresh setter every render, which is a changed
     // prop every render.
-    const onCursor = useMemo(() => (next: number) => setCursor(next), []);
+    const onCursor = useMemo(() => (next: number) => {
+      setCursor(next);
+      if (next !== 0 || uri === null || paging.busy || paging.done) return;
+      paging.busy = true;
+      void controller.loadOlderTurns(uri)
+        .then((more) => { paging.done = !more; })
+        .catch(() => { paging.done = true; })
+        .finally(() => { paging.busy = false; });
+    }, [uri, paging, controller]);
 
     if (!session) {
       return <EmptyState title="No session open" message="Open one from the catalogue." flex={1} />;

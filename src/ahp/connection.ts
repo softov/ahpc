@@ -77,6 +77,26 @@ export interface HostConnection {
   subscribe(uri: SessionUri, observer: (event: HostEvent) => void, chat?: string): { close(): void };
 
   /**
+   * Pull the page of history that sits before the turns already loaded.
+   *
+   * The turns do not come back from this. A host inserts them into the chat's
+   * own state and dispatches `chat/turnsLoaded` before it answers, so anything
+   * subscribed to that chat sees them arrive the way it sees everything else -
+   * which is why there is no return value carrying turns and no second path
+   * from a turn to the screen.
+   *
+   * What comes back is whether there is still more behind it, so a caller that
+   * wants the whole conversation can ask again and one that wants a screenful
+   * can stop.
+   *
+   * How much history a snapshot arrives with is the host's business and the
+   * two that exist disagree: one sends a tail window, and one sends none at
+   * all and expects to be asked. So this is not only how a long conversation
+   * is read to its beginning - against some hosts it is how it is read at all.
+   */
+  loadOlderTurns(uri: SessionUri, chat?: string): Promise<boolean>;
+
+  /**
    * Open a second conversation in the same session.
    *
    * A chat belongs to a session, and a session may hold several - the session

@@ -1102,6 +1102,46 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
   };
 
   /**
+   * Pull the page of history before the turns already loaded.
+   *
+   * Shared by the seam method and by the chat consumer, which asks once on
+   * opening when it was handed an empty window - so the two can never drift
+   * into fetching different things.
+   */
+  const loadOlder = async (uri: SessionUri, wanted?: string): Promise<boolean> => {
+    const chatUri = wanted ?? await chatOf(uri);
+    if (chatUri === null) return false;
+    const before = bag(await snapshotOf(chatUri));
+    /*
+     * The cursor if there is one, and nothing if there is not.
+     *
+     * Omitting it is not the same as having none: the protocol says an absent
+     * cursor asks the host for its next older page anyway, which is what a
+     * host that sent an empty window without one still owes. A cursor this
+     * client invented would be `-32602`, so the choice is between the host's
+     * own and no field at all.
+     */
+    const cursor = str(before.turnsNextCursor);
+    try {
+      // The result is empty by design. What was fetched arrives as
+      // `chat/turnsLoaded` on the chat channel, before this answers.
+      await client.request('fetchTurns', {
+        channel: chatUri,
+        ...(cursor === undefined ? {} : { cursor }),
+      });
+    }
+    catch (error) {
+      options.onRefusal?.(chatUri, reason(error));
+      return false;
+    }
+    const after = bag(await snapshotOf(chatUri));
+    // Absence means the state holds every turn the host retained, which is the
+    // protocol's own words for "that was the last page".
+    return str(after.turnsNextCursor) !== undefined;
+  };
+
+
+  /**
    * Dispatch to the session's chat, and never reject.
    *
    * These are the fire-and-forget half of the protocol: nothing awaits them,
@@ -1479,6 +1519,8 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
       catch { return []; }
     },
 
+    loadOlderTurns: loadOlder,
+
     createChat: async (uri, first) => {
       // The client picks the URI, as it does for a session, so it can be
       // subscribed to without a round trip in between.
@@ -1593,7 +1635,27 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
         talking?.release();
         chats.set(uri, chatUri);
         talking = channels.open(chatUri, {
-          opened: (fresh) => { if (fresh) chat = fresh; emit(); },
+          opened: (fresh) => {
+            if (fresh) chat = fresh;
+            emit();
+            /*
+             * A window with nothing in it, and a cursor saying there is more.
+             *
+             * One host puts a tail of the conversation in the snapshot and one
+             * puts none, and the second is not saying the chat is empty - it
+             * is saying to ask. Without this, opening such a session shows a
+             * blank transcript that no amount of waiting fills, and a person
+             * has no reason to think scrolling up would do anything.
+             *
+             * Once, on opening, and only when the window is empty: a chat that
+             * arrived with turns is one where reading further back is the
+             * person's business rather than this client's.
+             */
+            if (!live) return;
+            if (list(chat.turns).length > 0) return;
+            if (str(chat.turnsNextCursor) === undefined) return;
+            void loadOlder(uri, chatUri).catch(() => undefined);
+          },
           event: (event) => {
             if (event.type !== 'action') return;
             chat = bag(applyAction(ahp.chatReducer, chat, bag(event.params).action, bad));
