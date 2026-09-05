@@ -23,6 +23,14 @@ yesterday's behaviour. This one cannot, because its input is an output. It
 found a third defect on its first run - `listAutomationTriggerDefinitions` sent
 to the automations channel, where the declaration says the root one.
 
+Twenty commands declare `channel` as a string literal rather than a URI a
+client chooses, and the same test checks every request site in `live.ts`
+against those declarations - read out of the source rather than driven, because
+the runtime check only sees a command something calls and a site no test
+reaches is exactly where a wrong constant survives. Hosts are getting stricter
+here: ahpd answered any channel on that command until this was reported, and
+now refuses a wrong one with `-32602`.
+
 That is the only method here that has found defects in every implementation it
 was pointed at, this one included. Reading the source does not substitute for
 it: a conditional spread (`...(x ? { k } : {})`) is not excess-property-checked

@@ -17,7 +17,7 @@
  */
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { InMemoryTransport, type AhpTransport } from '@microsoft/agent-host-protocol/client';
@@ -205,5 +205,62 @@ describe('every frame this client sends is one the protocol declares', () => {
     const real = report.found.filter((one) => one.what !== known);
     expect(real.map((one) => one.what)).toEqual([]);
     expect(report.found.some((one) => one.what === known)).toBe(true);
+  });
+});
+
+/*
+ * The channel constants, at every site rather than every exercised one.
+ *
+ * Twenty commands declare `channel` as a string literal instead of a URI a
+ * client chooses, and a host that ignores the field answers a wrong one
+ * happily - which is how `listAutomationTriggerDefinitions` went to
+ * `ahp-automations://` here for as long as it existed. Hosts are getting
+ * stricter about it, so a wrong constant is turning from a silent success into
+ * a refusal.
+ *
+ * Read out of the source rather than driven, because the runtime check above
+ * only sees a command something calls: a request site no test reaches is
+ * exactly where a wrong constant survives.
+ */
+describe('every command that declares its channel is sent on that channel', () => {
+  it('matches the declaration at every request site', async () => {
+    const declared = new Map<string, string>();
+    const root = 'node_modules/@microsoft/agent-host-protocol/src/types';
+    const walk = async (at: string): Promise<string[]> => {
+      const found = await readdir(at, { withFileTypes: true });
+      const out: string[] = [];
+      for (const entry of found) {
+        const next = path.join(at, entry.name);
+        if (entry.isDirectory()) out.push(...await walk(next));
+        else if (entry.name.endsWith('.ts')) out.push(next);
+      }
+      return out;
+    };
+    for (const file of await walk(root)) {
+      const text = await readFile(file, 'utf8');
+      for (const found of text.matchAll(/export interface (\w+)Params[^{]*\{([\s\S]*?)\n\}/g)) {
+        const channel = /^\s*channel: '([^']+)';/m.exec(found[2] as string);
+        if (channel) {
+          const name = found[1] as string;
+          declared.set(`${name[0]?.toLowerCase() ?? ''}${name.slice(1)}`, channel[1] as string);
+        }
+      }
+    }
+    // If this finds nothing the walk is broken and the check below passes for
+    // the wrong reason.
+    expect(declared.size).toBeGreaterThan(10);
+
+    const live = await readFile('src/ahp/live.ts', 'utf8');
+    const names: Record<string, string> = { ROOT: 'ahp-root://', AUTOMATIONS: 'ahp-automations://' };
+    const wrong: string[] = [];
+    for (const [method, channel] of declared) {
+      const call = new RegExp(`client\\.request\\('${method}',\\s*\\{([\\s\\S]{0,160})`, 'g');
+      for (const site of live.matchAll(call)) {
+        const sent = /channel:\s*([A-Za-z_][\w.]*)/.exec(site[1] as string);
+        const got = sent?.[1] ?? '(none)';
+        if ((names[got] ?? got) !== channel) wrong.push(`${method}: sent ${got}, declares ${channel}`);
+      }
+    }
+    expect(wrong).toEqual([]);
   });
 });
