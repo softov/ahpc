@@ -128,6 +128,15 @@ export interface ChannelsOptions {
   client: ChannelClient;
   /** Told when a channel is refused, so the reason reaches a person. */
   onRefusal?(uri: string, message: string): void;
+  /** Told when the host refuses an action this client dispatched. */
+  onRejection?(uri: string, message: string): void;
+  /**
+   * This client's id, as `initialize` gave it.
+   *
+   * Only so that a refusal can be told from somebody else's: an envelope
+   * naming another client is still not applied, and is not reported here.
+   */
+  clientId?: string;
   /** The host's own words for a failure, as a client would show them. */
   reason(error: unknown): string;
   /**
@@ -174,7 +183,37 @@ export function openChannels(options: ChannelsOptions): Channels {
     if (typeof seq === 'number' && seq > seen) seen = seq;
   };
 
+  /**
+   * An action the host refused, which is not an action that happened.
+   *
+   * A rejected envelope carries the action the host declined to apply, so a
+   * consumer that reduced it would make the very change it was just told did
+   * not happen - worse than the silence, because the screen then disagrees
+   * with the host until something else moves it. It is reported and dropped.
+   *
+   * `serverSeq` is not read off it either. The counter advances with state,
+   * and a refusal moved none: the number on the envelope is the one this host
+   * is still at, and taking it as progress would leave a gap on the next
+   * reconnect that nothing can fill.
+   *
+   * A rejection answers one client's dispatch. One attributed to another
+   * client is nothing to say to the person sitting here, so it is dropped
+   * without being reported; one with no origin at all is taken as ours,
+   * because the alternative is losing the message a host that omits it sent.
+   */
+  const rejected = (uri: string, event: ChannelEvent): boolean => {
+    if (event.type !== 'action') return false;
+    const envelope = bag(event.params);
+    const why = envelope?.rejectionReason;
+    if (typeof why !== 'string') return false;
+    const from = bag(envelope?.origin)?.clientId;
+    const mine = options.clientId === undefined || typeof from !== 'string' || from === options.clientId;
+    if (mine) options.onRejection?.(uri, why);
+    return true;
+  };
+
   const deliver = (uri: string, event: ChannelEvent): void => {
+    if (rejected(uri, event)) return;
     note(event);
     const channel = held.get(uri);
     if (!channel) return;

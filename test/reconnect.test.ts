@@ -79,6 +79,31 @@ class Scripted {
     });
   }
 
+  /**
+   * Refuse an action a client dispatched, the way a host answers one it will
+   * not take: the action it did *not* apply, and its words for why.
+   *
+   * `serverSeq` deliberately does not move, because no state did.
+   */
+  async reject(
+    channel: string,
+    action: Record<string, unknown>,
+    reason: string,
+    clientId = 'ahpc-test',
+  ): Promise<void> {
+    await this.send({
+      jsonrpc: '2.0',
+      method: 'action',
+      params: {
+        channel,
+        action,
+        serverSeq: this.seq,
+        origin: { clientId, clientSeq: 1 },
+        rejectionReason: reason,
+      },
+    });
+  }
+
   /** The counter this host has reached, which a reconnect is measured against. */
   get serverSeq(): number { return this.seq; }
 
@@ -826,6 +851,85 @@ describe('reading a snapshot and opening the view do not let go in between', () 
     expect(seen.some((event) => event.type === 'snapshot')).toBe(true);
 
     two.close();
+    await host.close();
+  });
+});
+
+describe('an action the host refuses is not an action that happened', () => {
+  const started = (id: string): Record<string, unknown> => ({
+    type: 'chat/turnStarted',
+    turnId: id,
+    startedAt: new Date().toISOString(),
+    message: { text: `turn ${id}`, origin: { kind: 'user' } },
+  });
+
+  /** How much conversation the last snapshot had, which is what a rejection must not change. */
+  const counted = (events: HostEvent[]): number => {
+    const last = [...events].reverse().find((event) => event.type === 'snapshot');
+    if (last?.type !== 'snapshot') return 0;
+    return last.turns.length + (last.active === undefined ? 0 : 1);
+  };
+
+  async function watching(): Promise<{
+    host: Awaited<ReturnType<typeof liveHost>>;
+    scripted: Scripted;
+    seen: HostEvent[];
+    reported: string[];
+  }> {
+    const reported: string[] = [];
+    let scripted!: Scripted;
+    const open = async (): Promise<AhpTransport> => {
+      const [mine, theirs] = InMemoryTransport.pair();
+      scripted = new Scripted(theirs);
+      scripted.states.set(SESSION, { defaultChat: CHAT, chats: [] });
+      scripted.states.set(CHAT, { turns: [] });
+      return mine;
+    };
+    const host = await liveHost({
+      url: 'ws://scripted',
+      clientId: 'ahpc-test',
+      connect: open,
+      backoff: [0],
+      keepaliveMs: 0,
+      lingerMs: 0,
+      onRefusal: (_uri, message) => reported.push(message),
+    });
+    const seen: HostEvent[] = [];
+    host.subscribe(SESSION as never, (event) => seen.push(event));
+    await settle();
+    return { host, scripted, seen, reported };
+  }
+
+  it('says why, and leaves the state where the host left it', async () => {
+    const { host, scripted, seen, reported } = await watching();
+
+    // The same action twice: once refused, once not. Without the second half
+    // this asserts nothing - an action that would not have applied anyway
+    // looks exactly like one that was correctly dropped.
+    await scripted.reject(CHAT, started('t1'), 'This chat is busy.');
+    await settle();
+    expect(reported).toEqual(['This chat is busy.']);
+    expect(counted(seen)).toBe(0);
+
+    await scripted.act(CHAT, started('t2'));
+    await settle();
+    expect(counted(seen)).toBeGreaterThan(0);
+
+    await host.close();
+  });
+
+  it('keeps somebody else\'s refusal to itself', async () => {
+    const { host, scripted, seen, reported } = await watching();
+
+    // A host that sends a rejection to everyone watching rather than to the
+    // client that dispatched it. Still not applied - it is an action nobody
+    // took - and still not shown, because nobody here asked for it.
+    await scripted.reject(CHAT, started('t1'), 'This chat is busy.', 'somebody-else');
+    await settle();
+
+    expect(reported).toEqual([]);
+    expect(counted(seen)).toBe(0);
+
     await host.close();
   });
 });

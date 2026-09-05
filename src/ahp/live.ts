@@ -915,6 +915,11 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
     reason,
     lingerMs: options.lingerMs ?? LINGER_MS,
     onRefusal: (uri, message) => options.onRefusal?.(uri, message),
+    clientId,
+    // A refused action reaches a person the same way a refused channel does.
+    // Both are the host saying no in its own words, and neither is a fault
+    // here to be dressed up as one.
+    onRejection: (uri, message) => options.onRefusal?.(uri, message),
   });
   channels.drain(client);
 
