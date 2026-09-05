@@ -112,7 +112,7 @@ a host serves everything ahpd serves.
 4. `createResourceWatch` over the same directory, so a host is told rather than polling.
 5. Test: a scripted host reading a published file, and being refused a path outside the directory and a scheme that is not ours.
 
-**One thing this cannot settle.** The protocol has no way for a client to register a URI scheme, so a host talking to two clients cannot tell whose `virtual://` is whose. `virtual://ahpc/` is a convention this client is choosing. The host's roadmap has the same question from its side.
+**All of this is the specification's own shape**, not a convention invented here. `virtual://<client>/...` is the documented example for a client-published URI - in `commands.ts`, in `subscriptions.md`, in `root-channel.md`, in `resource-watch-channel.md`, and in the generated Rust, Go and .NET clients; the .NET conformance test publishes `virtual://native-aot/resource` and the TypeScript one `virtual://client/thing`. Refusing a URI with `-32009` is the declared throw, and the spec states the receiver enforces access through the same permission flow whichever peer initiated. So `--publish` is this client deciding what it serves, which is exactly what the specification says the receiver does.
 
 ## B-01-21 - Checking what this client sends
 
