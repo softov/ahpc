@@ -10,11 +10,13 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "build:watch": "tsc -p tsconfig.json --watch",
-    "start": "node dist/src/main.js",
     "dev": "npm run build && node dist/src/main.js",
     "dev:bun": "bun src/main.tsx",
+    "schema": "node tools/schema.mjs",
+    "start": "node dist/src/main.js",
+    "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "wire": "node tools/validate.mjs"
   },
   "dependencies": {
     "@microsoft/agent-host-protocol": "^0.9.0",
@@ -25,6 +27,8 @@
   "devDependencies": {
     "@textui/testing": "^0.4.0",
     "@types/node": "^22.10.2",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
     "typescript": "^5.9.3",
     "vitest": "^3.0.0"
   },

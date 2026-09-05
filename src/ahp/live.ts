@@ -2117,13 +2117,19 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
        * because that is all that can be assumed of a field the specification
        * does not have - including that the next host to send it means the
        * same thing.
+       *
+       * Both spellings, and both for good. `_meta` is where an extension
+       * belongs and the host that sends this one is moving it there; the bare
+       * field is what every copy of that host already deployed still sends,
+       * and reading only the new name would break against all of them to save
+       * one `??`.
        */
       const ran = [...list(talking.turns), talking.activeTurn]
         .map(bag)
         .reverse()
         .map((found) => selection(bag(found.message).model, found.usage))
         .find((found) => found !== undefined);
-      const last = ran?.id ?? str(state.model);
+      const last = ran?.id ?? str(bag(state._meta).model) ?? str(state.model);
 
       return {
         resource: uri,
