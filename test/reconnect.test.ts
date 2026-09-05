@@ -1186,3 +1186,84 @@ describe('what a turn ran at is kept, not only which model', () => {
     await host.close();
   });
 });
+
+describe('the model a host actually reports, rather than the one it declares', () => {
+  /*
+   * Shapes taken from a captured conversation with the reference host rather
+   * than from the declarations. `Message.model` is where the protocol says a
+   * turn's model goes and it arrives `null`; what is filled in is
+   * `usage.model`, a plain string, and `SessionState.model`, which no version
+   * of the protocol declares at all. Reading only the declared field showed
+   * no model anywhere, against either host, for the life of this client.
+   */
+  it('takes the model out of usage when the message carries none', async () => {
+    const { host, scripted } = await connect();
+    scripted.states.set(SESSION, { defaultChat: CHAT, chats: [], lifecycle: 'ready' });
+    scripted.states.set(CHAT, {
+      turns: [{
+        id: 't1',
+        startedAt: new Date().toISOString(),
+        state: 'complete',
+        message: { text: 'hello', origin: { kind: 'user' }, model: null },
+        usage: { inputTokens: 2, outputTokens: 3, cacheReadTokens: 11174, model: 'claude-opus-5' },
+      }],
+    });
+
+    const detail = await host.detail(SESSION as never);
+    expect(detail.model?.id).toBe('claude-opus-5');
+    // Usage records what answered, not what was asked for, so there is
+    // nothing to say about settings and nothing is invented.
+    expect(detail.model?.options).toBeUndefined();
+
+    await host.close();
+  });
+
+  it('falls back to the session\'s own model, undeclared as it is', async () => {
+    const { host, scripted } = await connect();
+    // No turns at all - a session opened and not yet spoken to, which is when
+    // a person most wants to know what it would run on.
+    scripted.states.set(SESSION, {
+      defaultChat: CHAT, chats: [], lifecycle: 'ready', model: 'claude-opus-5[1m]',
+    });
+    scripted.states.set(CHAT, { turns: [] });
+
+    const detail = await host.detail(SESSION as never);
+    expect(detail.model?.id).toBe('claude-opus-5[1m]');
+
+    await host.close();
+  });
+
+  it('prefers what the turn was asked for over what it used', async () => {
+    const { host, scripted } = await connect();
+    scripted.states.set(SESSION, { defaultChat: CHAT, chats: [], lifecycle: 'ready', model: 'ignored' });
+    scripted.states.set(CHAT, {
+      turns: [{
+        id: 't1',
+        startedAt: new Date().toISOString(),
+        state: 'complete',
+        message: {
+          text: 'hello',
+          origin: { kind: 'user' },
+          model: { id: 'opus[1m]', config: { thinkingLevel: 'max' } },
+        },
+        usage: { model: 'claude-opus-5' },
+      }],
+    });
+
+    const seen: HostEvent[] = [];
+    host.subscribe(SESSION as never, (event) => seen.push(event));
+    await settle();
+
+    // The request is the better answer where there is one: it is the only
+    // one that carries what the turn was asked for besides the model.
+    const detail = await host.detail(SESSION as never);
+    expect(detail.model?.id).toBe('opus[1m]');
+    const snapshot = seen.find((event) => event.type === 'snapshot');
+    const turn = snapshot?.type === 'snapshot'
+      ? [...snapshot.turns, ...(snapshot.active ? [snapshot.active] : [])].find((one) => one.model)
+      : undefined;
+    expect(turn?.model?.config).toEqual({ thinkingLevel: 'max' });
+
+    await host.close();
+  });
+});

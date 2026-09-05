@@ -374,7 +374,7 @@ function turn(value: unknown, running: boolean): Turn {
     state: running ? 'running'
       : state === 'cancelled' ? 'cancelled'
         : state === 'error' ? 'failed' : 'complete',
-    ...(str(bag(message.model).id) ? { model: selection(message.model) } : {}),
+    ...(selection(message.model, found.usage) ? { model: selection(message.model, found.usage) as ModelSelection } : {}),
     at: str(found.startedAt) ?? new Date(0).toISOString(),
     ...(typeof found.duration === 'number' ? { elapsedMs: found.duration } : {}),
   };
@@ -674,22 +674,33 @@ function config(value: unknown): SessionConfig {
 }
 
 /**
- * What a turn was asked for: the model, and the settings that went with it.
+ * What a turn was asked for, and failing that what it was reported as using.
  *
- * The settings were dropped here for as long as this client only ever read an
- * id, and dropping them made a turn's answer unaccountable - a thinking level
- * takes effect from the turn that names it, so two answers from one model are
- * two different questions and nothing recorded which. Values are flattened to
- * strings because that is what a form returns and what every reader here
- * shows; a host that sends a number for one sends a number this can print.
+ * `Message.model` is where the protocol says a turn's model is recorded, and
+ * on a captured conversation from the reference host it is `null` on every
+ * turn - the model is in `usage.model`, which is declared as "model used" and
+ * is a plain string rather than a `ModelSelection`. So both are read, asked
+ * for first: one says what was requested and the other what answered, and a
+ * client that read only the declared one showed no model at all.
+ *
+ * The settings are dropped by that second path, because usage does not carry
+ * any - which is honest. A thinking level takes effect from the turn that
+ * names it, so two answers from one model are two different questions, and a
+ * host that does not record which cannot be made to have done.
+ *
+ * Values are flattened to strings because that is what a form returns and what
+ * every reader here shows; a host that sends a number sends one this can
+ * print.
  */
-function selection(value: unknown): ModelSelection {
+function selection(value: unknown, usage?: unknown): ModelSelection | undefined {
   const found = bag(value);
+  const id = str(found.id) ?? str(bag(usage).model);
+  if (id === undefined) return undefined;
   const config = Object.entries(bag(found.config))
     .filter(([, one]) => one !== null && typeof one !== 'object')
     .map(([key, one]) => [key, String(one)]);
   return {
-    id: str(found.id) ?? '',
+    id,
     ...(config.length > 0 ? { config: Object.fromEntries(config) as Record<string, string> } : {}),
   };
 }
@@ -2094,10 +2105,23 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
       const chatUri = str(state.defaultChat) ?? null;
       if (chatUri) chats.set(uri, chatUri);
       const talking = bag(chatUri ? await snapshotOf(chatUri) : {});
-      const last = [...list(talking.turns), talking.activeTurn]
+      /*
+       * The last turn that recorded one, and the session's own after that.
+       *
+       * This used to test `str(message.model)` - a string test against an
+       * object - so it matched nothing a host has ever sent and the pane said
+       * "nothing said yet" against every host there is. `SessionState.model`
+       * is the fallback and is a *private extension*: no version of the
+       * protocol declares it, and the reference host sends it as the session's
+       * current model. Read last, and read as a string, because that is all
+       * that can be assumed of a field the specification does not have.
+       */
+      const ran = [...list(talking.turns), talking.activeTurn]
         .map(bag)
         .reverse()
-        .find((found) => str(bag(bag(found).message).model));
+        .map((found) => selection(bag(found.message).model, found.usage))
+        .find((found) => found !== undefined);
+      const last = ran?.id ?? str(state.model);
 
       return {
         resource: uri,
@@ -2116,7 +2140,7 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
           : str(state.lifecycle) ?? 'creating') as SessionDetail['lifecycle'],
         ...(channels.refusal(uri) !== undefined ? { refusal: channels.refusal(uri) as string } : {}),
         config: config(state.config),
-        ...(last ? { model: known(selection(bag(bag(last).message).model).id) } : {}),
+        ...(last !== undefined ? { model: known(last) } : {}),
         ...(str(state.activity) ? { activity: str(state.activity) as string } : {}),
       };
     },
