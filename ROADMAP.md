@@ -1,138 +1,221 @@
 # What is left to build
 
-Pending implementation, and nothing else. Not decisions, not findings, not why
-something is the way it is - that is what `git log` is for. When this file is
-empty it gets deleted.
+Pending implementation. Every item names the clause it comes from, in
+`docs/specification/` of the protocol repository or in the package's own
+declarations. Where the specification says how something works, that is what
+gets built - there is no choice to be made and none is offered here.
 
-Each item says what is missing, which part of the protocol it is, and the steps
-to finish it. `B-xx` codes are stable so a commit can name one, and are not
-reused.
+Batches are ordered so each one stands on its own and can be finished, tested
+and landed before the next begins. When the last is done this file is deleted.
 
-Two hosts have to work: ahpd and VS Code's agent host. Nothing here may assume
-a host serves everything ahpd serves.
+`B-xx` codes are stable so a commit can name one, and are not reused.
+
+Two hosts have to work: ahpd and VS Code's agent host. Neither is the
+specification, and where an implementation and the specification disagree, the
+specification is what this client follows.
 
 ---
 
-## B-01-09 - Signing in
+# Batch 1 - The handshake and the catalogue
 
-**Missing.** `authenticate` at every layer. `-32007` arrives as text; `auth/required` reaches the client and is routed nowhere.
+Smallest, and everything after it connects through this.
 
-**Blocks.** Any host with a protected resource. ahpd advertises them for its harness.
+## B-01-14 - `initialSubscriptions` and `locale`
 
-**Plan.**
-1. `authenticate(resource, token)` on `HostConnection`, `fake.ts` and `live.ts`.
-2. Resolve a token: `--token` flag, then an environment variable named for the resource, then a TUI prompt. On the command line, refuse and name the variable.
-3. Push it, retry the operation that failed.
-4. Re-push on `auth/required` with `reason: 'expired'`.
-5. Test: a scripted host refusing with `-32007`, then accepting.
+**Clause.** `lifecycle.md:10` gives the handshake as `initialize(protocolVersions[], clientId, clientInfo?, initialSubscriptions?, locale?)`. `lifecycle.md:36`: `initialSubscriptions` subscribes in the same round trip, "typically `ahp-root://` plus any previously-open session URIs". `root-channel.md:13`: "Clients SHOULD subscribe to it during the handshake via `initialSubscriptions`". `lifecycle.md:38`: `locale` is an IETF BCP 47 tag the server uses to localise user-facing strings.
 
-## B-01-11 - Telling the host about the terminal
+**Missing.** Neither is sent. The root channel is a separate `subscribe` afterwards.
 
-**Missing.** `terminal/resized`, `terminal/cleared`, `terminal/claimed`, `terminal/titleChanged`. All four are client-dispatchable; only `terminal/input` is sent.
+**Steps.**
+1. Send `initialSubscriptions: ['ahp-root://', ...held]` on the first connection and apply the returned snapshots. The reconnect supervisor already does this on its `initialize` fallback.
+2. Send `locale` from `LANG`/`LC_ALL`, normalised to BCP 47.
+3. Test: one round trip, not two, and the root snapshot applied from the handshake.
 
-**Blocks.** Output wraps at a width nobody chose, because the host is never told how wide this client draws. VS Code's client dispatches `terminal/resized` on connect - it is in the capture.
+## B-01-22 - Re-fetch the catalogue after a reconnect
 
-**Plan.**
-1. Dispatch `terminal/resized` from the terminal view's own resize, and once when it opens.
-2. Commands for clear, rename and claim, drawn only where the host serves them.
-3. Test: assert the frame on mount and on a size change.
+**Clause.** `root-channel.md:166`: "the `root/*` events are ephemeral and are **not** replayed on reconnect. After reconnecting, clients SHOULD re-fetch the catalogue via `listSessions`."
 
-## B-01-12 - Being visible in a session
+**Missing.** The supervisor resumes subscriptions and applies replay or snapshots, and never re-fetches. Sessions added or removed while the socket was down are absent until something else asks.
 
-**Missing.** `session/activeClientSet` is never dispatched, so this client never appears in another client's `activeClients` and the session header shows nobody.
+**Steps.**
+1. Call `listSessions` after every successful resume, replay branch included.
+2. Test: a scripted host that adds a session while disconnected, and a catalogue containing it after reconnect.
 
-**Blocks.** Two people on one session cannot see each other.
+## B-01-23 - `root/progress`
 
-**Plan.**
-1. Dispatch on opening a session view. Removal is host-managed on unsubscribe, which this client now sends.
-2. Draw the session's own `activeClients` in the header.
-3. Test: the dispatch on open, and the header after an `activeClients` change.
+**Clause.** `root-channel.md:186`: `progress` is monotonically non-decreasing per `progressToken`; complete when `progress === total`; the server MUST emit a final frame satisfying this; when `total` is absent clients SHOULD show an indeterminate indicator; a generic client MAY display `message` verbatim. Ephemeral, not replayed.
 
-## B-01-14 - Folding the handshake
+**Missing.** `progressToken` appears nowhere in this client. `createSession` accepts one and none is sent, so a slow session creation shows nothing.
 
-**Missing.** `initialSubscriptions` and `locale` on `initialize`. The root channel is a separate `subscribe` afterwards.
+**Steps.**
+1. Send a `progressToken` with `createSession` and any other command that accepts one.
+2. Route `root/progress` to the screen that started the work; indeterminate where `total` is absent; clear on the final frame.
+3. Test: progress frames with and without `total`.
 
-**Plan.**
-1. Pass `initialSubscriptions` on the first connection and apply the snapshots - the reconnect supervisor already does exactly this on its `initialize` fallback.
-2. Pass `locale` from the environment.
-3. Test: assert one round trip rather than two.
+---
 
-## B-01-15 - Automations from the command line
+# Batch 2 - The message
 
-**Missing.** `ahpc automation` entirely. `listAutomationTriggerDefinitions` is never called, so only a schedule can be authored - an event trigger cannot be offered because this client never asks what events exist. Run history is never paged.
+The model selection and the draft both live on `Message`, and this client
+carries neither outbound.
 
-**Plan.**
-1. `ahpc automation list|show|new|run|enable|disable|rm|runs`, over the seam that already exists.
-2. Call `listAutomationTriggerDefinitions` before drawing the trigger form; offer event triggers where the host has them.
-3. Page run history with the cursor the host returns.
+## B-01-20 - `Message.model` carries the selection, and the form that resolves it
 
-## B-01-16 - The host's log, and files that change
+**Clause.** `chat-channel.md:38`: `ChatState.draft` is the message being composed "including its model/agent selection". `chat-channel.md:66`: `createChat`'s `initialMessage` carries "its own `model` / `agent` selection". `state.schema.json` on `configSchema`: "Clients present this as a form and pass the resolved values in `ModelSelection.config`."
 
-**Missing.** `otlp/exportLogs` is served on an advertised template and nothing expands it. `createResourceWatch` is served and nothing creates one, so the changeset and file screens re-read on a timer.
+**Missing.** `say` and `queue` send `{ id }` with no `config`, so a model's own options can be read and never chosen. The specification puts the selection on the message; that is what gets built, whether or not another client exercises it.
 
-**Plan.**
-1. A resource watch behind the changeset and file screens, released on close - the channel registry already does the releasing.
-2. `ahpc logs [--level L] [--follow]`, expanding `InitializeResult.telemetry.logs`.
-3. Test: the watch is created on open and released on close.
+**Steps.**
+1. Carry `ModelSelection` whole outbound: `say`, `queue`, and `createChat`'s `initialMessage`.
+2. Build the form from the open model's `configSchema` - the `ConfigProperty` decoder already reads it - and send the resolved values as `ModelSelection.config`.
+3. Where a session config property and the model's schema name the same key, take the values from the model and the title and words from the host's schema.
+4. Test: a scripted host receiving `model: { id, config }`, and a model whose schema offers one value.
 
-## B-01-18 - Forks, side chats, and values that must be looked up
+## B-01-24 - `ChatState.draft`
 
-**Missing.** `createChat.source`, so a fork or a side chat cannot be started even where an agent advertises `capabilities.multipleChats: { fork, sideChat }` - the reference host does. `sessionConfigCompletions` is never called, so a property with `enumDynamic` renders as free text.
+**Clause.** `chat-channel.md:38` and `ChatState.draft`'s own declaration: "Clients MAY periodically sync their local input state into this field so a draft survives reloads and is visible to other clients viewing the same chat. Eager syncing is **not** required — clients SHOULD debounce and MAY sync only at convenient points. When presenting input UI for an existing chat, clients SHOULD use any `draft` to initialize their input state. Cleared (set to `undefined`) once the message is sent."
 
-**Blocks.** Choosing a branch to base a worktree on. The reference host's `branch` property carries `enumDynamic` while isolation is `worktree`, which is a host offering to list them.
+**Missing.** The composer neither reads the draft when opening a chat nor writes one. A message half-typed here is invisible everywhere else and lost on restart.
 
-**Plan.**
-1. Call `sessionConfigCompletions` for any property whose schema says `enumDynamic`, and draw the answer as choices.
-2. Offer fork and side chat exactly where `multipleChats` advertises each.
-3. Test: a scripted host with `enumDynamic` on one property.
+**Steps.**
+1. Initialise the composer from `ChatState.draft` when a chat opens.
+2. Dispatch `chat/draftChanged`, debounced, and on leaving the screen.
+3. Clear it when the message is sent.
+4. Test: a draft in the opening snapshot reaches the composer; typing produces one debounced dispatch, not one per key.
 
-## B-01-20 - Narrowing the effort choice to the model
+---
 
-**Missing.** The session-wide effort control offers every value even when the model running under it accepts only some. The model's own `options` are drawn beside it as facts.
+# Batch 3 - Presence and the terminal
 
-**Not** a per-turn control: the reference client sends the effort level as session config and never sends `ModelSelection.config`.
+## B-01-12 - `session/activeClientSet`
 
-**Plan.**
-1. Where a session config property and the open session's model both name the same key, take the values from the model and the key, title and words from the host's session schema.
-2. Leave the model's row as it is where nothing matches.
-3. Test: a model accepting one level, against a session schema offering five.
+**Clause.** `SessionState.activeClients` and its declaration: membership is host-managed, clients add or refresh themselves with `session/activeClientSet`, and the host removes them on unsubscribe. The reference client sends it on `createSession` as `activeClient`, with its `clientId` and its tools.
+
+**Missing.** Never dispatched, so this client never appears in another client's `activeClients` and the header shows nobody.
+
+**Steps.**
+1. Dispatch on opening a session view, and pass `activeClient` on `createSession`.
+2. Draw the session's `activeClients` in the header.
+3. Test: the dispatch on open, and the header after the list changes.
+
+## B-01-11 - The four terminal actions
+
+**Clause.** `terminal-channel.md:84` lists the client-dispatchable set: `terminal/input`, `terminal/resized`, `terminal/claimed`, `terminal/titleChanged`, `terminal/cleared`. `terminal-channel.md:120-125` gives each one's reduction: `resized` sets `cols`/`rows`, `claimed` sets `claim`, `titleChanged` sets `title`, `cleared` resets `content`. `terminal-channel.md:114`: clients MUST check `supportsCommandDetection` before relying on command boundaries.
+
+**Missing.** Only `terminal/input` is dispatched, so the host is never told how wide this client draws and output wraps at a width nobody chose.
+
+**Steps.**
+1. Dispatch `terminal/resized` on mount and on every resize.
+2. Commands for clear, rename and claim.
+3. Check `supportsCommandDetection` before drawing anything derived from command boundaries.
+4. Test: the frame on mount and on a size change.
+
+---
+
+# Batch 4 - Resources, both directions
+
+The `resource*` family is symmetrical. This client serves none of it and sends
+a third of it.
+
+## B-01-10 - The write half
+
+**Clause.** `CommandMap` declares `resourceWrite`, `resourceDelete`, `resourceMkdir`, `resourceMove`, `resourceCopy` and `resourceResolve` alongside the three this client sends. `commands.ts`: `-32008 NotFound` if the URI does not exist, `-32009 PermissionDenied` if not permitted, and the receiver enforces access through the `resourceRequest` flow.
+
+**Missing.** All six, at every layer. The browser is a viewer and the grant negotiation this client implements is negotiating for a capability nothing uses.
+
+**Steps.**
+1. All six on `HostConnection`, `fake.ts` and `live.ts`.
+2. `ahpc resource write|rm|mkdir|mv|cp|stat`.
+3. Read-modify-write carries `resourceResolve`'s `etag` as `ifMatch`; `-32011` draws as a conflict.
+4. Rename, delete and new-file in the browser, each asking the operation's own confirmation and the grant separately.
+5. Test: a stale `ifMatch`, and a refused grant.
+
+## B-01-16a - Resource watches
+
+**Clause.** `resource-watch-channel.md:15`: the watch URI is receiver-assigned and opaque. `:37`: there is no dispose command - the receiver MUST release the watcher once every subscriber has unsubscribed. `:68`: the receiver MUST gate `createResourceWatch` through the same permission flow, returning `-32009` with a `resourceRequest` payload when denied.
+
+**Missing.** No watch is ever created, so the changeset and file screens re-read on a timer.
+
+**Steps.**
+1. Create a watch behind the changeset and file screens; release on close, which the channel registry already does.
+2. Treat the returned channel as opaque.
+3. Handle `-32009` with its `resourceRequest` payload through the grant flow that already exists.
+4. Test: created on open, unsubscribed on close, and a denied watch asking for the grant.
 
 ## B-01-17 - Answering what a host asks
 
-**Missing.** All ten of `ServerCommandMap` - `resourceRead`, `resourceWrite`, `resourceList`, `resourceCopy`, `resourceDelete`, `resourceMove`, `resourceResolve`, `resourceMkdir`, `resourceRequest`, `createResourceWatch`. The package installs a default that answers `-32601`, so nothing hangs, and refusing is a legal answer - the registry says the receiver decides whether to allow, deny or prompt. But zero of ten implemented is zero of the protocol's reverse half.
+**Clause.** `subscriptions.md:13`: "The same nine `resource*` request methods plus `createResourceWatch` may also be initiated by the server. Used for host-driven per-session filesystem providers and for fetching client-published URIs (e.g. `virtual://my-client/...` plugins)." `commands.ts`: the receiver enforces access via the same permission/`resourceRequest` flow regardless of which peer initiated, and `-32009` is the declared refusal.
 
-**Blocks.** Nothing today: the reverse direction exists so a host can read URIs the client *published*, and this client publishes none. Neither capture contains a single host-initiated request. It is the one part of the protocol this client has no implementation of at all.
+**Missing.** All ten. The package's default answers `-32601`, which is legal, but this client implements no part of the protocol's reverse direction.
 
-**Serving anything by default would be a mistake**, so the content is opt-in and the refusal is the default rather than the gap.
+**Steps.**
+1. A request handler layer, so a host-initiated method is routed rather than falling to the package default. Refuse every URI with `-32009` until something is published.
+2. `--publish <dir>`, served under `virtual://ahpc/` - the scheme shape the specification's own examples and conformance tests use - with every path resolved and checked to be inside it.
+3. Serve the read half against it; refuse the write half unless `--publish-writable` is given.
+4. `createResourceWatch` over the same directory.
+5. Test: a host reading a published file, and being refused a path outside the directory.
 
-**Plan.**
-1. A request handler layer on the connection, so a host-initiated method is routed rather than falling through to the package's default. Refuse every URI with `-32009` until something opts in.
-2. `--publish <dir>`, serving that directory and nothing else under `virtual://ahpc/`, with every path resolved and checked to be inside it.
-3. Implement the read half against it - `resourceRead`, `resourceList`, `resourceResolve`, `resourceRequest` - and refuse the write half unless `--publish-writable` is given.
-4. `createResourceWatch` over the same directory, so a host is told rather than polling.
-5. Test: a scripted host reading a published file, and being refused a path outside the directory and a scheme that is not ours.
+---
 
-**All of this is the specification's own shape**, not a convention invented here. `virtual://<client>/...` is the documented example for a client-published URI - in `commands.ts`, in `subscriptions.md`, in `root-channel.md`, in `resource-watch-channel.md`, and in the generated Rust, Go and .NET clients; the .NET conformance test publishes `virtual://native-aot/resource` and the TypeScript one `virtual://client/thing`. Refusing a URI with `-32009` is the declared throw, and the spec states the receiver enforces access through the same permission flow whichever peer initiated. So `--publish` is this client deciding what it serves, which is exactly what the specification says the receiver does.
+# Batch 5 - Authentication
+
+## B-01-09 - `authenticate`
+
+**Clause.** `authentication.md:90`: the `resource` field MUST match a resource the server advertised, statically via `protectedResources` or dynamically via an MCP challenge. `:115`: `expiresIn` MUST be a positive integer when supplied. `:117`: a client that retained the original token response MUST subtract elapsed time before forwarding it, and MUST omit `expiresIn` when the expiry is unknown; an empty token revokes. `:131-133`: `-32007` MAY be returned from **any** command and its `data` MUST be an `AuthRequiredErrorData` describing what needs authenticating. `:200`: on `auth/required` with `reason: 'expired'` the client MUST acquire a new credential and MUST NOT blindly replay the challenged token. `:202`: the notification is ephemeral, so clients SHOULD re-check after reconnecting. `:63`: absent `required` means required.
+
+**Missing.** `authenticate` at every layer. `-32007` arrives as text and its `data` is discarded; `auth/required` reaches this client and is routed nowhere.
+
+**Steps.**
+1. `authenticate(resource, token, expiresIn?)` on the seam, `fake.ts` and `live.ts`.
+2. Read `AuthRequiredErrorData` off any `-32007` and name the resources it lists.
+3. Resolve a token: `--token`, then an environment variable named for the resource, then a TUI prompt; on the command line, refuse and name the variable. Send only a `resource` the host advertised.
+4. Compute `expiresIn` by subtracting elapsed time, omit it when unknown, and send an empty token to revoke.
+5. On `auth/required` with `reason: 'expired'`, acquire again rather than replay. Re-check after every reconnect.
+6. Test: `-32007` from a command that is not `authenticate`; an expired challenge; a resource the host never advertised.
+
+---
+
+# Batch 6 - The rest of the surface
+
+## B-01-18 - Completions, forks and side chats
+
+**Clause.** `sessionConfigCompletions` in `CommandMap`, driven by a property whose schema carries `enumDynamic` - the reference host sets it on `branch` while isolation is `worktree`. `createChat.source` and `capabilities.multipleChats: { fork, sideChat }`, which the reference host advertises.
+
+**Missing.** Neither is called, so a dynamic property renders as free text and a fork cannot be started.
+
+**Steps.**
+1. Call `sessionConfigCompletions` for any property whose schema says `enumDynamic`; draw the result as choices.
+2. Offer fork and side chat exactly where `multipleChats` advertises each.
+3. Test: a scripted host with `enumDynamic` on one property.
+
+## B-01-15 - Automations from the command line
+
+**Clause.** `automation-channel.md:82`: before dispatching `automation/removed` a client SHOULD verify the target advertises `AutomationOperation.Remove`. `listAutomationTriggerDefinitions` in `CommandMap` is how a client learns which triggers a host has.
+
+**Missing.** No `ahpc automation`. Trigger definitions are never fetched, so only a schedule can be authored. Run history is never paged.
+
+**Steps.**
+1. `ahpc automation list|show|new|run|enable|disable|rm|runs`.
+2. Call `listAutomationTriggerDefinitions` before drawing the trigger form.
+3. Verify `Remove` is advertised before dispatching a removal.
+4. Page run history with the host's cursor.
+
+## B-01-16b - The host's log
+
+**Clause.** `telemetry-channel.md:13`: clients MUST treat the telemetry URI as opaque apart from expanding the well-known template variables, and subscribe with the value advertised on `InitializeResult.telemetry` after expansion. `:39`: a host that emits none omits `telemetry`; clients SHOULD subscribe only to signals they can process.
+
+**Missing.** Nothing expands the template, so a host's own log is unreadable from here.
+
+**Steps.**
+1. `ahpc logs [--level L] [--follow]`, expanding `InitializeResult.telemetry.logs` and subscribing to signals this client renders.
+2. Draw nothing where `telemetry` is absent.
 
 ## B-01-21 - Checking what this client sends
 
-**Missing.** `tools/validate.mjs` reads what a host sent. Nothing reads what this client sends, and both captures it has run against are another client's traffic.
+**Not a clause - the tool that checks the clauses.** `tools/validate.mjs` reads what a host sent; nothing reads what this client sends, and both captures it has run against are another client's traffic.
 
-**Blocks.** Nothing visibly, which is the point: both hosts turned out to be sending undeclared fields, and this client builds outbound payloads with the same conditional spreads that caused it.
-
-**Plan.**
-1. Route client frames by method into the package's `*Params` declarations, next to the existing URI-to-state map.
-2. Run it over the captures already on disk - the client half is in the same files.
-3. A `--record <file>` flag on `ahpc` writing its own frames, so a capture can be made from a session rather than borrowed.
-4. Fix whatever it finds.
-
-## B-01-10 - Writing to the host's filesystem
-
-**Missing.** `resourceWrite`, `resourceDelete`, `resourceMkdir`, `resourceMove`, `resourceCopy` and `resourceResolve`, at every layer. `resourceList`, `resourceRead` and `resourceRequest` are served, so the browser is a viewer and the grant negotiation this client implements is negotiating for a capability nothing uses.
-
-**Plan.**
-1. All six on `HostConnection`, `fake.ts` and `live.ts`.
-2. `ahpc resource write|rm|mkdir|mv|cp|stat`.
-3. Read-modify-write carries `resourceResolve`'s `etag` as `ifMatch`, and `-32011` is drawn as the conflict it is rather than a generic failure.
-4. Rename, delete and new-file keys in the browser, behind the write grant, each asking the operation's own confirmation and the grant separately.
-5. Test: a scripted host refusing on a stale `ifMatch`, and one refusing the grant.
+**Steps.**
+1. Route client frames by method into the package's `*Params` declarations.
+2. Run it over the captures on disk - the client half is in the same files.
+3. `--record <file>` on `ahpc`, so a capture can be made from a session.
+4. Fix what it finds.
