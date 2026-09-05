@@ -1189,12 +1189,14 @@ describe('what a turn ran at is kept, not only which model', () => {
 
 describe('the model a host actually reports, rather than the one it declares', () => {
   /*
-   * Shapes taken from a captured conversation with the reference host rather
-   * than from the declarations. `Message.model` is where the protocol says a
-   * turn's model goes and it arrives `null`; what is filled in is
-   * `usage.model`, a plain string, and `SessionState.model`, which no version
-   * of the protocol declares at all. Reading only the declared field showed
-   * no model anywhere, against either host, for the life of this client.
+   * Shapes taken from a captured conversation rather than from the
+   * declarations. `Message.model` is where the protocol says a turn's model
+   * goes and it arrived empty; what was filled in is `usage.model`, a plain
+   * string, and `SessionState.model`, which no version of the protocol
+   * declares at all. Reading only the declared field showed no model
+   * anywhere, against either host, for the life of this client - and every
+   * fixture agreed with it, because they were written from the same
+   * declarations as the code.
    */
   it('takes the model out of usage when the message carries none', async () => {
     const { host, scripted } = await connect();

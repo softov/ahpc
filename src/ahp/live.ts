@@ -677,11 +677,11 @@ function config(value: unknown): SessionConfig {
  * What a turn was asked for, and failing that what it was reported as using.
  *
  * `Message.model` is where the protocol says a turn's model is recorded, and
- * on a captured conversation from the reference host it is `null` on every
- * turn - the model is in `usage.model`, which is declared as "model used" and
- * is a plain string rather than a `ModelSelection`. So both are read, asked
- * for first: one says what was requested and the other what answered, and a
- * client that read only the declared one showed no model at all.
+ * a host may leave it empty - one captured conversation has it absent on every
+ * turn with the model in `usage.model` instead, which is declared as "model
+ * used" and is a plain string rather than a `ModelSelection`. So both are
+ * read, asked for first: one says what was requested and the other what
+ * answered, and a client that read only the first showed no model at all.
  *
  * The settings are dropped by that second path, because usage does not carry
  * any - which is honest. A thinking level takes effect from the turn that
@@ -2112,9 +2112,11 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
        * object - so it matched nothing a host has ever sent and the pane said
        * "nothing said yet" against every host there is. `SessionState.model`
        * is the fallback and is a *private extension*: no version of the
-       * protocol declares it, and the reference host sends it as the session's
-       * current model. Read last, and read as a string, because that is all
-       * that can be assumed of a field the specification does not have.
+       * protocol declares it, and the one host known to send it means the
+       * session's current model by it. Read last, and read as a string,
+       * because that is all that can be assumed of a field the specification
+       * does not have - including that the next host to send it means the
+       * same thing.
        */
       const ran = [...list(talking.turns), talking.activeTurn]
         .map(bag)
