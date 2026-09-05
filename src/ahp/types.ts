@@ -458,6 +458,15 @@ export interface Agent {
   description?: string;
   models: ModelRow[];
   /**
+   * What this harness wants a token for before it will work.
+   *
+   * `AgentInfo.protectedResources`, and the only place a `resource` name may
+   * come from other than a live MCP challenge - `authenticate` MUST name one
+   * the host advertised, so a client that invents a name is one the host is
+   * obliged to refuse.
+   */
+  protectedResources?: { resource: string; description?: string }[];
+  /**
    * Whether this agent can hold more than one chat in a session.
    *
    * A gate, not a hint: a host that does not advertise it is one where

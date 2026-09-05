@@ -348,6 +348,8 @@ export async function cli(command: string, rest: string[]): Promise<number> {
       case 'terminal': return await shells(host, args, wants);
       case 'resource': return await files(host, args, wants);
 
+      case 'auth': return await signIn(host, args, wants);
+
       case 'agents': {
         const found = await settled(host, () => host.agents());
         if (wants) { json(found); break; }
@@ -987,6 +989,54 @@ async function files(host: HostConnection, args: Args, wants: boolean): Promise<
     return 0;
   }
   throw new Fault(`No 'resource ${verb}'. Try 'ahpc help'.`);
+}
+
+/**
+ * A token for one of the host's protected resources.
+ *
+ * `ahpc auth` lists what the host protects; `ahpc auth <resource>` pushes a
+ * token for one. The token comes from `--token`, then an environment variable
+ * named after the resource, then standard input - a flag is this invocation, a
+ * variable is this shell, and neither puts a credential in shell history the
+ * way a positional argument would.
+ */
+async function signIn(host: HostConnection, args: Args, wants: boolean): Promise<number> {
+  if (!host.protectedResources || !host.authenticate) {
+    throw new Fault('This host serves no protected resources.');
+  }
+  const known = await host.protectedResources();
+  const resource = args.positional(0);
+  if (resource === undefined) {
+    if (wants) { json(known); return 0; }
+    if (known.length === 0) { line('This host protects nothing.'); return 0; }
+    table(known.map((one) => [one.resource, one.description ?? '']));
+    return 0;
+  }
+  const token = args.value('--token')
+    ?? process.env[tokenVariable(resource)]
+    ?? (process.stdin.isTTY ? undefined : (await readAll(process.stdin)).trim());
+  if (token === undefined) {
+    throw new Fault(`No token. Pass --token, set ${tokenVariable(resource)}, or pipe one in.`);
+  }
+  // An expiry is only sent when it is known and is a positive integer, which
+  // is what the specification requires of it.
+  const expires = Number(args.value('--expires-in') ?? '');
+  await host.authenticate(resource, token, {
+    ...(Number.isInteger(expires) && expires > 0 ? { expiresIn: expires } : {}),
+  });
+  return 0;
+}
+
+/**
+ * The environment variable a resource's token is read from.
+ *
+ * Derived from the resource rather than fixed, because a host may protect
+ * several and one variable for all of them is one credential for all of them:
+ * `https://api.anthropic.com` becomes `AHPC_TOKEN_API_ANTHROPIC_COM`.
+ */
+function tokenVariable(resource: string): string {
+  const name = resource.replace(/^[a-z]+:\/\//, '').replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '');
+  return `AHPC_TOKEN_${name.toUpperCase()}`;
 }
 
 /** Everything on a stream, for the write that takes its content from a pipe. */

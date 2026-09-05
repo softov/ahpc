@@ -53,6 +53,8 @@ class Scripted {
   readonly slow = new Set<string>();
   /** The held `subscribe` for each slow channel, by request id. */
   private readonly holding = new Map<string, number | string>();
+  /** An error to refuse a subscribe with, in place of the plain `-32001`. */
+  refuseWith: Record<string, unknown> | null = null;
   /** What `resourceResolve` answers. */
   resolveWith: Record<string, unknown> = { uri: 'file:///x', type: 'file' };
   /** What the next `reconnect` answers. */
@@ -76,6 +78,15 @@ class Scripted {
   timesAsked(method: string, channel?: string): number {
     return this.asked.filter((frame) => frame.method === method
       && (channel === undefined || frame.params?.channel === channel)).length;
+  }
+
+  /** Say a protected resource needs a token, as `auth/required` does. */
+  async authRequired(resource: string, reason?: string): Promise<void> {
+    await this.send({
+      jsonrpc: '2.0',
+      method: 'auth/required',
+      params: { channel: ROOT, resource: { resource }, ...(reason === undefined ? {} : { reason }) },
+    });
   }
 
   /** Say how far along a piece of work is, against the token a client sent. */
@@ -207,7 +218,11 @@ class Scripted {
       const said = this.refuse.get(channel);
       if (said !== undefined) {
         if (id !== undefined) {
-          await this.send({ jsonrpc: '2.0', id, error: { code: -32001, message: said } });
+          await this.send({
+            jsonrpc: '2.0',
+            id,
+            error: this.refuseWith ?? { code: -32001, message: said },
+          });
         }
         return;
       }
@@ -263,6 +278,7 @@ class Scripted {
       return;
     }
     if (method === 'createSession') { await reply(null); return; }
+    if (method === 'authenticate') { await reply({}); return; }
     if (method === 'resourceResolve') { await reply(this.resolveWith); return; }
     if (method !== undefined && method.startsWith('resource')) { await reply({}); return; }
     if (method === 'ping') { await reply(null); return; }
@@ -1659,6 +1675,101 @@ describe('the write half of the filesystem, exactly as declared', () => {
     // neither a file nor a directory, and narrowing it here would be this
     // client answering something the host already did.
     expect(found).toEqual({ uri: 'file:///x/a.txt', type: 'file', size: 4, mtime: '2026-09-05T00:00:00Z' });
+
+    await host.close();
+  });
+});
+
+describe('signing in to what a host protects', () => {
+  async function protecting(): Promise<{ host: Awaited<ReturnType<typeof liveHost>>; scripted: Scripted; asked: { resources: { resource: string }[]; why?: string }[] }> {
+    const asked: { resources: { resource: string }[]; why?: string }[] = [];
+    let scripted!: Scripted;
+    const open = async (): Promise<AhpTransport> => {
+      const [mine, theirs] = InMemoryTransport.pair();
+      scripted = new Scripted(theirs);
+      scripted.states.set(ROOT, {
+        agents: [{
+          provider: 'claude',
+          protectedResources: [{ resource: 'https://api.anthropic.com', description: 'Anthropic API' }],
+          models: [],
+        }],
+        terminals: [],
+      });
+      return mine;
+    };
+    const host = await liveHost({
+      url: 'ws://scripted', clientId: 'ahpc-test', connect: open, backoff: [0], keepaliveMs: 0,
+      onAuthRequired: (resources, why) => asked.push({ resources, ...(why === undefined ? {} : { why }) }),
+    });
+    await settle();
+    return { host, scripted, asked };
+  }
+
+  it('pushes a token for a resource the host advertised', async () => {
+    const { host, scripted } = await protecting();
+
+    await host.authenticate?.('https://api.anthropic.com', 'tok', { expiresIn: 3540 });
+    const sent = scripted.asked.find((frame) => frame.method === 'authenticate')?.params;
+    expect(sent).toEqual({
+      channel: ROOT, resource: 'https://api.anthropic.com', token: 'tok', expiresIn: 3540,
+    });
+
+    await host.close();
+  });
+
+  it('will not name a resource the host never advertised', async () => {
+    const { host, scripted } = await protecting();
+
+    // `authentication.md`: the resource MUST match one the server advertised.
+    // Refusing here says which names exist; sending it would have the host
+    // say no without saying what would work.
+    await expect(host.authenticate?.('https://example.test', 'tok')).rejects.toThrow(/api\.anthropic\.com/);
+    expect(scripted.asked.some((frame) => frame.method === 'authenticate')).toBe(false);
+
+    await host.close();
+  });
+
+  it('leaves out an expiry that is not a positive integer', async () => {
+    const { host, scripted } = await protecting();
+
+    // MUST be a positive integer when supplied, and MUST be omitted when the
+    // expiry is unknown. Zero is not "already expired", it is not allowed.
+    await host.authenticate?.('https://api.anthropic.com', 'tok', { expiresIn: 0 });
+    const sent = scripted.asked.find((frame) => frame.method === 'authenticate')?.params;
+    expect(sent).not.toHaveProperty('expiresIn');
+
+    await host.close();
+  });
+
+  it('reads the resources off a `-32007` from any command', async () => {
+    const { host, scripted, asked } = await protecting();
+    scripted.refuse.set(SESSION, 'auth');
+    scripted.refuseWith = {
+      code: -32007,
+      message: 'Authentication required',
+      data: { resources: [{ resource: 'https://api.anthropic.com', description: 'Anthropic API' }] },
+    };
+
+    host.subscribe(SESSION as never, () => undefined);
+    await settle();
+
+    // The error MAY come back from any command, and its `data` is what says
+    // to what. Dropping it told a person that authentication was required and
+    // not what for.
+    expect(asked[0]?.resources[0]?.resource).toBe('https://api.anthropic.com');
+
+    await host.close();
+  });
+
+  it('says an expired credential is not one to send again', async () => {
+    const { host, scripted, asked } = await protecting();
+
+    await scripted.authRequired('https://api.anthropic.com', 'expired');
+    await settle(2);
+
+    // MUST acquire a new credential; MUST NOT blindly replay the challenged
+    // token. The reason is carried so the layer above can tell them apart.
+    expect(asked[asked.length - 1]?.why).toBe('expired');
 
     await host.close();
   });

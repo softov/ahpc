@@ -63,6 +63,20 @@ export async function connect(options: Where): Promise<HostConnection & { pump?(
       // runs and not on the frame that closes it - the finish is the thing
       // that happened, and it is what the screen shows next.
       onProgress: (_token, message) => { if (message !== null) sink.report(message); },
+      /*
+       * The host wants signing into something.
+       *
+       * Said in the words a person can act on, which means naming the
+       * resource and the variable that would satisfy it. `expired` is called
+       * out because the answer is different: a new credential, not the one
+       * that was just refused.
+       */
+      onAuthRequired: (resources, why) => {
+        const names = resources.map((one) => one.resource).join(', ');
+        sink.report(why === 'expired'
+          ? `The token for ${names} has expired. Sign in again: ahpc auth ${resources[0]?.resource ?? ''}`
+          : `${names} needs signing in to: ahpc auth ${resources[0]?.resource ?? ''}`);
+      },
       // What this client serves back. Nothing unless a directory was named:
       // the protocol is symmetrical, and a client that published by default
       // would be one that hands its disk to any host it connects to.

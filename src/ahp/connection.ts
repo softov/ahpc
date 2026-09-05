@@ -213,6 +213,23 @@ export interface HostConnection {
    * naming the grant that would lift it.
    */
   watchResource?(uri: string, observer: (changes: { uri: string; kind: string }[]) => void, options?: { recursive?: boolean }): Promise<{ close(): void }>;
+  /**
+   * Push a bearer token for one of the host's protected resources.
+   *
+   * `authentication.md`: `resource` MUST match one the server advertised -
+   * statically in `AgentInfo.protectedResources` or through a live MCP
+   * challenge. `expiresIn` MUST be a positive integer and MUST have elapsed
+   * time subtracted from it if the token response was held onto; it is
+   * omitted where the expiry is unknown. An empty token revokes.
+   */
+  authenticate?(resource: string, token: string, options?: { scopes?: string[]; expiresIn?: number }): Promise<void>;
+  /**
+   * The protected resources this host says it has, from `AgentInfo`.
+   *
+   * A `resource` this client invents is one the host MUST refuse, so this is
+   * what any token push has to name.
+   */
+  protectedResources?(): Promise<{ resource: string; description?: string }[]>;
   /** Close one. The last chat in a session is the session; dispose that instead. */
   disposeChat(chat: string): Promise<void>;
 

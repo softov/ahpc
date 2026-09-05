@@ -205,6 +205,8 @@ export function fakeHost(): FakeHost {
   const drafts = new Map<SessionUri, string>();
   /** Paths something is watching, so a test can see one released. */
   const watched = new Set<string>();
+  /** Tokens pushed, by resource. An empty token revokes, as the protocol says. */
+  const tokens = new Map<string, string>();
   const configs = new Map<SessionUri, Record<string, string>>();
   const observers = new Map<SessionUri, Set<(event: HostEvent) => void>>();
   const chats = new Map<SessionUri, string>();
@@ -871,6 +873,9 @@ export function fakeHost(): FakeHost {
           // `createChat` MUST NOT be called at all - and the second agent below
           // deliberately does not, so the gate itself is scripted too.
           multipleChats: true,
+        // What a real host advertises for a harness that needs signing in.
+        // `authenticate` may only name one of these.
+        protectedResources: [{ resource: 'https://api.anthropic.com', description: 'Anthropic API' }],
           // Three shapes, because a real host sends three. A model that takes
           // every thinking level, one that takes a single level that is not the
           // one anything defaults to - so it carries no default at all, which is
@@ -1823,6 +1828,25 @@ export function fakeHost(): FakeHost {
       if (body === undefined) throw new Error(`${uri} is not a file this host serves`);
       return { data: body, encoding: 'utf-8', contentType: 'text/plain' };
     },
+
+    /*
+     * A token this fixture takes and remembers.
+     *
+     * The resource is checked against what the agents advertise, because that
+     * is the rule a real host enforces - `authentication.md` says the value
+     * MUST match one the server advertised, and a fixture that accepted any
+     * string would let a client ship a name no host will take.
+     */
+    authenticate: async (resource, token) => {
+      const known = AGENTS.flatMap((agent) => agent.protectedResources ?? []);
+      if (known.length > 0 && !known.some((one) => one.resource === resource)) {
+        throw new Error(`This host protects ${known.map((one) => one.resource).join(', ')}, not ${resource}.`);
+      }
+      if (token === '') tokens.delete(resource); else tokens.set(resource, token);
+      return undefined;
+    },
+
+    protectedResources: async () => AGENTS.flatMap((agent) => agent.protectedResources ?? []),
 
     resourceResolve: async (uri) => {
       const at = inTree(uri);

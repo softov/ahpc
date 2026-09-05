@@ -16,24 +16,6 @@ specification is what this client follows.
 
 ---
 
-# Batch 5 - Authentication
-
-## B-01-09 - `authenticate`
-
-**Clause.** `authentication.md:90`: the `resource` field MUST match a resource the server advertised, statically via `protectedResources` or dynamically via an MCP challenge. `:115`: `expiresIn` MUST be a positive integer when supplied. `:117`: a client that retained the original token response MUST subtract elapsed time before forwarding it, and MUST omit `expiresIn` when the expiry is unknown; an empty token revokes. `:131-133`: `-32007` MAY be returned from **any** command and its `data` MUST be an `AuthRequiredErrorData` describing what needs authenticating. `:200`: on `auth/required` with `reason: 'expired'` the client MUST acquire a new credential and MUST NOT blindly replay the challenged token. `:202`: the notification is ephemeral, so clients SHOULD re-check after reconnecting. `:63`: absent `required` means required.
-
-**Missing.** `authenticate` at every layer. `-32007` arrives as text and its `data` is discarded; `auth/required` reaches this client and is routed nowhere.
-
-**Steps.**
-1. `authenticate(resource, token, expiresIn?)` on the seam, `fake.ts` and `live.ts`.
-2. Read `AuthRequiredErrorData` off any `-32007` and name the resources it lists.
-3. Resolve a token: `--token`, then an environment variable named for the resource, then a TUI prompt; on the command line, refuse and name the variable. Send only a `resource` the host advertised.
-4. Compute `expiresIn` by subtracting elapsed time, omit it when unknown, and send an empty token to revoke.
-5. On `auth/required` with `reason: 'expired'`, acquire again rather than replay. Re-check after every reconnect.
-6. Test: `-32007` from a command that is not `authenticate`; an expired challenge; a resource the host never advertised.
-
----
-
 # Batch 6 - The rest of the surface
 
 ## B-01-18 - Completions, forks and side chats

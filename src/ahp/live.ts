@@ -94,6 +94,16 @@ export interface LiveHostOptions {
    */
   onProgress?(token: string, message: string | null): void;
   /**
+   * The host wants a token before it will go on.
+   *
+   * `reason: 'expired'` is the one that matters: `authentication.md` says the
+   * client MUST acquire a new credential and MUST NOT blindly replay the one
+   * that was challenged. Arrives either as the `auth/required` notification or
+   * as the `data` on any `-32007`, which the specification says may come back
+   * from **any** command rather than only from `authenticate`.
+   */
+  onAuthRequired?(resources: { resource: string; description?: string }[], reason?: string): void;
+  /**
    * What this client serves back, when it was told to serve anything.
    *
    * Absent means a `publish()` that refuses everything, which is the default
@@ -1029,6 +1039,16 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
    */
   const working = new Map<string, string>();
   const notified = (method: string, params: Bag): void => {
+    if (method === 'auth/required') {
+      const one = bag(params.resource);
+      const resource = str(one.resource);
+      if (resource === undefined) return;
+      options.onAuthRequired?.(
+        [{ resource, ...(str(one.description) ? { description: str(one.description) as string } : {}) }],
+        str(params.reason),
+      );
+      return;
+    }
     if (method !== 'root/progress') return;
     const token = str(params.progressToken);
     if (token === undefined) return;
@@ -1098,8 +1118,27 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
    * through rather than replaced with one of ours.
    */
   const reason = (error: unknown): string => {
-    const rpc = error as { code?: number; message?: string } | null;
+    const rpc = error as { code?: number; message?: string; data?: unknown } | null;
     const message = rpc?.message ?? String(error);
+    /*
+     * A `-32007` says which resources need signing into, in its `data`.
+     *
+     * `authentication.md` puts an `AuthRequiredErrorData` there and says the
+     * error MAY come back from **any** command, not only `authenticate` - so
+     * this is read wherever a refusal is turned into words rather than at one
+     * call site. Dropping it left a person told that authentication was
+     * required and not told to what.
+     */
+    if (rpc?.code === -32007) {
+      const resources = list(bag(rpc.data).resources).map((raw) => {
+        const one = bag(raw);
+        return {
+          resource: str(one.resource) ?? '',
+          ...(str(one.description) ? { description: str(one.description) as string } : {}),
+        };
+      }).filter((one) => one.resource !== '');
+      if (resources.length > 0) options.onAuthRequired?.(resources);
+    }
     return typeof rpc?.code === 'number' ? `${message} (${rpc.code})` : message;
   };
 
@@ -1241,6 +1280,29 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
       }
     }
     return { id, displayName: id, provider: '' };
+  };
+
+  /**
+   * What the host says it protects, across every agent it advertises.
+   *
+   * `AgentInfo.protectedResources` is the static half of where a `resource`
+   * may come from; the other half is a live MCP challenge, which arrives as
+   * `auth/required` rather than being listable.
+   */
+  const advertised = async (): Promise<{ resource: string; description?: string }[]> => {
+    const found = new Map<string, { resource: string; description?: string }>();
+    for (const entry of list(mirror.root.agents)) {
+      for (const raw of list(bag(entry).protectedResources)) {
+        const one = bag(raw);
+        const resource = str(one.resource);
+        if (resource === undefined) continue;
+        found.set(resource, {
+          resource,
+          ...(str(one.description) ? { description: str(one.description) as string } : {}),
+        });
+      }
+    }
+    return [...found.values()];
   };
 
   /** The chat a session dispatches to, remembered so it is asked for once. */
@@ -1492,6 +1554,34 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
       };
     },
 
+    /*
+     * A token, for a resource the host said it protects.
+     *
+     * The `resource` is checked against what was advertised before anything is
+     * sent: `authentication.md` says it MUST match, so a name this client made
+     * up is a request the host is obliged to refuse - better to say which
+     * names exist than to have the host say no.
+     */
+    authenticate: async (resource, token, opts) => {
+      const known = await advertised();
+      if (known.length > 0 && !known.some((one) => one.resource === resource)) {
+        throw new Error(`This host protects ${known.map((one) => one.resource).join(', ')}, not ${resource}.`);
+      }
+      await client.request('authenticate', {
+        channel: ROOT,
+        resource,
+        token,
+        ...(opts?.scopes && opts.scopes.length > 0 ? { scopes: opts.scopes } : {}),
+        // A positive integer or nothing. Zero and negatives are not "expired
+        // already", they are values the protocol does not allow.
+        ...(typeof opts?.expiresIn === 'number' && Number.isInteger(opts.expiresIn) && opts.expiresIn > 0
+          ? { expiresIn: opts.expiresIn }
+          : {}),
+      });
+    },
+
+    protectedResources: async () => advertised(),
+
     resourceResolve: async (uri) => {
       const result = bag(await client.request('resourceResolve', { channel: ROOT, uri }));
       return {
@@ -1644,6 +1734,17 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
         provider: str(agent.provider) ?? str(agent.id) ?? 'unknown',
         displayName: str(agent.displayName) ?? str(agent.provider) ?? 'Agent',
         ...(str(agent.description) ? { description: str(agent.description) as string } : {}),
+        ...(list(agent.protectedResources).length > 0
+          ? {
+            protectedResources: list(agent.protectedResources).map((raw) => {
+              const one = bag(raw);
+              return {
+                resource: str(one.resource) ?? '',
+                ...(str(one.description) ? { description: str(one.description) as string } : {}),
+              };
+            }).filter((one) => one.resource !== ''),
+          }
+          : {}),
         // A gate, not a hint. Absent means `createChat` must not be called.
         ...(bag(agent.capabilities).multipleChats !== undefined ? { multipleChats: true } : {}),
         // The same decoder a session's list goes through, because it is the
