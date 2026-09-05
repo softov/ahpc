@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { openChannels } from './channels.js';
+import { publish } from './publish.js';
+import type { Published } from './publish.js';
 import type { HostConnection, HostEvent } from './connection.js';
 import type {
   Agent, Answer, Automation, AutomationRun, Changeset, ChangesetOperation, ChangesetOperationTarget, Completion, ConfigProperty, ContentRef, Customization, CustomizationKind,
@@ -91,6 +93,14 @@ export interface LiveHostOptions {
    * wait that looked like nothing happening.
    */
   onProgress?(token: string, message: string | null): void;
+  /**
+   * What this client serves back, when it was told to serve anything.
+   *
+   * Absent means a `publish()` that refuses everything, which is the default
+   * and the safe one - a client that offers its filesystem to whichever host
+   * it connects to is a mistake, not a feature.
+   */
+  publish?: Published;
 }
 
 /**
@@ -196,6 +206,8 @@ interface Client {
     lastSeenServerSeq: number;
     subscriptions: readonly string[];
   }): Promise<Record<string, unknown>>;
+  /** Install the answer to anything the host asks this client. */
+  setServerRequestHandler(handler: unknown): void;
   request(method: string, params: unknown): Promise<Record<string, unknown>>;
   subscribe(uri: string): Promise<{
     result: { snapshot?: { state?: unknown } };
@@ -220,6 +232,7 @@ interface Mirror {
 
 interface Loaded {
   Client: new (transport: unknown, config?: unknown) => Client;
+  createResourceRequestHandler(handlers: Record<string, (params: unknown) => Promise<unknown>>): unknown;
   Mirror: new () => Mirror;
   connect(url: string): Promise<unknown>;
   automationReducer(state: unknown, action: unknown): unknown;
@@ -304,6 +317,8 @@ async function load(): Promise<Loaded> {
     const transport = ws.WebSocketTransport as unknown as { connect(url: string): Promise<unknown> };
     return {
       Client: client.AhpClient as unknown as Loaded['Client'],
+      createResourceRequestHandler:
+        client.createResourceRequestHandler as unknown as Loaded['createResourceRequestHandler'],
       Mirror: client.AhpStateMirror as unknown as Loaded['Mirror'],
       connect: (url) => transport.connect(url),
       automationReducer: core.automationReducer as unknown as Loaded['automationReducer'],
@@ -1033,7 +1048,20 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
 
   const transport = tee(await openTransport() as Framed, notified);
   let client = new ahp.Client(transport, {});
+  /*
+   * What a host may ask this client for.
+   *
+   * The protocol is symmetrical and the package answers `-32601` to every
+   * server-initiated method until a handler is installed. Installing one is
+   * what makes this client an implementation of the reverse direction rather
+   * than a client that happens not to crash: a published directory answers,
+   * and everything else is refused with the code the specification declares
+   * for a refusal instead of the one for a method that does not exist.
+   */
+  const serving = options.publish ?? publish();
+  const answering = ahp.createResourceRequestHandler(serving.handlers());
   const mirror = new ahp.Mirror();
+  client.setServerRequestHandler(answering);
   client.connect();
 
   /*
@@ -1262,6 +1290,7 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
         try {
           const socket = tee(await openTransport() as Framed, notified);
           const fresh = new ahp.Client(socket, {});
+          fresh.setServerRequestHandler(answering);
           fresh.connect();
           const held = channels.held();
 
@@ -1527,6 +1556,35 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
         destination: to,
         ...(opts?.failIfExists ? { failIfExists: true } : {}),
       });
+    },
+
+    watchResource: async (uri, observer, opts) => {
+      const result = bag(await client.request('createResourceWatch', {
+        channel: ROOT,
+        uri,
+        ...(opts?.recursive ? { recursive: true } : {}),
+      }));
+      // Receiver-assigned and opaque: whatever the host called it is what gets
+      // subscribed to, and nothing here parses it.
+      const channel = str(result.channel);
+      if (channel === undefined) throw new Error('This host allocated no watch channel.');
+      const hold = channels.open(channel, {
+        opened: () => undefined,
+        event: (event) => {
+          if (event.type !== 'action') return;
+          const action = bag(bag(event.params).action);
+          if (str(action.type) !== 'resourceWatch/changed') return;
+          // `changes` is wrapped in `items` for forward compatibility, so it
+          // is read through rather than treated as the array itself.
+          observer(list(bag(action.changes).items).map((raw) => {
+            const change = bag(raw);
+            return { uri: str(change.uri) ?? '', kind: str(change.kind) ?? str(change.type) ?? 'changed' };
+          }));
+        },
+      });
+      // There is no dispose command. Releasing the last hold is what sends the
+      // `unsubscribe` the host releases the watcher on.
+      return { close: () => hold.release() };
     },
 
     /*

@@ -202,6 +202,17 @@ export interface HostConnection {
   resourceMkdir?(uri: string): Promise<void>;
   resourceMove?(from: string, to: string, options?: { failIfExists?: boolean }): Promise<void>;
   resourceCopy?(from: string, to: string, options?: { failIfExists?: boolean }): Promise<void>;
+  /**
+   * Be told when something under a path changes, instead of asking again.
+   *
+   * `resource-watch-channel.md`: the receiver allocates the channel URI and it
+   * is opaque; there is no dispose command, and the receiver MUST release the
+   * watcher once every subscriber has unsubscribed - so letting go of the
+   * returned handle is the whole of closing one. Creating one goes through the
+   * same permission flow as the rest of the family, so a refusal is `-32009`
+   * naming the grant that would lift it.
+   */
+  watchResource?(uri: string, observer: (changes: { uri: string; kind: string }[]) => void, options?: { recursive?: boolean }): Promise<{ close(): void }>;
   /** Close one. The last chat in a session is the session; dispose that instead. */
   disposeChat(chat: string): Promise<void>;
 

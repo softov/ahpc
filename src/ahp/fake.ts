@@ -62,6 +62,8 @@ export interface FakeHost extends HostConnection {
    * than despite the gate.
    */
   invoked(): { changeset: string; operationId: string; target?: unknown }[];
+  /** Paths a watch is open on, so releasing one can be asserted. */
+  watching(): string[];
 }
 
 type Step = () => void;
@@ -201,6 +203,8 @@ export function fakeHost(): FakeHost {
   const queues = new Map<SessionUri, QueuedMessage[]>();
   /** What each chat is holding as a draft, which is host state and not a screen's. */
   const drafts = new Map<SessionUri, string>();
+  /** Paths something is watching, so a test can see one released. */
+  const watched = new Set<string>();
   const configs = new Map<SessionUri, Record<string, string>>();
   const observers = new Map<SessionUri, Set<(event: HostEvent) => void>>();
   const chats = new Map<SessionUri, string>();
@@ -1894,6 +1898,22 @@ export function fakeHost(): FakeHost {
       return undefined;
     },
 
+    /*
+     * A watch this fixture opens and never fires.
+     *
+     * Which is honest: nothing changes under a scripted filesystem. What it
+     * demonstrates is the shape a caller has to get right - a handle whose
+     * release is the only way to close one, because the protocol has no
+     * dispose command and the receiver releases the watcher when the last
+     * subscriber goes.
+     */
+    watchResource: async (uri, _observer) => {
+      const at = inTree(uri);
+      if (at === undefined) throw new Error(`${uri} is not somewhere this host serves`);
+      watched.add(uri);
+      return { close: () => { watched.delete(uri); } };
+    },
+
     /**
      * One action, verbatim, without this fake knowing what most of them mean.
      *
@@ -2005,5 +2025,8 @@ export function fakeHost(): FakeHost {
     dispatched: () => [...sent],
 
     invoked: () => [...invoked],
+
+    /** What is being watched, so a screen closing can be seen to release it. */
+    watching: () => [...watched],
   };
 }

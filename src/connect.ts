@@ -2,6 +2,7 @@
 
 import { MissingProtocolPackage, liveHost } from './ahp/live.js';
 import { fakeHost } from './ahp/fake.js';
+import { publish } from './ahp/publish.js';
 import type { HostConnection } from './ahp/connection.js';
 
 /**
@@ -19,6 +20,16 @@ export interface Where {
   token?: string;
   /** Where the agent works - a path on the *host*, not on this machine. */
   path?: string;
+  /**
+   * A directory on *this* machine to serve back, under `virtual://ahpc/`.
+   *
+   * AHP is symmetrical and a host may read from a client-published URI. Absent
+   * means nothing is served and every such request is refused, which is the
+   * default because publishing by accident is worse than not publishing.
+   */
+  publish?: string;
+  /** Whether the published directory may be written to. Read-only otherwise. */
+  publishWritable?: boolean;
 }
 
 /**
@@ -52,6 +63,12 @@ export async function connect(options: Where): Promise<HostConnection & { pump?(
       // runs and not on the frame that closes it - the finish is the thing
       // that happened, and it is what the screen shows next.
       onProgress: (_token, message) => { if (message !== null) sink.report(message); },
+      // What this client serves back. Nothing unless a directory was named:
+      // the protocol is symmetrical, and a client that published by default
+      // would be one that hands its disk to any host it connects to.
+      ...(options.publish !== undefined
+        ? { publish: publish({ root: options.publish, ...(options.publishWritable ? { writable: true } : {}) }) }
+        : {}),
       onState: (state) => { if (state === 'offline') sink.report('The host stopped answering'); },
     });
   }

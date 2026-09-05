@@ -147,7 +147,7 @@ const SWITCHES = new Set([
   '--reject', '--claude', '--chat',
   // The write half's own flags, which take no value: without them here a
   // positional after one is read as that flag's argument and disappears.
-  '--create-only', '--recursive', '--fail-if-exists',
+  '--create-only', '--recursive', '--fail-if-exists', '--publish-writable',
 ]);
 
 /** A message for the person, not a stack trace. */
@@ -168,6 +168,10 @@ const where = (args: Args): Where => {
     ...(host ? { host } : {}),
     ...(token ? { token } : {}),
     ...(args.value('--cwd') ? { path: args.value('--cwd') as string } : {}),
+    // What this client serves back to the host, and whether the host may
+    // write into it. Both off unless asked for.
+    ...(args.value('--publish') ? { publish: args.value('--publish') as string } : {}),
+    ...(args.has('--publish-writable') ? { publishWritable: true } : {}),
   };
 };
 

@@ -16,51 +16,6 @@ specification is what this client follows.
 
 ---
 
-# Batch 4 - Resources, both directions
-
-The `resource*` family is symmetrical. This client serves none of it and sends
-a third of it.
-
-## B-01-10 - The write half
-
-**Clause.** `CommandMap` declares `resourceWrite`, `resourceDelete`, `resourceMkdir`, `resourceMove`, `resourceCopy` and `resourceResolve` alongside the three this client sends. `commands.ts`: `-32008 NotFound` if the URI does not exist, `-32009 PermissionDenied` if not permitted, and the receiver enforces access through the `resourceRequest` flow.
-
-**Missing.** All six, at every layer. The browser is a viewer and the grant negotiation this client implements is negotiating for a capability nothing uses.
-
-**Steps.**
-1. All six on `HostConnection`, `fake.ts` and `live.ts`.
-2. `ahpc resource write|rm|mkdir|mv|cp|stat`.
-3. Read-modify-write carries `resourceResolve`'s `etag` as `ifMatch`; `-32011` draws as a conflict.
-4. Rename, delete and new-file in the browser, each asking the operation's own confirmation and the grant separately.
-5. Test: a stale `ifMatch`, and a refused grant.
-
-## B-01-16a - Resource watches
-
-**Clause.** `resource-watch-channel.md:15`: the watch URI is receiver-assigned and opaque. `:37`: there is no dispose command - the receiver MUST release the watcher once every subscriber has unsubscribed. `:68`: the receiver MUST gate `createResourceWatch` through the same permission flow, returning `-32009` with a `resourceRequest` payload when denied.
-
-**Missing.** No watch is ever created, so the changeset and file screens re-read on a timer.
-
-**Steps.**
-1. Create a watch behind the changeset and file screens; release on close, which the channel registry already does.
-2. Treat the returned channel as opaque.
-3. Handle `-32009` with its `resourceRequest` payload through the grant flow that already exists.
-4. Test: created on open, unsubscribed on close, and a denied watch asking for the grant.
-
-## B-01-17 - Answering what a host asks
-
-**Clause.** `subscriptions.md:13`: "The same nine `resource*` request methods plus `createResourceWatch` may also be initiated by the server. Used for host-driven per-session filesystem providers and for fetching client-published URIs (e.g. `virtual://my-client/...` plugins)." `commands.ts`: the receiver enforces access via the same permission/`resourceRequest` flow regardless of which peer initiated, and `-32009` is the declared refusal.
-
-**Missing.** All ten. The package's default answers `-32601`, which is legal, but this client implements no part of the protocol's reverse direction.
-
-**Steps.**
-1. A request handler layer, so a host-initiated method is routed rather than falling to the package default. Refuse every URI with `-32009` until something is published.
-2. `--publish <dir>`, served under `virtual://ahpc/` - the scheme shape the specification's own examples and conformance tests use - with every path resolved and checked to be inside it.
-3. Serve the read half against it; refuse the write half unless `--publish-writable` is given.
-4. `createResourceWatch` over the same directory.
-5. Test: a host reading a published file, and being refused a path outside the directory.
-
----
-
 # Batch 5 - Authentication
 
 ## B-01-09 - `authenticate`
