@@ -1124,3 +1124,65 @@ describe('a model is read as the catalogue sends it', () => {
     await host.close();
   });
 });
+
+describe('what a turn ran at is kept, not only which model', () => {
+  it('carries the settings the host sent beside the id', async () => {
+    const { host, scripted } = await connect();
+    scripted.states.set(SESSION, { defaultChat: CHAT, chats: [] });
+    scripted.states.set(CHAT, {
+      turns: [{
+        id: 't1',
+        startedAt: new Date().toISOString(),
+        message: {
+          text: 'answer',
+          origin: { kind: 'agent' },
+          // What the protocol calls `ModelSelection`: the model, and the
+          // resolved answers to whatever the model's own schema asked.
+          model: { id: 'opus[1m]', config: { thinkingLevel: 'xhigh' } },
+        },
+      }],
+    });
+
+    const seen: HostEvent[] = [];
+    host.subscribe(SESSION as never, (event) => seen.push(event));
+    await settle();
+
+    const snapshot = seen.find((event) => event.type === 'snapshot');
+    const turn = snapshot?.type === 'snapshot'
+      ? [...snapshot.turns, ...(snapshot.active ? [snapshot.active] : [])].find((one) => one.model)
+      : undefined;
+    // The id alone cannot say what an answer cost: a thinking level is chosen
+    // per turn and holds from that turn onwards.
+    expect(turn?.model?.id).toBe('opus[1m]');
+    expect(turn?.model?.config).toEqual({ thinkingLevel: 'xhigh' });
+
+    await host.close();
+  });
+
+  it('takes a model that came with nothing beside it', async () => {
+    const { host, scripted } = await connect();
+    scripted.states.set(SESSION, { defaultChat: CHAT, chats: [] });
+    scripted.states.set(CHAT, {
+      turns: [{
+        id: 't1',
+        startedAt: new Date().toISOString(),
+        message: { text: 'answer', origin: { kind: 'agent' }, model: { id: 'haiku' } },
+      }],
+    });
+
+    const seen: HostEvent[] = [];
+    host.subscribe(SESSION as never, (event) => seen.push(event));
+    await settle();
+
+    const snapshot = seen.find((event) => event.type === 'snapshot');
+    const turn = snapshot?.type === 'snapshot'
+      ? [...snapshot.turns, ...(snapshot.active ? [snapshot.active] : [])].find((one) => one.model)
+      : undefined;
+    // Absent rather than empty, so nothing downstream has to tell an answer
+    // with no settings from one whose settings were an empty object.
+    expect(turn?.model?.id).toBe('haiku');
+    expect(turn?.model?.config).toBeUndefined();
+
+    await host.close();
+  });
+});

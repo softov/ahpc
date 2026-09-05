@@ -102,6 +102,10 @@ const BlockView = defineComponent<{
         <Row gap={1} padding={[1, 0, 0, 0]}>
           <text content={theme.glyphs.bulletFilled} fg={block.state === 'running' ? 'accent' : 'muted'} />
           <text content={block.model ?? 'agent'} bold fg="accent" />
+          {/* What this turn was asked for, where the host said. A thinking
+              level is chosen per turn and holds from that turn onwards, so
+              two answers from one model are two different questions. */}
+          {block.settings ? <text content={block.settings} fg="subtle" /> : null}
           <text content={block.meta} fg="subtle" flex={1} />
           {block.state === 'cancelled' ? <text content="stopped" fg="warning" /> : null}
           {block.state === 'failed' ? <text content="failed" fg="danger" /> : null}

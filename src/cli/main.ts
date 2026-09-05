@@ -772,7 +772,13 @@ async function sessions(host: HostConnection, args: Args, wants: boolean): Promi
       line();
       for (const turn of turns) {
         const text = turn.role === 'user' ? (turn.message ?? '') : spoken(turn);
-        line(`## ${turn.role === 'user' ? 'Said' : 'Answered'}${turn.model ? ` (${turn.model})` : ''}`);
+        // The model and what it was asked for. An export that named the model
+        // and not the thinking level recorded half of what produced the answer
+        // underneath it.
+        const asked = turn.model
+          ? [turn.model.id, ...Object.values(turn.model.config ?? {})].join(', ')
+          : '';
+        line(`## ${turn.role === 'user' ? 'Said' : 'Answered'}${asked ? ` (${asked})` : ''}`);
         line();
         if (text) { line(text); line(); }
       }

@@ -1154,6 +1154,25 @@ describe('what a session actually is', () => {
   });
 
   /**
+   * What the answer above was asked for.
+   *
+   * A thinking level is chosen per turn and holds from that turn onwards, so
+   * an id alone cannot say what any given answer cost - two answers from one
+   * model are two different questions. The values are the host's own, and the
+   * key is not drawn: `medium` is what a person reads, `thinkingLevel medium`
+   * is twice as long and no clearer.
+   */
+  it('says what the turn was asked for, beside the model that answered', async () => {
+    const { t } = await catalogue({ width: 140, height: 30 });
+    t.app.store.set(SELECTED, 'ahp-session:/1f0a');
+    await t.app.execute('session.open');
+    for (let i = 0; i < 8; i++) await t.settle();
+
+    expect(t.hasText('medium')).toBe(true);
+    await t.unmount();
+  });
+
+  /**
    * The same rows on a terminal half as wide.
    *
    * Not a duplicate. The label column used to be a constant eleven on the

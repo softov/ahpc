@@ -170,7 +170,15 @@ export interface Turn {
   message?: string;
   parts: ResponsePart[];
   state: 'running' | 'complete' | 'cancelled' | 'failed';
-  model?: string;
+  /**
+   * What this turn ran on, as the host reported it.
+   *
+   * The id and whatever settings went with it. Carried whole because the
+   * settings are the only record of what a turn was actually asked for -
+   * a thinking level is chosen per turn and takes effect from that turn
+   * onwards, so an id alone cannot say what any given answer cost.
+   */
+  model?: ModelSelection;
   at: string;
   elapsedMs?: number;
 }
@@ -363,6 +371,19 @@ export interface ChangesetOperationTarget {
  * different ways, so a client with its own words is one that disagrees with
  * whichever host it is connected to.
  */
+/**
+ * A model, as a turn names one.
+ *
+ * The protocol's own shape: an id, and the resolved answers to whatever
+ * `ModelRow.options` asked. Distinct from the catalogue row - this is the
+ * choice, that is what there was to choose from.
+ */
+export interface ModelSelection {
+  id: string;
+  /** Answers by property key, in the host's own vocabulary. */
+  config?: Record<string, string>;
+}
+
 export interface ModelRow {
   /** What rides on a turn. */
   id: string;

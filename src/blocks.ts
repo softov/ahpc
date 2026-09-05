@@ -15,7 +15,18 @@ import type { QueuedMessage, ToolCall, Turn } from './ahp/types.js';
  */
 export type Block =
   | { kind: 'said'; id: string; turnId: string; text: string }
-  | { kind: 'header'; id: string; turnId: string; model?: string; meta: string; state: Turn['state'] }
+  | {
+    kind: 'header'; id: string; turnId: string; model?: string;
+    /**
+     * What the turn was asked for besides the model, in the host's words.
+     *
+     * The values rather than the keys: `thinkingLevel` is one host's name for
+     * a property whose *answers* are what a person reads, and a header that
+     * spelled out the key would be twice as long and no clearer.
+     */
+    settings?: string;
+    meta: string; state: Turn['state'];
+  }
   | { kind: 'prose'; id: string; turnId: string; content: string; streaming: boolean }
   | { kind: 'reasoning'; id: string; turnId: string; content: string; streaming: boolean }
   | { kind: 'notice'; id: string; turnId: string; content: string }
@@ -44,7 +55,8 @@ export function toBlocks(turns: Turn[], queued: QueuedMessage[] = []): Block[] {
       kind: 'header',
       id: `${turn.id}:head`,
       turnId: turn.id,
-      ...(turn.model ? { model: turn.model } : {}),
+      ...(turn.model ? { model: turn.model.id } : {}),
+      ...(turn.model?.config ? { settings: Object.values(turn.model.config).join(' · ') } : {}),
       meta: running ? 'running' : turn.elapsedMs ? `${(turn.elapsedMs / 1000).toFixed(1)}s` : '',
       state: turn.state,
     });

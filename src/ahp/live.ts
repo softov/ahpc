@@ -5,7 +5,7 @@ import type {
   Agent, Answer, Automation, AutomationRun, Changeset, ChangesetOperation, ChangesetOperationTarget, Completion, ConfigProperty, ContentRef, Customization, CustomizationKind,
   TerminalRow, TerminalState,
   FileContent, FileEdit, McpState, PendingInput, QueuedMessage, Question, QuestionKind,
-  ModelRow, ResponsePart, SessionConfig, SessionDetail, SessionSummary, SessionUri, ToolCall,
+  ModelRow, ModelSelection, ResponsePart, SessionConfig, SessionDetail, SessionSummary, SessionUri, ToolCall,
   ToolCallStatus, Turn,
 } from './types.js';
 import { SessionFlag } from './types.js';
@@ -374,7 +374,7 @@ function turn(value: unknown, running: boolean): Turn {
     state: running ? 'running'
       : state === 'cancelled' ? 'cancelled'
         : state === 'error' ? 'failed' : 'complete',
-    ...(str(bag(message.model).id) ? { model: str(bag(message.model).id) as string } : {}),
+    ...(str(bag(message.model).id) ? { model: selection(message.model) } : {}),
     at: str(found.startedAt) ?? new Date(0).toISOString(),
     ...(typeof found.duration === 'number' ? { elapsedMs: found.duration } : {}),
   };
@@ -670,6 +670,27 @@ function config(value: unknown): SessionConfig {
       };
     }),
     values: Object.fromEntries(Object.entries(values).map(([key, entry]) => [key, String(entry)])),
+  };
+}
+
+/**
+ * What a turn was asked for: the model, and the settings that went with it.
+ *
+ * The settings were dropped here for as long as this client only ever read an
+ * id, and dropping them made a turn's answer unaccountable - a thinking level
+ * takes effect from the turn that names it, so two answers from one model are
+ * two different questions and nothing recorded which. Values are flattened to
+ * strings because that is what a form returns and what every reader here
+ * shows; a host that sends a number for one sends a number this can print.
+ */
+function selection(value: unknown): ModelSelection {
+  const found = bag(value);
+  const config = Object.entries(bag(found.config))
+    .filter(([, one]) => one !== null && typeof one !== 'object')
+    .map(([key, one]) => [key, String(one)]);
+  return {
+    id: str(found.id) ?? '',
+    ...(config.length > 0 ? { config: Object.fromEntries(config) as Record<string, string> } : {}),
   };
 }
 
@@ -2095,7 +2116,7 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
           : str(state.lifecycle) ?? 'creating') as SessionDetail['lifecycle'],
         ...(channels.refusal(uri) !== undefined ? { refusal: channels.refusal(uri) as string } : {}),
         config: config(state.config),
-        ...(last ? { model: known(str(bag(bag(bag(last).message).model).id) as string) } : {}),
+        ...(last ? { model: known(selection(bag(bag(last).message).model).id) } : {}),
         ...(str(state.activity) ? { activity: str(state.activity) as string } : {}),
       };
     },

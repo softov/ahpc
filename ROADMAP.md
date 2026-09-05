@@ -137,25 +137,17 @@ AHP is symmetrical, and the package answers a host-initiated request with `-3260
 
 **Suggestions.** (1) Read the agent's capabilities and offer fork and side chat exactly where they are advertised, which is the rule the rest of this client already follows. (2) Wait until a host advertises one, and take both then. (3) Take `sessionConfigCompletions` only alongside the first property that needs it, which is the host's `A-01-03c` seen from here.
 
-## B-01-19 - A session says which model, and nothing about it
+## B-01-20 - A thinking level can be read and cannot be chosen
 
-`AgentInfo.models` carries `{ id, name, provider }` and, for a model whose harness reports effort levels, a `configSchema` describing a `thinkingLevel` property. The session info view shows an id.
+`ModelSelection` is carried inbound now: a turn keeps the settings it ran with, the transcript says them beside the model, and the export records both. What is left is the other direction. `say` and `queue` send `{ id }` with no `config`, so nothing a person picks can reach the host.
 
-**What it costs today.** `opus[1m]` is what a person reads where the host sent a display name beside it. The model's own options - which thinking levels it takes, and which one it opens at - are on the wire and are not drawn anywhere, so the only way to know what a model can be asked for is to try it.
+**What changed under this entry, which is why it is worth doing now.** ahpd honours the field as of `5f0b040` - `TurnMessage.model` is parsed as the `ModelSelection` it is and the effort is read out of `config.thinkingLevel`. Before that the config went nowhere and neither did the model: both `begin` sites tested `typeof message.model === 'string'`, so against any real client the model a turn named was dropped entirely. So this is no longer a control that would write a field nobody reads.
 
-**Two things that shape this, both checked against the hosts rather than assumed.** The per-model `thinkingLevel` is a *fact* here, not a control. The protocol is explicit about what it is *for* - `state.schema.json` says of `configSchema` that clients present it as a form and pass the resolved values in `ModelSelection.config` - and ahpd advertises the form and then drops what comes back, reading `model.id` alone and taking its effort from the session-wide `effortLevel`. So a picker wired to it would write a field nothing reads. Read-only is not a shortcut past the contract; it is the only honest thing to draw until a host consumes `model.config`, and the moment one does this becomes the form the schema describes. And `enumLabels` is read positionally and never mapped here - ahpd, VS Code's SDK projection and its own agent spell the same five effort values three different ways, so a client with its own word list is a client that disagrees with whatever host it is connected to. The one-value schema with no `default` is real and only happens when that single level is not `high`, which is the case a naive "show the default" row renders blank.
+**What it costs today.** The model's options are drawn in the session pane as facts and there is nothing to set them with. A person who can see that this model takes five thinking levels still has to reach for the session-wide `effortLevel` to change one, which is a different control describing the same thing.
 
-`provider` is required by the protocol and equals the enclosing agent's, so it is a field to satisfy rather than a fact to show twice. Everything else the audit might expect - `maxContextWindow`, `maxOutputTokens`, `maxPromptTokens`, `supportsVision`, `policyState` - is absent from both ahpd and VS Code's SDK transport, and appears only in VS Code's Copilot-routed projection. Nothing here should draw a control for them.
+**The thing to get right.** A level is not per turn in the way the field's shape suggests. The harness holds one setting for the whole query, so a turn that names a level sets it from that turn onwards - and ahpd emits `session/configChanged` for the session-wide `effortLevel` at the same moment, precisely so the two controls cannot describe different futures. A UI that implied otherwise would be lying about what it just did.
 
-**Suggestions.** (1) Name and id in the info view, with the model's effort levels listed from `enumLabels` and the default marked where the schema has one, resolved against `RootState.agents[].models`. (2) The same, and mark the session-wide `effortLevel` beside them so the fact and the control that exists are visibly different things. (3) Name only, and leave the options until a host honours them.
-
-## B-01-20 - What a turn ran at is thrown away on the way in
-
-`ModelSelection` on a chat message carries `id` and `config`. This client keeps `message.model.id` and discards the rest, and `say` and `queue` send `{ id }` with nothing beside it.
-
-**What it costs today.** A turn's model is an id with no name, no provider and no chosen thinking level, so nothing here can say what a past turn actually ran at - only which model was named. It also means a per-model option can never be *sent*, whatever a host does with it, because the field is dropped before it reaches the wire.
-
-**Suggestions.** (1) Carry `ModelSelection` whole, in and out, and let the screens decide what to show - the field is on the chat channel, and `say` and `queue` are the two places that send it. (2) Carry it inbound only, which makes the transcript truthful and leaves sending for whenever a host honours the config. (3) Leave it, and accept that a model is a string here.
+**Suggestions.** (1) A chip on the control row beside the model chip, built from the selected model's `options` and sent as `ModelSelection.config` - which is what the schema says a client does with a `configSchema`, and it reads the session's `effortLevel` back for what is in force. (2) The same, but drive the existing session config control from the model's options instead of adding a second chip, so there is one place to change it and the model only narrows the choices. (3) Leave it, and let the session-wide setting be the only way.
 
 ## B-01-05 - A diff is drawn from scratch here, and will stay that way
 

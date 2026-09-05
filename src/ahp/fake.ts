@@ -599,7 +599,7 @@ export function fakeHost(): FakeHost {
         id: 't2',
         role: 'agent',
         state: 'complete',
-        model: 'claude-opus-5',
+        model: { id: 'claude-opus-5' },
         at: AT,
         elapsedMs: 21_400,
         parts: [
@@ -624,7 +624,7 @@ export function fakeHost(): FakeHost {
       id: 't3',
       role: 'agent',
       state: 'running',
-      model: 'claude-opus-5',
+      model: { id: 'claude-opus-5', config: { thinkingLevel: 'medium' } },
       at: AT,
       parts: [
         { kind: 'markdown', id: 'm3', content: 'Let me check that the patched header actually builds before you take it any further.' },
@@ -654,7 +654,7 @@ export function fakeHost(): FakeHost {
       id: 's2-t2',
       role: 'agent',
       state: 'running',
-      model: 'claude-sonnet-5',
+      model: { id: 'claude-sonnet-5' },
       at: AT,
       parts: [
         { kind: 'reasoning', id: 's2-r1', content: 'Sizing rule first: a component that fills has a measured height, one that does not draws everything.' },
@@ -678,7 +678,7 @@ export function fakeHost(): FakeHost {
         id: 's3-t2',
         role: 'agent',
         state: 'complete',
-        model: 'gpt-5',
+        model: { id: 'gpt-5' },
         at: AT,
         elapsedMs: 3_100,
         parts: [
@@ -706,7 +706,7 @@ export function fakeHost(): FakeHost {
         id: 's4-t2',
         role: 'agent',
         state: 'failed',
-        model: 'claude-opus-5',
+        model: { id: 'claude-opus-5' },
         at: AT,
         elapsedMs: 900,
         parts: [
@@ -737,7 +737,7 @@ export function fakeHost(): FakeHost {
         id: 's5-t2',
         role: 'agent',
         state: 'complete',
-        model: 'claude-sonnet-5',
+        model: { id: 'claude-sonnet-5' },
         at: AT,
         elapsedMs: 12_000,
         parts: [
@@ -1030,7 +1030,7 @@ export function fakeHost(): FakeHost {
    */
   function reply(uri: SessionUri, said: string): void {
     const userTurn: Turn = { id: nextId('u'), role: 'user', message: said, parts: [], state: 'complete', at: AT };
-    const model = models.get(uri) ?? 'claude-opus-5';
+    const model = { id: models.get(uri) ?? 'claude-opus-5' };
     const agentTurn: Turn = { id: nextId('a'), role: 'agent', parts: [], state: 'running', model, at: AT };
 
     script.push(() => {
@@ -1828,7 +1828,7 @@ export function fakeHost(): FakeHost {
         // The id a turn named, resolved against the catalogue - which is what
         // the live host does, and a fixture that answered a bare id would be
         // one where the screens were never asked to resolve anything.
-        ...(last?.model ? { model: modelRow(last.model) } : {}),
+        ...(last?.model ? { model: modelRow(last.model.id) } : {}),
         ...(summaries.get(uri)?.activity ? { activity: summaries.get(uri)?.activity as string } : {}),
       };
     },
