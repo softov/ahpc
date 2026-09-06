@@ -117,20 +117,16 @@ describe('a snapshot held while its reader leaves', () => {
 
 describe('a reader that arrives while the socket is down', () => {
   /*
-   * Marked failing, because it is.
+   * The reader nobody had written a test for.
    *
-   * Opening a session while the client is between connections subscribes to
-   * nothing: the reader is given no snapshot, no error and no later retry,
-   * and `state()` says `connected` the whole time - so the screen is an empty
-   * transcript on a session that has turns in it, and navigating away and
-   * back is the only thing that fixes it. A person produces this by pressing
-   * enter on a session while the daemon is restarting.
-   *
-   * Written the way it should behave rather than the way it does. The day the
-   * resubscribe lands, this passes and the marker has to come off, which is
-   * the point of leaving it here rather than in a document.
+   * This used to subscribe to nothing: the channel went into the reconnect's
+   * list of subscriptions to resume, the host had never been sent one for it,
+   * and the replay that came back was taken as covering it - so it was marked
+   * open, never asked for, and its reader waited for a snapshot nobody was
+   * going to send. `state()` said `connected` throughout. A person produces
+   * it by pressing enter on a session while the daemon is restarting.
    */
-  it.fails('is subscribed once the connection comes back', async () => {
+  it('is subscribed once the connection comes back', async () => {
     const { host, reopen, read } = await connect((one) => {
       one.states.set(SESSION, { defaultChat: CHAT, chats: [{ resource: CHAT, title: 'Chat' }], status: 1 });
       one.states.set(CHAT, { turns: [{

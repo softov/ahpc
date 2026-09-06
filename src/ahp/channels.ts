@@ -122,6 +122,18 @@ interface Held {
   consumers: Set<Consumer>;
   /** True once the host has answered a subscribe for this channel. */
   opened: boolean;
+  /**
+   * True once the host has *ever* answered one, on any connection.
+   *
+   * `opened` is about this connection and a detach clears it; this is not
+   * cleared, because it is the answer to a different question: whether the
+   * host has a subscription of its own to restore. A channel a reader opened
+   * after the socket went has none - the request never reached anybody - so it
+   * is neither worth naming in a `reconnect` nor covered by the replay that
+   * comes back, and treating it as though it were leaves its reader waiting
+   * for a snapshot nobody is going to send.
+   */
+  known: boolean;
   /** True once consumers have been handed the snapshot that answer carried. */
   told: boolean;
   /** What arrived while the subscribe was still in flight. */
@@ -189,7 +201,7 @@ export function openChannels(options: ChannelsOptions): Channels {
   const entry = (uri: string): Held => {
     const found = held.get(uri);
     if (found) return found;
-    const made: Held = { uses: 0, consumers: new Set(), opened: false, told: false, waiting: [] };
+    const made: Held = { uses: 0, consumers: new Set(), opened: false, known: false, told: false, waiting: [] };
     held.set(uri, made);
     return made;
   };
@@ -301,6 +313,7 @@ export function openChannels(options: ChannelsOptions): Channels {
     const asking = client.subscribe(uri).then(({ result }) => {
       if (era === generation && held.get(uri) === channel) {
         channel.opened = true;
+        channel.known = true;
         channel.fromSeq = result.snapshot?.fromSeq;
       }
       return bag(result.snapshot?.state);
@@ -459,7 +472,11 @@ export function openChannels(options: ChannelsOptions): Channels {
       }
     },
 
-    held: () => [...held.keys()].filter((uri) => (held.get(uri)?.uses ?? 0) > 0),
+    // What the host can be asked to resume: held by a reader *and* opened at
+    // some point, because the host cannot restore a subscription it was never
+    // sent.
+    held: () => [...held.keys()]
+      .filter((uri) => (held.get(uri)?.uses ?? 0) > 0 && held.get(uri)?.known === true),
     seq: () => seen,
     refusal: (uri) => refused.get(uri),
     forget: (uri) => { if (uri === undefined) refused.clear(); else refused.delete(uri); },
@@ -504,7 +521,7 @@ export function openChannels(options: ChannelsOptions): Channels {
         // subscriptions behind it are ones it restored itself and none of them
         // needs asking for again.
         for (const channel of held.values()) {
-          if (channel.uses === 0 || channel.opened) continue;
+          if (channel.uses === 0 || channel.opened || !channel.known) continue;
           channel.opened = true;
           channel.told = true;
           const queued = channel.waiting.splice(0);
@@ -520,6 +537,7 @@ export function openChannels(options: ChannelsOptions): Channels {
         const channel = held.get(snapshot.resource);
         if (!channel) continue;
         channel.opened = true;
+        channel.known = true;
         channel.told = true;
         channel.waiting.length = 0;
         for (const consumer of channel.consumers) consumer.opened(bag(snapshot.state));
@@ -536,6 +554,7 @@ export function openChannels(options: ChannelsOptions): Channels {
     adopt: (uri, state) => {
       const channel = entry(uri);
       channel.opened = true;
+      channel.known = true;
       channel.told = false;
       channel.initial = state;
     },
