@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { h } from '@textui/core';
+import { defineComponent, h, useState } from '@textui/core';
 import { renderApp } from '@textui/testing';
 import type { Harness } from '@textui/testing';
 import { ChatComposer } from '../src/view/composer.js';
@@ -79,5 +79,86 @@ describe('the completion menu is a window over the whole answer', () => {
     const t = await open(60, 12);
     expect(shown(t).length).toBeLessThanOrEqual(6);
     expect(t.lines().join('\n')).toContain('file0.ts');
+  });
+});
+
+/*
+ * Escape, and what it is closest to.
+ *
+ * Typing `/` opened the menu and escape left for the session list, because the
+ * menu is derived from the draft and has no state to close - so the key passed
+ * through it to the field and then to the screen. Escape means "the thing in
+ * front of me", and the menu is in front.
+ */
+describe('escape closes the menu before it leaves anything', () => {
+  const withMenu = async (value: string, onCancel: () => void): Promise<Harness> => {
+    const t = await renderApp({
+      width: 80,
+      height: 24,
+      theme: 'workbench',
+      root: h(ChatComposer, {
+        value,
+        onChange: () => undefined,
+        onSubmit: () => undefined,
+        onCancel,
+        paths: paths(12),
+        autoFocus: true,
+      }),
+    });
+    await t.settle();
+    await t.settle();
+    return t;
+  };
+
+  it('shuts the menu and stays where it is', async () => {
+    let left = 0;
+    const t = await withMenu('@src/', () => { left += 1; });
+    expect(shown(t).length).toBeGreaterThan(0);
+
+    await t.press('escape');
+    await t.settle();
+    expect(shown(t)).toEqual([]);
+    // The screen is the *next* escape, not this one.
+    expect(left).toBe(0);
+  });
+
+  it('leaves on the escape after that', async () => {
+    let left = 0;
+    const t = await withMenu('@src/', () => { left += 1; });
+    await t.press('escape');
+    await t.settle();
+    await t.press('escape');
+    await t.settle();
+    expect(left).toBe(1);
+  });
+
+  it('brings the menu back when the question changes', async () => {
+    // Stateful, because the draft is the component's input: a fixed `value`
+    // would mean typing changed nothing and the menu stayed shut for a
+    // reason that is this test's rather than the code's.
+    const Typing = defineComponent<Record<string, never>>('Typing', () => {
+      const [value, setValue] = useState('@src/');
+      return h(ChatComposer, {
+        value,
+        onChange: setValue,
+        onSubmit: () => undefined,
+        paths: paths(12),
+        autoFocus: true,
+      });
+    });
+    const t = await renderApp({ width: 80, height: 24, theme: 'workbench', root: h(Typing, {}) });
+    await t.settle();
+    await t.settle();
+    expect(shown(t).length).toBeGreaterThan(0);
+
+    await t.press('escape');
+    await t.settle();
+    expect(shown(t)).toEqual([]);
+
+    // A dismissal is about the draft it was dismissed at, so another
+    // character is another question and the menu answers it.
+    await t.press('f');
+    await t.settle();
+    expect(shown(t).length).toBeGreaterThan(0);
   });
 });

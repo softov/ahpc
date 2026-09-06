@@ -119,7 +119,19 @@ export const ChatComposer: (props: ChatComposerProps) => RenderOutput =
         ...(path.description ? { description: path.description } : {}),
       }));
     const byInsert = new Map(paths.map((path) => [path.insertText, path]));
-    const matches = offered;
+
+    /*
+     * Escape closes the menu before it does anything else.
+     *
+     * The menu is drawn from the draft, so there is no state to close - which
+     * is why escape used to pass straight through it to the field and then to
+     * the screen, and typing `/` and pressing escape left for the session
+     * list. What is remembered is the draft it was dismissed at: the menu
+     * stays shut for that exact text and comes back the moment another
+     * character makes it a different question.
+     */
+    const [dismissedAt, setDismissedAt] = useState<string | null>(null);
+    const matches = dismissedAt === value ? [] : offered;
 
     // Which completion is under the cursor. Clamped rather than reset, so a
     // list that shrinks as more is typed keeps a valid row instead of
@@ -202,7 +214,10 @@ export const ChatComposer: (props: ChatComposerProps) => RenderOutput =
               if (path && onPath) { onPath(path); return; }
               onSubmit(next);
             }}
-            {...(onCancel ? { onCancel } : {})}
+            onCancel={() => {
+              if (matches.length > 0) { setDismissedAt(value); return; }
+              onCancel?.();
+            }}
             onOverflow={(direction: -1 | 1) => {
               if (matches.length > 0) { step(direction); return; }
               onHistory?.(direction);
