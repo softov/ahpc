@@ -56,14 +56,24 @@ jobs:
       - run: timeout 600 npm test
       - run: npm run build
 
-      - name: Publish
+      # Staged, not published. The version is uploaded and held, and nothing is
+      # installable until somebody approves it on the package page - which is
+      # npm's own recommendation, and the right gate for the one action in this
+      # repository that cannot be undone. A tag can be pushed by accident; an
+      # npm version cannot be unpublished.
+      #
+      # `--provenance` attaches a signed attestation tying this tarball to this
+      # commit and this workflow, which npm shows on the package page.
+      - name: Stage the release
         if: ${{ inputs.dry_run != true }}
-        # `--provenance` attaches a signed attestation tying this tarball to
-        # this commit and this workflow, which npm shows on the package page.
-        # For a human approval step before it goes live, change this to
-        # `npm stage publish` and approve it on npmjs.com.
-        run: npm publish --provenance --access public
+        run: npm stage publish --provenance --access public
 
-      - name: What would have been published
+      - name: Say what is waiting
+        if: ${{ inputs.dry_run != true }}
+        run: |
+          echo "Staged. Approve it at https://www.npmjs.com/package/@softov/ahpc"
+          echo "The approve button stays disabled until npm has finished scanning."
+
+      - name: What would have been staged
         if: ${{ inputs.dry_run == true }}
-        run: npm publish --dry-run --access public
+        run: npm stage publish --dry-run --access public
