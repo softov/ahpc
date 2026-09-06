@@ -11,7 +11,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { fakeHost } from '../src/ahp/fake.js';
 import { TOOLS, named } from '../src/mcp/tools.js';
-import { PROTOCOL, SERVER, answer, call } from '../src/mcp/serve.js';
+import { PROTOCOL, SERVER, SPOKEN, answer, call } from '../src/mcp/serve.js';
 import { serve, type Serving } from '../src/mcp/http.js';
 
 let running: Serving | undefined;
@@ -63,6 +63,20 @@ describe('the protocol', () => {
     expect((said?.result as { capabilities: { tools: unknown } }).capabilities.tools).toBeDefined();
   });
 
+  it('takes the client\'s version where it can speak it', async () => {
+    // Answering our own regardless would tell a client one release behind to
+    // take this version or disconnect, over a difference these tools do not
+    // touch.
+    for (const version of SPOKEN) {
+      const said = await ask({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: version } });
+      expect((said?.result as { protocolVersion: string }).protocolVersion).toBe(version);
+    }
+    // And one it cannot is answered with the newest it can, which is an offer
+    // rather than a refusal.
+    const other = await ask({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '1999-01-01' } });
+    expect((other?.result as { protocolVersion: string }).protocolVersion).toBe(PROTOCOL);
+  });
+
   it('says nothing back to a notification', async () => {
     // A reply to a message with no id is a protocol error on this end, and
     // the client that sent it has nobody waiting for one.
@@ -93,9 +107,13 @@ describe('the protocol', () => {
 });
 
 describe('over HTTP', () => {
-  const start = async (options: { token?: string } = {}): Promise<string> => {
+  const start = async (options: { token?: string; origins?: string[] } = {}): Promise<string> => {
     running = await serve(fakeHost(), {
-      ...SERVER, host: '127.0.0.1', port: 0, ...(options.token === undefined ? {} : { token: options.token }),
+      ...SERVER,
+      host: '127.0.0.1',
+      port: 0,
+      ...(options.token === undefined ? {} : { token: options.token }),
+      ...(options.origins === undefined ? {} : { origins: options.origins }),
     });
     return `http://127.0.0.1:${running.port}`;
   };
@@ -158,6 +176,45 @@ describe('over HTTP', () => {
     expect(allowed.status).toBe(200);
     // And a wrong one is refused rather than let through by a prefix match.
     expect((await fetch(`${at}/api`, { headers: { authorization: 'Bearer secretly' } })).status).toBe(401);
+  });
+
+  it('refuses a browser on another origin, which loopback does not', async () => {
+    /*
+     * The transport's one hard security rule.
+     *
+     * Binding to `127.0.0.1` is not the protection it looks like: a page on
+     * any site can POST here from inside the browser of the person running
+     * this, and the request arrives from their own machine. Without the check
+     * an open tab is enough to drive every session on the host.
+     */
+    const at = await start();
+    const evil = await fetch(`${at}/api`, { headers: { origin: 'http://evil.example' } });
+    expect(evil.status).toBe(403);
+
+    // Its own origin is fine, and so is one that was allowed by name.
+    const mine = await fetch(`${at}/api`, { headers: { origin: at } });
+    expect(mine.status).toBe(200);
+    const named = await start({ origins: ['http://tools.example'] });
+    expect((await fetch(`${named}/api`, { headers: { origin: 'http://tools.example' } })).status).toBe(200);
+  });
+
+  it('lets a program with no origin at all through', async () => {
+    // A shell script, a webhook and an MCP client send none. Refusing those
+    // would refuse every real caller to guard against a browser, which always
+    // sends one.
+    const at = await start();
+    expect((await fetch(`${at}/api`)).status).toBe(200);
+  });
+
+  it('refuses a protocol version it cannot speak, and takes the ones it can', async () => {
+    const at = await start();
+    for (const version of SPOKEN) {
+      const said = await fetch(`${at}/api`, { headers: { 'mcp-protocol-version': version } });
+      expect(said.status, version).toBe(200);
+    }
+    const old = await fetch(`${at}/api`, { headers: { 'mcp-protocol-version': '2024-11-05' } });
+    expect(old.status).toBe(400);
+    expect((await old.json() as { error: string }).error).toContain('does not speak MCP');
   });
 
   it('says where to look rather than 404ing silently', async () => {

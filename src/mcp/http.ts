@@ -14,7 +14,7 @@
 
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { HostConnection } from '../ahp/connection.js';
-import { answer, call, listing, type Incoming } from './serve.js';
+import { SPOKEN, answer, call, listing, type Incoming } from './serve.js';
 
 /** How much of a request body is read before it is refused, in bytes. */
 const LIMIT = 1_000_000;
@@ -32,6 +32,14 @@ export interface ServeOptions {
    * token is what makes binding anywhere else defensible.
    */
   token?: string;
+  /**
+   * Browser origins allowed to reach this, beyond its own.
+   *
+   * Empty is the safe default and the usual answer: a shell script, a webhook
+   * and an MCP client send no `Origin` at all, so nothing legitimate is turned
+   * away by allowing none. This is for a page somebody serves themselves.
+   */
+  origins?: readonly string[];
   onProblem?(said: string): void;
 }
 
@@ -72,6 +80,49 @@ const allowed = (request: IncomingMessage, token: string | undefined): boolean =
   return typeof said === 'string' && said.trim() === `Bearer ${token}`;
 };
 
+/**
+ * Whether a browser may talk to this.
+ *
+ * The transport says a server **MUST** validate `Origin` to stop DNS
+ * rebinding, and the reason it says so is that binding to loopback is not the
+ * protection it looks like: a page on any website can POST to
+ * `http://127.0.0.1:7431` from inside the browser of the person running this,
+ * and the request arrives from their own machine looking exactly like theirs.
+ * Without this, opening a tab would be enough to drive every session on the
+ * host.
+ *
+ * No header at all is allowed. A browser always sends one on a request like
+ * these; a program does not, and refusing those would refuse every real
+ * caller to guard against a thing that cannot happen.
+ */
+const sameOrigin = (request: IncomingMessage, url: URL, extra: readonly string[]): boolean => {
+  const said = request.headers.origin;
+  if (typeof said !== 'string' || said === '') return true;
+  if (extra.includes(said)) return true;
+  try {
+    const from = new URL(said);
+    // The host and port this request came in on, whatever name was used to
+    // reach it - `localhost` and `127.0.0.1` are the same server and a person
+    // typing either should not be told no.
+    return from.host === url.host;
+  }
+  catch { return false; }
+};
+
+/**
+ * Whether this can speak the version the client says it is using.
+ *
+ * The transport says an invalid or unsupported `MCP-Protocol-Version` **MUST**
+ * be a 400. Absent is not unsupported: the same paragraph says to assume
+ * `2025-03-26` where there is no header, which is a client from before it
+ * existed.
+ */
+const speakable = (request: IncomingMessage): boolean => {
+  const said = request.headers['mcp-protocol-version'];
+  if (said === undefined) return true;
+  return typeof said === 'string' && SPOKEN.includes(said);
+};
+
 /** Start listening. Answers once the socket is up. */
 export async function serve(host: HostConnection, options: ServeOptions): Promise<Serving> {
   const server: Server = createServer((request, response) => {
@@ -80,6 +131,18 @@ export async function serve(host: HostConnection, options: ServeOptions): Promis
         const url = new URL(request.url ?? '/', `http://${request.headers.host ?? 'localhost'}`);
         const path = url.pathname.replace(/\/+$/, '') || '/';
 
+        if (!sameOrigin(request, url, options.origins ?? [])) {
+          // 403 rather than 401: a token would not make this request
+          // acceptable, so inviting one would be the wrong thing to say.
+          send(response, 403, { error: `This server does not serve requests from ${String(request.headers.origin)}.` });
+          return;
+        }
+        if (!speakable(request)) {
+          send(response, 400, {
+            error: `This server does not speak MCP ${String(request.headers['mcp-protocol-version'])}. It speaks ${SPOKEN.join(', ')}.`,
+          });
+          return;
+        }
         if (!allowed(request, options.token)) {
           send(response, 401, { error: 'This server needs a bearer token.' });
           return;

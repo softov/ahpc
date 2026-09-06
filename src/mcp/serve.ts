@@ -18,8 +18,19 @@ import type { HostConnection } from '../ahp/connection.js';
 import { TOOLS, named } from './tools.js';
 import { version } from '../version.js';
 
-/** The version of MCP this speaks, and the one it answers `initialize` with. */
+/** The newest version of MCP this speaks, and what it answers an unknown one with. */
 export const PROTOCOL = '2025-06-18';
+
+/**
+ * Every version this will serve, newest first.
+ *
+ * Both of these describe the same tools, and this server uses nothing either
+ * of them added or removed - no sessions, no resources, no sampling - so
+ * refusing the older one would be refusing a client for a difference that
+ * cannot reach it. `2024-11-05` is *not* here: its HTTP transport is a
+ * different shape, with an `endpoint` event and a second URL.
+ */
+export const SPOKEN: readonly string[] = ['2025-06-18', '2025-03-26'];
 
 /**
  * What this server calls itself.
@@ -121,8 +132,18 @@ export async function answer(
   const no = (code: number, said: string): Outgoing => ({ jsonrpc: '2.0', id, error: { code, message: said } });
 
   if (method === 'initialize') {
+    /*
+     * The client's version where this can speak it, and the newest otherwise.
+     *
+     * `lifecycle` says a server answering a version it was not asked for is
+     * telling the client to take that one or disconnect, so answering our
+     * own regardless would refuse every client a release behind for no
+     * reason. A version this cannot speak gets the newest it can, which is
+     * the offer the client then accepts or drops.
+     */
+    const asked = bag(message.params).protocolVersion;
     return ok({
-      protocolVersion: PROTOCOL,
+      protocolVersion: typeof asked === 'string' && SPOKEN.includes(asked) ? asked : PROTOCOL,
       capabilities: { tools: { listChanged: false } },
       serverInfo: { name: options.name, version: options.version },
     });

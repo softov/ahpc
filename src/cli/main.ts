@@ -117,6 +117,7 @@ Serving these sessions to something else
                                launches this process
   serve                        the same tools on a socket, shared
                                [--serve-host H] [--serve-port N] [--serve-token T]
+                               [--serve-origin URL]… a browser page allowed in
                                /mcp is MCP; /api/<tool> is plain JSON
 
 Anything else
@@ -342,6 +343,8 @@ export async function cli(command: string, rest: string[]): Promise<number> {
           host: args.value('--serve-host') ?? '127.0.0.1',
           port: Number(args.value('--serve-port') ?? 7431),
           ...(args.value('--serve-token') === undefined ? {} : { token: args.value('--serve-token') as string }),
+          // Repeatable, because a page and its API are often two origins.
+          origins: args.every('--serve-origin'),
           onProblem: (said) => process.stderr.write(`${said}\n`),
         });
         line(`ahpc on http://${at.host}:${at.port} against ${host.url || '(scripted host)'}`);

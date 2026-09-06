@@ -215,7 +215,7 @@ Writes are guarded by the file's etag unless you pass `--force`, so two clients 
 | Command | | |
 |---|---|---|
 | `mcp` | MCP on stdin and stdout, for a client that launches this process | |
-| `serve` | The same tools on a socket, shared | `--serve-host H` `--serve-port N` `--serve-token T` |
+| `serve` | The same tools on a socket, shared | `--serve-host H` `--serve-port N` `--serve-token T` `--serve-origin URL` |
 
 ### Anything else
 
@@ -256,6 +256,8 @@ curl -XPOST localhost:7431/api/send_turn -d '{"session":"claude:/…","text":"wh
 `send_turn` blocks until the turn ends and returns what the agent said. A turn that stops to ask a person something is not finished: `wait_for_attention` says what it wants, and `confirm_tool_call` and `answer_question` answer it.
 
 It binds to `127.0.0.1` unless told otherwise, because anybody who can reach the port can drive every session on the host. `--serve-token` sets a bearer token, which is what makes `--serve-host 0.0.0.0` defensible.
+
+Requests carrying a browser `Origin` are refused unless the origin is this server's own or was named with `--serve-origin`, repeatable. That is the transport's own rule and it is not paranoia: loopback is not the protection it looks like, because a page on any site can POST to `127.0.0.1` from inside the browser of the person running this, and the request arrives from their own machine. A program - a script, a webhook, an MCP client - sends no `Origin` and is let through.
 
 ## AHP support
 
