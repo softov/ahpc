@@ -35,6 +35,9 @@ export function publishedUnder(clientId: string): string {
 /** JSON-RPC codes this answers with, as `commands.ts` declares them. */
 const NOT_FOUND = -32008;
 const PERMISSION_DENIED = -32009;
+const ALREADY_EXISTS = -32010;
+const CONFLICT = -32011;
+const tagOf = (size: number, mtimeMs: number): string => `W/"${size.toString(16)}-${Math.trunc(mtimeMs).toString(16)}"`;
 
 export interface Published {
   /** The directory served, or null when nothing was published. */
@@ -76,6 +79,7 @@ export function publish(options: { root?: string; writable?: boolean; clientId?:
    * was not called.
    */
   const PREFIX = publishedUnder(options.clientId ?? 'ahpc');
+  const writes = new Map<string, Promise<void>>();
 
   /**
    * The file a `virtual://<clientId>/...` names, or a refusal.
@@ -154,6 +158,73 @@ export function publish(options: { root?: string; writable?: boolean; clientId?:
     throw new PublishRefusal(NOT_FOUND, `${String(uri)} is not there.`);
   };
 
+  const write = async (at: string, uri: unknown, params: {
+    data?: unknown; encoding?: unknown; createOnly?: unknown; mode?: unknown;
+    position?: unknown; ifMatch?: unknown;
+  }): Promise<void> => {
+    const before = writes.get(at) ?? Promise.resolve();
+    const operation = before.catch(() => {}).then(async () => {
+      const mode = params.mode === 'append' || params.mode === 'insert' ? params.mode : 'truncate';
+      const position = typeof params.position === 'number' ? params.position : 0;
+      const createOnly = params.createOnly === true;
+      const ifMatch = typeof params.ifMatch === 'string' ? params.ifMatch : undefined;
+      const incoming = params.encoding === 'base64'
+        ? Buffer.from(String(params.data), 'base64')
+        : Buffer.from(String(params.data), 'utf8');
+      let flags = (mode === 'truncate' && position === 0 ? constants.O_WRONLY : constants.O_RDWR) | constants.O_NOFOLLOW;
+      if (ifMatch === undefined) flags |= constants.O_CREAT;
+      if (createOnly && ifMatch === undefined) flags |= constants.O_EXCL;
+      const file = await open(at, flags).catch((error: NodeJS.ErrnoException) => {
+        if (createOnly && error.code === 'EEXIST') {
+          throw new PublishRefusal(ALREADY_EXISTS, `${String(uri)} already exists.`);
+        }
+        if (ifMatch !== undefined && error.code === 'ENOENT') {
+          throw new PublishRefusal(CONFLICT, `${String(uri)} has changed since ${ifMatch}.`);
+        }
+        if (error.code === 'ENOENT') return gone(uri);
+        throw new PublishRefusal(PERMISSION_DENIED, `Could not write ${String(uri)}: ${error.message}`);
+      });
+      try {
+        const found = await file.stat();
+        if (found.isDirectory()) throw new PublishRefusal(PERMISSION_DENIED, `${String(uri)} is a directory.`);
+        if (createOnly && ifMatch !== undefined) {
+          throw new PublishRefusal(ALREADY_EXISTS, `${String(uri)} already exists.`);
+        }
+        if (ifMatch !== undefined && tagOf(found.size, found.mtimeMs) !== ifMatch) {
+          throw new PublishRefusal(CONFLICT, `${String(uri)} has changed since ${ifMatch}.`);
+        }
+        const held = mode === 'truncate' && position === 0 ? Buffer.alloc(0) : await file.readFile();
+        let output: Buffer;
+        if (mode === 'append') {
+          const cut = Math.max(0, held.length - Math.max(0, position));
+          output = Buffer.concat([held.subarray(0, cut), incoming, held.subarray(cut)]);
+        }
+        else if (mode === 'insert') {
+          const cut = Math.min(Math.max(0, position), held.length);
+          output = Buffer.concat([held.subarray(0, cut), incoming, held.subarray(cut)]);
+        }
+        else {
+          const cut = Math.min(Math.max(0, position), held.length);
+          output = Buffer.concat([held.subarray(0, cut), incoming]);
+        }
+        let offset = 0;
+        while (offset < output.length) {
+          const { bytesWritten } = await file.write(output, offset, output.length - offset, offset);
+          if (bytesWritten === 0) {
+            throw new PublishRefusal(PERMISSION_DENIED, `Could not finish writing ${String(uri)}.`);
+          }
+          offset += bytesWritten;
+        }
+        await file.truncate(output.length);
+      } finally { await file.close(); }
+    });
+    writes.set(at, operation);
+    try { await operation; }
+    finally {
+      if (writes.get(at) === operation) writes.delete(at);
+    }
+  };
+
   return {
     root,
     writable,
@@ -208,6 +279,7 @@ export function publish(options: { root?: string; writable?: boolean; clientId?:
             type: found.isDirectory() ? 'directory' : 'file',
             size: found.size,
             mtime: new Date(found.mtimeMs).toISOString(),
+            ...(found.isDirectory() ? {} : { etag: tagOf(found.size, found.mtimeMs) }),
           };
         }
         catch { return gone(uri); }
@@ -229,16 +301,12 @@ export function publish(options: { root?: string; writable?: boolean; clientId?:
       }),
 
       resourceWrite: async (params: unknown) => {
-        const { uri, data, encoding } = params as { uri?: unknown; data?: unknown; encoding?: unknown };
+        const input = params as {
+          uri?: unknown; data?: unknown; encoding?: unknown; createOnly?: unknown;
+          mode?: unknown; position?: unknown; ifMatch?: unknown;
+        };
         mutable();
-        const at = await where(uri);
-        const file = await open(at, constants.O_WRONLY | constants.O_CREAT | constants.O_NOFOLLOW);
-        try {
-          await file.truncate(0);
-          await file.writeFile(encoding === 'base64'
-            ? Buffer.from(String(data), 'base64')
-            : Buffer.from(String(data), 'utf8'));
-        } finally { await file.close(); }
+        await write(await where(input.uri), input.uri, input);
         return {};
       },
 
@@ -281,5 +349,3 @@ export function publish(options: { root?: string; writable?: boolean; clientId?:
     }),
   };
 }
-
-

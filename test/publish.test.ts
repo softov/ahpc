@@ -152,6 +152,48 @@ describe('writing is a second decision, not part of publishing', () => {
     expect(await readFile(path.join(root, 'written.txt'), 'utf8')).toBe('yes');
   });
 
+  it('honours write modes and preconditions', async () => {
+    const handlers = publish({ root, writable: true }).handlers();
+    const uri = `${PUBLISH_PREFIX}write-semantics.txt`;
+    await writeFile(path.join(root, 'write-semantics.txt'), 'ABCDEFGH');
+    await handlers.resourceWrite?.({ uri, data: 'xy', encoding: 'utf-8', mode: 'insert', position: 3 });
+    expect(await readFile(path.join(root, 'write-semantics.txt'), 'utf8')).toBe('ABCxyDEFGH');
+    await handlers.resourceWrite?.({ uri, data: '!', encoding: 'utf-8', mode: 'append', position: 2 });
+    expect(await readFile(path.join(root, 'write-semantics.txt'), 'utf8')).toBe('ABCxyDEF!GH');
+    await handlers.resourceWrite?.({ uri, data: '.', encoding: 'utf-8', mode: 'truncate', position: 4 });
+    expect(await readFile(path.join(root, 'write-semantics.txt'), 'utf8')).toBe('ABCx.');
+
+    expect(await refused(() => handlers.resourceWrite?.({
+      uri, data: 'no', encoding: 'utf-8', createOnly: true,
+    }) as Promise<unknown>)).toBe(-32010);
+    const { etag } = await handlers.resourceResolve?.({ uri }) as { etag: string };
+    await handlers.resourceWrite?.({ uri, data: 'new', encoding: 'utf-8', ifMatch: etag });
+    expect(await refused(() => handlers.resourceWrite?.({
+      uri, data: 'stale', encoding: 'utf-8', ifMatch: etag,
+    }) as Promise<unknown>)).toBe(-32011);
+  });
+
+  it('allows only one simultaneous createOnly or matching-etag write', async () => {
+    const handlers = publish({ root, writable: true }).handlers();
+    const created = `${PUBLISH_PREFIX}competing-create.txt`;
+    const creates = await Promise.allSettled(Array.from({ length: 8 }, (_, number) =>
+      handlers.resourceWrite?.({ uri: created, data: String(number), encoding: 'utf-8', createOnly: true })));
+    expect(creates.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    for (const result of creates.filter((result) => result.status === 'rejected')) {
+      expect((result.reason as { code: number }).code).toBe(-32010);
+    }
+
+    const uri = `${PUBLISH_PREFIX}competing-etag.txt`;
+    await writeFile(path.join(root, 'competing-etag.txt'), 'before');
+    const { etag } = await handlers.resourceResolve?.({ uri }) as { etag: string };
+    const updates = await Promise.allSettled(Array.from({ length: 8 }, (_, number) =>
+      handlers.resourceWrite?.({ uri, data: String(number), encoding: 'utf-8', ifMatch: etag })));
+    expect(updates.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    for (const result of updates.filter((result) => result.status === 'rejected')) {
+      expect((result.reason as { code: number }).code).toBe(-32011);
+    }
+  });
+
   it('will not write outside the directory even when writable', async () => {
     const handlers = publish({ root, writable: true }).handlers();
     expect(await refused(() => handlers.resourceWrite?.({
