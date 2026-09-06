@@ -118,6 +118,14 @@ declaration is `origin: ActionOrigin | undefined` - required, satisfied only by
 sending the key with an undefined value, which no JSON does. Both ahpd and VS
 Code's host omit it.
 
+**`RpcError` is not round-trip safe through the package's own client.** Its
+constructor formats the message it is given - `RPC error <code>: <text>` - and
+the client puts `err.message` straight into the JSON-RPC `message` field when
+answering a host-initiated request, so the prefix travels. The receiver builds
+its own `RpcError` from what arrived and prefixes again. Anyone throwing one
+from a server-request handler doubles it. Worked around here by restoring the
+bare message on the instance, which keeps the type that carries the code.
+
 **A tool's `inputSchema` is a closed declaration a real JSON Schema
 overflows.** Both hosts put `$comment` in one, which is a legal keyword the
 type does not allow.
