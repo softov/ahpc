@@ -255,6 +255,8 @@ curl -XPOST localhost:7431/api/send_turn -d '{"session":"claude:/…","text":"wh
 
 `send_turn` blocks until the turn ends and returns what the agent said. A turn that stops to ask a person something is not finished: `wait_for_attention` says what it wants, and `confirm_tool_call` and `answer_question` answer it.
 
+A caller that does not want to sit in silence for a minute puts a `progressToken` in the request's `_meta`, and gets a `notifications/progress` line for each tool the agent reaches for. On `serve` that also decides the shape of the reply: asked for, the POST is answered with an SSE stream carrying the notifications and then the result; not asked for, it is one JSON object. MCP has no shape for streaming partial *result* content, so the reply itself still arrives whole at the end - what this fixes is an agent that looked frozen, not one you want to watch write.
+
 It binds to `127.0.0.1` unless told otherwise, because anybody who can reach the port can drive every session on the host. `--serve-token` sets a bearer token, which is what makes `--serve-host 0.0.0.0` defensible.
 
 Requests carrying a browser `Origin` are refused unless the origin is this server's own or was named with `--serve-origin`, repeatable. That is the transport's own rule and it is not paranoia: loopback is not the protection it looks like, because a page on any site can POST to `127.0.0.1` from inside the browser of the person running this, and the request arrives from their own machine. A program - a script, a webhook, an MCP client - sends no `Origin` and is let through.

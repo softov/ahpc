@@ -39,7 +39,13 @@ export async function stdio(
           options.onProblem?.(`Not JSON: ${said.slice(0, 200)}`);
           return;
         }
-        const reply = await answer(host, message, options);
+        const reply = await answer(host, message, {
+          ...options,
+          // A notification mid-request is free here: stdout is a stream and
+          // the client is already reading lines off it. The HTTP half has to
+          // choose a response type before it can say anything at all.
+          notify: (notification) => say({ jsonrpc: '2.0', ...notification }),
+        });
         if (reply !== undefined) say(reply);
       }).catch((error: unknown) => {
         options.onProblem?.(error instanceof Error ? error.message : String(error));

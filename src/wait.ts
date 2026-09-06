@@ -74,6 +74,14 @@ export interface TurnOptions {
   onDelta?(text: string): void;
   /** A tool call the agent is blocked on, said once per call. */
   onWaiting?(call: { id: string; name: string }): void;
+  /**
+   * A tool the agent has started using, said once per call.
+   *
+   * Every tool call rather than only the ones that stop for a person, because
+   * this is what a caller watching a long turn has to go on: `onWaiting` fires
+   * on an approval and most turns never ask for one.
+   */
+  onStep?(call: { id: string; name: string }): void;
 }
 
 /**
@@ -105,6 +113,13 @@ export async function turn(
   let first = true;
   let noted: string | undefined;
   let answer: Turn | undefined;
+  /** Tool calls already reported, so a snapshot rebuilt per token says each once. */
+  const stepped = new Set<string>();
+  const step = (call: { id: string; name: string }): void => {
+    if (stepped.has(call.id)) return;
+    stepped.add(call.id);
+    options.onStep?.(call);
+  };
 
   const finished = until(host, uri, (event) => {
     /*
@@ -121,8 +136,9 @@ export async function turn(
       if (event.kind === 'markdown') options.onDelta?.(event.text);
       return false;
     }
-    if (event.type === 'toolCall' && event.call.status === 'pending-confirmation') {
-      if (noted !== event.call.id) {
+    if (event.type === 'toolCall') {
+      step({ id: event.call.id, name: event.call.name });
+      if (event.call.status === 'pending-confirmation' && noted !== event.call.id) {
         noted = event.call.id;
         options.onWaiting?.({ id: event.call.id, name: event.call.name });
       }
@@ -140,6 +156,9 @@ export async function turn(
       sawActive = true;
       const now = spoken(event.active);
       if (now.length > given) { options.onDelta?.(now.slice(given)); given = now.length; }
+      for (const part of event.active.parts) {
+        if (part.kind === 'toolCall') step({ id: part.call.id, name: part.call.name });
+      }
       const call = event.active.parts.find((part) => part.kind === 'toolCall'
         && part.call.status === 'pending-confirmation');
       if (call?.kind === 'toolCall' && noted !== call.call.id) {

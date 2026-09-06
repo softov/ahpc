@@ -49,6 +49,23 @@ export interface Incoming {
   params?: unknown;
 }
 
+/**
+ * One progress notification, as `notifications/progress` puts it on the wire.
+ *
+ * `progress` MUST increase on every one, `total` is left out because an
+ * agent's reply has no length known in advance, and `message` is what a person
+ * reads - which is the tool name a session stopped on, or the host's own words
+ * for what it is doing.
+ */
+export interface Progress {
+  progressToken: string | number;
+  progress: number;
+  message?: string;
+}
+
+/** Somewhere to put progress while a tool runs, or nothing where nobody asked. */
+export type Report = ((said: string) => void) | undefined;
+
 /** What goes back, or nothing at all where the message was a notification. */
 export type Outgoing = { jsonrpc: '2.0'; id: number | string | null } & (
   | { result: unknown; error?: never }
@@ -82,7 +99,12 @@ export const listing = (): unknown => ({
  * fault it can only give up over. So a refusal from the host - a session that
  * is gone, a directory it does not serve - comes back as content.
  */
-export async function call(host: HostConnection, name: string, input: unknown): Promise<unknown> {
+export async function call(
+  host: HostConnection,
+  name: string,
+  input: unknown,
+  report?: Report,
+): Promise<unknown> {
   const tool = named(name);
   if (tool === undefined) {
     return {
@@ -91,7 +113,7 @@ export async function call(host: HostConnection, name: string, input: unknown): 
     };
   }
   try {
-    const answer = await tool.run(host, bag(input));
+    const answer = await tool.run(host, bag(input), report);
     return {
       // Both, because clients differ: the text is what a model reads and
       // `structuredContent` is what a program does, and sending only the
@@ -111,6 +133,30 @@ export async function call(host: HostConnection, name: string, input: unknown): 
 }
 
 /**
+ * Somewhere for a running tool to say what it is doing, if anybody asked.
+ *
+ * A caller opts in by putting a `progressToken` in `_meta` on the request, and
+ * `undefined` here means it did not - in which case a tool that reports
+ * anything is writing to nowhere, which is exactly what should happen. The
+ * counter is this closure's, because `progress` MUST increase and a tool
+ * counting for itself would be a tool that has to know about the protocol.
+ */
+function reporter(
+  message: Incoming,
+  notify: ((notification: { method: string; params: unknown }) => void) | undefined,
+): Report {
+  const token = bag(bag(message.params)._meta).progressToken;
+  if (notify === undefined) return undefined;
+  if (typeof token !== 'string' && typeof token !== 'number') return undefined;
+  let count = 0;
+  return (said: string): void => {
+    count += 1;
+    const params: Progress = { progressToken: token, progress: count, message: said };
+    notify({ method: 'notifications/progress', params });
+  };
+}
+
+/**
  * Answer one message.
  *
  * `undefined` where there is nothing to send back, which is a notification -
@@ -119,7 +165,19 @@ export async function call(host: HostConnection, name: string, input: unknown): 
 export async function answer(
   host: HostConnection,
   message: Incoming,
-  options: { name: string; version: string },
+  options: {
+    name: string;
+    version: string;
+    /**
+     * Somewhere to send a notification while this is being answered.
+     *
+     * Given by a transport that has one: stdio always does, and HTTP does only
+     * once it has decided to answer with a stream. Absent means there is
+     * nowhere to say anything until the result, which is the ordinary case and
+     * why every progress path here is optional.
+     */
+    notify?(notification: { method: string; params: unknown }): void;
+  },
 ): Promise<Outgoing | undefined> {
   const method = typeof message.method === 'string' ? message.method : '';
   const id = message.id ?? null;
@@ -154,7 +212,7 @@ export async function answer(
     const params = bag(message.params);
     const name = typeof params.name === 'string' ? params.name : '';
     if (name === '') return no(INVALID_PARAMS, 'tools/call needs a name.');
-    try { return ok(await call(host, name, params.arguments)); }
+    try { return ok(await call(host, name, params.arguments, reporter(message, options.notify))); }
     catch (error) { return no(INTERNAL, error instanceof Error ? error.message : String(error)); }
   }
   return no(METHOD_NOT_FOUND, `This server does not implement ${method}. It serves tools and nothing else.`);

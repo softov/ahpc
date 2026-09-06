@@ -48,7 +48,15 @@ export interface Tool {
   input: Schema;
   /** Whether it changes anything, which some clients ask a person about. */
   readOnly: boolean;
-  run(host: HostConnection, input: Record<string, unknown>): Promise<unknown>;
+  /**
+   * Do it.
+   *
+   * `report` is where to say what is happening while a long one runs, and is
+   * absent unless the caller asked for progress and the transport can carry
+   * it. A tool that reports nothing is a tool that finishes quickly enough
+   * not to need to.
+   */
+  run(host: HostConnection, input: Record<string, unknown>, report?: (said: string) => void): Promise<unknown>;
 }
 
 const text = (value: unknown): string => (typeof value === 'string' ? value : '');
@@ -220,11 +228,23 @@ export const TOOLS: Tool[] = [
       required: ['session', 'text'],
       additionalProperties: false,
     },
-    run: async (host, input) => {
+    run: async (host, input, report) => {
       const model = text(input.model);
       const answer = await runTurn(host, uriOf(input), text(input.text), {
         ...(model === '' ? {} : { model: { id: model } as never }),
         ...(typeof input.timeoutSeconds === 'number' ? { timeoutSeconds: input.timeoutSeconds } : {}),
+        /*
+         * What a caller watching this is told while it waits.
+         *
+         * The tool a session stopped on, not the reply as it is typed: MCP's
+         * progress carries a human-readable line and has no shape for partial
+         * result content, so the text still arrives whole at the end. What
+         * this fixes is an agent that looked frozen for a minute.
+         */
+        ...(report === undefined ? {} : {
+          onStep: (call) => report(call.name),
+          onWaiting: (call) => report(`waiting on ${call.name}`),
+        }),
       });
       // Not an error: the turn is still running and the session is still
       // there, which is a different thing to tell a caller than a failure.

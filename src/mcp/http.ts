@@ -59,6 +59,44 @@ const body = async (request: IncomingMessage): Promise<string> => {
   return read;
 };
 
+/**
+ * Answer a request with a stream rather than one object.
+ *
+ * The transport allows either, and this is the branch that lets anything be
+ * said before the result: notifications go out as they happen and the response
+ * is the last event, after which the stream closes. Only opened where the
+ * caller asked for progress, because a stream is worse for everybody else -
+ * more to parse, and a connection held open for a request that answers at once.
+ */
+const stream = (response: ServerResponse): {
+  event(value: unknown): void;
+  end(value: unknown): void;
+} => {
+  response.writeHead(200, {
+    'content-type': 'text/event-stream',
+    'cache-control': 'no-cache, no-transform',
+    connection: 'keep-alive',
+  });
+  const event = (value: unknown): void => { response.write(`data: ${JSON.stringify(value)}\n\n`); };
+  return {
+    event,
+    end: (value) => { event(value); response.end(); },
+  };
+};
+
+/**
+ * Whether this request asked to be told what is happening while it waits.
+ *
+ * A `progressToken` in `_meta`, which is the only way a caller asks. Read here
+ * rather than inside `answer`, because the decision it drives - a stream or an
+ * object - has to be made before a single byte of the response is written.
+ */
+const wantsProgress = (message: Incoming): boolean => {
+  const params = message.params as { _meta?: { progressToken?: unknown } } | undefined;
+  const token = params?._meta?.progressToken;
+  return typeof token === 'string' || typeof token === 'number';
+};
+
 const send = (response: ServerResponse, code: number, value: unknown): void => {
   const text = JSON.stringify(value);
   response.writeHead(code, {
@@ -166,6 +204,21 @@ export async function serve(host: HostConnection, options: ServeOptions): Promis
           let message: Incoming;
           try { message = JSON.parse(await body(request)) as Incoming; }
           catch { send(response, 400, { jsonrpc: '2.0', id: null, error: { code: -32700, message: 'That is not JSON.' } }); return; }
+
+          if (wantsProgress(message)) {
+            const open = stream(response);
+            const reply = await answer(host, message, {
+              ...options,
+              notify: (notification) => open.event({ jsonrpc: '2.0', ...notification }),
+            });
+            // A notification that also carried a progress token has nothing to
+            // end the stream with, so it is closed rather than left open on a
+            // response that is never coming.
+            if (reply === undefined) { response.end(); return; }
+            open.end(reply);
+            return;
+          }
+
           const reply = await answer(host, message, options);
           // A notification is answered with 202 and no body, which is what the
           // transport says and what a client waiting on one would hang over.

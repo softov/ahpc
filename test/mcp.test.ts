@@ -217,12 +217,102 @@ describe('over HTTP', () => {
     expect((await old.json() as { error: string }).error).toContain('does not speak MCP');
   });
 
+  it('answers with a stream when the caller asked to be kept informed', async () => {
+    const at = await start();
+    const said = await fetch(`${at}/mcp`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0', id: 1, method: 'tools/call',
+        params: { name: 'list_agents', _meta: { progressToken: 1 }, arguments: {} },
+      }),
+    });
+    // The transport lets a server answer a request with either shape, and this
+    // is the one that can carry anything before the result.
+    expect(said.headers.get('content-type')).toContain('text/event-stream');
+    const text = await said.text();
+    const frames = text.split('\n\n').filter((one) => one.startsWith('data: '))
+      .map((one) => JSON.parse(one.slice('data: '.length)) as { id?: unknown });
+    // The response is the last event on the stream, and then it closes.
+    expect(frames.at(-1)?.id).toBe(1);
+  });
+
+  it('answers with one object when it was not asked', async () => {
+    const at = await start();
+    const said = await fetch(`${at}/mcp`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'list_agents', arguments: {} } }),
+    });
+    // A stream is worse for a caller that did not ask: more to parse, and a
+    // connection held open for a request that answers at once.
+    expect(said.headers.get('content-type')).toContain('application/json');
+  });
+
   it('says where to look rather than 404ing silently', async () => {
     const at = await start();
     const said = await fetch(`${at}/nowhere`);
     expect(said.status).toBe(404);
     expect((await said.json() as { error: string }).error).toContain('/api');
   });
+});
+
+describe('saying what is happening while a turn runs', () => {
+  it('sends nothing where the caller did not ask', async () => {
+    const said: unknown[] = [];
+    const reply = await answer(fakeHost(), {
+      jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'list_agents', arguments: {} },
+    }, { ...SERVER, notify: (one) => said.push(one) });
+    // No `progressToken`, so nothing is entitled to a notification - the spec
+    // is explicit that one may only reference a token an active request gave.
+    expect(said).toEqual([]);
+    expect(reply).toBeDefined();
+  });
+
+  it('counts up, and stops at the response', async () => {
+    const host = fakeHost();
+    const made = await named('new_session')!.run(host, {}) as { session: string };
+    const said: { params: { progressToken: unknown; progress: number; message?: string } }[] = [];
+
+    const answering = answer(host, {
+      jsonrpc: '2.0',
+      id: 4,
+      method: 'tools/call',
+      params: {
+        name: 'send_turn',
+        _meta: { progressToken: 'p-4' },
+        // `run` in the text picks the scripted reply that uses tools and then
+        // stops on one - which is the turn worth watching, and the reason a
+        // caller asks for progress at all.
+        arguments: { session: made.session, text: 'run the tests', timeoutSeconds: 1 },
+      },
+    }, { ...SERVER, notify: (one) => said.push(one as typeof said[number]) });
+
+    let finished = false;
+    void answering.then(() => { finished = true; }, () => { finished = true; });
+    for (let i = 0; i < 400 && !finished; i += 1) {
+      host.drain();
+      await new Promise((tick) => { setTimeout(tick, 0); });
+    }
+    const reply = await answering;
+    const before = said.length;
+
+    expect(reply).toBeDefined();
+    // The scripted turn uses two tools and stops on one of them, so this is
+    // the shape a caller actually sees rather than an assertion that tolerates
+    // silence.
+    expect(said.length).toBeGreaterThan(0);
+    expect(said.map((one) => one.params.message)).toContain('Read');
+    // Every one carries the token it was asked under, and `progress` MUST
+    // increase - a client that dedupes on it would drop the rest otherwise.
+    expect(said.every((one) => one.params.progressToken === 'p-4')).toBe(true);
+    const counts = said.map((one) => one.params.progress);
+    expect(counts).toEqual([...counts].sort((a, b) => a - b));
+    expect(new Set(counts).size).toBe(counts.length);
+    // And they stop after the result, which the spec requires in as many words.
+    await new Promise((tick) => { setTimeout(tick, 10); });
+    expect(said.length).toBe(before);
+  }, 20_000);
 });
 
 describe('the tools a session is driven with', () => {
