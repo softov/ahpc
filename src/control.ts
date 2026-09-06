@@ -1977,7 +1977,9 @@ function keys(): {
   return [
     // Global: nothing types these, so they are safe wherever focus is.
     { keys: 'ctrl+p', commandId: 'app.palette' },
-    { keys: 'ctrl+g', commandId: 'bood.toggle' },
+    // `alt+g` rather than `ctrl+g`, which is the external editor's key in
+    // every other agent CLI and is kept free for it here.
+    { keys: 'alt+g', commandId: 'bood.toggle' },
     // The clause is on the *binding*, not only on the command. A binding that
     // matches has handled the key - whether or not the command it names then
     // declines to run - so a `when` that lives only on the command swallows
@@ -1995,7 +1997,13 @@ function keys(): {
     { keys: 'ctrl+c', commandId: 'terminal.interrupt', when: `${SCREEN} == 'terminal' && ${OPEN_TERMINAL}` },
     { keys: 'ctrl+n', commandId: 'session.new' },
     { keys: 'ctrl+r', commandId: 'session.refresh' },
-    { keys: 'ctrl+t', commandId: 'view.theme' },
+    /*
+     * `alt+t`, for the reason `alt+m` is the markdown key: an alt chord
+     * arrives as ESC then the letter, which survives SSH, tmux and a console
+     * that has never heard of the kitty protocol. It also leaves `ctrl+t`
+     * unclaimed, which is what the other agent CLIs spend on a todo list.
+     */
+    { keys: 'alt+t', commandId: 'view.theme' },
     /*
      * Three, and `alt+m` is the one to reach for.
      *

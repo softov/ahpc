@@ -119,7 +119,7 @@ Appearance
   --screen <name>       Which screen to open on
   --bood                Let the creature loose on the whole screen. It
                         keeps off the composer and off anything asking
-                        a question, and ctrl+g turns it off again.
+                        a question, and alt+g turns it off again.
   --session <uri>       Open this session
 
 Stills, for a README or a test
@@ -318,7 +318,7 @@ export async function tui(argv: string[]): Promise<void> {
   const host = await connect(options);
   const app = createApp({
     terminal,
-    // A starting point, not a fixture. `ctrl+t` and the palette change both
+    // A starting point, not a fixture. `alt+t` and the palette change both
     // while it runs, and the screens are the same graph under either.
     theme: options.theme,
     shell: options.shell,

@@ -71,8 +71,8 @@ A new session asks the host's own questions before the first message — the age
 | `ctrl+p` | The command palette |
 | `ctrl+n` | New session |
 | `ctrl+r` | Refresh |
-| `ctrl+t` | Theme |
-| `ctrl+m` | Markdown on or off |
+| `alt+t` | Theme |
+| `alt+m` | Markdown on or off |
 | `ctrl+c` | Stop the running turn, or quit |
 
 A tool call waiting on you takes `a` to approve, `d` to deny and `1`-`9` for an option it offered. A question takes `tab` between fields, `space` to choose and `enter` to send.

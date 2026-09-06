@@ -1913,7 +1913,7 @@ describe('the figure on an empty screen', () => {
   });
 
   /** On and off without editing a file, or it is a mascot people keep off. */
-  it('takes ctrl+g for the creature', async () => {
+  it('takes alt+g for the creature', async () => {
     const host = fakeHost();
     const t = await renderApp({
       width: 92, height: 26, shell: 'workbench', theme: 'workbench',
@@ -1922,11 +1922,11 @@ describe('the figure on an empty screen', () => {
     for (let i = 0; i < 8; i += 1) await t.settle();
     expect(t.app.store.get<boolean>(BOOD_FLOAT)).toBe(true);
 
-    t.press('ctrl+g');
+    t.press('alt+g');
     for (let i = 0; i < 4; i += 1) await t.settle();
     expect(t.app.store.get<boolean>(BOOD_FLOAT)).toBe(false);
 
-    t.press('ctrl+g');
+    t.press('alt+g');
     for (let i = 0; i < 4; i += 1) await t.settle();
     expect(t.app.store.get<boolean>(BOOD_FLOAT)).toBe(true);
     await t.unmount();
