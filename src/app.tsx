@@ -376,6 +376,14 @@ const Status = defineComponent<Record<string, never>>('ChatStatus', () => {
 export interface ChatOptions {
   builtins?: boolean;
   /**
+   * Keys from the config file, over the ones this client ships with.
+   *
+   * A chord to a command id, or to `null` to take the chord away. Read once
+   * at startup: a binding is registered when the controller is, and this
+   * client has no reload.
+   */
+  keys?: Record<string, string | null>;
+  /**
    * The header trades its own name for a seven-cell creature, on a session.
    *
    * Off unless asked for, and it is the config file that asks - `boodInline`
@@ -419,7 +427,7 @@ export function registerChat(app: TextUIApp, options: ChatOptions = {}): Disposa
   if (options.builtins !== false) bag.add(registerBuiltins(app));
 
   const host = options.host ?? fakeHost();
-  const controller = createController(app, host);
+  const controller = createController(app, host, options.keys);
   app.store.set(WORKSPACE, options.workspace ?? process.cwd());
   app.store.set(SPLIT_AT, options.splitAt ?? SPLIT_DEFAULT);
   // Once, here, rather than per mount: two surfaces drawing two different

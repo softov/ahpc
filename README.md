@@ -79,12 +79,26 @@ Before the first message, a new session asks the agent, the model and its option
 | `esc` | Close the menu, then leave the field, then go back |
 | `/` | Slash commands, from the host and from `ahpc` |
 | `@` | Complete a file path on the host |
+| `ctrl+g` | Edit the message in `$VISUAL` or `$EDITOR` |
 | `ctrl+p` | Command palette |
 | `ctrl+n` | New session |
 | `ctrl+r` | Refresh |
 | `alt+t` | Theme |
 | `alt+m` | Markdown on or off |
 | `ctrl+c` | Cancel the running turn, or quit |
+
+Editing in the composer follows readline:
+
+| Key | |
+|---|---|
+| `ctrl+a` / `ctrl+e` | Start or end of the line |
+| `ctrl+k` / `ctrl+u` | Delete to the end, or to the start |
+| `ctrl+w`, `alt+backspace` | Delete the word before the caret |
+| `alt+d` | Delete the word after it |
+| `ctrl+z` / `alt+z` | Undo, redo |
+| `ctrl+←` / `ctrl+→` | Move a word at a time |
+
+Undo groups a run of typing into one step, so it takes back a word rather than a character.
 
 When a tool call is waiting: `a` approves, `d` denies, `1`-`9` pick an offered option. When the agent asks a question: `tab` moves between fields, `space` selects, `enter` sends.
 
@@ -228,6 +242,22 @@ Precedence: a flag overrides an environment variable, which overrides the file.
 | `--config-file` | Read this file instead |
 
 `ahpc config` prints the file path and the values in force. It works without a host, which is what you need when the host is the problem.
+
+### Keys
+
+`keys` maps a chord to a command id, or to `null` to unbind it:
+
+```json
+{
+  "keys": {
+    "ctrl+g": "editor.open",
+    "ctrl+t": null,
+    "ctrl+y": "session.new"
+  }
+}
+```
+
+Naming a chord replaces every default on it, so a chord is either yours or the client's and never half of each. A chord bound to a name no command answers to is reported at startup rather than ignored. `ctrl+c`, `ctrl+d`, `ctrl+h`, `ctrl+i`, `ctrl+j`, `ctrl+m` and `ctrl+[` cannot be rebound usefully — a terminal sends them as interrupt, end-of-file, backspace, tab, newline, return and escape.
 
 ## Development
 

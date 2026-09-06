@@ -15,6 +15,20 @@ export interface Config {
   /** The shell layout. */
   shell?: string;
   /**
+   * Keys, over the ones this client ships with.
+   *
+   * A chord to a command id - `"ctrl+g": "editor.open"` - or to `null`, which
+   * takes the chord away and binds nothing. Naming a chord replaces every
+   * default on it, including one registered against a single screen, so a
+   * chord is either yours or ours and never half of each.
+   *
+   * `ahpc config` lists the command ids. A chord bound to a name no command
+   * answers to is reported at startup rather than dropped, because a binding
+   * that silently does nothing is indistinguishable from one that never
+   * loaded.
+   */
+  keys?: Record<string, string | null>;
+  /**
    * Trade the header's own name for a seven-cell creature, on an open session.
    *
    * Off unless it is asked for. The header's leftmost cell is the one part of

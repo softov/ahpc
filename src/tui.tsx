@@ -67,6 +67,8 @@ interface Options {
   token?: string;
   /** Read this config instead of the one XDG names. */
   configFile?: string;
+  /** Keys from the config file, over the ones this client ships with. */
+  keys?: Record<string, string | null>;
   /**
    * Where the agent works.
    *
@@ -228,6 +230,7 @@ async function still(options: Options): Promise<void> {
       registerChat(booted, {
         host, workspace: workspaceFor(options),
         boodInline: options.boodInline, boodFloat: options.boodFloat,
+        ...(options.keys ? { keys: options.keys } : {}),
       });
     },
 
@@ -312,6 +315,7 @@ export async function tui(argv: string[]): Promise<void> {
   if (file.shell && !argv.includes('--shell')) options.shell = file.shell;
   if (file.boodInline !== undefined) options.boodInline = file.boodInline;
   if (file.boodFloat !== undefined && !argv.includes('--bood')) options.boodFloat = file.boodFloat;
+  if (file.keys) options.keys = file.keys;
   if (options.help) {
     process.stdout.write(USAGE);
     return;
@@ -334,6 +338,7 @@ export async function tui(argv: string[]): Promise<void> {
       registerChat(booted, {
         host, workspace: workspaceFor(options),
         boodInline: options.boodInline, boodFloat: options.boodFloat,
+        ...(options.keys ? { keys: options.keys } : {}),
       });
       booted.commands.register({
         id: 'app.quit',
@@ -352,6 +357,22 @@ export async function tui(argv: string[]): Promise<void> {
       // everywhere else.
       booted.keybindings.register({ keys: 'ctrl+c', commandId: 'app.quit' });
       booted.keybindings.register({ keys: 'ctrl+q', commandId: 'app.quit' });
+
+      /*
+       * A rebinding that names nothing is said out loud.
+       *
+       * Checked here rather than where the bindings are registered, because
+       * this is the first point at which every command exists - `app.quit`
+       * above is registered by the shell rather than by the controller, and a
+       * check that ran earlier would report it as unknown. A chord bound to a
+       * name no command answers to does nothing at all, which from the
+       * keyboard is indistinguishable from a config file that never loaded.
+       */
+      for (const [chord, id] of Object.entries(options.keys ?? {})) {
+        if (id !== null && !booted.commands.get(id)) {
+          sink.report(`Config: ${chord} is bound to "${id}", which is not a command. Run 'ahpc config --json' for the ones there are.`);
+        }
+      }
     },
   });
 

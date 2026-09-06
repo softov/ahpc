@@ -6,6 +6,10 @@ import type {
   TextUIApp,
 } from '@textui/core';
 import { createBag, serviceKey } from '@textui/core';
+import { spawn } from 'node:child_process';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { confirm } from '@textui/widgets';
 import { operate } from './ahp/operate.js';
 import type { HostConnection } from './ahp/connection.js';
@@ -215,6 +219,7 @@ export const AUTOMATIONS_SCOPE = 'chat.automations';
 export function createController(
   app: TextUIApp,
   host: HostConnection & { pump?(): boolean },
+  bindings?: Record<string, string | null>,
 ): Controller & Disposable {
   const bag = createBag();
   // The client's own copy of the conversation, kept so a delta can be applied
@@ -873,7 +878,7 @@ export function createController(
   const watching = host.onSessions(refreshSoon);
   bag.add({ dispose: () => watching.close() });
   for (const command of commands(app, controller, host)) bag.add(app.commands.register(command));
-  for (const binding of keys()) bag.add(app.keybindings.register(binding));
+  for (const binding of keys(bindings)) bag.add(app.keybindings.register(binding));
 
   return Object.assign(controller, { dispose: () => bag.dispose() });
 }
@@ -1390,6 +1395,55 @@ function commands(
     // Appearance is a registration, not a rewrite. The same graph is mounted
     // under whichever theme and shell are chosen, which is the claim the
     // runtime makes and the one an example is meant to be evidence for.
+    /**
+     * The message, in whatever editor the shell says.
+     *
+     * `$VISUAL` before `$EDITOR`, which is the order every program that opens
+     * one uses: `EDITOR` is historically the line editor and `VISUAL` the
+     * full-screen one, and a terminal application wants the second.
+     *
+     * The file is `.md` because that is what a message is - an editor that
+     * highlights by extension gets it right, and one that does not is
+     * unaffected.
+     */
+    {
+      id: 'editor.open',
+      title: 'Edit in $EDITOR',
+      category: 'Compose',
+      description: 'Open the message in an external editor',
+      slots: ['palette'],
+      run: async () => {
+        const editor = process.env.VISUAL ?? process.env.EDITOR;
+        if (!editor) {
+          controller.report(new Error('No $VISUAL or $EDITOR is set, so there is no editor to open.'));
+          return;
+        }
+        // A directory of its own, so the name is not guessable and nothing
+        // else in the temp directory is touched when it is removed.
+        const where = await mkdtemp(join(tmpdir(), 'ahpc-'));
+        const file = join(where, 'message.md');
+        try {
+          await writeFile(file, app.store.get<string>(DRAFT) ?? '');
+          await app.suspend(async () => {
+            await new Promise<void>((resolve) => {
+              // Through the shell, because `$EDITOR` is a command line and not
+              // a path: `code -w` and `nvim -c ...` are both ordinary values.
+              const child = spawn(`${editor} "$1"`, ['--', file], { stdio: 'inherit', shell: true });
+              child.on('close', () => { resolve(); });
+              child.on('error', () => { resolve(); });
+            });
+          });
+          const text = await readFile(file, 'utf8');
+          // One trailing newline is the editor's, not the message's - every
+          // editor that respects POSIX adds it and nobody typed it.
+          const next = text.replace(/\n$/, '');
+          app.store.set(DRAFT, next);
+          controller.draft(next);
+        }
+        catch (error) { controller.report(error); }
+        finally { await rm(where, { recursive: true, force: true }); }
+      },
+    },
     {
       id: 'view.theme',
       title: 'Theme',
@@ -1966,20 +2020,46 @@ function commands(
  * nothing types them. Single letters are registered against the transcript's
  * focus scope, because while the composer has focus they are letters.
  */
-function keys(): {
+interface Binding {
   keys: string;
   commandId: string;
   scopeId?: string;
   when?: string;
   args?: Record<string, unknown>;
   priority?: number;
-}[] {
+}
+
+/**
+ * The defaults, with the config file's own bindings over them.
+ *
+ * Naming a chord replaces every default on it rather than adding to them: a
+ * chord that meant one thing globally and another on one screen would still
+ * mean the second after somebody rebound the first, which is not what
+ * rebinding a key means. `null` takes the chord away and binds nothing.
+ */
+function keys(over?: Record<string, string | null>): Binding[] {
+  const defaults = shipped();
+  if (!over || Object.keys(over).length === 0) return defaults;
+  const named = new Set(Object.keys(over));
+  return [
+    ...defaults.filter((binding) => !named.has(binding.keys)),
+    ...Object.entries(over)
+      .filter((entry): entry is [string, string] => entry[1] !== null)
+      .map(([chord, commandId]) => ({ keys: chord, commandId })),
+  ];
+}
+
+/** What this client ships with. */
+function shipped(): Binding[] {
   return [
     // Global: nothing types these, so they are safe wherever focus is.
     { keys: 'ctrl+p', commandId: 'app.palette' },
     // `alt+g` rather than `ctrl+g`, which is the external editor's key in
     // every other agent CLI and is kept free for it here.
     { keys: 'alt+g', commandId: 'bood.toggle' },
+    // The key every other agent CLI opens an editor with, which is why the
+    // creature moved off it.
+    { keys: 'ctrl+g', commandId: 'editor.open' },
     // The clause is on the *binding*, not only on the command. A binding that
     // matches has handled the key - whether or not the command it names then
     // declines to run - so a `when` that lives only on the command swallows
