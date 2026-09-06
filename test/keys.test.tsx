@@ -82,7 +82,9 @@ describe('the editor command', () => {
     delete process.env.VISUAL;
     delete process.env.EDITOR;
     try {
-      await t.app.commands.get('editor.open')?.run?.({});
+      // The handler takes the args and a context; neither is read on the
+      // path this asserts, which is the one that answers before any of it.
+      await t.app.commands.get('editor.open')?.run({}, { app: t.app } as never);
       for (let i = 0; i < 4; i += 1) await t.settle();
       // A command that quietly does nothing is one somebody retries.
       expect(t.app.store.get<string>(HOST_ERROR) ?? '').toContain('EDITOR');
