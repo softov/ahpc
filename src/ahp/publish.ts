@@ -168,6 +168,27 @@ export function publish(options: { root?: string; writable?: boolean; clientId?:
    * What is not deliberate is fixing one and not the other: everything here
    * was wrong in both at once, and was corrected in both at once.
    */
+  /*
+   * The destination half of a copy or a move.
+   *
+   * Two refusals the source does not have. A destination that is a symbolic
+   * link would carry the bytes to wherever it points, which is the same hole
+   * `O_NOFOLLOW` closes for a write. And `failIfExists` is the caller saying
+   * it does not want an overwrite, which is the whole reason the flag is on
+   * the wire - a copy that quietly replaced a file is the loss it exists to
+   * prevent. `ahpd` refuses both in its `pair`.
+   */
+  const pair = async (destination: unknown, failIfExists: boolean): Promise<string> => {
+    const to = await where(destination, true);
+    if (await lstat(to).then((found) => found.isSymbolicLink(), () => false)) {
+      throw new PublishRefusal(PERMISSION_DENIED, `${String(destination)} is a symbolic link.`);
+    }
+    if (failIfExists && await stat(to).then(() => true, () => false)) {
+      throw new PublishRefusal(ALREADY_EXISTS, `${String(destination)} already exists.`);
+    }
+    return to;
+  };
+
   const write = async (at: string, uri: unknown, params: {
     data?: unknown; encoding?: unknown; createOnly?: unknown; mode?: unknown;
     position?: unknown; ifMatch?: unknown;
@@ -329,7 +350,10 @@ export function publish(options: { root?: string; writable?: boolean; clientId?:
           mode?: unknown; position?: unknown; ifMatch?: unknown;
         };
         mutable();
-        await write(await where(input.uri), input.uri, input);
+        // The link itself, never its destination: `O_NOFOLLOW` in `write` can
+        // only refuse a final symbolic link if the path it is handed still
+        // has one. `ahpd` resolves only the parent for the same reason.
+        await write(await where(input.uri, true), input.uri, input);
         return {};
       },
 
@@ -342,22 +366,28 @@ export function publish(options: { root?: string; writable?: boolean; clientId?:
 
       resourceMkdir: async (params: unknown) => {
         mutable();
-        await mkdir(await where((params as { uri?: unknown }).uri), { recursive: true });
+        await mkdir(await where((params as { uri?: unknown }).uri, true), { recursive: true });
         return {};
       },
 
       resourceMove: async (params: unknown) => {
-        const { source, destination } = params as { source?: unknown; destination?: unknown };
+        const { source, destination, failIfExists } = params as {
+          source?: unknown; destination?: unknown; failIfExists?: unknown;
+        };
         mutable();
-        await rename(await where(source, true), await where(destination, true));
+        const from = await where(source, true);
+        const to = await pair(destination, failIfExists === true);
+        await rename(from, to);
         return {};
       },
 
       resourceCopy: async (params: unknown) => {
-        const { source, destination } = params as { source?: unknown; destination?: unknown };
+        const { source, destination, failIfExists } = params as {
+          source?: unknown; destination?: unknown; failIfExists?: unknown;
+        };
         mutable();
         const from = await where(source);
-        const to = await where(destination);
+        const to = await pair(destination, failIfExists === true);
         const input = await open(from, constants.O_RDONLY | constants.O_NOFOLLOW);
         try {
           const output = await open(to, constants.O_WRONLY | constants.O_CREAT | constants.O_NOFOLLOW);

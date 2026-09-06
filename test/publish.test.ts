@@ -226,18 +226,61 @@ describe('writing is a second decision, not part of publishing', () => {
     expect(directory).not.toContain('EISDIR');
 
     /*
-     * The link half, which this client answers differently from `ahpd`.
+     * The link half, and a link that stays inside the publication.
      *
-     * `where` resolves the final component, so a link whose destination is
-     * still published is written *through* - the open sees the destination
-     * and `O_NOFOLLOW` never fires. `ahpd` resolves only the parent, so the
-     * same write is refused there. Pinned rather than left implied, because
-     * the two are meant to be the same algorithm; see ROADMAP.md.
+     * Refused all the same. The boundary is not what is being enforced here -
+     * the destination is published and readable - it is that a host asking to
+     * write `X` and having the bytes land in `Y` is a surprise, and that
+     * `ahpd` refuses the same write. Reading through a link is still allowed
+     * at both ends.
      */
     await writeFile(path.join(root, 'link-target.txt'), 'target');
     await symlink(path.join(root, 'link-target.txt'), path.join(root, 'inside-write-link.txt'));
-    expect(await said('inside-write-link.txt')).toBe('');
-    expect(await readFile(path.join(root, 'link-target.txt'), 'utf8')).toBe('x');
+    const inside = await said('inside-write-link.txt');
+    expect(inside).toContain('is a symbolic link');
+    expect(inside).not.toContain('ELOOP');
+    expect(await readFile(path.join(root, 'link-target.txt'), 'utf8')).toBe('target');
+  });
+
+  it('refuses a copy or a move onto a link, and honours failIfExists', async () => {
+    /*
+     * The destination half, which the source does not share.
+     *
+     * A destination that is a link would carry the bytes wherever it points,
+     * which is the hole `O_NOFOLLOW` closes for a write; and `failIfExists`
+     * is the caller saying it does not want an overwrite, which was being
+     * read off the wire and dropped. `ahpd` refuses both.
+     */
+    const handlers = publish({ root, writable: true }).handlers();
+    await writeFile(path.join(root, 'pair-source.txt'), 'source');
+    await writeFile(path.join(root, 'pair-target.txt'), 'target');
+    await symlink(path.join(root, 'pair-target.txt'), path.join(root, 'pair-link.txt'));
+
+    for (const method of ['resourceCopy', 'resourceMove'] as const) {
+      expect(await refused(() => handlers[method]?.({
+        source: `${PUBLISH_PREFIX}pair-source.txt`, destination: `${PUBLISH_PREFIX}pair-link.txt`,
+      }) as Promise<unknown>)).toBe(-32009);
+    }
+    // Neither the link nor what it points at moved, and the source is still
+    // where it was - a refused move that had already renamed would be a file
+    // nobody can find.
+    expect(await readFile(path.join(root, 'pair-target.txt'), 'utf8')).toBe('target');
+    expect(await readFile(path.join(root, 'pair-source.txt'), 'utf8')).toBe('source');
+
+    await writeFile(path.join(root, 'pair-there.txt'), 'already');
+    expect(await refused(() => handlers.resourceCopy?.({
+      source: `${PUBLISH_PREFIX}pair-source.txt`,
+      destination: `${PUBLISH_PREFIX}pair-there.txt`,
+      failIfExists: true,
+    }) as Promise<unknown>)).toBe(-32010);
+    expect(await readFile(path.join(root, 'pair-there.txt'), 'utf8')).toBe('already');
+
+    // And without the flag it is an ordinary overwrite, which is the default
+    // the protocol gives these two.
+    await handlers.resourceCopy?.({
+      source: `${PUBLISH_PREFIX}pair-source.txt`, destination: `${PUBLISH_PREFIX}pair-there.txt`,
+    });
+    expect(await readFile(path.join(root, 'pair-there.txt'), 'utf8')).toBe('source');
   });
 
   it('will not write outside the directory even when writable', async () => {
