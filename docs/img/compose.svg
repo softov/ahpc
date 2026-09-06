@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="462" viewBox="0 0 820 462" font-family="ui-monospace, SFMono-Regular, &apos;SF Mono&apos;, Menlo, Consolas, &apos;DejaVu Sans Mono&apos;, monospace" font-size="13px">
+<title>chat - sessions</title>
+<rect width="820" height="462" rx="6" fill="#fffdf9"/>
+<text x="10" y="23" fill="#b4531f" font-weight="bold" textLength="72" lengthAdjust="spacing" xml:space="preserve">Assistant</text>
+<text x="90" y="23" fill="#c56532" textLength="8" lengthAdjust="spacing" xml:space="preserve">·</text>
+<text x="106" y="23" fill="#7a756c" textLength="120" lengthAdjust="spacing" xml:space="preserve">fake://scripted</text>
+<text x="354" y="176" fill="#7a756c" textLength="104" lengthAdjust="spacing" xml:space="preserve">A new session</text>
+<text x="266" y="193" fill="#c56532" textLength="288" lengthAdjust="spacing" xml:space="preserve">The first message is what starts it.</text>
+<text x="250" y="210" fill="#c56532" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">◂</text>
+<text x="258" y="210" fill="#c56532" textLength="304" lengthAdjust="spacing" xml:space="preserve"> esc for the sessions you already have</text>
+<text x="10" y="380" fill="#2b2a27" textLength="800" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈</text>
+<text x="10" y="397" fill="#c56532" text-decoration="underline" textLength="8" lengthAdjust="spacing" xml:space="preserve">A</text>
+<text x="18" y="397" fill="#c56532" textLength="168" lengthAdjust="spacing" xml:space="preserve">sk the agent anything</text>
+<text x="186" y="397" fill="#c56532" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">…</text>
+<text x="10" y="414" fill="#2b2a27" textLength="800" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈</text>
+<text x="18" y="431" fill="#7a756c" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">◆</text>
+<text x="26" y="431" fill="#2b2a27" textLength="104" lengthAdjust="spacing" xml:space="preserve"> Claude Code </text>
+<text x="130" y="431" fill="#c56532" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▾</text>
+<text x="162" y="431" fill="#7a756c" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">◇</text>
+<text x="170" y="431" fill="#2b2a27" textLength="72" lengthAdjust="spacing" xml:space="preserve"> default </text>
+<text x="242" y="431" fill="#c56532" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▾</text>
+<text x="274" y="431" fill="#7a756c" textLength="8" lengthAdjust="spacing" xml:space="preserve">?</text>
+<text x="282" y="431" fill="#2b2a27" textLength="120" lengthAdjust="spacing" xml:space="preserve"> Ask each time </text>
+<text x="402" y="431" fill="#c56532" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▾</text>
+<text x="434" y="431" fill="#7a756c" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▣</text>
+<text x="442" y="431" fill="#2b2a27" textLength="88" lengthAdjust="spacing" xml:space="preserve"> Workspace </text>
+<text x="530" y="431" fill="#c56532" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▾</text>
+<text x="562" y="431" fill="#7a756c" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">⌂</text>
+<text x="570" y="431" fill="#2b2a27" textLength="112" lengthAdjust="spacing" xml:space="preserve"> no workspace </text>
+<text x="682" y="431" fill="#c56532" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▾</text>
+<text x="754" y="431" fill="#8c959f" font-weight="bold" textLength="32" lengthAdjust="spacing" xml:space="preserve">send</text>
+<text x="794" y="431" fill="#c56532" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▸</text>
+<text x="10" y="448" fill="#b4531f" font-weight="bold" textLength="40" lengthAdjust="spacing" xml:space="preserve">enter</text>
+<text x="58" y="448" fill="#7a756c" textLength="40" lengthAdjust="spacing" xml:space="preserve">start</text>
+<text x="98" y="448" fill="#c56532" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
+<text x="122" y="448" fill="#b4531f" font-weight="bold" textLength="80" lengthAdjust="spacing" xml:space="preserve">ctrl+enter</text>
+<text x="210" y="448" fill="#7a756c" textLength="56" lengthAdjust="spacing" xml:space="preserve">newline</text>
+<text x="266" y="448" fill="#c56532" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
+<text x="290" y="448" fill="#b4531f" font-weight="bold" textLength="24" lengthAdjust="spacing" xml:space="preserve">tab</text>
+<text x="322" y="448" fill="#7a756c" textLength="56" lengthAdjust="spacing" xml:space="preserve">options</text>
+<text x="378" y="448" fill="#c56532" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
+<text x="402" y="448" fill="#b4531f" font-weight="bold" textLength="24" lengthAdjust="spacing" xml:space="preserve">esc</text>
+<text x="434" y="448" fill="#7a756c" textLength="64" lengthAdjust="spacing" xml:space="preserve">sessions</text>
+<text x="498" y="448" fill="#c56532" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
+<text x="522" y="448" fill="#b4531f" font-weight="bold" textLength="48" lengthAdjust="spacing" xml:space="preserve">ctrl+c</text>
+<text x="578" y="448" fill="#7a756c" textLength="32" lengthAdjust="spacing" xml:space="preserve">quit</text>
+<text x="786" y="448" fill="#7a756c" textLength="24" lengthAdjust="spacing" xml:space="preserve">new</text>
+</svg>

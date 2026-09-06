@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="530" viewBox="0 0 820 530" font-family="ui-monospace, SFMono-Regular, &apos;SF Mono&apos;, Menlo, Consolas, &apos;DejaVu Sans Mono&apos;, monospace" font-size="13px">
+<title>chat - chat</title>
+<rect width="820" height="530" rx="6" fill="#fffdf9"/>
+<rect x="306" y="333" width="80" height="17" fill="#f5f2ec"/>
+<text x="10" y="23" fill="#b4531f" font-weight="bold" textLength="72" lengthAdjust="spacing" xml:space="preserve">Assistant</text>
+<text x="90" y="23" fill="#c56532" textLength="8" lengthAdjust="spacing" xml:space="preserve">·</text>
+<text x="106" y="23" fill="#b4531f" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">●</text>
+<text x="114" y="23" fill="#2b2a27" textLength="648" lengthAdjust="spacing" xml:space="preserve"> Split the transcript viewport                                                   </text>
+<text x="762" y="23" fill="#7a756c" textLength="48" lengthAdjust="spacing" xml:space="preserve">textui</text>
+<text x="10" y="40" fill="#b4531f" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">●</text>
+<text x="26" y="40" fill="#2b2a27" font-weight="bold" textLength="232" lengthAdjust="spacing" xml:space="preserve">Split the transcript viewport</text>
+<text x="754" y="40" fill="#b4531f" textLength="56" lengthAdjust="spacing" xml:space="preserve">running</text>
+<text x="10" y="57" fill="#7a756c" textLength="56" lengthAdjust="spacing" xml:space="preserve">Harness</text>
+<text x="66" y="57" fill="#2b2a27" textLength="272" lengthAdjust="spacing" xml:space="preserve">        claude  ·  claude-sonnet-5</text>
+<text x="10" y="74" fill="#7a756c" textLength="112" lengthAdjust="spacing" xml:space="preserve">Thinking Level</text>
+<text x="122" y="74" fill="#2b2a27" textLength="120" lengthAdjust="spacing" xml:space="preserve"> Thinking Level</text>
+<text x="10" y="91" fill="#7a756c" textLength="88" lengthAdjust="spacing" xml:space="preserve">Permissions</text>
+<text x="98" y="91" fill="#2b2a27" textLength="128" lengthAdjust="spacing" xml:space="preserve">    Accept edits</text>
+<text x="10" y="108" fill="#7a756c" textLength="72" lengthAdjust="spacing" xml:space="preserve">Isolation</text>
+<text x="82" y="108" fill="#2b2a27" textLength="120" lengthAdjust="spacing" xml:space="preserve">      Workspace</text>
+<text x="10" y="125" fill="#7a756c" textLength="72" lengthAdjust="spacing" xml:space="preserve">Workspace</text>
+<text x="82" y="125" fill="#2b2a27" textLength="160" lengthAdjust="spacing" xml:space="preserve">      /github/textui</text>
+<text x="10" y="142" fill="#7a756c" textLength="48" lengthAdjust="spacing" xml:space="preserve">Branch</text>
+<text x="58" y="142" fill="#2b2a27" textLength="104" lengthAdjust="spacing" xml:space="preserve">         main</text>
+<text x="10" y="159" fill="#7a756c" textLength="56" lengthAdjust="spacing" xml:space="preserve">Started</text>
+<text x="66" y="159" fill="#2b2a27" textLength="240" lengthAdjust="spacing" xml:space="preserve">        Aug 22, 2026, 06:00 AM</text>
+<text x="10" y="176" fill="#7a756c" textLength="56" lengthAdjust="spacing" xml:space="preserve">Session</text>
+<text x="66" y="176" fill="#2b2a27" textLength="200" lengthAdjust="spacing" xml:space="preserve">        ahp-session:/6b21</text>
+<text x="10" y="193" fill="#7a756c" textLength="32" lengthAdjust="spacing" xml:space="preserve">Chat</text>
+<text x="42" y="193" fill="#2b2a27" textLength="200" lengthAdjust="spacing" xml:space="preserve">           ahp-chat:/6b21</text>
+<text x="10" y="210" fill="#2b2a27" textLength="800" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈</text>
+<text x="10" y="261" fill="#b4531f" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▸</text>
+<text x="26" y="261" fill="#b4531f" font-weight="bold" textLength="24" lengthAdjust="spacing" xml:space="preserve">you</text>
+<text x="18" y="278" fill="#2b2a27" textLength="464" lengthAdjust="spacing" xml:space="preserve"> The Feed draws nothing inside a content-sized panel. Why?</text>
+<text x="10" y="312" fill="#b4531f" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">●</text>
+<text x="26" y="312" fill="#b4531f" font-weight="bold" textLength="120" lengthAdjust="spacing" xml:space="preserve">claude-sonnet-5</text>
+<text x="154" y="312" fill="#c56532" textLength="56" lengthAdjust="spacing" xml:space="preserve">running</text>
+<text x="26" y="329" fill="#c56532" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▸</text>
+<text x="42" y="329" fill="#c56532" font-style="italic" textLength="136" lengthAdjust="spacing" xml:space="preserve">thought, 17 words</text>
+<text x="18" y="346" fill="#2b2a27" textLength="288" lengthAdjust="spacing" xml:space="preserve"> Because it takes its viewport from </text>
+<text x="306" y="346" fill="#b4531f" textLength="80" lengthAdjust="spacing" xml:space="preserve">useMeasure</text>
+<text x="386" y="346" fill="#2b2a27" textLength="400" lengthAdjust="spacing" xml:space="preserve">, and in a content-sized panel there is nothing to</text>
+<text x="18" y="363" fill="#2b2a27" textLength="496" lengthAdjust="spacing" xml:space="preserve"> measure - the height is zero, the window is zero rows, and it</text>
+<text x="514" y="363" fill="#2b2a27" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▏</text>
+<text x="10" y="448" fill="#2b2a27" textLength="800" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈</text>
+<text x="10" y="465" fill="#c56532" text-decoration="underline" textLength="8" lengthAdjust="spacing" xml:space="preserve">T</text>
+<text x="18" y="465" fill="#c56532" textLength="360" lengthAdjust="spacing" xml:space="preserve">he agent is working. Type to queue a message.</text>
+<text x="10" y="482" fill="#2b2a27" textLength="800" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈</text>
+<text x="10" y="499" fill="#c56532" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">◆</text>
+<text x="26" y="499" fill="#c56532" textLength="88" lengthAdjust="spacing" xml:space="preserve">Claude Code</text>
+<text x="130" y="499" fill="#7a756c" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">◇</text>
+<text x="138" y="499" fill="#2b2a27" textLength="80" lengthAdjust="spacing" xml:space="preserve"> Sonnet 5 </text>
+<text x="218" y="499" fill="#c56532" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▾</text>
+<text x="250" y="499" fill="#7a756c" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▪</text>
+<text x="258" y="499" fill="#2b2a27" textLength="128" lengthAdjust="spacing" xml:space="preserve"> Thinking Level </text>
+<text x="386" y="499" fill="#c56532" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▾</text>
+<text x="418" y="499" fill="#7a756c" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">✓</text>
+<text x="426" y="499" fill="#2b2a27" textLength="112" lengthAdjust="spacing" xml:space="preserve"> Accept edits </text>
+<text x="538" y="499" fill="#c56532" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▾</text>
+<text x="562" y="499" fill="#c56532" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▣</text>
+<text x="578" y="499" fill="#c56532" textLength="72" lengthAdjust="spacing" xml:space="preserve">Workspace</text>
+<text x="658" y="499" fill="#c56532" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">⌂</text>
+<text x="674" y="499" fill="#c56532" textLength="48" lengthAdjust="spacing" xml:space="preserve">textui</text>
+<text x="746" y="499" fill="#8c959f" font-weight="bold" textLength="40" lengthAdjust="spacing" xml:space="preserve">queue</text>
+<text x="794" y="499" fill="#c56532" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▸</text>
+<text x="10" y="516" fill="#b4531f" font-weight="bold" textLength="40" lengthAdjust="spacing" xml:space="preserve">enter</text>
+<text x="58" y="516" fill="#7a756c" textLength="32" lengthAdjust="spacing" xml:space="preserve">send</text>
+<text x="90" y="516" fill="#c56532" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
+<text x="114" y="516" fill="#b4531f" font-weight="bold" textLength="80" lengthAdjust="spacing" xml:space="preserve">ctrl+enter</text>
+<text x="202" y="516" fill="#7a756c" textLength="56" lengthAdjust="spacing" xml:space="preserve">newline</text>
+<text x="258" y="516" fill="#c56532" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
+<text x="282" y="516" fill="#b4531f" font-weight="bold" textLength="24" lengthAdjust="spacing" xml:space="preserve">esc</text>
+<text x="314" y="516" fill="#7a756c" textLength="32" lengthAdjust="spacing" xml:space="preserve">read</text>
+<text x="346" y="516" fill="#c56532" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
+<text x="370" y="516" fill="#b4531f" font-weight="bold" textLength="48" lengthAdjust="spacing" xml:space="preserve">ctrl+c</text>
+<text x="426" y="516" fill="#7a756c" textLength="32" lengthAdjust="spacing" xml:space="preserve">stop</text>
+<text x="778" y="516" fill="#7a756c" textLength="32" lengthAdjust="spacing" xml:space="preserve">chat</text>
+</svg>
