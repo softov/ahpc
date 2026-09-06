@@ -15,9 +15,22 @@
 import { commandIn } from './flags.js';
 
 const argv = process.argv.slice(2);
-const first = commandIn(argv);
 
-if (first !== undefined) {
+/*
+ * Answered before anything is loaded.
+ *
+ * `--version` with no command would otherwise open the screen, which is a
+ * question answered by a whole renderer starting up and then being read off a
+ * status bar. Neither front end is imported to answer it.
+ */
+const asked = argv.includes('--version') || argv.includes('-v');
+const first = asked ? undefined : commandIn(argv);
+
+if (asked) {
+  const { version } = await import('./version.js');
+  process.stdout.write(`${version()}\n`);
+}
+else if (first !== undefined) {
   /*
    * A closed pipe is not an error.
    *

@@ -139,6 +139,7 @@ Stills, for a README or a test
   --approve             Answer the confirmation the script stops at
   --answer              ...and then the question
 
+  --version, -v         What version this is
   --help, -h            This
 
 Commands

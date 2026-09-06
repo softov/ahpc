@@ -16,6 +16,7 @@
 
 import type { HostConnection } from '../ahp/connection.js';
 import { TOOLS, named } from './tools.js';
+import { version } from '../version.js';
 
 /** The version of MCP this speaks, and the one it answers `initialize` with. */
 export const PROTOCOL = '2025-06-18';
@@ -23,12 +24,11 @@ export const PROTOCOL = '2025-06-18';
 /**
  * What this server calls itself.
  *
- * MCP requires a version where AHP's `clientInfo` does not, so this is the
- * only version string in the source. Cosmetic - a client displays it and
- * nothing branches on it - and deliberately not read out of `package.json`,
- * which sits at a different depth in the published tree than it does here.
+ * MCP requires a version where AHP's `clientInfo` does not. Read from the
+ * manifest rather than written here: the literal that used to be here said
+ * 0.1 while the package said 0.2, within a day of being written.
  */
-export const SERVER = { name: 'ahpc', version: '0.1' } as const;
+export const SERVER = { name: 'ahpc', version: version() };
 
 /** A JSON-RPC request or notification, as far as this needs to read one. */
 export interface Incoming {

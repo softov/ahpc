@@ -223,6 +223,7 @@ Writes are guarded by the file's etag unless you pass `--force`, so two clients 
 |---|---|---|
 | `dispatch <uri> <type>` | Send a raw protocol action | `--field k=v` `--chat` |
 | `config` | Show the config file path and current values | `--json` |
+| `--version` | What version this is | |
 | `help` | Print this command list | |
 
 ## As a tool server

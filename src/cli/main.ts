@@ -122,6 +122,7 @@ Serving these sessions to something else
 Anything else
   dispatch <uri> <type>        send one action verbatim  [--field k=v]… [--chat]
   status                       what this client is connected to       [--json]
+  --version                    what version this is
   help                         this
 
 The host
