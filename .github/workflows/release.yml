@@ -33,6 +33,14 @@ jobs:
           registry-url: https://registry.npmjs.org
           cache: npm
 
+      # The npm bundled with Node 22 is 10.x, which has neither trusted
+      # publishing (11.5.1 and later) nor `npm stage` (12). Without this the
+      # release fails at the last step, having done everything else.
+      - name: An npm that can do this
+        run: |
+          npm install -g npm@12
+          npm --version
+
       - run: npm ci
 
       # The tag is a claim about what is in package.json, and a tag that
