@@ -8,6 +8,15 @@ import { useFloorTop } from './creature.js';
 import type { ComposerOption } from './controls.js';
 
 /**
+ * Rows the completion menu shows at once.
+ *
+ * A cap on the box's height and not on the list: the menu sits above the
+ * composer and a menu that grew with the answer would push the field it is
+ * completing off a short terminal. What does not fit is scrolled to.
+ */
+const VISIBLE = 6;
+
+/**
  * What you type, and one line saying what it will be sent as.
  *
  * The field itself is `TextArea` from the catalog - growing, scrolling and
@@ -85,9 +94,8 @@ export const ChatComposer: (props: ChatComposerProps) => RenderOutput =
       // What the host contributed first. A person typing a slash into a chat
       // is usually reaching for a skill, and the client's own commands - which
       // are also in the palette, on their own key - would otherwise fill the
-      // six rows there is room for.
-      .sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'session' ? -1 : 1))
-      .slice(0, 6);
+      // rows that are visible without scrolling.
+      .sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'session' ? -1 : 1));
     const byId = new Map(found.map((command) => [command.id, command]));
     /*
      * One menu, and whichever list is live fills it.
@@ -105,7 +113,7 @@ export const ChatComposer: (props: ChatComposerProps) => RenderOutput =
         // a `/review`, and the title alone does not say which this is.
         meta: command.from ?? command.title,
       }))
-      : paths.slice(0, 6).map((path) => ({
+      : paths.map((path) => ({
         id: path.insertText,
         label: path.insertText,
         ...(path.description ? { description: path.description } : {}),
@@ -150,6 +158,18 @@ export const ChatComposer: (props: ChatComposerProps) => RenderOutput =
               items={matches}
               focusable={false}
               selectedId={chosen?.id}
+              /*
+               * A window over all of them, not the first six.
+               *
+               * The list scrolls to keep the selected row in view, and the
+               * selection here is driven from outside - so walking past the
+               * sixth moves the window rather than stopping. Truncating the
+               * items instead made up and down cycle the six that survived,
+               * with no way to reach a seventh: a host that answers thirty
+               * paths for `@src/` offered six of them and looked like it had
+               * no more.
+               */
+              visibleRows={VISIBLE}
               marker
               // Not focusable, so this is the click: a completion clicked is a
               // completion chosen, and there is nowhere for a merely
