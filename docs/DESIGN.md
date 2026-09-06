@@ -16,6 +16,9 @@ src/
   view/         the components, and nothing else
   screens.tsx   which component goes where
   app.tsx       registration: components, screens, surfaces
+  cli/          the other front end: one command, an answer, and exit
+  mcp/          the third: the same sessions as tools, over stdio and HTTP
+  wait.ts       block until a turn finishes. Shared by the CLI and the tools
   main.tsx      the terminal, the quit key, and the clock
 ```
 

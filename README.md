@@ -7,7 +7,7 @@
 ![built with TextUI](https://img.shields.io/badge/built%20with-TextUI-7048e8)
 
 A terminal client for the [Agent Host Protocol](https://microsoft.github.io/agent-host-protocol/).
-It can be used as cli (commands) or tui (interactive chat).
+It can be used as cli (commands), tui (interactive chat), or a tool server that lets an agent elsewhere drive the sessions on your host.
 
 Connect to an AHP host, manage sessions, and work with agents directly from your terminal.
 
@@ -55,6 +55,7 @@ ahpc session list --host ws://127.0.0.1:9187
 | Automations | Scheduled and triggered runs, with their history. |
 | Customizations | Skills, prompts, agents and MCP servers, and which are enabled. |
 | Telemetry | Stream the host's log. |
+| Tool server | Serve those sessions to an agent somewhere else, over MCP or a plain JSON API. |
 
 ## Interactive
 
