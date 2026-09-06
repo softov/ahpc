@@ -148,6 +148,15 @@ captures, and none is declared in 0.9.0 or 1.0.0.
 | config property `scope` | ahpd | no |
 | `SessionState.resource`, `changes`, `modifiedAt` | ahpd | no |
 | root config property `sessionMutable` | VS Code | no |
+| completion attachment `_meta.command` / `_meta.uri` | required by VS Code | n/a - see below |
+
+VS Code's host reads that last one rather than sending it, and reads it
+strictly: `_toChatInputCompletionItem` discards any completion whose attachment
+`_meta` carries neither `command` nor `uri`, with no error on either side. A
+host answering 54 conformant items can have all 54 disappear into an empty
+menu. It costs this client nothing today - completions are consumed here, not
+served - but a completions *provider* added later inherits the convention as a
+contract, and nothing declares it.
 
 ---
 
