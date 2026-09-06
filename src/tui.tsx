@@ -40,7 +40,8 @@ interface Options {
    * replay one.
    */
   svg?: string;
-  screen: string;
+  /** Which screen a still opens on. Absent is the one the application boots to. */
+  screen?: string;
   session?: string;
   theme: string;
   shell: string;
@@ -150,7 +151,6 @@ export function parse(argv: string[]): Options {
     height: process.stdout.rows ?? 30,
     tick: 40,
     settled: false,
-    screen: 'sessions',
     theme: 'paper',
     shell: 'workbench',
     boodInline: false,
@@ -237,10 +237,17 @@ async function still(options: Options): Promise<void> {
     // can do without being answered, which is how the confirmation is reached.
     before: (app) => {
       const controller = app.services.require(CONTROLLER);
-      if (options.session) {
-        controller.open(options.session);
-        if (options.screen !== 'sessions') app.screens.push(options.screen);
-      }
+      if (options.session) controller.open(options.session);
+      /*
+       * Pushed when asked for, and not otherwise.
+       *
+       * `screen` used to default to `sessions` and the push was skipped for
+       * that value, so `--screen sessions` was the one screen a still could
+       * not take - the session list, which is the first thing a reader of the
+       * README wants to see. Absent means the screen the application boots
+       * to, which is what a still with no flags has always shown.
+       */
+      if (options.screen) app.screens.push(options.screen);
       if (options.say) controller.send(options.say);
 
       const steps = options.pump ?? (options.settled ? 100_000 : 0);
@@ -264,7 +271,7 @@ async function still(options: Options): Promise<void> {
       await writeFile(options.svg, `${bufferToSvg(app.buffer(), {
         background: app.theme.colors.canvas,
         foreground: app.theme.colors.text,
-        title: `chat - ${options.screen}`,
+        title: `chat - ${options.screen ?? 'new'}`,
       })}\n`, 'utf8');
     },
   });

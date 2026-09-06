@@ -50,9 +50,13 @@ node dist/src/main.js session list --host ws://127.0.0.1:9187
 
 `ahpc` with no command opens the screen.
 
-![A session, its transcript and the facts about it](docs/img/session.svg)
+![The session list, with status and workspace for each](docs/img/sessions.svg)
 
-The header shows the model, thinking level, permission mode, workspace and branch. All of it comes from the host, not from local guesses.
+The list shows every session on the host: its status, the agent, the workspace and branch, and what it is doing right now. Sessions waiting on you are counted at the top. `/` filters by title, agent or workspace.
+
+![A session, its transcript and the facts about it](docs/img/transcript.svg)
+
+Inside a session, the header shows the model, thinking level, permission mode, workspace and branch. All of it comes from the host, not from local guesses.
 
 ![Starting a session, and the questions the host asks first](docs/img/compose.svg)
 
