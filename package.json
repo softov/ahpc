@@ -1,5 +1,5 @@
 {
-  "name": "ahpc",
+  "name": "@softov/ahpc",
   "version": "0.1.0",
   "type": "module",
   "description": "A terminal client for the Agent Host Protocol: sessions, a streaming transcript, and interactive prompts",
@@ -30,6 +30,9 @@
   },
   "bin": {
     "ahpc": "./dist/src/main.js"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "files": [
     "dist/src",

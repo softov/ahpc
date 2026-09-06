@@ -1,6 +1,6 @@
 # ahpc
 
-[![npm](https://img.shields.io/npm/v/ahpc)](https://www.npmjs.com/package/ahpc)
+[![npm](https://img.shields.io/npm/v/%40softov%2Fahpc)](https://www.npmjs.com/package/@softov/ahpc)
 ![license MIT](https://img.shields.io/badge/license-MIT-blue)
 ![node >=22](https://img.shields.io/badge/node-%3E%3D22-5fa04e)
 ![Agent Host Protocol 0.9.0](https://img.shields.io/badge/AHP-0.9.0-0b7285)
@@ -20,10 +20,12 @@ The interface is built with [TextUI](https://github.com/softov/textui), a compon
 ## Quick start
 
 ```sh
-npm install -g ahpc
+npm install -g @softov/ahpc
 ```
 
-Or run it without installing, with `npx ahpc`.
+Or run it without installing, with `npx @softov/ahpc`.
+
+The package is scoped; the command it installs is `ahpc`.
 
 A scripted host is built in, so the screen runs with nothing else to set up:
 
