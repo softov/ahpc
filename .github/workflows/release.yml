@@ -82,6 +82,20 @@ jobs:
           echo "Staged. Approve it at https://www.npmjs.com/package/@softov/ahpc"
           echo "The approve button stays disabled until npm has finished scanning."
 
+      # A rehearsal on a tree whose version is already on npm is refused, which
+      # is right and is not a failure of this workflow - it is what every dry
+      # run before a bump looks like. Recognised so the rehearsal stays usable
+      # at any point, and so anything else still fails.
       - name: What would have been staged
         if: ${{ inputs.dry_run == true }}
-        run: npm stage publish --dry-run --access public
+        run: |
+          set -u
+          said=$(npm stage publish --dry-run --access public 2>&1) && code=0 || code=$?
+          echo "$said"
+          if [ "$code" = "0" ]; then exit 0; fi
+          if printf '%s' "$said" | grep -q 'cannot publish over'; then
+            echo
+            echo "That version is already on npm. Expected until package.json is bumped."
+            exit 0
+          fi
+          exit "$code"
