@@ -296,8 +296,9 @@ export function openChannels(options: ChannelsOptions): Channels {
     const channel = entry(uri);
     if (channel.pending) return channel.pending;
     channel.told = false;
+    const era = generation;
     const asking = client.subscribe(uri).then(({ result }) => {
-      channel.opened = true;
+      if (era === generation && held.get(uri) === channel) channel.opened = true;
       return bag(result.snapshot?.state);
     });
     channel.pending = asking;
@@ -333,11 +334,16 @@ export function openChannels(options: ChannelsOptions): Channels {
   const drop = (uri: string): void => {
     const channel = held.get(uri);
     if (!channel || channel.uses > 0) return;
+    const era = generation;
     const release = (): void => {
+      if (era !== generation || held.get(uri) !== channel) return;
       const now = held.get(uri);
       // Somebody took it back while this was waiting, which is the whole
       // reason for waiting.
       if (!now || now.uses > 0) return;
+      // Keep the entry until the request answers. A reader returning meanwhile
+      // shares it; otherwise its successful subscribe still needs releasing.
+      if (now.pending) { void now.pending.then(release, release); return; }
       held.delete(uri);
       if (!now.opened) return;
       void client.unsubscribe(uri).catch(() => undefined);
@@ -526,7 +532,11 @@ export function openChannels(options: ChannelsOptions): Channels {
 
     detach: () => {
       generation += 1;
-      for (const channel of held.values()) {
+      for (const [uri, channel] of held) {
+        if (channel.uses === 0) {
+          clearTimeout(channel.leaving);
+          held.delete(uri);
+        }
         channel.opened = false;
         channel.told = false;
         channel.waiting.length = 0;
