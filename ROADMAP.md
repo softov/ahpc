@@ -7,7 +7,7 @@ Open scopes only. A row comes out when the work lands, and git keeps what was he
 | | |
 | --- | --- |
 | a scenario runner | The seams already allow this client and a real host to run against each other over an in-memory transport, with no model and no socket. Built as a harness that can pause a handshake, drop a connection and reattach, it would cover the interleavings that unit tests do not. It is what found the late-reader bug, written once by hand |
-| measure the transcript before optimising it | A live subscription rebuilds the user-facing view after every reduced action. That may be costly with a long history and fine-grained streaming, or it may be nothing. Nobody has measured it, so there is no defect here yet and no optimisation worth writing |
+| decide whether to cache the transcript projection | Measured on 6 September 2026 by `npm run bench`, which is `test/transcript.bench.ts`. The reducer is flat in history - about a microsecond whatever the chat holds - and the rebuild after it is linear: one streamed token costs 0.05ms into 10 turns, 0.15ms into 100, 0.62ms into 500 and 2.5ms into 2000. So the projection is the cost and `transcript` walking finished turns is where it is. Nothing to do at ordinary lengths; a long session at a fast token rate is a different answer. Caching completed turns is the fix if one is wanted, and it needs invalidating on history loads, truncation and reconnect snapshots |
 
 ## Deliberate duplication
 
