@@ -173,6 +173,14 @@ layer for all ten server-initiated methods exists and answers; without
 enforcing access exactly as the specification describes. Serving by default
 would hand this machine's disk to whatever host it connected to.
 
+**A refusal's code is mapped at the seam, not raised at it.** `publish.ts`
+imports nothing from the protocol package, so it raises its own error carrying
+the declared code and `live.ts` turns that into the package's `RpcError`. The
+package reads a code off that type and nothing else, so a handler that throws
+anything at all is answered `-32603` - which both refusals were, with their
+messages intact and their codes gone, until a host-initiated round trip was
+tested rather than the handlers alone.
+
 **`createResourceWatch` is not served over a published directory.** Nine of the
 ten reverse methods answer; a host asking this client to watch one of its
 published files gets `-32601`, which is the true answer rather than a stub.
