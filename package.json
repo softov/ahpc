@@ -1,6 +1,6 @@
 {
   "name": "@softov/ahpc",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "description": "A terminal client for the Agent Host Protocol: sessions, a streaming transcript, and interactive prompts",
   "keywords": [
