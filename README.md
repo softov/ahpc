@@ -1,5 +1,6 @@
 # ahpc
 
+[![npm](https://img.shields.io/npm/v/ahpc)](https://www.npmjs.com/package/ahpc)
 ![license MIT](https://img.shields.io/badge/license-MIT-blue)
 ![node >=22](https://img.shields.io/badge/node-%3E%3D22-5fa04e)
 ![Agent Host Protocol 0.9.0](https://img.shields.io/badge/AHP-0.9.0-0b7285)
@@ -19,22 +20,22 @@ The interface is built with [TextUI](https://github.com/softov/textui), a compon
 ## Quick start
 
 ```sh
-git clone https://github.com/softov/ahpc
-cd ahpc
-npm install && npm run build
+npm install -g ahpc
 ```
 
-A scripted host is built in, so the screen runs with nothing else installed:
+Or run it without installing, with `npx ahpc`.
+
+A scripted host is built in, so the screen runs with nothing else to set up:
 
 ```sh
-node dist/src/main.js
+ahpc
 ```
 
 Point it at a real host:
 
 ```sh
-node dist/src/main.js --host ws://127.0.0.1:9187
-node dist/src/main.js session list --host ws://127.0.0.1:9187
+ahpc --host ws://127.0.0.1:9187
+ahpc session list --host ws://127.0.0.1:9187
 ```
 
 [`ahpd`](https://github.com/softov/ahpd) and VS Code's agent host are both AHP hosts.
@@ -221,7 +222,7 @@ All 30 client-to-server requests are implemented, and 21 of the 45 client-dispat
 AHP is symmetrical, so a host can also request things from the client. Nine of the ten server-initiated methods are implemented; `createResourceWatch` is not. Nothing is shared until `--publish <dir>` names a directory, and it stays read-only without `--publish-writable`:
 
 ```sh
-node dist/src/main.js --host ws://127.0.0.1:9187 --publish ~/notes
+ahpc --host ws://127.0.0.1:9187 --publish ~/notes
 ```
 
 The host reads those files at `virtual://<clientId>/<path>`. Publishing lasts only while the screen is open.
@@ -266,9 +267,13 @@ Naming a chord replaces every default on it, so a chord is either yours or the c
 ## Development
 
 ```sh
+git clone https://github.com/softov/ahpc
+cd ahpc
+npm install
+
 npm test
 npm run typecheck
-npm run build
+npm run build      # dist/src, which is what the package ships
 ```
 
 Two tools check the client against the protocol itself:

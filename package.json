@@ -1,18 +1,48 @@
 {
   "name": "ahpc",
-  "version": "0.0.1",
-  "private": true,
+  "version": "0.1.0",
   "type": "module",
   "description": "A terminal client for the Agent Host Protocol: sessions, a streaming transcript, and interactive prompts",
+  "keywords": [
+    "ahp",
+    "agent-host-protocol",
+    "agent-host",
+    "agent",
+    "ai",
+    "protocol",
+    "json-rpc",
+    "websocket",
+    "cli",
+    "command-line",
+    "tui",
+    "terminal",
+    "client"
+  ],
+  "author": "Luiz Fernando Softov <lfs@softov.dev>",
+  "license": "MIT",
+  "homepage": "https://github.com/softov/ahpc#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/softov/ahpc.git"
+  },
+  "bugs": {
+    "url": "https://github.com/softov/ahpc/issues"
+  },
   "bin": {
     "ahpc": "./dist/src/main.js"
   },
+  "files": [
+    "dist/src",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "bench": "vitest bench --run",
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.build.json",
     "build:watch": "tsc -p tsconfig.json --watch",
     "dev": "npm run build && node dist/src/main.js",
     "dev:bun": "bun src/main.tsx",
+    "prepack": "tsc -p tsconfig.build.json",
     "schema": "node tools/schema.mjs",
     "start": "node dist/src/main.js",
     "test": "vitest run",
@@ -35,6 +65,5 @@
   },
   "engines": {
     "node": ">=22"
-  },
-  "license": "MIT"
+  }
 }
