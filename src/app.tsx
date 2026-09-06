@@ -341,8 +341,10 @@ const Hints = defineComponent<BoxProps>('ChatHints', (props) => {
         { keys: leftRight, label: 'detail' },
         { keys: 'enter', label: 'open' },
         { keys: 'n', label: 'new' },
-        { keys: 'a', label: 'archive' },
-        { keys: '/', label: 'filter' },
+        // `a` archives and `delete` disposes, and neither is here: the row is
+        // one line and naming `ctrl+f` cost it the room. Both are a letter
+        // away in the palette, and the filter is the one nothing else offers.
+        { keys: 'ctrl+f', label: 'filter' },
         { keys: 'ctrl+p', label: 'commands' },
         { keys: 'ctrl+c', label: 'quit' },
       ]}

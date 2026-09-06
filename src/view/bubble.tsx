@@ -88,6 +88,8 @@ export interface StreamingTextProps extends BoxProps {
    * it wants one or the other regardless.
    */
   markdown?: boolean;
+  /** Text to pick out, for the find box. Coloured wherever it appears. */
+  match?: string;
 }
 
 /**
@@ -102,7 +104,7 @@ export interface StreamingTextProps extends BoxProps {
  */
 export const StreamingText: (props: StreamingTextProps) => RenderOutput =
   defineComponent<StreamingTextProps>('StreamingText', (props) => {
-    const { content, streaming, quiet, maxLines, markdown, ...rest } = props;
+    const { content, streaming, quiet, maxLines, markdown, match, ...rest } = props;
     const theme = useTheme();
     // Only while something is arriving. A ticker marks its component dirty
     // whether or not the frame it produces differs, so an unconditional one
@@ -130,6 +132,7 @@ export const StreamingText: (props: StreamingTextProps) => RenderOutput =
           content={shown}
           wrap="word"
           {...(quiet ? { fg: 'muted' as const } : {})}
+          {...(match ? { match } : {})}
           {...rest}
         />
       );
@@ -140,12 +143,15 @@ export const StreamingText: (props: StreamingTextProps) => RenderOutput =
         content={shown}
         {...(quiet ? { quiet: true } : {})}
         {...(maxLines !== undefined ? { maxLines } : {})}
+        {...(match ? { match } : {})}
         {...rest}
       />
     );
   });
 
 export interface ReasoningBlockProps extends BoxProps {
+  /** Text to pick out, for the find box. Handed to the text inside it. */
+  match?: string;
   content: string;
   expanded?: boolean;
   streaming?: boolean;
@@ -162,7 +168,7 @@ export interface ReasoningBlockProps extends BoxProps {
  */
 export const ReasoningBlock: (props: ReasoningBlockProps) => RenderOutput =
   defineComponent<ReasoningBlockProps>('ReasoningBlock', (props) => {
-    const { content, expanded, streaming, summary, ...rest } = props;
+    const { content, expanded, streaming, summary, match, ...rest } = props;
     const theme = useTheme();
     const chevron = expanded ? theme.glyphs.chevronDown : theme.glyphs.chevronRight;
     const words = content.trim().split(/\s+/).filter(Boolean).length;
@@ -176,7 +182,7 @@ export const ReasoningBlock: (props: ReasoningBlockProps) => RenderOutput =
         {expanded ? (
           <Row gap={1}>
             <text content=" " />
-            <StreamingText content={content} quiet flex={1} {...(streaming ? { streaming: true } : {})} />
+            <StreamingText content={content} quiet flex={1} {...(streaming ? { streaming: true } : {})} {...(match ? { match } : {})} />
           </Row>
         ) : null}
       </Column>

@@ -1,4 +1,4 @@
-import type { BindingPath, RenderOutput, SemanticVariant, TextUIApp } from '@textui/core';
+import type { ArgSpec, BindingPath, RenderOutput, SemanticVariant, TextUIApp } from '@textui/core';
 import {
   defineComponent,
   useApp,
@@ -23,11 +23,11 @@ import { branchName, branchDrift,
   ARCHIVED, AUTOMATIONS, AUTOMATION_ROW, CHANGES, CUSTOMIZATIONS, DRAFT, EXPANDED, FILTER, FOCUS, HISTORY, HOST, INPUT,
   CHANGE_AT, CHANGE_ROW, CHANGE_SCOPES, FILES_AT, FILES_ENTRIES, FILES_OPEN,
   MODEL, MODEL_CONFIG, OPEN, OPEN_FILE, CHAT_URI, PROVIDER, QUEUE, SELECTED, SESSIONS, SETTINGS, SIDEBAR,
-  CHATS, OPEN_TERMINAL, PRESENT, SPLIT_AT, SPLIT_DEFAULT, TERMINAL, TERMINALS, TURNS, WORKSPACE,
-  openSession, visibleSessions, workspaceName,
+  CHATS, CURSOR, FIND, FINDING, FIND_AT, OPEN_TERMINAL, PRESENT, SPLIT_AT, SPLIT_DEFAULT, TERMINAL, TERMINALS, TURNS, WORKSPACE,
+  hiddenSessions, openSession, visibleSessions, workspaceName,
 } from './state.js';
 import type { HostState } from './state.js';
-import { toBlocks } from './blocks.js';
+import { findBlocks, toBlocks } from './blocks.js';
 import type {
   Agent, Automation, Changeset, ChangesetScope, Completion, ContentRef, Customization, FileContent, PendingInput, QueuedMessage, ResourceEntry,
   TerminalRow, TerminalState,
@@ -169,6 +169,7 @@ export const SessionsScreen: (props: Record<string, never>) => RenderOutput =
     const archived = useStoreValue<boolean>(ARCHIVED, false) ?? false;
     const selected = useStoreValue<string | null>(SELECTED, null) ?? null;
     const sessions = visibleSessions(app.store);
+    const hidden = hiddenSessions(app.store);
     const host = useStoreValue<HostState>(HOST);
 
     // A list with a highlight and nothing selected is a detail panel that is
@@ -247,8 +248,8 @@ export const SessionsScreen: (props: Record<string, never>) => RenderOutput =
           <SearchBox
             value={filter}
             placeholder="title, provider or workspace"
-            // Named, so `/` has something to focus. A control whose id comes
-            // from its instance cannot be the target of a command.
+            // Named, so `ctrl+f` has something to focus. A control whose id
+            // comes from its instance cannot be the target of a command.
             focusId="chat.filter"
             onChange={(value: string) => app.store.set(FILTER, value)}
           />
@@ -267,7 +268,21 @@ export const SessionsScreen: (props: Record<string, never>) => RenderOutput =
             onOpen={(uri: string) => { controller.open(uri); app.screens.push('chat'); }}
             emptyMessage={filter ? 'Nothing matches' : 'No sessions on this host'}
           />
-          {!archived ? <text content="x  show archived" fg="subtle" /> : null}
+          {/*
+            * What the switch is doing, both ways round.
+            *
+            * It used to read `x  show archived` and disappear once pressed,
+            * so the only sign anything had happened was a row further up that
+            * may not be on screen - and on a host with nothing archived,
+            * pressing it changed nothing at all and the line had promised
+            * otherwise. Now the line says which way the switch is set, and it
+            * is there only when it has something to do.
+            */}
+          {archived
+            ? <text content="x  hide archived" fg="subtle" />
+            : hidden > 0
+              ? <text content={`x  show archived (${hidden})`} fg="subtle" />
+              : null}
         </Panel>
 
         {open ? (
@@ -583,6 +598,22 @@ function useComposerOptions(): ComposerOption[] {
  * menu is a list of what can be done, and a row that cannot be chosen is a row
  * that has to be read to find that out.
  */
+/**
+ * A command's arguments, written the way they would be typed.
+ *
+ * Required in angle brackets and optional in square ones, which is how every
+ * usage line since man(1) has said the same thing.
+ *
+ * An argument with fixed choices is left out: it is asked for with a picker,
+ * so nothing is typed after the name and a mask saying otherwise would be
+ * wrong. A command whose arguments are all pickers has no mask at all.
+ */
+function mask(args: ArgSpec[] | undefined): string | undefined {
+  const typed = (args ?? []).filter((arg) => arg.choices === undefined);
+  if (typed.length === 0) return undefined;
+  return typed.map((arg) => (arg.required ? `<${arg.name}>` : `[${arg.name}]`)).join(' ');
+}
+
 function slashCommands(app: TextUIApp, contributed: Customization[]): SlashCommand[] {
   const session: SlashCommand[] = contributed
     .filter((item) => (item.kind === 'skill' || item.kind === 'prompt')
@@ -602,6 +633,7 @@ function slashCommands(app: TextUIApp, contributed: Customization[]): SlashComma
       kind: 'client' as const,
       title: command.title,
       ...(command.description ? { description: command.description } : {}),
+      ...(mask(command.args) ? { hint: mask(command.args) as string } : {}),
     }));
 
   return [...session, ...client];
@@ -632,7 +664,7 @@ export const ChatScreen: (props: Record<string, never>) => RenderOutput =
     // The cursor is state like everything else, and it lives in the screen's
     // own scope - so it survives a trip to the changes list, which is
     // `keepAlive`, and dies with the screen, which is what a scope is for.
-    const [cursor, setCursor] = useStore<number>('$/screen.chat/cursor' as BindingPath, 0);
+    const [cursor, setCursor] = useStore<number>(CURSOR, 0);
 
     // Subscribed, because `openSession` is a plain read. The caption carries
     // the session's own state, and a state arriving from the host while the
@@ -657,6 +689,39 @@ export const ChatScreen: (props: Record<string, never>) => RenderOutput =
      * re-renders for the draft dragged four hundred blocks along with it.
      */
     const blocks = useMemo(() => toBlocks(turns, queued), [turns, queued]);
+
+    /*
+     * Find, over the conversation on screen.
+     *
+     * The matches are block indices and the cursor is a block index, so
+     * moving between them is moving the cursor - the feed then scrolls to it
+     * and draws it selected, which is the same thing that happens when the
+     * arrow keys walk the transcript. There is no second notion of "where the
+     * search is".
+     *
+     * `at` is clamped rather than reset, so a match list that shrinks as more
+     * is typed keeps the reader near where they were instead of throwing them
+     * back to the top of the conversation on every keystroke.
+     */
+    const finding = useStoreValue<boolean>(FINDING, false) ?? false;
+    const query = useStoreValue<string>(FIND, '') ?? '';
+    const found = useMemo(() => findBlocks(blocks, query), [blocks, query]);
+    const at = Math.min(useStoreValue<number>(FIND_AT, 0) ?? 0, Math.max(0, found.length - 1));
+
+    /*
+     * The keyboard goes to the box when it opens.
+     *
+     * Not from the command that opens it, and not from this effect directly:
+     * the field is a child, its focus id is registered by the child's own
+     * mount effect, and a parent's effect runs first - so both of those ask
+     * for an id that does not exist yet and silently focus nothing. A
+     * microtask is after the whole flush, which is when the field is there.
+     */
+    useEffect(() => {
+      if (!finding) return;
+      queueMicrotask(() => app.focus.focus('chat.find'));
+    }, [finding]);
+
     const options = useComposerOptions();
     // Read here as well as on the panel, because the slash menu is the other
     // place a skill is reached from and this is the screen it is reached on.
@@ -738,12 +803,52 @@ export const ChatScreen: (props: Record<string, never>) => RenderOutput =
 
     return (
       <Column flex={1} gap={1}>
+        {finding ? (
+          /*
+           * The find box, in the top right corner.
+           *
+           * A row of its own above the transcript rather than floating over
+           * it: a box drawn on top of the conversation hides the lines it is
+           * there to help you read, and the one row it costs is only spent
+           * while a search is open.
+           */
+          <Row justify="end" gap={1}>
+            <SearchBox
+              value={query}
+              placeholder="find in this conversation"
+              width={40}
+              focusId="chat.find"
+              onChange={(next: string) => {
+                app.store.set(FIND, next);
+                // A new term is a new search, so it starts at the first match
+                // rather than at whatever number the last one had reached.
+                app.store.set(FIND_AT, 0);
+                const hits = findBlocks(blocks, next);
+                if (hits.length > 0) setCursor(hits[0] as number);
+              }}
+              // Enter is the next one, which is what every find box in a
+              // terminal does. Up, down and escape are keybindings rather
+              // than handlers here: the field does not claim them, so they
+              // reach the bindings, and that is where every other key in this
+              // application is declared.
+              onSubmit={() => { void app.execute('chat.find.next'); }}
+            />
+            <text
+              content={query.trim() === '' ? '' : found.length === 0
+                ? 'no match'
+                : `${String(at + 1)} of ${String(found.length)}`}
+              fg={query.trim() !== '' && found.length === 0 ? 'danger' : 'accent'}
+            />
+          </Row>
+        ) : null}
+
         <ChatTranscript
           // The top of the conversation, inside it. See `head`.
           head={head}
           flex={1}
           blocks={blocks}
           expanded={expanded}
+          {...(finding && query.trim() !== '' ? { match: query.trim() } : {})}
           cursor={cursor ?? 0}
           onCursor={onCursor}
           onToggle={onToggle}
@@ -763,8 +868,12 @@ export const ChatScreen: (props: Record<string, never>) => RenderOutput =
             // how you leave. Sent back to the transcript unconditionally it
             // read as "escape does nothing", and a session blocked on a
             // confirmation could not be left without answering it. So escape
-            // leaves whatever it is in: the block first, then the screen.
+            // leaves whatever it is in: the find box, then the block, then
+            // the screen. The find box is named here because a global handler
+            // runs before any keybinding, so the box's own escape never gets
+            // the key while a session is waiting on an answer.
             onEscape={() => {
+              if (finding) { void app.execute('chat.find.close'); return; }
               if (app.focus.focused() === 'chat.transcript') app.screens.pop();
               else app.focus.focus('chat.transcript');
             }}

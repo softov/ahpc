@@ -136,3 +136,37 @@ describe('a session that is open', () => {
     await m.t.unmount();
   });
 });
+
+/*
+ * A switch says which way it is set.
+ *
+ * `Show archived sessions` was a title in one direction for a thing with two,
+ * and pressing it made the row that offered it disappear - so on a host with
+ * nothing archived it changed the list not at all and took away the only
+ * sign that anything had happened.
+ */
+describe('the archived switch reports its own state', () => {
+  it('is checked in the palette when archived sessions are showing', async () => {
+    const m = await open();
+    expect(m.t.app.commands.isChecked('session.toggleArchived')).toBe(false);
+    await m.t.app.execute('session.toggleArchived');
+    await settle(m);
+    expect(m.t.app.commands.isChecked('session.toggleArchived')).toBe(true);
+    await m.t.unmount();
+  });
+
+  it('counts what it is hiding, and says the other direction once it is on', async () => {
+    const m = await open();
+    await m.t.app.execute('go.sessions');
+    await settle(m);
+    // The fake host holds one archived session, so the row has something to
+    // offer and says how much.
+    expect(m.t.hasText('show archived (1)')).toBe(true);
+
+    m.t.press('x');
+    await settle(m);
+    expect(m.t.hasText('hide archived')).toBe(true);
+    expect(m.t.hasText('show archived')).toBe(false);
+    await m.t.unmount();
+  });
+});

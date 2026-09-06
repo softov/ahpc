@@ -11,18 +11,19 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { confirm } from '@textui/widgets';
+import { findBlocks, toBlocks } from './blocks.js';
 import { operate } from './ahp/operate.js';
 import type { HostConnection } from './ahp/connection.js';
 import type { Terminals } from './terminal.js';
 import { createTerminals } from './terminal.js';
 import type {
-  Agent, Answer, Automation, Changeset, ChangesetScope, ChatSource, Completion, ConfigProperty, ContentRef, Customization, FileContent, ResourceEntry, SessionConfig, SessionDetail,
+  Agent, Answer, Automation, Changeset, ChangesetScope, ChatSource, Completion, ConfigProperty, ContentRef, Customization, FileContent, QueuedMessage, ResourceEntry, SessionConfig, SessionDetail,
   SessionUri, Turn,
 } from './ahp/types.js';
 import { SessionFlag } from './ahp/types.js';
 import { valueIcon } from './view/icons.js';
 import {
-  ARCHIVED, BOOD_FLOAT, CAN_ADD_CHAT, CAN_FORK, CAN_SIDE_CHAT, CHAT_URI, CHATS, CUSTOMIZATIONS, DRAFT, EXPANDED, FILTER, HAS_CHATS,
+  ARCHIVED, BOOD_FLOAT, CAN_ADD_CHAT, CAN_FORK, CAN_SIDE_CHAT, CHAT_URI, CHATS, CUSTOMIZATIONS, CURSOR, DRAFT, EXPANDED, FILTER, FIND, FINDING, FIND_AT, HAS_CHATS,
   HOST, HOST_ERROR, INPUT, MODEL, MODEL_CONFIG, OPEN_TERMINAL,
   AUTOMATIONS, AUTOMATION_ROW,
   CHANGES as CHANGES_AT_PATH, CHANGE_AT, CHANGE_ROW, CHANGE_SCOPES, FILES_AT, FILES_OPEN,
@@ -949,6 +950,25 @@ function commands(
   const running = (): boolean => turns(app.store).some((turn) => turn.state === 'running');
 
   /**
+   * Move the transcript cursor to the match `by` away from the one it is on.
+   *
+   * The blocks are rebuilt here rather than read from the screen: a command
+   * has the store and nothing else, and the store holds the turns that the
+   * screen builds the same blocks from. Doing it once per keypress on a
+   * conversation is not the cost that matters.
+   */
+  const step = (by: number): void => {
+    const query = app.store.get<string>(FIND) ?? '';
+    const blocks = toBlocks(turns(app.store), app.store.get<QueuedMessage[]>(QUEUE) ?? []);
+    const found = findBlocks(blocks, query);
+    if (found.length === 0) return;
+    const from = Math.min(app.store.get<number>(FIND_AT) ?? 0, found.length - 1);
+    const next = (from + by + found.length) % found.length;
+    app.store.set(FIND_AT, next);
+    app.store.set(CURSOR, found[next] ?? 0);
+  };
+
+  /**
    * The catalogue, one screen above the composer.
    *
    * Reset-then-push rather than push: the catalogue is reachable from the
@@ -1075,6 +1095,40 @@ function commands(
             width: 62,
             placeholder: 'Configure',
             commands: app.commands.list({ slot: 'config', enabledOnly: true }),
+            onClose: { handler: () => app.layers.close('palette') },
+          },
+        });
+      },
+    },
+    {
+      /*
+       * Every key that works right here, and what it does.
+       *
+       * The palette on `ctrl+p` is the list of *commands* and answers "what
+       * can I do"; this answers "what does this key do", which is the other
+       * question and the one a person asks with the keyboard in front of
+       * them. So it is the commands that have a chord, and only the ones
+       * whose `when` passes where the reader is standing - a keymap listing
+       * keys that do nothing here is a keymap that has to be second-guessed.
+       */
+      id: 'help.keys',
+      title: 'Keys',
+      category: 'Help',
+      description: 'Every key that does something here',
+      slots: ['palette'],
+      run: () => {
+        app.layers.open({
+          id: 'palette',
+          layer: 'modal',
+          scrim: true,
+          trapFocus: true,
+          dismissOnEscape: true,
+          node: {
+            component: 'CommandPalette',
+            width: 62,
+            placeholder: 'Keys',
+            commands: app.commands.list({ enabledOnly: true })
+              .filter((command) => app.keybindings.forCommand(command.id).length > 0),
             onClose: { handler: () => app.layers.close('palette') },
           },
         });
@@ -1923,11 +1977,15 @@ function commands(
     },
     {
       id: 'session.toggleArchived',
-      title: 'Show archived sessions',
+      title: 'Archived sessions',
       category: 'Session',
-      description: 'List archived sessions',
+      description: 'List the sessions that have been put away',
       slots: ['palette'],
       keepOpen: true,
+      // A switch, and the palette says which way it is set. The title used to
+      // read `Show archived sessions`, which is one direction of a thing that
+      // has two and says nothing about where it stands.
+      checked: ARCHIVED,
       run: () => app.store.set(ARCHIVED, !(app.store.get<boolean>(ARCHIVED) ?? false)),
     },
 
@@ -1986,6 +2044,65 @@ function commands(
       // Focus goes to a field that is only mounted on these two screens.
       when: `${SCREEN} == 'chat' || ${SCREEN} == 'new'`,
       run: () => app.focus.focus('chat.composer'),
+    },
+    {
+      /*
+       * Find, in the conversation that is open.
+       *
+       * The same key as the catalogue's filter, on the screen where the
+       * catalogue is not: `ctrl+f` means "look for something in what is in
+       * front of me", and which of the two that is depends on where you are.
+       */
+      id: 'chat.find',
+      title: 'Find in the conversation',
+      category: 'Chat',
+      description: 'Search what has been said in this session',
+      slots: ['palette'],
+      when: `${SCREEN} == 'chat'`,
+      run: () => {
+        app.store.set(FINDING, true);
+        app.focus.focus('chat.find');
+      },
+    },
+    {
+      /*
+       * The next match, and the one before it.
+       *
+       * The matches are block indices and the transcript cursor is a block
+       * index, so going to one is moving the cursor - the feed scrolls to it
+       * and draws it selected, which is what it already does when the arrow
+       * keys walk the conversation. Nothing here has a second idea of where
+       * the search is.
+       *
+       * Wrapping at both ends, because a reader pressing enter at the last
+       * match means "keep going": a find that falls silent at the end of the
+       * conversation reads as broken rather than as finished.
+       */
+      id: 'chat.find.next',
+      title: 'Next match',
+      category: 'Chat',
+      when: `${SCREEN} == 'chat' && ${FINDING}`,
+      run: () => step(1),
+    },
+    {
+      id: 'chat.find.previous',
+      title: 'Previous match',
+      category: 'Chat',
+      when: `${SCREEN} == 'chat' && ${FINDING}`,
+      run: () => step(-1),
+    },
+    {
+      id: 'chat.find.close',
+      title: 'Close the find box',
+      category: 'Chat',
+      // Not in the palette: escape closes it and it is only reachable while
+      // it is open, so a row for it is a row that never applies.
+      when: `${SCREEN} == 'chat' && ${FINDING}`,
+      run: () => {
+        app.store.set(FINDING, false);
+        app.store.set(FIND, '');
+        app.focus.focus('chat.transcript');
+      },
     },
     {
       id: 'session.filter',
@@ -2139,6 +2256,8 @@ function shipped(): Binding[] {
   return [
     // Global: nothing types these, so they are safe wherever focus is.
     { keys: 'ctrl+p', commandId: 'app.palette' },
+    // Help, where every terminal application has put it.
+    { keys: 'f1', commandId: 'help.keys' },
     // `alt+g` rather than `ctrl+g`, which is the external editor's key in
     // every other agent CLI and is kept free for it here.
     { keys: 'alt+g', commandId: 'bood.toggle' },
@@ -2206,7 +2325,37 @@ function shipped(): Binding[] {
     // footer has room to name. It confirms either way - ending somebody
     // else's conversation is not an undo.
     { keys: 'delete', commandId: 'session.dispose', scopeId: SESSIONS_SCOPE },
-    { keys: '/', commandId: 'session.filter', scopeId: SESSIONS_SCOPE },
+    // `ctrl+f` rather than `/`, which is what a person reaches for to search
+    // and what the field itself leaves unclaimed.
+    /*
+     * The catalogue's filter and the conversation's find, on the one key a
+     * person reaches for to search.
+     *
+     * The clauses are on the *bindings* and not only on the commands. A
+     * binding that matches has handled the key whether or not the command it
+     * names then declines to run, so the first of these two swallowed
+     * `ctrl+f` on every screen and the second was never reached.
+     */
+    { keys: 'ctrl+f', commandId: 'session.filter', when: `${SCREEN} == 'sessions'` },
+    { keys: 'ctrl+f', commandId: 'chat.find', when: `${SCREEN} == 'chat'` },
+    /*
+     * Walking the matches, while the find box is up.
+     *
+     * The field does not claim up and down, so they reach the bindings. Not
+     * scoped to the conversation: the keyboard is in the field, and a scope
+     * is about which screen a *letter* belongs to. The clause is what keeps
+     * these three off every other key press - unguarded they are `up`, `down`
+     * and `escape` taken away from the whole application.
+     *
+     * `priority` and not position, because escape here has to beat the escape
+     * that leaves the screen and that one is declared above. Order decides a
+     * tie and this is not a tie to settle by which line came first: the find
+     * box is the thing in front of the reader, so it answers first for as
+     * long as it is open.
+     */
+    { keys: 'down', commandId: 'chat.find.next', when: FINDING, priority: 10 },
+    { keys: 'up', commandId: 'chat.find.previous', when: FINDING, priority: 10 },
+    { keys: 'escape', commandId: 'chat.find.close', when: FINDING, priority: 10 },
     // Scoped, not global, and after the focused node has had its turn: while
     // the filter box has the keyboard these two are caret movement, and the
     // runtime offers the key there first.

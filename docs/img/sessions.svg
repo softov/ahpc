@@ -1,57 +1,52 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="820" height="428" viewBox="0 0 820 428" font-family="ui-monospace, SFMono-Regular, &apos;SF Mono&apos;, Menlo, Consolas, &apos;DejaVu Sans Mono&apos;, monospace" font-size="13px">
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="530" viewBox="0 0 820 530" font-family="ui-monospace, SFMono-Regular, &apos;SF Mono&apos;, Menlo, Consolas, &apos;DejaVu Sans Mono&apos;, monospace" font-size="13px">
 <title>chat - sessions</title>
-<rect width="820" height="428" rx="6" fill="#fffdf9"/>
-<rect x="10" y="61" width="800" height="17" fill="#eadcc6"/>
-<rect x="10" y="78" width="800" height="17" fill="#eadcc6"/>
-<text x="10" y="23" fill="#b4531f" font-weight="bold" textLength="72" lengthAdjust="spacing" xml:space="preserve">Assistant</text>
-<text x="90" y="23" fill="#c56532" textLength="8" lengthAdjust="spacing" xml:space="preserve">·</text>
-<text x="106" y="23" fill="#7a756c" textLength="120" lengthAdjust="spacing" xml:space="preserve">fake://scripted</text>
-<text x="10" y="40" fill="#2b2a27" font-weight="bold" textLength="64" lengthAdjust="spacing" xml:space="preserve">Sessions</text>
-<text x="666" y="40" fill="#7a756c" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">⚠</text>
-<text x="674" y="40" fill="#7a756c" textLength="136" lengthAdjust="spacing" xml:space="preserve"> 1 waiting on you</text>
-<text x="18" y="57" fill="#7a756c" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">⌕</text>
-<text x="34" y="57" fill="#c56532" textLength="224" lengthAdjust="spacing" xml:space="preserve">title, provider or workspace</text>
-<text x="10" y="74" fill="#2b2a27" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▸</text>
-<text x="26" y="74" fill="#2b2a27" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">◌</text>
-<text x="34" y="74" fill="#2b2a27" textLength="776" lengthAdjust="spacing" xml:space="preserve"> Kqueue events on Linux                                                            waiting on you</text>
-<text x="10" y="91" fill="#2b2a27" textLength="616" lengthAdjust="spacing" xml:space="preserve">    claude  ·  brb_framework main  ·  waiting for permission to run a command</text>
-<text x="26" y="108" fill="#b4531f" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">●</text>
-<text x="34" y="108" fill="#2b2a27" textLength="720" lengthAdjust="spacing" xml:space="preserve"> Split the transcript viewport                                                            </text>
-<text x="754" y="108" fill="#7a756c" textLength="56" lengthAdjust="spacing" xml:space="preserve">running</text>
-<text x="42" y="125" fill="#7a756c" textLength="504" lengthAdjust="spacing" xml:space="preserve">claude  ·  textui main  ·  reading packages/core/src/ui/data.ts</text>
-<text x="26" y="142" fill="#e95c5e" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">✕</text>
-<text x="34" y="142" fill="#2b2a27" textLength="736" lengthAdjust="spacing" xml:space="preserve"> Advisor case 412 triage                                                                    </text>
-<text x="770" y="142" fill="#7a756c" textLength="40" lengthAdjust="spacing" xml:space="preserve">error</text>
-<text x="42" y="159" fill="#7a756c" textLength="248" lengthAdjust="spacing" xml:space="preserve">claude  ·  service_advisor main</text>
-<text x="26" y="176" fill="#7a756c" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">○</text>
-<text x="34" y="176" fill="#2b2a27" textLength="744" lengthAdjust="spacing" xml:space="preserve"> Why does the composer eat q                                                                 </text>
-<text x="778" y="176" fill="#7a756c" textLength="32" lengthAdjust="spacing" xml:space="preserve">idle</text>
-<text x="42" y="193" fill="#7a756c" textLength="208" lengthAdjust="spacing" xml:space="preserve">copilotcli  ·  textui main</text>
-<text x="10" y="397" fill="#c56532" textLength="128" lengthAdjust="spacing" xml:space="preserve">x  show archived</text>
-<text x="10" y="414" fill="#b4531f" font-weight="bold" textLength="16" lengthAdjust="spacingAndGlyphs" xml:space="preserve">↑↓</text>
-<text x="34" y="414" fill="#7a756c" textLength="32" lengthAdjust="spacing" xml:space="preserve">move</text>
-<text x="66" y="414" fill="#c56532" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
-<text x="90" y="414" fill="#b4531f" font-weight="bold" textLength="16" lengthAdjust="spacingAndGlyphs" xml:space="preserve">←→</text>
-<text x="114" y="414" fill="#7a756c" textLength="48" lengthAdjust="spacing" xml:space="preserve">detail</text>
-<text x="162" y="414" fill="#c56532" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
-<text x="186" y="414" fill="#b4531f" font-weight="bold" textLength="40" lengthAdjust="spacing" xml:space="preserve">enter</text>
-<text x="234" y="414" fill="#7a756c" textLength="32" lengthAdjust="spacing" xml:space="preserve">open</text>
-<text x="266" y="414" fill="#c56532" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
-<text x="290" y="414" fill="#b4531f" font-weight="bold" textLength="8" lengthAdjust="spacing" xml:space="preserve">n</text>
-<text x="306" y="414" fill="#7a756c" textLength="24" lengthAdjust="spacing" xml:space="preserve">new</text>
-<text x="330" y="414" fill="#c56532" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
-<text x="354" y="414" fill="#b4531f" font-weight="bold" textLength="8" lengthAdjust="spacing" xml:space="preserve">a</text>
-<text x="370" y="414" fill="#7a756c" textLength="56" lengthAdjust="spacing" xml:space="preserve">archive</text>
-<text x="426" y="414" fill="#c56532" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
-<text x="450" y="414" fill="#b4531f" font-weight="bold" textLength="8" lengthAdjust="spacing" xml:space="preserve">/</text>
-<text x="466" y="414" fill="#7a756c" textLength="48" lengthAdjust="spacing" xml:space="preserve">filter</text>
-<text x="514" y="414" fill="#c56532" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
-<text x="538" y="414" fill="#b4531f" font-weight="bold" textLength="24" lengthAdjust="spacing" xml:space="preserve">ctr</text>
-<text x="562" y="414" fill="#b4531f" font-weight="bold" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">…</text>
-<text x="578" y="414" fill="#7a756c" textLength="32" lengthAdjust="spacing" xml:space="preserve">comm</text>
-<text x="610" y="414" fill="#7a756c" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">…</text>
-<text x="618" y="414" fill="#c56532" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
-<text x="642" y="414" fill="#b4531f" font-weight="bold" textLength="48" lengthAdjust="spacing" xml:space="preserve">ctrl+c</text>
-<text x="698" y="414" fill="#7a756c" textLength="32" lengthAdjust="spacing" xml:space="preserve">quit</text>
-<text x="746" y="414" fill="#7a756c" textLength="64" lengthAdjust="spacing" xml:space="preserve">sessions</text>
+<rect width="820" height="530" rx="6" fill="#0d1117"/>
+<rect x="10" y="61" width="800" height="17" fill="#1f6feb"/>
+<rect x="10" y="78" width="800" height="17" fill="#1f6feb"/>
+<text x="10" y="23" fill="#58a6ff" font-weight="bold" textLength="72" lengthAdjust="spacing" xml:space="preserve">Assistant</text>
+<text x="90" y="23" fill="#a7a7a7" textLength="8" lengthAdjust="spacing" xml:space="preserve">·</text>
+<text x="106" y="23" fill="#9b949e" textLength="120" lengthAdjust="spacing" xml:space="preserve">fake://scripted</text>
+<text x="10" y="40" fill="#c9d1d9" font-weight="bold" textLength="64" lengthAdjust="spacing" xml:space="preserve">Sessions</text>
+<text x="666" y="40" fill="#9b949e" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">⚠</text>
+<text x="674" y="40" fill="#9b949e" textLength="136" lengthAdjust="spacing" xml:space="preserve"> 1 waiting on you</text>
+<text x="18" y="57" fill="#9b949e" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">⌕</text>
+<text x="34" y="57" fill="#a7a7a7" textLength="224" lengthAdjust="spacing" xml:space="preserve">title, provider or workspace</text>
+<text x="10" y="74" fill="#0d1117" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▸</text>
+<text x="26" y="74" fill="#0d1117" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">◌</text>
+<text x="34" y="74" fill="#0d1117" textLength="776" lengthAdjust="spacing" xml:space="preserve"> Kqueue events on Linux                                                            waiting on you</text>
+<text x="10" y="91" fill="#0d1117" textLength="616" lengthAdjust="spacing" xml:space="preserve">    claude  ·  brb_framework main  ·  waiting for permission to run a command</text>
+<text x="26" y="108" fill="#58a6ff" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">●</text>
+<text x="34" y="108" fill="#c9d1d9" textLength="720" lengthAdjust="spacing" xml:space="preserve"> Split the transcript viewport                                                            </text>
+<text x="754" y="108" fill="#9b949e" textLength="56" lengthAdjust="spacing" xml:space="preserve">running</text>
+<text x="42" y="125" fill="#9b949e" textLength="504" lengthAdjust="spacing" xml:space="preserve">claude  ·  textui main  ·  reading packages/core/src/ui/data.ts</text>
+<text x="26" y="142" fill="#f85149" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">✕</text>
+<text x="34" y="142" fill="#c9d1d9" textLength="736" lengthAdjust="spacing" xml:space="preserve"> Advisor case 412 triage                                                                    </text>
+<text x="770" y="142" fill="#9b949e" textLength="40" lengthAdjust="spacing" xml:space="preserve">error</text>
+<text x="42" y="159" fill="#9b949e" textLength="248" lengthAdjust="spacing" xml:space="preserve">claude  ·  service_advisor main</text>
+<text x="26" y="176" fill="#9b949e" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">○</text>
+<text x="34" y="176" fill="#c9d1d9" textLength="744" lengthAdjust="spacing" xml:space="preserve"> Why does the composer eat q                                                                 </text>
+<text x="778" y="176" fill="#9b949e" textLength="32" lengthAdjust="spacing" xml:space="preserve">idle</text>
+<text x="42" y="193" fill="#9b949e" textLength="208" lengthAdjust="spacing" xml:space="preserve">copilotcli  ·  textui main</text>
+<text x="10" y="499" fill="#a7a7a7" textLength="160" lengthAdjust="spacing" xml:space="preserve">x  show archived (1)</text>
+<text x="10" y="516" fill="#58a6ff" font-weight="bold" textLength="16" lengthAdjust="spacingAndGlyphs" xml:space="preserve">↑↓</text>
+<text x="34" y="516" fill="#9b949e" textLength="32" lengthAdjust="spacing" xml:space="preserve">move</text>
+<text x="66" y="516" fill="#a7a7a7" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
+<text x="90" y="516" fill="#58a6ff" font-weight="bold" textLength="16" lengthAdjust="spacingAndGlyphs" xml:space="preserve">←→</text>
+<text x="114" y="516" fill="#9b949e" textLength="48" lengthAdjust="spacing" xml:space="preserve">detail</text>
+<text x="162" y="516" fill="#a7a7a7" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
+<text x="186" y="516" fill="#58a6ff" font-weight="bold" textLength="40" lengthAdjust="spacing" xml:space="preserve">enter</text>
+<text x="234" y="516" fill="#9b949e" textLength="32" lengthAdjust="spacing" xml:space="preserve">open</text>
+<text x="266" y="516" fill="#a7a7a7" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
+<text x="290" y="516" fill="#58a6ff" font-weight="bold" textLength="8" lengthAdjust="spacing" xml:space="preserve">n</text>
+<text x="306" y="516" fill="#9b949e" textLength="24" lengthAdjust="spacing" xml:space="preserve">new</text>
+<text x="330" y="516" fill="#a7a7a7" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
+<text x="354" y="516" fill="#58a6ff" font-weight="bold" textLength="48" lengthAdjust="spacing" xml:space="preserve">ctrl+f</text>
+<text x="410" y="516" fill="#9b949e" textLength="48" lengthAdjust="spacing" xml:space="preserve">filter</text>
+<text x="458" y="516" fill="#a7a7a7" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
+<text x="482" y="516" fill="#58a6ff" font-weight="bold" textLength="48" lengthAdjust="spacing" xml:space="preserve">ctrl+p</text>
+<text x="538" y="516" fill="#9b949e" textLength="64" lengthAdjust="spacing" xml:space="preserve">commands</text>
+<text x="602" y="516" fill="#a7a7a7" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
+<text x="626" y="516" fill="#58a6ff" font-weight="bold" textLength="48" lengthAdjust="spacing" xml:space="preserve">ctrl+c</text>
+<text x="682" y="516" fill="#9b949e" textLength="32" lengthAdjust="spacing" xml:space="preserve">quit</text>
+<text x="746" y="516" fill="#9b949e" textLength="64" lengthAdjust="spacing" xml:space="preserve">sessions</text>
 </svg>

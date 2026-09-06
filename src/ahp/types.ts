@@ -611,6 +611,14 @@ export interface SlashCommand {
   description?: string;
   /** Where a session command came from: the plugin or directory. */
   from?: string;
+  /**
+   * What goes after the name, written the way it would be typed.
+   *
+   * `/autocompact <tokens>` says more about the command than a sentence
+   * describing it, and it is the one thing a menu cannot show in a row: the
+   * row is the name.
+   */
+  hint?: string;
 }
 
 /**

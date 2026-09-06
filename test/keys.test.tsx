@@ -180,3 +180,36 @@ describe('a command is offered where it works', () => {
     await t.unmount();
   });
 });
+
+/*
+ * F1, and what it is for.
+ *
+ * `ctrl+p` lists the commands and answers "what can I do". A person with the
+ * keyboard in front of them is asking the other question - "what does this
+ * key do" - and the answer is the commands that have a chord here.
+ */
+describe('f1 opens the keymap', () => {
+  it('lists the commands that have a key, and not the ones that do not', async () => {
+    const t = await running();
+    await t.press('f1');
+    for (let i = 0; i < 4; i += 1) await t.settle();
+    const screen = t.lines().join('\n');
+
+    // Bound, so it is in the panel - beside the chord that runs it.
+    expect(screen).toContain('ctrl+p');
+    // `help.keys` is itself bound, which is how the panel names its own key.
+    expect(screen).toContain('f1');
+    await t.unmount();
+  });
+
+  it('leaves out a command nothing is bound to', async () => {
+    // `app.config` ships without a chord of its own, so the keymap has no row
+    // for it while the command palette does.
+    const t = await running();
+    expect(t.app.keybindings.forCommand('app.config')).toHaveLength(0);
+    await t.press('f1');
+    for (let i = 0; i < 4; i += 1) await t.settle();
+    expect(t.lines().join('\n')).not.toContain('the rest of what this client decides');
+    await t.unmount();
+  });
+});

@@ -231,6 +231,20 @@ export const HISTORY = '$/chat/ui/history' as BindingPath;
 export const FILTER = '$/chat/ui/filter' as BindingPath;
 export const ARCHIVED = '$/chat/ui/archived' as BindingPath;
 export const EXPANDED = '$/chat/ui/expanded' as BindingPath;
+/** What is being looked for in the open conversation. Empty means nothing is. */
+export const FIND = '$/chat/ui/find' as BindingPath;
+/** Whether the find box is up. It stays up on an empty query, which is how it is typed into. */
+export const FINDING = '$/chat/ui/finding' as BindingPath;
+/** Which of the matches the cursor is on, counted from zero. */
+export const FIND_AT = '$/chat/ui/findAt' as BindingPath;
+/**
+ * Which block the transcript cursor is on.
+ *
+ * In the chat screen's own scope, so it survives a trip to the changes list
+ * and dies with the screen. Named here because the find commands move it and
+ * they do not live in the screen.
+ */
+export const CURSOR = '$/screen.chat/cursor' as BindingPath;
 /**
  * Whether what the agent said is drawn as markdown, or as what it typed.
  *
@@ -447,6 +461,18 @@ export function visibleSessions(store: ReactiveStore): SessionSummary[] {
       || session.provider.includes(query)
       || session.workingDirectories.some((dir) => dir.toLowerCase().includes(query)))
     .sort(byUrgency);
+}
+
+/**
+ * How many sessions the archived switch is keeping out of the list.
+ *
+ * Zero while the switch is on, because then it is keeping none out. What it
+ * counts is the difference the switch would make: a row offering to show
+ * archived sessions where there are none to show is a row that does nothing.
+ */
+export function hiddenSessions(store: ReactiveStore): number {
+  if (store.get<boolean>(ARCHIVED) ?? false) return 0;
+  return sessions(store).filter((session) => decodeStatus(session.status).archived).length;
 }
 
 export function openSession(store: ReactiveStore): SessionSummary | null {

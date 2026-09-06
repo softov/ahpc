@@ -23,6 +23,15 @@ export interface ChatTranscriptProps extends BoxProps {
   cursor?: number;
   onCursor?(index: number): void;
   /**
+   * What the find box is looking for.
+   *
+   * Passed down to be coloured where it appears, not to decide what is drawn:
+   * every block stays where it was and the ones holding the term light up, so
+   * a reader keeps the conversation around a hit instead of a filtered list
+   * of the lines that matched.
+   */
+  match?: string;
+  /**
    * What this conversation is, as the first thing in it.
    *
    * Inside the scrolling region rather than pinned above it: a caption outside
@@ -40,7 +49,7 @@ export interface ChatTranscriptProps extends BoxProps {
 export const ChatTranscript: (props: ChatTranscriptProps) => RenderOutput =
   defineComponent<ChatTranscriptProps>('ChatTranscript', (props) => {
     const {
-      blocks, expanded, onToggle, cursor, onCursor, head,
+      blocks, expanded, onToggle, cursor, onCursor, head, match,
       focusId = 'chat.transcript', ...rest
     } = props;
 
@@ -72,6 +81,7 @@ export const ChatTranscript: (props: ChatTranscriptProps) => RenderOutput =
             block={block}
             expanded={expanded[block.id] ?? false}
             active={cursor !== undefined && blocks[cursor]?.id === block.id}
+            {...(match ? { match } : {})}
             onToggle={() => onToggle(block.id)}
           />
         ))}
@@ -83,9 +93,13 @@ const BlockView = defineComponent<{
   block: Block;
   expanded: boolean;
   active: boolean;
+  match?: string;
   onToggle(): void;
-}>('ChatBlockView', ({ block, expanded, active, onToggle }) => {
+}>('ChatBlockView', ({ block, expanded, active, match, onToggle }) => {
   const theme = useTheme();
+  // Spread rather than passed, so a block with no search over it carries no
+  // extra prop and its text node is compared unchanged.
+  const hit = match ? { match } : {};
 
   switch (block.kind) {
     case 'said':
@@ -94,7 +108,7 @@ const BlockView = defineComponent<{
       // as it spaces one speaker from the next.
       return (
         <ChatBubble speaker="user" padding={[1, 0, 0, 0]}>
-          <text content={block.text} wrap="word" />
+          <text content={block.text} wrap="word" {...hit} />
         </ChatBubble>
       );
     case 'header':
@@ -115,7 +129,7 @@ const BlockView = defineComponent<{
       return (
         <Row gap={1}>
           <Gutter />
-          <StreamingText content={block.content} streaming={block.streaming} flex={1} />
+          <StreamingText content={block.content} streaming={block.streaming} flex={1} {...hit} />
         </Row>
       );
     case 'reasoning':
@@ -127,6 +141,7 @@ const BlockView = defineComponent<{
             expanded={expanded}
             streaming={block.streaming}
             flex={1}
+            {...hit}
             {...(active ? { bg: 'selected' as const } : {})}
           />
         </Row>
@@ -135,7 +150,7 @@ const BlockView = defineComponent<{
       return (
         <Row gap={1}>
           <text content={theme.glyphs.info} fg="info" />
-          <text content={block.content} fg="muted" wrap="word" flex={1} />
+          <text content={block.content} fg="muted" wrap="word" flex={1} {...hit} />
         </Row>
       );
     // Not a notice. A notice is the harness saying something in passing, and
@@ -145,7 +160,7 @@ const BlockView = defineComponent<{
       return (
         <Row gap={1}>
           <text content={theme.glyphs.cross} fg="danger" />
-          <text content={block.content} fg="danger" wrap="word" flex={1} />
+          <text content={block.content} fg="danger" wrap="word" flex={1} {...hit} />
           {block.resumable ? <text content="resumable" fg="subtle" /> : null}
         </Row>
       );
@@ -161,7 +176,7 @@ const BlockView = defineComponent<{
       return (
         <Row gap={1}>
           <text content={theme.glyphs.chevronRight} fg={active ? 'accent' : 'subtle'} />
-          <text content={block.text} fg="subtle" italic wrap="word" flex={1} />
+          <text content={block.text} fg="subtle" italic wrap="word" flex={1} {...hit} />
           {/* What the cursor being here is *for*. A queue you cannot take
               anything out of is a list of messages you have to let happen. */}
           <text content={active ? 'enter drops it' : 'queued'} fg="warning" />

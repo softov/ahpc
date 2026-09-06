@@ -10,9 +10,9 @@ import type { Completion } from '../src/ahp/types.js';
  *
  * It showed the first six of whatever the host answered and cycled those six,
  * so a host offering thirty paths for `@src/` looked like it had six and there
- * was no key that reached the seventh. The menu is six rows tall because it
- * sits above the field it is completing and must not push it off a short
- * terminal - which is a cap on the box, not on the list.
+ * was no key that reached the seventh. The cap is on the box and not on the
+ * list, and it is eight only where eight fit: the menu sits above the field it
+ * is completing and gives its rows back rather than pushing the field off.
  */
 
 const paths = (count: number): Completion[] => Array.from({ length: count }, (_, i) => ({
@@ -33,6 +33,9 @@ const open = async (width: number, height: number): Promise<Harness> => {
       onSubmit: () => undefined,
       paths: paths(12),
       autoFocus: true,
+      // The control row, so the bottom of the composer is a real row and a
+      // short terminal can be asked whether it still drew it.
+      options: [{ id: 'model', label: 'model', value: 'sonnet' }],
     }),
   });
   await t.settle();
@@ -50,8 +53,8 @@ const shown = (t: Harness): string[] =>
 describe('the completion menu is a window over the whole answer', () => {
   it('scrolls to a row past the ones that fit', async () => {
     const t = await open(80, 24);
-    // Six at a time, which is the cap on the box.
-    expect(shown(t)).toHaveLength(6);
+    // Eight at a time, which is the cap on the box.
+    expect(shown(t)).toHaveLength(8);
     expect(shown(t)).toContain('file0.ts');
     expect(shown(t)).not.toContain('file11.ts');
 
@@ -75,10 +78,19 @@ describe('the completion menu is a window over the whole answer', () => {
 
   it('keeps the composer on screen on a short terminal', async () => {
     // The menu grows upward from the field, so the field is what it would
-    // push off. Six rows plus the composer is what has to fit in twelve.
+    // push off. What has to survive is the composer, not the menu: the rows
+    // are worth having only while there is somewhere to type.
     const t = await open(60, 12);
-    expect(shown(t).length).toBeLessThanOrEqual(6);
-    expect(t.lines().join('\n')).toContain('file0.ts');
+    // Fewer than the eight a tall terminal gets, and still a menu.
+    expect(shown(t).length).toBeGreaterThan(0);
+    expect(shown(t).length).toBeLessThan(8);
+    expect(shown(t)).toContain('file0.ts');
+
+    // The field, and the bar under it - the composer's first row of content
+    // and its last. Eight rows here drew the border with neither between them.
+    const screen = t.lines();
+    expect(screen.some((line) => line.includes('@src/ '))).toBe(true);
+    expect(screen[screen.length - 2]).toContain('send');
   });
 });
 
@@ -132,6 +144,52 @@ describe('escape closes the menu before it leaves anything', () => {
     expect(left).toBe(1);
   });
 
+  it('brings the menu back after the draft that was dismissed is retyped', async () => {
+    /*
+     * Dismissing at `/`, deleting it and typing `/` again is the same text and
+     * a different question. Remembering only the text kept the menu shut until
+     * the screen was left and come back to, which is the shape of a bug people
+     * work around rather than report.
+     *
+     * The slash menu rather than the path one, because that is where it was
+     * found and because it is computed from the draft here - the host has no
+     * say in whether it is showing.
+     */
+    const commands = [
+      { id: 'compact', kind: 'session' as const, title: 'compact' },
+      { id: 'review', kind: 'session' as const, title: 'review' },
+    ];
+    const Retyping = defineComponent<Record<string, never>>('Retype', () => {
+      const [value, setValue] = useState('/');
+      return h(ChatComposer, {
+        value,
+        onChange: setValue,
+        onSubmit: () => undefined,
+        commands,
+        autoFocus: true,
+      });
+    });
+    const t = await renderApp({ width: 80, height: 24, theme: 'workbench', root: h(Retyping, {}) });
+    await t.settle();
+    await t.settle();
+    const menu = (): boolean => t.lines().some((line) => line.includes('/compact'));
+    expect(menu()).toBe(true);
+
+    await t.press('escape');
+    await t.settle();
+    expect(menu()).toBe(false);
+
+    // The slash goes, and with it the menu that was dismissed.
+    await t.press('backspace');
+    await t.settle();
+    expect(menu()).toBe(false);
+
+    // Typed again, and it is a new question rather than the old one.
+    await t.press('/');
+    await t.settle();
+    expect(menu()).toBe(true);
+  });
+
   it('brings the menu back when the question changes', async () => {
     // Stateful, because the draft is the component's input: a fixed `value`
     // would mean typing changed nothing and the menu stayed shut for a
@@ -160,5 +218,51 @@ describe('escape closes the menu before it leaves anything', () => {
     await t.press('f');
     await t.settle();
     expect(shown(t).length).toBeGreaterThan(0);
+  });
+});
+
+/*
+ * What goes after the name.
+ *
+ * A menu row is the command's name, so a command that takes an argument has
+ * nowhere in the list to say so and `/autocompact` reads as complete. It goes
+ * on the rule under the list: one line for the whole menu, following the
+ * highlight instead of being repeated down every row.
+ */
+
+const withHint = async (): Promise<Harness> => {
+  const t = await renderApp({
+    width: 80,
+    height: 24,
+    theme: 'workbench',
+    root: h(ChatComposer, {
+      value: '/auto',
+      onChange: () => undefined,
+      onSubmit: () => undefined,
+      commands: [
+        { id: 'autocompact', kind: 'client' as const, title: 'Autocompact', hint: '[tokens]' },
+        { id: 'autorun', kind: 'client' as const, title: 'Autorun' },
+      ],
+      autoFocus: true,
+    }),
+  });
+  await t.settle();
+  await t.settle();
+  return t;
+};
+
+describe('a command that takes an argument says so', () => {
+  it('writes the mask into the rule under the list', async () => {
+    const t = await withHint();
+    expect(t.lines().join('\n')).toContain('/autocompact [tokens]');
+  });
+
+  it('drops it for a command that takes nothing', async () => {
+    const t = await withHint();
+    await t.press('down');
+    await t.settle();
+    const screen = t.lines().join('\n');
+    expect(screen).toContain('/autorun');
+    expect(screen).not.toContain('[tokens]');
   });
 });

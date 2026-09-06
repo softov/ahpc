@@ -1,5 +1,5 @@
 import type { BoxProps, RenderOutput } from '@textui/core';
-import { defineComponent, useMeasure, useState, useTheme } from '@textui/core';
+import { defineComponent, useEffect, useMeasure, useSize, useState, useTheme } from '@textui/core';
 import type { ListItem } from '@textui/widgets';
 import { Column, Divider, List, TextArea } from '@textui/widgets';
 import type { Completion, SlashCommand } from '../ahp/types.js';
@@ -8,13 +8,34 @@ import { useFloorTop } from './creature.js';
 import type { ComposerOption } from './controls.js';
 
 /**
- * Rows the completion menu shows at once.
+ * Rows the completion menu shows at once, at most.
  *
- * A cap on the box's height and not on the list: the menu sits above the
- * composer and a menu that grew with the answer would push the field it is
- * completing off a short terminal. What does not fit is scrolled to.
+ * A cap on the box's height and not on the list: what does not fit is
+ * scrolled to. The menu sits above the composer and takes its room from it,
+ * so on a short terminal this is not the number that applies - see `fits`.
  */
-const VISIBLE = 6;
+const VISIBLE = 8;
+
+/**
+ * Rows the composer itself takes: two border, two divider, the field and the
+ * bar under it. Eight menu rows on a terminal twelve high left four for all
+ * of that and drew an empty box - a menu on top of a field with no room to
+ * type in it.
+ */
+const COMPOSER_ROWS = 6;
+
+/** The menu's own frame, which is height the list does not get. */
+const MENU_BORDER = 2;
+
+/**
+ * Rows the menu may have here, which is whatever the composer can spare.
+ *
+ * The floor is there because a terminal can always be made too short for
+ * both; below it the composer gives way, since a menu with nothing under it
+ * is the same dead end from the other side.
+ */
+const fits = (height: number): number =>
+  Math.max(3, Math.min(VISIBLE, height - COMPOSER_ROWS - MENU_BORDER));
 
 /**
  * What you type, and one line saying what it will be sent as.
@@ -129,8 +150,19 @@ export const ChatComposer: (props: ChatComposerProps) => RenderOutput =
      * list. What is remembered is the draft it was dismissed at: the menu
      * stays shut for that exact text and comes back the moment another
      * character makes it a different question.
+     *
+     * And it is forgotten as soon as there is no menu to dismiss. Remembering
+     * the text alone was not enough: dismissing at `/`, deleting it and typing
+     * `/` again produced the same draft, so the menu stayed shut for a
+     * question that had been asked afresh. Clearing when nothing matches ties
+     * the dismissal to one continuous menu rather than to a string that can
+     * come back.
      */
     const [dismissedAt, setDismissedAt] = useState<string | null>(null);
+    const empty = offered.length === 0;
+    useEffect(() => {
+      if (empty && dismissedAt !== null) setDismissedAt(null);
+    }, [empty]);
     const matches = dismissedAt === value ? [] : offered;
 
     // Which completion is under the cursor. Clamped rather than reset, so a
@@ -139,6 +171,18 @@ export const ChatComposer: (props: ChatComposerProps) => RenderOutput =
     const [highlight, setHighlight] = useState(0);
     const index = Math.max(0, Math.min(highlight, matches.length - 1));
     const chosen = matches[index];
+
+    /*
+     * What goes after the name of the command under the cursor.
+     *
+     * A row is the name, so a command that takes an argument has nowhere in
+     * the list to say so, and `/autocompact` reads as complete when it is
+     * not. It goes on the rule under the list, where it is one line for the
+     * whole menu and changes as the highlight moves rather than being
+     * repeated down every row.
+     */
+    const usage = chosen === undefined ? undefined : byId.get(chosen.id)?.hint;
+    const hint = usage === undefined ? undefined : `/${chosen?.id ?? ''} ${usage}`;
 
     /**
      * Up and down, while the menu is open.
@@ -157,6 +201,10 @@ export const ChatComposer: (props: ChatComposerProps) => RenderOutput =
     // not on it. The slash menu grows this upward, so it is read every time
     // rather than being a number somebody wrote down once.
     useFloorTop('composer', useMeasure().y);
+
+    // How tall the menu may be here. Read unconditionally: it is a hook, and
+    // the menu is drawn from a branch.
+    const rows = fits(useSize().height);
 
     return (
       <Column {...rest} gap={0}>
@@ -181,7 +229,7 @@ export const ChatComposer: (props: ChatComposerProps) => RenderOutput =
                * paths for `@src/` offered six of them and looked like it had
                * no more.
                */
-              visibleRows={VISIBLE}
+              visibleRows={hint === undefined ? rows : rows - 1}
               marker
               // Not focusable, so this is the click: a completion clicked is a
               // completion chosen, and there is nowhere for a merely
@@ -194,6 +242,7 @@ export const ChatComposer: (props: ChatComposerProps) => RenderOutput =
               }}
               emptyMessage="no command"
             />
+            {hint === undefined ? null : <Divider label={hint} />}
           </Column>
         ) : null}
 

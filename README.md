@@ -59,11 +59,13 @@ node dist/src/main.js session list --host ws://127.0.0.1:9187
 
 ![The session list, with status and workspace for each](docs/img/sessions.svg)
 
-The list shows every session on the host: its status, the agent, the workspace and branch, and what it is doing right now. Sessions waiting on you are counted at the top. `/` filters by title, agent or workspace.
+The list shows every session on the host: its status, the agent, the workspace and branch, and what it is doing right now. Sessions waiting on you are counted at the top. `ctrl+f` filters by title, agent or workspace, and `x` shows the archived ones with a count of how many that is.
 
 ![A session, its transcript and the facts about it](docs/img/transcript.svg)
 
 Inside a session, the header shows the model, thinking level, permission mode, workspace and branch. All of it comes from the host, not from local guesses.
+
+`ctrl+f` opens a find box in the top right. Type and the term is coloured wherever it appears; `enter` and `down` go to the next one, `up` to the one before, and both wrap. The box says which match you are on and how many there are.
 
 ![Starting a session, and the questions the host asks first](docs/img/compose.svg)
 
@@ -81,6 +83,8 @@ Before the first message, a new session asks the agent, the model and its option
 | `@` | Complete a file path on the host |
 | `ctrl+g` | Edit the message in `$VISUAL` or `$EDITOR` |
 | `ctrl+p` | Command palette |
+| `f1` | Every key that works where you are |
+| `ctrl+f` | Filter the session list, or find in the open conversation |
 | `ctrl+n` | New session |
 | `ctrl+r` | Refresh |
 | `alt+t` | Theme |
