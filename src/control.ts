@@ -1459,6 +1459,8 @@ function commands(
       category: 'Compose',
       description: 'Open the message in an external editor',
       slots: ['palette'],
+      // The draft it edits belongs to the composer, and only two screens have one.
+      when: `${SCREEN} == 'chat' || ${SCREEN} == 'new'`,
       run: async () => {
         const editor = process.env.VISUAL ?? process.env.EDITOR;
         if (!editor) {
@@ -1592,6 +1594,8 @@ function commands(
       category: 'Compose',
       description: 'Select the model',
       slots: ['palette'],
+      // The model rides on the message being composed, so it needs a composer.
+      when: `${SCREEN} == 'chat' || ${SCREEN} == 'new'`,
       args: [{
         name: 'id',
         type: 'string' as const,
@@ -1827,6 +1831,8 @@ function commands(
       category: 'Session',
       description: 'Show the conversation',
       slots: ['palette'],
+      // It opens the row under the cursor, so it needs one.
+      when: `${SELECTED} || ${OPEN}`,
       run: (args: Record<string, unknown>) => {
         const uri = (typeof args.uri === 'string' ? args.uri : null) ?? selected();
         if (!uri) return;
@@ -1864,6 +1870,8 @@ function commands(
       category: 'Session',
       description: 'Hide or show this session',
       slots: ['palette'],
+      // It acts on the session being read, or the one selected in the catalogue.
+      when: `${OPEN} || ${SELECTED}`,
       run: () => {
         const uri = target();
         // Every session, not the visible ones. An archived session is hidden
@@ -1881,6 +1889,8 @@ function commands(
       category: 'Session',
       description: 'Mark this session read or unread',
       slots: ['palette'],
+      // It acts on the session being read, or the one selected in the catalogue.
+      when: `${OPEN} || ${SELECTED}`,
       run: () => {
         const uri = target();
         const session = sessions(app.store).find((found) => found.resource === uri);
@@ -1894,6 +1904,8 @@ function commands(
       category: 'Session',
       description: 'Delete this session',
       slots: ['palette'],
+      // It acts on the session being read, or the one selected in the catalogue.
+      when: `${OPEN} || ${SELECTED}`,
       run: async () => {
         const uri = target();
         if (!uri) return;
@@ -1939,6 +1951,8 @@ function commands(
       category: 'Chat',
       description: 'Approve the tool call ',
       slots: ['palette'],
+      // There is nothing to approve until the agent has asked.
+      when: `${INPUT}`,
       run: (args: Record<string, unknown>) => controller.approve(typeof args.option === 'string' ? args.option : undefined),
       args: [{ name: 'option', type: 'string' as const }],
     },
@@ -1948,6 +1962,8 @@ function commands(
       category: 'Chat',
       description: 'Deny the tool call',
       slots: ['palette'],
+      // There is nothing to deny until the agent has asked.
+      when: `${INPUT}`,
       run: () => controller.deny()
     },
     {
@@ -1956,6 +1972,8 @@ function commands(
       category: 'Chat',
       description: 'Send a message',
       slots: ['palette'],
+      // `send` returns without a session, so offering it without one is offering nothing.
+      when: `${OPEN}`,
       args: [{ name: 'text', type: 'string' as const, required: true, description: 'What to say' }],
       run: (args: Record<string, unknown>) => controller.send(String(args.text ?? '')),
     },
@@ -1965,6 +1983,8 @@ function commands(
       category: 'Chat',
       description: 'Focus the composer',
       slots: ['palette'],
+      // Focus goes to a field that is only mounted on these two screens.
+      when: `${SCREEN} == 'chat' || ${SCREEN} == 'new'`,
       run: () => app.focus.focus('chat.composer'),
     },
     {
@@ -1973,6 +1993,8 @@ function commands(
       category: 'Session',
       description: 'Filter the catalogue',
       slots: ['palette'],
+      // The filter box belongs to the catalogue.
+      when: `${SCREEN} == 'sessions'`,
       run: () => app.focus.focus('chat.filter'),
     },
     /**
@@ -2030,6 +2052,8 @@ function commands(
       category: 'Chat',
       description: 'Focus the transcript',
       slots: ['palette'],
+      // The transcript is the conversation's, and nothing else mounts it.
+      when: `${SCREEN} == 'chat'`,
       run: () => app.focus.focus('chat.transcript'),
     },
     {
