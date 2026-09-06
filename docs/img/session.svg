@@ -66,13 +66,13 @@
 <text x="10" y="516" fill="#b4531f" font-weight="bold" textLength="40" lengthAdjust="spacing" xml:space="preserve">enter</text>
 <text x="58" y="516" fill="#7a756c" textLength="32" lengthAdjust="spacing" xml:space="preserve">send</text>
 <text x="90" y="516" fill="#c56532" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
-<text x="114" y="516" fill="#b4531f" font-weight="bold" textLength="112" lengthAdjust="spacing" xml:space="preserve">ctrl/alt+enter</text>
-<text x="234" y="516" fill="#7a756c" textLength="56" lengthAdjust="spacing" xml:space="preserve">newline</text>
-<text x="290" y="516" fill="#c56532" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
-<text x="314" y="516" fill="#b4531f" font-weight="bold" textLength="24" lengthAdjust="spacing" xml:space="preserve">esc</text>
-<text x="346" y="516" fill="#7a756c" textLength="32" lengthAdjust="spacing" xml:space="preserve">read</text>
-<text x="378" y="516" fill="#c56532" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
-<text x="402" y="516" fill="#b4531f" font-weight="bold" textLength="48" lengthAdjust="spacing" xml:space="preserve">ctrl+c</text>
-<text x="458" y="516" fill="#7a756c" textLength="32" lengthAdjust="spacing" xml:space="preserve">stop</text>
+<text x="114" y="516" fill="#b4531f" font-weight="bold" textLength="72" lengthAdjust="spacing" xml:space="preserve">alt+enter</text>
+<text x="194" y="516" fill="#7a756c" textLength="56" lengthAdjust="spacing" xml:space="preserve">newline</text>
+<text x="250" y="516" fill="#c56532" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
+<text x="274" y="516" fill="#b4531f" font-weight="bold" textLength="24" lengthAdjust="spacing" xml:space="preserve">esc</text>
+<text x="306" y="516" fill="#7a756c" textLength="32" lengthAdjust="spacing" xml:space="preserve">read</text>
+<text x="338" y="516" fill="#c56532" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
+<text x="362" y="516" fill="#b4531f" font-weight="bold" textLength="48" lengthAdjust="spacing" xml:space="preserve">ctrl+c</text>
+<text x="418" y="516" fill="#7a756c" textLength="32" lengthAdjust="spacing" xml:space="preserve">stop</text>
 <text x="778" y="516" fill="#7a756c" textLength="32" lengthAdjust="spacing" xml:space="preserve">chat</text>
 </svg>

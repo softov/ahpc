@@ -167,19 +167,19 @@ const Header = defineComponent<Record<string, never>>('ChatHeader', () => {
 const Hints = defineComponent<BoxProps>('ChatHints', (props) => {
   const theme = useTheme();
   /**
-   * Which keys make a newline.
+   * Which key the footer names for a newline.
    *
-   * Both, because only one of them exists everywhere. `ctrl+enter` has three
-   * encodings - a bare LF, xterm's `CSI 27;5;13~`, kitty's `CSI 13;5u` - and
-   * the decoder reads all three, but a terminal that sends plain CR for
-   * ctrl+enter is sending the enter key and nothing downstream can tell them
-   * apart. VS Code's terminal is one such. `alt+enter` is `ESC CR`, which
-   * every terminal can express, so it is the one that always arrives.
+   * `alt+enter`, which is `ESC CR` and the one encoding every terminal can
+   * express. The field also takes `ctrl+enter`, and that is deliberately not
+   * named here: it has three encodings - a bare LF, xterm's `CSI 27;5;13~`,
+   * kitty's `CSI 13;5u` - and a terminal that sends plain CR for it is
+   * sending the enter key, which nothing downstream can tell apart. VS Code's
+   * terminal is one such, so naming it offers a key that does not exist.
    *
-   * Naming only `ctrl+enter` offered a key that does not exist on some
-   * terminals while keeping the working one a secret.
+   * One key in the row rather than two: the row elides every hint on a narrow
+   * terminal, and a hint nobody can read costs the same as a wrong one.
    */
-  const newline = 'ctrl/alt+enter';
+  const newline = 'alt+enter';
   const waiting = useStoreValue<{ kind: string } | null>(INPUT, null);
   const upDown = `${theme.glyphs.arrowUp}${theme.glyphs.arrowDown}`;
   const leftRight = `${theme.glyphs.arrowLeft}${theme.glyphs.arrowRight}`;

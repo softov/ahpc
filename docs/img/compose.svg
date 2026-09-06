@@ -33,16 +33,16 @@
 <text x="10" y="448" fill="#b4531f" font-weight="bold" textLength="40" lengthAdjust="spacing" xml:space="preserve">enter</text>
 <text x="58" y="448" fill="#7a756c" textLength="40" lengthAdjust="spacing" xml:space="preserve">start</text>
 <text x="98" y="448" fill="#c56532" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
-<text x="122" y="448" fill="#b4531f" font-weight="bold" textLength="112" lengthAdjust="spacing" xml:space="preserve">ctrl/alt+enter</text>
-<text x="242" y="448" fill="#7a756c" textLength="56" lengthAdjust="spacing" xml:space="preserve">newline</text>
-<text x="298" y="448" fill="#c56532" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
-<text x="322" y="448" fill="#b4531f" font-weight="bold" textLength="24" lengthAdjust="spacing" xml:space="preserve">tab</text>
-<text x="354" y="448" fill="#7a756c" textLength="56" lengthAdjust="spacing" xml:space="preserve">options</text>
-<text x="410" y="448" fill="#c56532" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
-<text x="434" y="448" fill="#b4531f" font-weight="bold" textLength="24" lengthAdjust="spacing" xml:space="preserve">esc</text>
-<text x="466" y="448" fill="#7a756c" textLength="64" lengthAdjust="spacing" xml:space="preserve">sessions</text>
-<text x="530" y="448" fill="#c56532" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
-<text x="554" y="448" fill="#b4531f" font-weight="bold" textLength="48" lengthAdjust="spacing" xml:space="preserve">ctrl+c</text>
-<text x="610" y="448" fill="#7a756c" textLength="32" lengthAdjust="spacing" xml:space="preserve">quit</text>
+<text x="122" y="448" fill="#b4531f" font-weight="bold" textLength="72" lengthAdjust="spacing" xml:space="preserve">alt+enter</text>
+<text x="202" y="448" fill="#7a756c" textLength="56" lengthAdjust="spacing" xml:space="preserve">newline</text>
+<text x="258" y="448" fill="#c56532" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
+<text x="282" y="448" fill="#b4531f" font-weight="bold" textLength="24" lengthAdjust="spacing" xml:space="preserve">tab</text>
+<text x="314" y="448" fill="#7a756c" textLength="56" lengthAdjust="spacing" xml:space="preserve">options</text>
+<text x="370" y="448" fill="#c56532" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
+<text x="394" y="448" fill="#b4531f" font-weight="bold" textLength="24" lengthAdjust="spacing" xml:space="preserve">esc</text>
+<text x="426" y="448" fill="#7a756c" textLength="64" lengthAdjust="spacing" xml:space="preserve">sessions</text>
+<text x="490" y="448" fill="#c56532" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
+<text x="514" y="448" fill="#b4531f" font-weight="bold" textLength="48" lengthAdjust="spacing" xml:space="preserve">ctrl+c</text>
+<text x="570" y="448" fill="#7a756c" textLength="32" lengthAdjust="spacing" xml:space="preserve">quit</text>
 <text x="786" y="448" fill="#7a756c" textLength="24" lengthAdjust="spacing" xml:space="preserve">new</text>
 </svg>

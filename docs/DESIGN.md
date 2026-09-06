@@ -197,13 +197,16 @@ includes VS Code.
 `@textui/terminal` now decodes all three, so the footer no longer checks a
 capability that only ever described one of them.
 
-It names `ctrl/alt+enter` rather than `ctrl+enter`, because none of the three
-encodings is universal: a terminal that sends plain CR for ctrl+enter is
-sending the enter key, and nothing downstream can recover the difference. VS
-Code's terminal is one of those. `alt+enter` is `ESC CR`, which every terminal
-can express, so it is the fallback that always arrives - and naming only
-`ctrl+enter` offered a key that does not exist on some terminals while keeping
-the working one a secret.
+It names `alt+enter` and nothing else, while the field goes on taking both.
+None of the three ctrl encodings is universal: a terminal that sends plain CR
+for ctrl+enter is sending the enter key, and nothing downstream can recover the
+difference. VS Code's terminal is one of those, so naming `ctrl+enter` offers a
+key that does not exist there. `alt+enter` is `ESC CR`, which every terminal
+can express.
+
+Both were named for a while. One is better: the hint row elides every entry on
+a narrow terminal, and the row's job is to name a key that works rather than to
+enumerate the keys that might.
 
 `shift+enter` is in none of the three and is offered nowhere: there is no
 encoding in which it differs from enter.
