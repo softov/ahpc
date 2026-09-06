@@ -166,11 +166,15 @@ describe('writing is a second decision, not part of publishing', () => {
     expect(await refused(() => handlers.resourceWrite?.({
       uri, data: 'no', encoding: 'utf-8', createOnly: true,
     }) as Promise<unknown>)).toBe(-32010);
+    // The code says it was refused; only the file says the refusal happened
+    // before anything was written, which is the whole point of the flag.
+    expect(await readFile(path.join(root, 'write-semantics.txt'), 'utf8')).toBe('ABCx.');
     const { etag } = await handlers.resourceResolve?.({ uri }) as { etag: string };
     await handlers.resourceWrite?.({ uri, data: 'new', encoding: 'utf-8', ifMatch: etag });
     expect(await refused(() => handlers.resourceWrite?.({
       uri, data: 'stale', encoding: 'utf-8', ifMatch: etag,
     }) as Promise<unknown>)).toBe(-32011);
+    expect(await readFile(path.join(root, 'write-semantics.txt'), 'utf8')).toBe('new');
   });
 
   it('allows only one simultaneous createOnly or matching-etag write', async () => {
@@ -182,6 +186,10 @@ describe('writing is a second decision, not part of publishing', () => {
     for (const result of creates.filter((result) => result.status === 'rejected')) {
       expect((result.reason as { code: number }).code).toBe(-32010);
     }
+    // Eight writers, eight different digits: a file holding one of them whole
+    // is what says the seven that were refused wrote nothing.
+    expect(['0', '1', '2', '3', '4', '5', '6', '7'])
+      .toContain(await readFile(path.join(root, 'competing-create.txt'), 'utf8'));
 
     const uri = `${PUBLISH_PREFIX}competing-etag.txt`;
     await writeFile(path.join(root, 'competing-etag.txt'), 'before');
@@ -192,6 +200,9 @@ describe('writing is a second decision, not part of publishing', () => {
     for (const result of updates.filter((result) => result.status === 'rejected')) {
       expect((result.reason as { code: number }).code).toBe(-32011);
     }
+    // As above, and here a lost update would leave 'before' or a mixture.
+    expect(['0', '1', '2', '3', '4', '5', '6', '7'])
+      .toContain(await readFile(path.join(root, 'competing-etag.txt'), 'utf8'));
   });
 
   it('says why a directory or a link is refused, rather than reporting an errno', async () => {
@@ -213,6 +224,20 @@ describe('writing is a second decision, not part of publishing', () => {
     const directory = await said('adir');
     expect(directory).toContain('is a directory');
     expect(directory).not.toContain('EISDIR');
+
+    /*
+     * The link half, which this client answers differently from `ahpd`.
+     *
+     * `where` resolves the final component, so a link whose destination is
+     * still published is written *through* - the open sees the destination
+     * and `O_NOFOLLOW` never fires. `ahpd` resolves only the parent, so the
+     * same write is refused there. Pinned rather than left implied, because
+     * the two are meant to be the same algorithm; see ROADMAP.md.
+     */
+    await writeFile(path.join(root, 'link-target.txt'), 'target');
+    await symlink(path.join(root, 'link-target.txt'), path.join(root, 'inside-write-link.txt'));
+    expect(await said('inside-write-link.txt')).toBe('');
+    expect(await readFile(path.join(root, 'link-target.txt'), 'utf8')).toBe('x');
   });
 
   it('will not write outside the directory even when writable', async () => {
@@ -220,6 +245,7 @@ describe('writing is a second decision, not part of publishing', () => {
     expect(await refused(() => handlers.resourceWrite?.({
       uri: `${PUBLISH_PREFIX}../escaped.txt`, data: 'no', encoding: 'utf-8',
     }) as Promise<unknown>)).toBe(-32009);
+    await expect(readFile(path.join(root, '..', 'escaped.txt'))).rejects.toThrow();
   });
 
   it('answers a request for access with what would grant it', async () => {
@@ -404,6 +430,10 @@ it('keeps every publication operation inside the real directory', async () => {
       expect(await refused(() => handlers.resourceList!({ uri: uri('outside-dir') }))).toBe(-32009);
     }
     expect(await readFile(target, 'utf8')).toBe('outside');
+    // The refusals that would have created something rather than changed it:
+    // a dangling link written through, and a copy whose source was outside.
+    await expect(readFile(path.join(outside, 'absent'))).rejects.toThrow();
+    await expect(readFile(path.join(root, 'copy.txt'))).rejects.toThrow();
   } finally { await rm(outside, { recursive: true, force: true }); }
 });
 

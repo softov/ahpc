@@ -78,6 +78,34 @@ class Scripted {
     void this.run();
   }
 
+  /**
+   * The channels this host would still be sending on.
+   *
+   * Every `subscribe` this client sent that it has not since released, in the
+   * order it took them. Derived from the frames rather than kept as state, so
+   * what it reports is what the client actually said: a reader whose release
+   * lost its `unsubscribe` leaves its channel here for the rest of the run,
+   * which a per-method count cannot show.
+   */
+  stillOpen(): string[] {
+    const held: string[] = [];
+    for (const frame of this.asked) {
+      // The handshake opens channels without a `subscribe` of their own -
+      // that saved round trip is the point of `initialSubscriptions` - so a
+      // count that reads only `subscribe` frames misses the catalogue.
+      if (frame.method === 'initialize') {
+        for (const channel of (frame.params?.initialSubscriptions as string[] | undefined) ?? []) {
+          if (!held.includes(channel)) held.push(channel);
+        }
+      }
+      const channel = frame.params?.channel;
+      if (typeof channel !== 'string') continue;
+      if (frame.method === 'subscribe' && !held.includes(channel)) held.push(channel);
+      if (frame.method === 'unsubscribe' && held.includes(channel)) held.splice(held.indexOf(channel), 1);
+    }
+    return held;
+  }
+
   /** Every frame of one method, for asserting how many times it was sent. */
   timesAsked(method: string, channel?: string): number {
     return this.asked.filter((frame) => frame.method === method
@@ -367,6 +395,10 @@ describe('a channel is let go when the last reader leaves', () => {
     await settle();
     expect(scripted.timesAsked('unsubscribe', SESSION)).toBe(1);
     expect(scripted.timesAsked('unsubscribe', CHAT)).toBe(1);
+    // And nothing but the catalogue is left open, which the counts above
+    // cannot say: they are about two channels this test named, and a leak is
+    // a channel nobody thought to name.
+    expect(scripted.stillOpen()).toEqual([ROOT]);
 
     await host.close();
   });
@@ -390,6 +422,7 @@ describe('a channel is let go when the last reader leaves', () => {
     two.close();
     await settle();
     expect(scripted.timesAsked('unsubscribe', SESSION)).toBe(1);
+    expect(scripted.stillOpen()).toEqual([ROOT]);
 
     await host.close();
   });
