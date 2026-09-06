@@ -1,0 +1,139 @@
+{
+  "revision": "2026-09-06",
+  "about": "resourceWrite, as both ends of AHP have to implement it. This file is checked into ahpc and into ahpd byte for byte, and each repository runs it against its own implementation - ahpc's in src/ahp/publish.ts, ahpd's in packages/sdk/src/resources.ts. The two are deliberate copies of one algorithm, so a case that passes in one and fails in the other is the drift this exists to catch. Changing behaviour means changing the cases here and copying the file to the other repository; a case added on one side only is a case the other side never runs, which is the limit of what a fixture without a shared package can do.",
+  "refusals": {
+    "notFound": "there is nothing there to write, or nowhere to write it",
+    "refused": "this end declines: a symbolic link, a directory, outside the root",
+    "alreadyExists": "createOnly, and it does",
+    "conflict": "ifMatch, and the file is not what the caller last saw"
+  },
+  "cases": [
+    {
+      "name": "truncate from zero replaces what was there",
+      "before": { "file": "the old contents, which are longer" },
+      "write": { "data": "new" },
+      "then": { "content": "new" }
+    },
+    {
+      "name": "truncate from zero creates a file that is not there",
+      "before": "absent",
+      "write": { "data": "made" },
+      "then": { "content": "made" }
+    },
+    {
+      "name": "truncate at a position keeps the head and drops everything after it",
+      "before": { "file": "abcdefg" },
+      "write": { "data": "XY", "mode": "truncate", "position": 3 },
+      "then": { "content": "abcXY" }
+    },
+    {
+      "name": "truncate past the end of the file writes at the end rather than padding",
+      "before": { "file": "abc" },
+      "write": { "data": "XY", "mode": "truncate", "position": 99 },
+      "then": { "content": "abcXY" }
+    },
+    {
+      "name": "append with no position is a POSIX append",
+      "before": { "file": "abc" },
+      "write": { "data": "XY", "mode": "append" },
+      "then": { "content": "abcXY" }
+    },
+    {
+      "name": "append counts backwards from the end, not forwards from the start",
+      "before": { "file": "abcde" },
+      "write": { "data": "XY", "mode": "append", "position": 2 },
+      "then": { "content": "abcXYde" }
+    },
+    {
+      "name": "append further back than the file is long clamps to the start",
+      "before": { "file": "abc" },
+      "write": { "data": "XY", "mode": "append", "position": 99 },
+      "then": { "content": "XYabc" }
+    },
+    {
+      "name": "append into a file that is not there creates it",
+      "before": "absent",
+      "write": { "data": "XY", "mode": "append" },
+      "then": { "content": "XY" }
+    },
+    {
+      "name": "insert at zero goes in front of everything",
+      "before": { "file": "abc" },
+      "write": { "data": "XY", "mode": "insert", "position": 0 },
+      "then": { "content": "XYabc" }
+    },
+    {
+      "name": "insert counts forwards from the start",
+      "before": { "file": "abc" },
+      "write": { "data": "XY", "mode": "insert", "position": 2 },
+      "then": { "content": "abXYc" }
+    },
+    {
+      "name": "insert past the end clamps to the end and keeps nothing out",
+      "before": { "file": "abc" },
+      "write": { "data": "XY", "mode": "insert", "position": 99 },
+      "then": { "content": "abcXY" }
+    },
+    {
+      "name": "base64 data is decoded before any of the arithmetic",
+      "before": { "file": "abc" },
+      "write": { "data": "WFk=", "encoding": "base64", "mode": "insert", "position": 1 },
+      "then": { "content": "aXYbc" }
+    },
+    {
+      "name": "createOnly writes a file that is not there",
+      "before": "absent",
+      "write": { "data": "first", "createOnly": true },
+      "then": { "content": "first" }
+    },
+    {
+      "name": "createOnly refuses one that is",
+      "before": { "file": "already" },
+      "write": { "data": "second", "createOnly": true },
+      "then": { "refusal": "alreadyExists", "content": "already" }
+    },
+    {
+      "name": "createOnly with ifMatch is a contradiction and is refused as one",
+      "before": { "file": "already" },
+      "write": { "data": "second", "createOnly": true, "ifMatch": "current" },
+      "then": { "refusal": "alreadyExists", "content": "already" }
+    },
+    {
+      "name": "ifMatch on the tag the file has writes",
+      "before": { "file": "before" },
+      "write": { "data": "after", "ifMatch": "current" },
+      "then": { "content": "after" }
+    },
+    {
+      "name": "ifMatch on a tag the file no longer has is a conflict, and changes nothing",
+      "before": { "file": "before" },
+      "write": { "data": "after", "ifMatch": "stale" },
+      "then": { "refusal": "conflict", "content": "before" }
+    },
+    {
+      "name": "ifMatch on a file that is not there is a conflict rather than a create",
+      "before": "absent",
+      "write": { "data": "after", "ifMatch": "stale" },
+      "then": { "refusal": "conflict", "absent": true }
+    },
+    {
+      "name": "a symbolic link is refused rather than followed",
+      "before": { "symlinkTo": "elsewhere.txt" },
+      "write": { "data": "through the link" },
+      "then": { "refusal": "refused", "elsewhere": "not this" }
+    },
+    {
+      "name": "a directory is refused rather than opened",
+      "before": "directory",
+      "write": { "data": "into a directory" },
+      "then": { "refusal": "refused" }
+    },
+    {
+      "name": "a file under a directory that is not there is not found",
+      "path": "no/such/place/file.txt",
+      "before": "absent",
+      "write": { "data": "nowhere" },
+      "then": { "refusal": "notFound" }
+    }
+  ]
+}
