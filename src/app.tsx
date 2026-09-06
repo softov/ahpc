@@ -167,16 +167,19 @@ const Header = defineComponent<Record<string, never>>('ChatHeader', () => {
 const Hints = defineComponent<BoxProps>('ChatHints', (props) => {
   const theme = useTheme();
   /**
-   * Which key makes a newline.
+   * Which keys make a newline.
    *
-   * `ctrl+enter`, and no longer conditionally. This used to be gated on the
-   * kitty protocol on the belief that it was the only encoding able to express
-   * the key - "without it a terminal sends 0x0d for both". That is not true:
-   * most terminals send a bare LF, xterm sends `CSI 27;5;13~`, and the
-   * decoder reads all three. The gate was hiding a key that worked, and
-   * naming `alt+enter` instead sent people to the fallback.
+   * Both, because only one of them exists everywhere. `ctrl+enter` has three
+   * encodings - a bare LF, xterm's `CSI 27;5;13~`, kitty's `CSI 13;5u` - and
+   * the decoder reads all three, but a terminal that sends plain CR for
+   * ctrl+enter is sending the enter key and nothing downstream can tell them
+   * apart. VS Code's terminal is one such. `alt+enter` is `ESC CR`, which
+   * every terminal can express, so it is the one that always arrives.
+   *
+   * Naming only `ctrl+enter` offered a key that does not exist on some
+   * terminals while keeping the working one a secret.
    */
-  const newline = 'ctrl+enter';
+  const newline = 'ctrl/alt+enter';
   const waiting = useStoreValue<{ kind: string } | null>(INPUT, null);
   const upDown = `${theme.glyphs.arrowUp}${theme.glyphs.arrowDown}`;
   const leftRight = `${theme.glyphs.arrowLeft}${theme.glyphs.arrowRight}`;

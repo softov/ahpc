@@ -63,7 +63,7 @@ A new session asks the host's own questions before the first message — the age
 | Key | |
 |---|---|
 | `enter` | Send |
-| `ctrl+enter` | Newline |
+| `ctrl+enter`, `alt+enter` | Newline. `alt+enter` is the one every terminal can send; VS Code's cannot express `ctrl+enter` at all. |
 | `tab` | The options row |
 | `esc` | Back, or to the sessions you already have |
 | `/` | Commands the host offers, and this client's own |

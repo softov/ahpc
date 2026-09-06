@@ -194,10 +194,16 @@ with no modifier, so the newline was unreachable in every terminal that does
 not speak the kitty protocol - which, with `enableKittyKeyboardProtocol` off,
 includes VS Code.
 
-`@textui/terminal` now decodes all three, so the footer names `ctrl+enter`
-unconditionally rather than checking a capability that only ever described one
-of them. `alt+enter` stays for a terminal that sends plain CR for both, which
-nothing can recover.
+`@textui/terminal` now decodes all three, so the footer no longer checks a
+capability that only ever described one of them.
+
+It names `ctrl/alt+enter` rather than `ctrl+enter`, because none of the three
+encodings is universal: a terminal that sends plain CR for ctrl+enter is
+sending the enter key, and nothing downstream can recover the difference. VS
+Code's terminal is one of those. `alt+enter` is `ESC CR`, which every terminal
+can express, so it is the fallback that always arrives - and naming only
+`ctrl+enter` offered a key that does not exist on some terminals while keeping
+the working one a secret.
 
 `shift+enter` is in none of the three and is offered nowhere: there is no
 encoding in which it differs from enter.
