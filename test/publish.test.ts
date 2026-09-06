@@ -194,6 +194,27 @@ describe('writing is a second decision, not part of publishing', () => {
     }
   });
 
+  it('says why a directory or a link is refused, rather than reporting an errno', async () => {
+    /*
+     * Both refusals are the open flags' doing - `O_NOFOLLOW` answers `ELOOP`
+     * and a directory opened for writing answers `EISDIR` - and both used to
+     * reach the host as the raw error. The code alone is the same either way,
+     * which is how it went unnoticed, so this asserts the words.
+     */
+    const handlers = publish({ root, writable: true }).handlers();
+    await mkdir(path.join(root, 'adir'), { recursive: true });
+    const said = async (name: string): Promise<string> => {
+      try {
+        await handlers.resourceWrite?.({ uri: `${PUBLISH_PREFIX}${name}`, data: 'x', encoding: 'utf-8' });
+        return '';
+      }
+      catch (error) { return String((error as { message?: string }).message ?? ''); }
+    };
+    const directory = await said('adir');
+    expect(directory).toContain('is a directory');
+    expect(directory).not.toContain('EISDIR');
+  });
+
   it('will not write outside the directory even when writable', async () => {
     const handlers = publish({ root, writable: true }).handlers();
     expect(await refused(() => handlers.resourceWrite?.({

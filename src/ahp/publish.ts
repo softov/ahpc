@@ -158,6 +158,16 @@ export function publish(options: { root?: string; writable?: boolean; clientId?:
     throw new PublishRefusal(NOT_FOUND, `${String(uri)} is not there.`);
   };
 
+  /*
+   * `ahpd` carries a second copy of this, in its `resources.ts`.
+   *
+   * `resourceWrite` is symmetrical - a host asks a client for one exactly as a
+   * client asks a host - so both ends need the same flags, the same order of
+   * preconditions and the same append and insert arithmetic. This client does
+   * not depend on that package and is not going to, so the copy is deliberate.
+   * What is not deliberate is fixing one and not the other: everything here
+   * was wrong in both at once, and was corrected in both at once.
+   */
   const write = async (at: string, uri: unknown, params: {
     data?: unknown; encoding?: unknown; createOnly?: unknown; mode?: unknown;
     position?: unknown; ifMatch?: unknown;
@@ -182,16 +192,29 @@ export function publish(options: { root?: string; writable?: boolean; clientId?:
           throw new PublishRefusal(CONFLICT, `${String(uri)} has changed since ${ifMatch}.`);
         }
         if (error.code === 'ENOENT') return gone(uri);
+        // The two refusals the flags produce, said in this client's own words:
+        // `O_NOFOLLOW` answers a final link with `ELOOP`, and a directory
+        // opened for writing answers `EISDIR`. Both are a refusal to write
+        // what was asked for, and neither is useful to a host as an errno.
+        if (error.code === 'ELOOP') {
+          throw new PublishRefusal(PERMISSION_DENIED, `${String(uri)} is a symbolic link.`);
+        }
+        if (error.code === 'EISDIR') {
+          throw new PublishRefusal(PERMISSION_DENIED, `${String(uri)} is a directory.`);
+        }
         throw new PublishRefusal(PERMISSION_DENIED, `Could not write ${String(uri)}: ${error.message}`);
       });
       try {
-        const found = await file.stat();
-        if (found.isDirectory()) throw new PublishRefusal(PERMISSION_DENIED, `${String(uri)} is a directory.`);
         if (createOnly && ifMatch !== undefined) {
           throw new PublishRefusal(ALREADY_EXISTS, `${String(uri)} already exists.`);
         }
-        if (ifMatch !== undefined && tagOf(found.size, found.mtimeMs) !== ifMatch) {
-          throw new PublishRefusal(CONFLICT, `${String(uri)} has changed since ${ifMatch}.`);
+        if (ifMatch !== undefined) {
+          // Off the open descriptor, so what is compared is the file about to
+          // be written rather than whatever the name pointed at a moment ago.
+          const found = await file.stat();
+          if (tagOf(found.size, found.mtimeMs) !== ifMatch) {
+            throw new PublishRefusal(CONFLICT, `${String(uri)} has changed since ${ifMatch}.`);
+          }
         }
         const held = mode === 'truncate' && position === 0 ? Buffer.alloc(0) : await file.readFile();
         let output: Buffer;
