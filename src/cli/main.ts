@@ -7,6 +7,7 @@ import type { Where } from '../connect.js';
 import { ago, archived, branch, json, line, mark, project, table } from './render.js';
 import type { HostConnection, HostEvent } from '../ahp/connection.js';
 import { operate } from '../ahp/operate.js';
+import { SWITCHES } from '../flags.js';
 import type { Answer, ModelSelection, SessionUri, Turn } from '../ahp/types.js';
 
 export const HELP = `ahpc - drive an agent host from a shell
@@ -169,15 +170,6 @@ class Args {
     return out;
   }
 }
-
-/** Flags that take no value, so a positional after one is still a positional. */
-const SWITCHES = new Set([
-  '--json', '--full', '--all', '--archived', '--unread', '--undo', '--off', '--deny',
-  '--reject', '--claude', '--chat',
-  // The write half's own flags, which take no value: without them here a
-  // positional after one is read as that flag's argument and disappears.
-  '--create-only', '--recursive', '--fail-if-exists', '--publish-writable', '--follow', '--force',
-]);
 
 /** A message for the person, not a stack trace. */
 export class Fault extends Error {}

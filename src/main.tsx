@@ -9,52 +9,10 @@
  * whole renderer and `ahpc session list --json` should not pay for one.
  */
 
-/**
- * The words that mean "no screen".
- *
- * A closed set rather than "anything that is not a flag": every other argument
- * shape has always started the screen, and a typo becoming a silent CLI run
- * would be a worse answer than a refusal.
- */
-const COMMANDS = new Set([
-  'help', 'status', 'config', 'session', 'chat', 'terminal', 'resource',
-  'agents', 'models', 'commands', 'customizations', 'completions', 'changes', 'content',
-  'prompt', 'exec', 'cancel', 'queue', 'unqueue',
-  'watch', 'confirm', 'answer', 'dispatch',
-]);
-
-/**
- * Flags that take no value, so what follows one is not its value.
- *
- * Kept here rather than imported, because importing it would load the CLI to
- * decide whether to load the CLI.
- */
-const SWITCHES = new Set([
-  '--static', '-s', '--settled', '--approve', '--answer', '--bood',
-  '--help', '-h', '--json', '--full', '--archived', '--unread', '--undo',
-  '--off', '--deny', '--reject', '--chat', '--publish-writable',
-]);
-
-/**
- * The command, wherever it is.
- *
- * `ahpc --claude status` and `ahpc status --claude` mean the same thing, so
- * this is a scan rather than a look at the first word - reading only the first
- * one made every flag before a command silently open the screen instead.
- * A flag that takes a value swallows the next word, or `--path status` would
- * be a command.
- */
-const commandIn = (argv: string[]): string | undefined => {
-  for (let i = 0; i < argv.length; i++) {
-    const word = argv[i] as string;
-    if (word.startsWith('-')) {
-      if (!SWITCHES.has(word)) i++;
-      continue;
-    }
-    return COMMANDS.has(word) ? word : undefined;
-  }
-  return undefined;
-};
+// Both tables live in a leaf of their own: three components read this
+// vocabulary and holding a copy each is what let them disagree. Importing it
+// does not load a front end, which is the reason they were copied here.
+import { commandIn } from './flags.js';
 
 const argv = process.argv.slice(2);
 const first = commandIn(argv);

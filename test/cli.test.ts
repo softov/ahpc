@@ -11,6 +11,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import { parse } from '../src/tui.js';
+import { SWITCHES, commandIn } from '../src/flags.js';
 
 describe('the screen reads the flags it documents', () => {
   it('takes a directory to publish, read-only by default', () => {
@@ -31,12 +32,25 @@ describe('the screen reads the flags it documents', () => {
 /*
  * The entry point scans argv for a command word, and to do that it has to know
  * which flags take a value - `--path status` must not make `status` a command.
- * That list lives in `main.tsx` and the flags themselves live in `tui.tsx`, so
- * the two drift silently: a value-less flag missing from it swallows the word
- * after it, and `ahpc --publish-writable status` opens the screen instead.
+ * Held as a table per component that was three vocabularies: seven flags the
+ * CLI knew and the router did not each swallowed the command after them.
  */
-describe('the entry point knows which flags take a value', () => {
-  it('agrees with the screen about every one of them', async () => {
+describe('one flag vocabulary, read by everything that parses one', () => {
+  it('routes a command that follows a valueless flag', () => {
+    // The seven that did not, each a real invocation.
+    for (const flag of ['--force', '--recursive', '--all', '--claude', '--create-only', '--fail-if-exists', '--follow']) {
+      expect(commandIn([flag, 'resource'])).toBe('resource');
+    }
+    // ...while a flag that does take a value still swallows it, which is the
+    // reason the set exists at all.
+    expect(commandIn(['--path', 'status'])).toBeUndefined();
+    expect(commandIn(['--publish', 'session'])).toBeUndefined();
+    expect(commandIn(['--host', 'ws://x', 'status'])).toBe('status');
+    // A word that is not a command opens the screen rather than guessing.
+    expect(commandIn(['--force', 'nonsense'])).toBeUndefined();
+  });
+
+  it('agrees with the screen about every flag it parses', async () => {
     const source = await readFile('src/tui.tsx', 'utf8');
     const from = source.indexOf('export function parse');
     const to = source.indexOf('default:', from);
@@ -44,34 +58,44 @@ describe('the entry point knows which flags take a value', () => {
     expect(to).toBeGreaterThan(from);
 
     /*
-     * Read per line, which holds only while every arm is a one-liner. Asserted
-     * rather than assumed: a multi-line arm would make this read the wrong
-     * body and quietly answer for a flag it never saw.
+     * Read per line, which holds only while every arm is a one-liner.
+     * Asserted rather than assumed: a multi-line arm would make this read the
+     * wrong body and quietly answer for a flag it never saw.
      */
-    const takesValue = new Map<string, boolean>();
+    const wrong: string[] = [];
+    let seen = 0;
     for (const line of source.slice(from, to).split('\n')) {
       const cases = [...line.matchAll(/case '(-[^']+)':/g)].map((one) => one[1] as string);
       if (cases.length === 0) continue;
       expect(line).toContain('break;');
-      for (const flag of cases) takesValue.set(flag, line.includes('argv[++i]'));
+      for (const flag of cases) {
+        seen += 1;
+        const takesValue = line.includes('argv[++i]');
+        if (takesValue && SWITCHES.has(flag)) wrong.push(`${flag} takes a value and is listed as a switch`);
+        if (!takesValue && !SWITCHES.has(flag)) wrong.push(`${flag} takes no value and is missing from SWITCHES`);
+      }
     }
-    // If this finds nothing the slice is wrong and everything below passes for
-    // the wrong reason.
-    expect(takesValue.size).toBeGreaterThan(15);
+    expect(seen).toBeGreaterThan(15);
+    expect(wrong).toEqual([]);
+  });
 
-    const entry = await readFile('src/main.tsx', 'utf8');
-    const listed = entry.slice(entry.indexOf('const SWITCHES'), entry.indexOf(']);', entry.indexOf('const SWITCHES')));
-    const switches = new Set([...listed.matchAll(/'(-[^']+)'/g)].map((one) => one[1] as string));
-    expect(switches.size).toBeGreaterThan(10);
-
+  it('agrees with the shell about every flag it reads', async () => {
+    /*
+     * The CLI asks two different questions of a flag, and which one it asks
+     * says whether the flag has a value: `args.has` is a switch, `args.value`
+     * is not. So its own source states the same fact the set does, and the two
+     * can be held against each other without a third table to maintain.
+     */
+    const source = await readFile('src/cli/main.ts', 'utf8');
     const wrong: string[] = [];
-    for (const [flag, value] of takesValue) {
-      // A flag with a value must not be listed, or the scan stops swallowing
-      // the value and reads it as a command.
-      if (value && switches.has(flag)) wrong.push(`${flag} takes a value and is listed as a switch`);
-      // A flag without one must be, or the scan swallows the word after it.
-      if (!value && !switches.has(flag)) wrong.push(`${flag} takes no value and is missing from SWITCHES`);
+    let seen = 0;
+    for (const hit of source.matchAll(/args\.(has|value)\('(--[\w-]+)'\)/g)) {
+      seen += 1;
+      const [, how, flag] = hit as unknown as [string, string, string];
+      if (how === 'has' && !SWITCHES.has(flag)) wrong.push(`${flag} is read as a switch and is missing from SWITCHES`);
+      if (how === 'value' && SWITCHES.has(flag)) wrong.push(`${flag} is read for a value and is listed as a switch`);
     }
+    expect(seen).toBeGreaterThan(15);
     expect(wrong).toEqual([]);
   });
 });
