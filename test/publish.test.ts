@@ -247,12 +247,23 @@ describe('a refusal reaches the host as the code it was refused with', () => {
     const { host, ask } = await hosted({ root, writable: true });
     const error = await ask('resourceResolve', { uri: `${publishedUnder('ahpc-codes')}absent.txt` });
     expect(error.code).toBe(-32008);
+    /*
+     * And the sentence, which is the half a reader acts on. The code says a
+     * resource is missing; only the message says which, and it crosses the
+     * same seam that was prefixing the other one. Asserting the code alone
+     * checks the envelope and not what was promised to be inside it.
+     */
+    expect(error.message).toBe(`${publishedUnder('ahpc-codes')}absent.txt is not there.`);
     await host.close();
   });
 
   it('still answers -32601 for the method it does not implement', async () => {
     const { host, ask } = await hosted({ root });
     const error = await ask('createResourceWatch', { uri: `${publishedUnder('ahpc-codes')}note.txt` });
+    // The code only, deliberately: this message is the package's own wording
+    // for a method with no handler, not a sentence this client promises, and
+    // pinning it here would assert somebody else's prose across their
+    // versions.
     expect(error.code).toBe(-32601);
     await host.close();
   });
