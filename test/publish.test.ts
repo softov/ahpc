@@ -117,7 +117,9 @@ describe('writing is a second decision, not part of publishing', () => {
     // This client cannot put the question to whoever started it - it may be a
     // pipe in a script - so the grant is a flag and the refusal says so.
     expect(answer.granted).toBe(false);
-    expect(answer.reason).toContain('--publish-writable');
+    // The whole sentence: a refusal that names the flag is only useful if
+    // the rest of it says what the flag would do.
+    expect(answer.reason).toBe('This client published its directory read-only. Restart it with --publish-writable.');
   });
 });
 

@@ -225,7 +225,7 @@ it('negotiates once and then runs it, the same way against either host', async (
   const asked: string[] = [];
   const done = await operate(host, changeset, 'commit', { ask: (r) => { asked.push(r.uri); return true; } });
   expect(asked).toHaveLength(1);
-  expect(done.message).toContain('Committed');
+  expect(done.message).toBe('Committed 1a2b3c4: what the session changed');
   // It ran *after* the grant rather than despite the gate.
   expect(host.invoked().map((one) => one.operationId)).toEqual(['commit']);
   // And what it did comes back on the changeset, not in that answer.

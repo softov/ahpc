@@ -339,7 +339,9 @@ describe('when the agent is waiting', () => {
     await m.t.settle();
 
     expect(m.t.store.get(INPUT_STATUS) ?? null).toBeNull();
-    expect(m.t.store.get<string>(HOST_ERROR)).toContain('could not list the terminals');
+    // Exactly what was reported, so anything decorating it on the way is a
+    // failure rather than a substring that still matches.
+    expect(m.t.store.get<string>(HOST_ERROR)).toBe('could not list the terminals');
     await m.t.unmount();
   });
 
@@ -1590,7 +1592,8 @@ describe('when the host says no', () => {
 
     // The pane asks about whatever is highlighted, so this fires on arrival
     // and again on every arrow key.
-    expect(t.store.get<string>(HOST_ERROR)).toContain('No agent for session');
+    // The code is part of the answer, and a containment check was hiding it.
+    expect(t.store.get<string>(HOST_ERROR)).toBe('No agent for session (-32001)');
     expect(t.hasText('No agent for session')).toBe(true);
 
     // And it is still an application: the list still moves.
