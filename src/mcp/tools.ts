@@ -21,7 +21,7 @@
 
 import type { HostConnection } from '../ahp/connection.js';
 import { SessionFlag } from '../ahp/types.js';
-import type { Answer, SessionUri, Turn } from '../ahp/types.js';
+import type { Answer, SessionUri, TerminalState, Turn } from '../ahp/types.js';
 import { spoken, turn as runTurn, until } from '../wait.js';
 
 /** As much of JSON Schema as a tool's arguments need. */
@@ -37,10 +37,30 @@ export interface Schema {
   additionalProperties?: boolean;
 }
 
+/**
+ * A set of tools a caller has to ask for by name.
+ *
+ * The core table - sessions, turns, attention - is what a server is for and is
+ * always served. These are not: a tool table is read by a model alongside
+ * everything else it was given, and thirty tools is a worse server than twelve
+ * for the thing almost everybody wants. So they are opt-*in*, one group at a
+ * time, and a caller that needs files says so.
+ */
+export type Group = 'resources' | 'terminals' | 'automations' | 'changes';
+
+/** Every group there is, for `--mcp-tools` to name in its help. */
+export const GROUPS: readonly Group[] = ['resources', 'terminals', 'automations', 'changes'];
+
 /** One tool, as MCP describes it and as this client runs it. */
 export interface Tool {
   /** The name a caller uses. MCP has no dots, so these are underscored. */
   name: string;
+  /**
+   * The group that has to be turned on for this to be served.
+   *
+   * Absent is core: always there, never asked for.
+   */
+  group?: Group;
   /** A short label, for a client that shows one. */
   title: string;
   /** What it does and when to reach for it, written for a model. */
@@ -81,6 +101,19 @@ const said = (one: Turn): Record<string, unknown> => ({
       : null))
     .filter((one_) => one_ !== null),
 });
+
+/** The URI a resource tool was given, which is a `file://` on the host rather than a local path. */
+const pathOf = (input: Record<string, unknown>, key = 'path'): string => {
+  const found = text(input[key]);
+  if (found === '') throw new Error(`No ${key} was given. Resource tools take a file:// URI on the host, not a path on this machine.`);
+  return found;
+};
+
+/** A host half this connection may not have, or the reason it does not. */
+function has<T>(part: T | undefined, what: string): T {
+  if (part === undefined) throw new Error(`This host serves no ${what}. A host is given one, and this one was not.`);
+  return part;
+}
 
 export const TOOLS: Tool[] = [
   {
@@ -371,7 +404,419 @@ export const TOOLS: Tool[] = [
       return { answered: true };
     },
   },
+  /*
+   * The files the host serves, which is the `resources` group.
+   *
+   * Every one of these takes a `file://` URI on the *host*, not a path here -
+   * the host may be on another machine, and a tool that quietly resolved a
+   * relative path against this process's directory would be wrong in a way
+   * nobody notices until it writes somewhere.
+   */
+  {
+    name: 'list_directory',
+    group: 'resources',
+    title: 'List a directory',
+    description: 'What is in a directory the host serves. Takes a file:// URI on the host.',
+    readOnly: true,
+    input: {
+      type: 'object',
+      properties: { path: { type: 'string', description: 'A file:// URI of a directory on the host.' } },
+      required: ['path'],
+      additionalProperties: false,
+    },
+    run: async (host, input) => has(host.resourceList, 'filesystem')(pathOf(input)),
+  },
+  {
+    name: 'read_file',
+    group: 'resources',
+    title: 'Read a file',
+    description: 'The contents of a file the host serves. Text comes back as text; anything the host sends as bytes comes back base64 with the encoding said.',
+    readOnly: true,
+    input: {
+      type: 'object',
+      properties: { path: { type: 'string', description: 'A file:// URI on the host.' } },
+      required: ['path'],
+      additionalProperties: false,
+    },
+    run: async (host, input) => has(host.resourceRead, 'filesystem')(pathOf(input)),
+  },
+  {
+    name: 'write_file',
+    group: 'resources',
+    title: 'Write a file',
+    description: 'Write a file on the host, refusing if it changed since it was read. Pass force to write over whatever is there now. A host that has not granted write access to that directory refuses this, and only a person at the host can grant it.',
+    readOnly: false,
+    input: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'A file:// URI on the host.' },
+        content: { type: 'string', description: 'The whole new contents. This replaces the file.' },
+        createOnly: { type: 'boolean', description: 'Refuse if the file already exists.' },
+        force: { type: 'boolean', description: 'Write even if the file changed since it was last read.' },
+      },
+      required: ['path', 'content'],
+      additionalProperties: false,
+    },
+    run: async (host, input) => {
+      const write = has(host.resourceWrite, 'writable filesystem');
+      const uri = pathOf(input);
+      /*
+       * The etag the file has now, unless told not to.
+       *
+       * The same guard `ahpc resource write` has, and it matters more here: a
+       * model reads a file, thinks about it, and writes it back, and the whole
+       * of that is a read-modify-write with a person editing in between. A
+       * write with no `ifMatch` lands on whatever is there and loses their edit.
+       */
+      let ifMatch: string | undefined;
+      if (input.force !== true && host.resourceResolve) {
+        try { ifMatch = (await host.resourceResolve(uri)).etag; }
+        catch { /* not there yet, so there is nothing to have changed */ }
+      }
+      await write(uri, text(input.content), {
+        ...(input.createOnly === true ? { createOnly: true } : {}),
+        ...(ifMatch === undefined ? {} : { ifMatch }),
+      });
+      return { written: uri };
+    },
+  },
+  {
+    name: 'make_directory',
+    group: 'resources',
+    title: 'Make a directory',
+    description: 'Create a directory on the host.',
+    readOnly: false,
+    input: {
+      type: 'object',
+      properties: { path: { type: 'string' } },
+      required: ['path'],
+      additionalProperties: false,
+    },
+    run: async (host, input) => {
+      await has(host.resourceMkdir, 'writable filesystem')(pathOf(input));
+      return { made: pathOf(input) };
+    },
+  },
+  {
+    name: 'delete_path',
+    group: 'resources',
+    title: 'Delete a file or directory',
+    description: 'Remove something on the host. A directory needs recursive.',
+    readOnly: false,
+    input: {
+      type: 'object',
+      properties: {
+        path: { type: 'string' },
+        recursive: { type: 'boolean', description: 'Needed to remove a directory that is not empty.' },
+      },
+      required: ['path'],
+      additionalProperties: false,
+    },
+    run: async (host, input) => {
+      await has(host.resourceDelete, 'writable filesystem')(pathOf(input), {
+        ...(input.recursive === true ? { recursive: true } : {}),
+      });
+      return { deleted: pathOf(input) };
+    },
+  },
+  {
+    name: 'move_path',
+    group: 'resources',
+    title: 'Move or rename',
+    description: 'Move something on the host, which is also how it is renamed.',
+    readOnly: false,
+    input: {
+      type: 'object',
+      properties: {
+        from: { type: 'string' },
+        to: { type: 'string' },
+        failIfExists: { type: 'boolean', description: 'Refuse rather than write over something already at the destination.' },
+      },
+      required: ['from', 'to'],
+      additionalProperties: false,
+    },
+    run: async (host, input) => {
+      await has(host.resourceMove, 'writable filesystem')(pathOf(input, 'from'), pathOf(input, 'to'), {
+        ...(input.failIfExists === true ? { failIfExists: true } : {}),
+      });
+      return { moved: pathOf(input, 'to') };
+    },
+  },
+  {
+    name: 'copy_path',
+    group: 'resources',
+    title: 'Copy',
+    description: 'Copy something on the host.',
+    readOnly: false,
+    input: {
+      type: 'object',
+      properties: {
+        from: { type: 'string' },
+        to: { type: 'string' },
+        failIfExists: { type: 'boolean', description: 'Refuse rather than write over something already at the destination.' },
+      },
+      required: ['from', 'to'],
+      additionalProperties: false,
+    },
+    run: async (host, input) => {
+      await has(host.resourceCopy, 'writable filesystem')(pathOf(input, 'from'), pathOf(input, 'to'), {
+        ...(input.failIfExists === true ? { failIfExists: true } : {}),
+      });
+      return { copied: pathOf(input, 'to') };
+    },
+  },
+
+  /* The host's terminals, which is the `terminals` group. */
+  {
+    name: 'list_terminals',
+    group: 'terminals',
+    title: 'List terminals',
+    description: 'The terminals the host is running, with the URI each other terminal tool takes.',
+    readOnly: true,
+    input: { type: 'object', properties: {}, additionalProperties: false },
+    run: async (host) => (await host.terminals()).map((row) => ({
+      terminal: row.resource,
+      title: row.title,
+      ...(row.exitCode === undefined ? {} : { exitCode: row.exitCode }),
+    })),
+  },
+  {
+    name: 'new_terminal',
+    group: 'terminals',
+    title: 'Open a terminal',
+    description: 'Start a terminal on the host and return its URI.',
+    readOnly: false,
+    input: {
+      type: 'object',
+      properties: {
+        workingDirectory: { type: 'string', description: 'An absolute path on the host.' },
+        name: { type: 'string' },
+      },
+      additionalProperties: false,
+    },
+    run: async (host, input) => ({
+      terminal: await host.createTerminal({
+        ...(text(input.workingDirectory) === '' ? {} : { cwd: text(input.workingDirectory) }),
+        ...(text(input.name) === '' ? {} : { name: text(input.name) }),
+      }),
+    }),
+  },
+  {
+    name: 'send_to_terminal',
+    group: 'terminals',
+    title: 'Type into a terminal',
+    description: 'Send a line to a terminal. A newline is added unless newline is false, because a shell runs lines rather than strings.',
+    readOnly: false,
+    input: {
+      type: 'object',
+      properties: {
+        terminal: { type: 'string', description: 'A terminal URI from list_terminals or new_terminal.' },
+        text: { type: 'string' },
+        newline: { type: 'boolean', description: 'Whether to end it with a newline. True unless said otherwise.' },
+      },
+      required: ['terminal', 'text'],
+      additionalProperties: false,
+    },
+    run: async (host, input) => {
+      host.writeTerminal(pathOf(input, 'terminal'), `${text(input.text)}${input.newline === false ? '' : '\n'}`);
+      return { sent: true };
+    },
+  },
+  {
+    name: 'read_terminal',
+    group: 'terminals',
+    title: 'Read a terminal',
+    description: 'What a terminal has written so far. With waitSeconds it keeps reading until the process exits or that long passes, which is how a command that was just sent is waited on.',
+    readOnly: true,
+    input: {
+      type: 'object',
+      properties: {
+        terminal: { type: 'string' },
+        waitSeconds: { type: 'number', description: 'Wait this long for the process to exit before answering. Zero, the default, answers with what is there now.' },
+      },
+      required: ['terminal'],
+      additionalProperties: false,
+    },
+    run: async (host, input, report) => {
+      const uri = pathOf(input, 'terminal');
+      const seconds = typeof input.waitSeconds === 'number' && input.waitSeconds > 0 ? input.waitSeconds : 0;
+      return new Promise((done) => {
+        let last: TerminalState | undefined;
+        const stop = (): void => {
+          clearTimeout(timer);
+          handle.close();
+          done({
+            terminal: uri,
+            title: last?.title ?? '',
+            output: last?.output ?? '',
+            ...(last?.exitCode === undefined ? { running: true } : { exitCode: last.exitCode }),
+          });
+        };
+        const timer = setTimeout(stop, Math.max(0, seconds) * 1000);
+        timer.unref?.();
+        const handle = host.watchTerminal(uri, (state) => {
+          last = state;
+          report?.(state.exitCode === undefined ? `${state.output.length} bytes` : `exited ${state.exitCode}`);
+          // The first state carries the whole buffer, so a caller that is not
+          // waiting has its answer as soon as one arrives.
+          if (seconds === 0 || state.exitCode !== undefined) stop();
+        });
+      });
+    },
+  },
+  {
+    name: 'dispose_terminal',
+    group: 'terminals',
+    title: 'Close a terminal',
+    description: 'Close a terminal on the host.',
+    readOnly: false,
+    input: {
+      type: 'object',
+      properties: { terminal: { type: 'string' } },
+      required: ['terminal'],
+      additionalProperties: false,
+    },
+    run: async (host, input) => {
+      await host.disposeTerminal(pathOf(input, 'terminal'));
+      return { disposed: true };
+    },
+  },
+
+  /* Scheduled work, which is the `automations` group. */
+  {
+    name: 'list_automations',
+    group: 'automations',
+    title: 'List automations',
+    description: 'What the host runs on a schedule, whether each is on, and when it next fires.',
+    readOnly: true,
+    input: { type: 'object', properties: {}, additionalProperties: false },
+    run: async (host) => (await has(host.automations, 'automations')()).map((one) => ({
+      automation: one.resource,
+      title: one.title,
+      enabled: one.enabled,
+      ...(one.schedule === undefined ? {} : { schedule: one.schedule.expression, timeZone: one.schedule.timeZone }),
+      ...(one.nextRunAt === undefined ? {} : { nextRunAt: one.nextRunAt }),
+      operations: one.operations,
+      lastRuns: one.runs.slice(0, 5),
+    })),
+  },
+  {
+    name: 'run_automation',
+    group: 'automations',
+    title: 'Run an automation',
+    description: 'Fire an automation now, without waiting for its schedule. Answers once the host has taken it, not once it has finished.',
+    readOnly: false,
+    input: {
+      type: 'object',
+      properties: { automation: { type: 'string', description: 'An automation URI from list_automations.' } },
+      required: ['automation'],
+      additionalProperties: false,
+    },
+    run: async (host, input) => {
+      await has(host.runAutomation, 'automations')(pathOf(input, 'automation'));
+      return { started: true };
+    },
+  },
+  {
+    name: 'set_automation_enabled',
+    group: 'automations',
+    title: 'Turn an automation on or off',
+    description: 'Stop an automation firing, or start it again. The definition stays either way.',
+    readOnly: false,
+    input: {
+      type: 'object',
+      properties: { automation: { type: 'string' }, enabled: { type: 'boolean' } },
+      required: ['automation', 'enabled'],
+      additionalProperties: false,
+    },
+    run: async (host, input) => {
+      await has(host.setAutomationEnabled, 'automations')(pathOf(input, 'automation'), input.enabled === true);
+      return { enabled: input.enabled === true };
+    },
+  },
+  {
+    name: 'remove_automation',
+    group: 'automations',
+    title: 'Remove an automation',
+    description: 'Delete an automation from the host. Use set_automation_enabled to stop one without losing it.',
+    readOnly: false,
+    input: {
+      type: 'object',
+      properties: { automation: { type: 'string' } },
+      required: ['automation'],
+      additionalProperties: false,
+    },
+    run: async (host, input) => {
+      await has(host.removeAutomation, 'automations')(pathOf(input, 'automation'));
+      return { removed: true };
+    },
+  },
+
+  /* What a session changed, which is the `changes` group. */
+  {
+    name: 'list_changesets',
+    group: 'changes',
+    title: 'List changesets',
+    description: 'The changesets a session offers - what the conversation changed, what one turn changed, what the working tree has. Each is a URI show_changes takes.',
+    readOnly: true,
+    input: {
+      type: 'object',
+      properties: { session: { type: 'string' } },
+      required: ['session'],
+      additionalProperties: false,
+    },
+    run: async (host, input) => (await has(host.changesets, 'changesets')(uriOf(input))).map((scope) => ({
+      changeset: scope.uriTemplate,
+      label: scope.label,
+      ...(scope.description === undefined ? {} : { description: scope.description }),
+      // What is still to be filled in. A template with these left in it is not
+      // a URI yet, and saying so is better than the host refusing it later.
+      variables: scope.variables,
+    })),
+  },
+  {
+    name: 'show_changes',
+    group: 'changes',
+    title: 'Show a changeset',
+    description: 'The files in a changeset and how much each changed. The contents are not here: a changeset of two hundred files is a list worth having and megabytes that are not. Read one with read_file.',
+    readOnly: true,
+    input: {
+      type: 'object',
+      properties: {
+        session: { type: 'string' },
+        changeset: { type: 'string', description: 'A changeset URI from list_changesets. The session\'s own, if omitted.' },
+      },
+      required: ['session'],
+      additionalProperties: false,
+    },
+    run: async (host, input) => {
+      const target = text(input.changeset);
+      const found = await host.changes(uriOf(input), target === '' ? undefined : target);
+      return {
+        status: found.status,
+        files: found.files.map((file) => ({
+          uri: file.uri,
+          added: file.diff.added,
+          removed: file.diff.removed,
+          ...(file.before === undefined ? { created: true } : {}),
+          ...(file.after === undefined ? { deleted: true } : {}),
+        })),
+        operations: (found.operations ?? []).map((op) => op.id),
+      };
+    },
+  },
 ];
 
-/** One tool by the name a caller used, or nothing. */
+/**
+ * One tool by the name a caller used, or nothing.
+ *
+ * Over the whole table, including groups nobody turned on - whether a tool
+ * exists and whether this server serves it are different questions, and
+ * `served` answers the second. Telling somebody the tool is in a group they
+ * did not ask for is a better answer than telling them it does not exist.
+ */
 export const named = (name: string): Tool | undefined => TOOLS.find((one) => one.name === name);
+
+/** The tools a server started with these groups serves. */
+export const served = (groups: readonly string[] = []): Tool[] =>
+  TOOLS.filter((one) => one.group === undefined || groups.includes(one.group));

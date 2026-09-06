@@ -19,7 +19,7 @@ import { answer, type Incoming } from './serve.js';
  */
 export async function stdio(
   host: HostConnection,
-  options: { name: string; version: string; onProblem?(said: string): void },
+  options: { name: string; version: string; groups?: readonly string[]; onProblem?(said: string): void },
 ): Promise<void> {
   const say = (value: unknown): void => { process.stdout.write(`${JSON.stringify(value)}\n`); };
   let rest = '';

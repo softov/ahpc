@@ -40,6 +40,8 @@ export interface ServeOptions {
    * away by allowing none. This is for a page somebody serves themselves.
    */
   origins?: readonly string[];
+  /** The opt-in tool groups to serve, beyond the core table. */
+  groups?: readonly string[];
   onProblem?(said: string): void;
 }
 
@@ -190,7 +192,7 @@ export async function serve(host: HostConnection, options: ServeOptions): Promis
         // what to call. Every tool with its schema, which is also what an MCP
         // client gets from `tools/list`.
         if (request.method === 'GET' && (path === '/api' || path === '/')) {
-          send(response, 200, listing());
+          send(response, 200, listing(options.groups));
           return;
         }
 
@@ -236,7 +238,7 @@ export async function serve(host: HostConnection, options: ServeOptions): Promis
             try { input = JSON.parse(raw); }
             catch { send(response, 400, { error: 'That is not JSON.' }); return; }
           }
-          const result = await call(host, name, input) as { isError?: boolean; structuredContent?: unknown; content?: { text?: string }[] };
+          const result = await call(host, name, input, undefined, options.groups) as { isError?: boolean; structuredContent?: unknown; content?: { text?: string }[] };
           // Shaped for a program rather than for a model: the answer itself,
           // or the refusal as an error, without MCP's content envelope around
           // it. A caller that wants the envelope has `/mcp`.

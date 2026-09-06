@@ -10,7 +10,7 @@
 
 import { afterEach, describe, expect, it } from 'vitest';
 import { fakeHost } from '../src/ahp/fake.js';
-import { TOOLS, named } from '../src/mcp/tools.js';
+import { GROUPS, TOOLS, named, served } from '../src/mcp/tools.js';
 import { PROTOCOL, SERVER, SPOKEN, answer, call } from '../src/mcp/serve.js';
 import { serve, type Serving } from '../src/mcp/http.js';
 
@@ -37,6 +37,8 @@ describe('the table', () => {
       for (const key of tool.input.required ?? []) {
         expect(Object.keys(tool.input.properties)).toContain(key);
       }
+      // A group nobody can name is a tool nobody can reach.
+      if (tool.group !== undefined) expect(GROUPS).toContain(tool.group);
     }
   });
 
@@ -86,8 +88,40 @@ describe('the protocol', () => {
   it('lists the tools with their schemas', async () => {
     const said = await ask({ jsonrpc: '2.0', id: 2, method: 'tools/list' });
     const listed = (said?.result as { tools: { name: string; inputSchema: unknown }[] }).tools;
-    expect(listed).toHaveLength(TOOLS.length);
+    expect(listed).toHaveLength(served().length);
     expect(listed.every((one) => one.inputSchema !== undefined)).toBe(true);
+  });
+
+  it('serves the core table and nothing else until a group is asked for', async () => {
+    const said = await ask({ jsonrpc: '2.0', id: 20, method: 'tools/list' });
+    const names = (said?.result as { tools: { name: string }[] }).tools.map((one) => one.name);
+    // The point of the groups: a model reads this table alongside everything
+    // else it was given, so the default is the twelve a session needs.
+    expect(names).toContain('send_turn');
+    expect(names).not.toContain('read_file');
+    expect(names.length).toBeLessThan(TOOLS.length);
+  });
+
+  it('serves a group once it is asked for', async () => {
+    const host = fakeHost();
+    const said = await answer(host, { jsonrpc: '2.0', id: 21, method: 'tools/list' },
+      { ...SERVER, groups: ['resources'] }) as Record<string, unknown>;
+    const names = (said.result as { tools: { name: string }[] }).tools.map((one) => one.name);
+    expect(names).toContain('read_file');
+    expect(names).not.toContain('list_terminals');
+  });
+
+  it('says which group a tool is in rather than that it does not exist', async () => {
+    const host = fakeHost();
+    const said = await answer(host, {
+      jsonrpc: '2.0', id: 22, method: 'tools/call',
+      params: { name: 'read_file', arguments: { path: 'file:///tmp/x' } },
+    }, SERVER) as Record<string, unknown>;
+    const result = said.result as { isError: boolean; content: { text: string }[] };
+    expect(result.isError).toBe(true);
+    // The difference between this and "no such tool" is one flag, and only
+    // the person who started the server can supply it.
+    expect(result.content[0]?.text).toContain('--mcp-tools resources');
   });
 
   it('refuses a method it does not implement, rather than pretending', async () => {
@@ -107,13 +141,14 @@ describe('the protocol', () => {
 });
 
 describe('over HTTP', () => {
-  const start = async (options: { token?: string; origins?: string[] } = {}): Promise<string> => {
+  const start = async (options: { token?: string; origins?: string[]; groups?: string[] } = {}): Promise<string> => {
     running = await serve(fakeHost(), {
       ...SERVER,
       host: '127.0.0.1',
       port: 0,
       ...(options.token === undefined ? {} : { token: options.token }),
       ...(options.origins === undefined ? {} : { origins: options.origins }),
+      ...(options.groups === undefined ? {} : { groups: options.groups }),
     });
     return `http://127.0.0.1:${running.port}`;
   };
@@ -127,7 +162,7 @@ describe('over HTTP', () => {
     });
     expect(said.status).toBe(200);
     const body = await said.json() as { result: { tools: unknown[] } };
-    expect(body.result.tools).toHaveLength(TOOLS.length);
+    expect(body.result.tools).toHaveLength(served().length);
   });
 
   it('answers a notification with 202 and no body', async () => {
@@ -166,7 +201,19 @@ describe('over HTTP', () => {
   it('lists what it serves to somebody who has just started it', async () => {
     const at = await start();
     const said = await fetch(`${at}/api`);
-    expect((await said.json() as { tools: unknown[] }).tools).toHaveLength(TOOLS.length);
+    expect((await said.json() as { tools: unknown[] }).tools).toHaveLength(served().length);
+  });
+
+  it('serves the extra tools over HTTP too, where they were asked for', async () => {
+    const at = await start({ groups: ['resources', 'automations'] });
+    const listed = (await (await fetch(`${at}/api`)).json() as { tools: { name: string }[] }).tools;
+    expect(listed.map((one) => one.name)).toContain('list_automations');
+    expect(listed).toHaveLength(served(['resources', 'automations']).length);
+    // And the plain JSON half refuses one from a group nobody turned on, with
+    // the same answer the MCP half gives.
+    const no = await fetch(`${at}/api/list_terminals`, { method: 'POST' });
+    expect(no.status).toBe(400);
+    expect((await no.json() as { error: string }).error).toContain('--mcp-tools terminals');
   });
 
   it('refuses everything without the token, once one is set', async () => {

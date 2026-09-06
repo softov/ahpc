@@ -214,8 +214,8 @@ Writes are guarded by the file's etag unless you pass `--force`, so two clients 
 
 | Command | | |
 |---|---|---|
-| `mcp` | MCP on stdin and stdout, for a client that launches this process | |
-| `serve` | The same tools on a socket, shared | `--serve-host H` `--serve-port N` `--serve-token T` `--serve-origin URL` |
+| `mcp` | MCP on stdin and stdout, for a client that launches this process | `--mcp-tools G,…` |
+| `serve` | The same tools on a socket, shared | `--serve-host H` `--serve-port N` `--serve-token T` `--serve-origin URL` `--mcp-tools G,…` |
 
 ### Anything else
 
@@ -252,6 +252,29 @@ ahpc --host ws://127.0.0.1:9187 serve --serve-port 7431
 curl -XPOST localhost:7431/api/new_session -d '{"workingDirectory":"/work"}'
 curl -XPOST localhost:7431/api/send_turn -d '{"session":"claude:/…","text":"what is in this directory"}'
 ```
+
+### More than the twelve
+
+Files, terminals, automations and changesets are there too, one group at a time, and off unless asked for. That is on purpose: a tool table is read by a model alongside everything else it was given, and thirty tools is a worse server than twelve for the thing almost everybody wants, which is driving a session.
+
+```sh
+ahpc --host ws://127.0.0.1:9187 mcp --mcp-tools resources,changes
+```
+
+| Group | Tools |
+|---|---|
+| `resources` | `list_directory` `read_file` `write_file` `make_directory` `delete_path` `move_path` `copy_path` |
+| `terminals` | `list_terminals` `new_terminal` `send_to_terminal` `read_terminal` `dispose_terminal` |
+| `automations` | `list_automations` `run_automation` `set_automation_enabled` `remove_automation` |
+| `changes` | `list_changesets` `show_changes` |
+
+Repeatable as well as comma-separated. It is `--mcp-tools` rather than `--tools` because every other flag on this client is an AHP thing, and a bare `--tools` would read like it was choosing which tools the *agent* may call - a different question with a different answer.
+
+Calling a tool from a group nobody turned on is refused with the flag that would turn it on, rather than with "no such tool", because those are different problems and only the person who started the server can fix the first.
+
+Writing needs the host to have granted write access to that directory, and a host that has not refuses with `-32009` saying so. That is not something this client can grant on a model's behalf: it is the same question a person answers before a session may edit their repository.
+
+`read_file` and `write_file` take a `file://` URI on the *host*, not a path on the machine running `ahpc` - the two may not be the same machine. `write_file` reads the file's etag first and refuses a write if it changed in between, unless passed `force`; a model reading a file, thinking, and writing it back is a read-modify-write with a person editing in the middle of it.
 
 `send_turn` blocks until the turn ends and returns what the agent said. A turn that stops to ask a person something is not finished: `wait_for_attention` says what it wants, and `confirm_tool_call` and `answer_question` answer it.
 

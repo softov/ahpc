@@ -9,7 +9,8 @@ import type { HostConnection, HostEvent } from '../ahp/connection.js';
 import { operate } from '../ahp/operate.js';
 import { SWITCHES } from '../flags.js';
 import { spoken, turn as runTurn, until } from '../wait.js';
-import { TOOLS } from '../mcp/tools.js';
+import { GROUPS, served } from '../mcp/tools.js';
+import type { Group } from '../mcp/tools.js';
 import { SERVER } from '../mcp/serve.js';
 import { stdio } from '../mcp/stdio.js';
 import { serve as serveHttp } from '../mcp/http.js';
@@ -119,6 +120,9 @@ Serving these sessions to something else
                                [--serve-host H] [--serve-port N] [--serve-token T]
                                [--serve-origin URL]… a browser page allowed in
                                /mcp is MCP; /api/<tool> is plain JSON
+  both take [--mcp-tools G,…]  extra tool groups to serve, on top of the
+                               sessions ones: resources, terminals,
+                               automations, changes
 
 Anything else
   dispatch <uri> <type>        send one action verbatim  [--field k=v]… [--chat]
@@ -331,15 +335,18 @@ export async function cli(command: string, rest: string[]): Promise<number> {
        * `/api/<tool>` for anything that is not an MCP client.
        */
       case 'mcp': {
+        const groups = wanted(args);
         // Nothing but JSON-RPC on stdout, ever: a stray line here is a parse
         // error at the other end of a pipe nobody can see.
-        process.stderr.write(`ahpc mcp on ${host.url || '(scripted host)'}, ${TOOLS.length} tools\n`);
-        await stdio(host, { ...SERVER, onProblem: (said) => process.stderr.write(`${said}\n`) });
+        process.stderr.write(`ahpc mcp on ${host.url || '(scripted host)'}, ${served(groups).length} tools\n`);
+        await stdio(host, { ...SERVER, groups, onProblem: (said) => process.stderr.write(`${said}\n`) });
         return 0;
       }
       case 'serve': {
+        const groups = wanted(args);
         const at = await serveHttp(host, {
           ...SERVER,
+          groups,
           host: args.value('--serve-host') ?? '127.0.0.1',
           port: Number(args.value('--serve-port') ?? 7431),
           ...(args.value('--serve-token') === undefined ? {} : { token: args.value('--serve-token') as string }),
@@ -348,7 +355,7 @@ export async function cli(command: string, rest: string[]): Promise<number> {
           onProblem: (said) => process.stderr.write(`${said}\n`),
         });
         line(`ahpc on http://${at.host}:${at.port} against ${host.url || '(scripted host)'}`);
-        line(`  /mcp        MCP, ${TOOLS.length} tools`);
+        line(`  /mcp        MCP, ${served(groups).length} tools`);
         line('  /api/<tool> the same tools as plain JSON');
         if (args.value('--serve-token') === undefined && at.host !== '127.0.0.1' && at.host !== '::1') {
           // Said rather than refused: binding wide open is a decision somebody
@@ -911,6 +918,27 @@ async function chats(host: HostConnection, args: Args, wants: boolean): Promise<
   }
   if (verb === 'rm') { await host.disposeChat(uri); line(`Closed ${uri}.`); return 0; }
   throw new Fault(`No 'chat ${verb}'. Try 'ahpc help'.`);
+}
+
+/**
+ * The tool groups `--mcp-tools` asked for.
+ *
+ * Comma-separated and repeatable, because both are what people type. Named
+ * `--mcp-tools` and not `--tools`: every other flag on this client is an AHP
+ * thing, and a bare `--tools` reads like one - it would look like it was
+ * choosing which tools the *agent* may call, which is a different question
+ * with a different answer.
+ */
+function wanted(args: Args): Group[] {
+  const said = args.every('--mcp-tools')
+    .flatMap((one) => one.split(','))
+    .map((one) => one.trim())
+    .filter((one) => one !== '');
+  const strange = said.filter((one) => !(GROUPS as readonly string[]).includes(one));
+  if (strange.length > 0) {
+    throw new Fault(`No tool group called ${strange.join(', ')}. There is ${GROUPS.join(', ')}.`);
+  }
+  return said as Group[];
 }
 
 /** Everything under `terminal`. */

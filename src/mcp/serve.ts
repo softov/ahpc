@@ -15,7 +15,7 @@
  */
 
 import type { HostConnection } from '../ahp/connection.js';
-import { TOOLS, named } from './tools.js';
+import { named, served } from './tools.js';
 import { version } from '../version.js';
 
 /** The newest version of MCP this speaks, and what it answers an unknown one with. */
@@ -80,8 +80,8 @@ const bag = (value: unknown): Record<string, unknown> =>
   (typeof value === 'object' && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : {});
 
 /** The tools, in the shape `tools/list` puts them on the wire. */
-export const listing = (): unknown => ({
-  tools: TOOLS.map((tool) => ({
+export const listing = (groups: readonly string[] = []): unknown => ({
+  tools: served(groups).map((tool) => ({
     name: tool.name,
     title: tool.title,
     description: tool.description,
@@ -104,12 +104,22 @@ export async function call(
   name: string,
   input: unknown,
   report?: Report,
+  groups: readonly string[] = [],
 ): Promise<unknown> {
   const tool = named(name);
   if (tool === undefined) {
     return {
       isError: true,
       content: [{ type: 'text', text: `No tool called ${name}. Ask tools/list for what there is.` }],
+    };
+  }
+  // Exists, but this server was not started with it. Said as itself rather
+  // than as "no such tool", because the difference is one flag and only the
+  // person who started this can supply it.
+  if (tool.group !== undefined && !groups.includes(tool.group)) {
+    return {
+      isError: true,
+      content: [{ type: 'text', text: `${name} is in the ${tool.group} group, which this server was not started with. It needs --mcp-tools ${tool.group}.` }],
     };
   }
   try {
@@ -168,6 +178,8 @@ export async function answer(
   options: {
     name: string;
     version: string;
+    /** The opt-in tool groups this server was started with, if any. */
+    groups?: readonly string[];
     /**
      * Somewhere to send a notification while this is being answered.
      *
@@ -207,12 +219,12 @@ export async function answer(
     });
   }
   if (method === 'ping') return ok({});
-  if (method === 'tools/list') return ok(listing());
+  if (method === 'tools/list') return ok(listing(options.groups));
   if (method === 'tools/call') {
     const params = bag(message.params);
     const name = typeof params.name === 'string' ? params.name : '';
     if (name === '') return no(INVALID_PARAMS, 'tools/call needs a name.');
-    try { return ok(await call(host, name, params.arguments, reporter(message, options.notify))); }
+    try { return ok(await call(host, name, params.arguments, reporter(message, options.notify), options.groups)); }
     catch (error) { return no(INTERNAL, error instanceof Error ? error.message : String(error)); }
   }
   return no(METHOD_NOT_FOUND, `This server does not implement ${method}. It serves tools and nothing else.`);
