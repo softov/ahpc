@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# One run per branch. A push over a push is a run nobody is waiting for.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    # A hung test should fail the run rather than sit on a runner for six hours,
+    # which is the default.
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # The `engines` field, and the version the tests are written against.
+          node-version: 22
+          cache: npm
+
+      # `npm ci` rather than `npm install`, so a lockfile that does not match
+      # package.json fails here rather than resolving to something nobody
+      # wrote down. This repository keeps a pnpm and a deno lockfile too and
+      # neither is current; `package-lock.json` is the one that installs.
+      - run: npm ci
+
+      - run: npm run typecheck
+
+      # Bounded, because a job that runs into the runner's own timeout is
+      # cancelled rather than failed, and a cancelled job leaves no readable
+      # log at all.
+      - name: Tests
+        run: timeout 600 npm test
+
+      - run: npm run build
+
+      # What would actually be published, which is not what `files` says until
+      # something has packed it.
+      - name: Pack
+        run: npm pack --pack-destination ${{ runner.temp }}
+
+  # `resourceWrite` is symmetrical, so this client implements the whole of it
+  # and so does `ahpd`. `test/fixtures/resource-write.json` is the same file in
+  # both repositories and each runs it against its own implementation - which
+  # catches a behavioural divergence, but not a case added on one side and
+  # never copied to the other. This is what catches that.
+  fixture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: The write fixture matches ahpd's copy
+        run: |
+          set -u
+          url=https://raw.githubusercontent.com/softov/ahpd/main/test/fixtures/resource-write.json
+          code=$(curl -sS -o "$RUNNER_TEMP/theirs.json" -w '%{http_code}' "$url")
+          if [ "$code" = "404" ]; then
+            # Not landed over there yet. Said rather than failed, because the
+            # two repositories are pushed one at a time and a red build for the
+            # gap between them would be a build nobody could make green.
+            echo "ahpd's main has no copy of this fixture yet. Nothing to compare."
+            exit 0
+          fi
+          if [ "$code" != "200" ]; then
+            echo "Could not read ahpd's copy: HTTP $code"
+            exit 1
+          fi
+          diff -u "$RUNNER_TEMP/theirs.json" test/fixtures/resource-write.json && echo "The two copies are identical."
