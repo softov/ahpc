@@ -57,3 +57,26 @@ it('does not let an old response release a new connection', async () => {
   next.answer(); await tick(); hold.release();
   expect(next.released).toEqual(['one']);
 });
+
+it('does not replay into a fresh baseline an action it already contains', async () => {
+  let answer!: (value: { result: { snapshot: { state: object; fromSeq: number } } }) => void;
+  const client: ChannelClient = {
+    subscribe: () => new Promise((resolve) => { answer = resolve; }),
+    unsubscribe: async () => {},
+    async *events() {
+      yield { channel: 'one', event: { type: 'action', params: { serverSeq: 5 } } };
+      yield { channel: 'one', event: { type: 'action', params: { serverSeq: 6 } } };
+    },
+  };
+  const channels = openChannels({ client, reason: String });
+  let value = 0;
+  const hold = channels.open('one', {
+    opened: (state) => { value = state?.value as number; },
+    event: () => { value += 1; },
+  });
+  channels.drain(client); await tick();
+  answer({ result: { snapshot: { state: { value: 5 }, fromSeq: 5 } } });
+  await tick();
+  expect(value).toBe(6);
+  hold.release();
+});

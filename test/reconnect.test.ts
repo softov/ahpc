@@ -1962,3 +1962,37 @@ describe('a read-modify-write is guarded by what it read', () => {
     await host.close();
   });
 });
+
+it('gives a late reader the existing conversation and keeps both readers live', async () => {
+  const { host, scripted } = await connect();
+  scripted.states.set(SESSION, { defaultChat: CHAT, chats: [] });
+  scripted.states.set(CHAT, { turns: [{ id: 'kept', message: { text: 'already said', origin: { kind: 'user' } },
+    responseParts: [], state: 'complete', startedAt: new Date().toISOString() }] });
+  const first: HostEvent[] = []; const second: HostEvent[] = [];
+  const one = host.subscribe(SESSION as never, (event) => first.push(event));
+  await settle();
+  const two = host.subscribe(SESSION as never, (event) => second.push(event));
+  await settle();
+  const latest = (events: HostEvent[]) => events.filter((event) => event.type === 'snapshot').at(-1);
+  expect(latest(second)?.turns).toEqual(latest(first)?.turns);
+  expect(latest(second)?.turns.length).toBeGreaterThan(0);
+  one.close();
+  await scripted.act(CHAT, { type: 'chat/draftChanged', draft: { text: 'still here' } });
+  await settle();
+  expect(latest(second)?.draft).toBe('still here');
+  expect(scripted.timesAsked('unsubscribe', CHAT)).toBe(0);
+  two.close(); await host.close();
+});
+
+it('gives a late terminal watcher the existing output', async () => {
+  const { host, scripted } = await connect();
+  const uri = 'ahp-terminal:/late';
+  scripted.states.set(uri, { title: 'shell', content: [{ type: 'unclassified', value: 'kept output' }] });
+  const one = host.watchTerminal(uri, () => {});
+  await settle();
+  const output: string[] = [];
+  const two = host.watchTerminal(uri, (state) => output.push(state.output));
+  await settle();
+  expect(output.at(-1)).toBe('kept output');
+  one.close(); two.close(); await host.close();
+});

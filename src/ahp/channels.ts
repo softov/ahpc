@@ -33,7 +33,7 @@ export interface Consumer {
 
 /** What this registry needs of a protocol client. */
 export interface ChannelClient {
-  subscribe(uri: string): Promise<{ result: { snapshot?: { state?: unknown } | null } }>;
+  subscribe(uri: string): Promise<{ result: { snapshot?: { state?: unknown; fromSeq?: number } | null } }>;
   unsubscribe(uri: string): Promise<void>;
   events(): AsyncIterableIterator<AddressedEvent>;
 }
@@ -126,6 +126,8 @@ interface Held {
   told: boolean;
   /** What arrived while the subscribe was still in flight. */
   waiting: ChannelEvent[];
+  /** Boundary of the latest snapshot, for actions buffered while it arrived. */
+  fromSeq?: number;
   /** The release waiting to happen, if the last reader has gone. */
   leaving?: ReturnType<typeof setTimeout>;
   /** The `subscribe` already out for this channel, which a second reader waits on. */
@@ -236,7 +238,7 @@ export function openChannels(options: ChannelsOptions): Channels {
     // Before the snapshot has landed there is nothing to apply this to. The
     // host starts sending the moment it accepts the subscribe, which is
     // earlier than it answers one.
-    if (!channel.opened) { channel.waiting.push(event); return; }
+    if (!channel.opened || !channel.told) { channel.waiting.push(event); return; }
     for (const consumer of channel.consumers) consumer.event(event);
   };
 
@@ -295,10 +297,12 @@ export function openChannels(options: ChannelsOptions): Channels {
   const ask = (uri: string): Promise<ChannelState> => {
     const channel = entry(uri);
     if (channel.pending) return channel.pending;
-    channel.told = false;
     const era = generation;
     const asking = client.subscribe(uri).then(({ result }) => {
-      if (era === generation && held.get(uri) === channel) channel.opened = true;
+      if (era === generation && held.get(uri) === channel) {
+        channel.opened = true;
+        channel.fromSeq = result.snapshot?.fromSeq;
+      }
       return bag(result.snapshot?.state);
     });
     channel.pending = asking;
@@ -309,6 +313,8 @@ export function openChannels(options: ChannelsOptions): Channels {
 
   /** Ask the host for a channel, and give what comes back to whoever is waiting. */
   const start = (uri: string, era: number): void => {
+    const opening = entry(uri);
+    opening.told = false;
     void (async () => {
       try {
         const state = await ask(uri);
@@ -319,6 +325,9 @@ export function openChannels(options: ChannelsOptions): Channels {
         for (const consumer of channel.consumers) consumer.opened(state);
         const queued = channel.waiting.splice(0);
         for (const event of queued) {
+          const seq = bag(event.params)?.serverSeq;
+          if (event.type === 'action' && typeof seq === 'number'
+            && channel.fromSeq !== undefined && seq <= channel.fromSeq) continue;
           for (const consumer of channel.consumers) consumer.event(event);
         }
       }
@@ -399,9 +408,10 @@ export function openChannels(options: ChannelsOptions): Channels {
       }
       else if (alone) { channel.told = false; start(uri, generation); }
       else if (channel.told) {
-        // Somebody is already reading it. This one needs the state as it
-        // stands, and the host will not send a second snapshot for it.
-        queueMicrotask(() => { if (channel.consumers.has(consumer)) consumer.opened(null); });
+        // The readers keep their own reduced state. Ask once for a fresh
+        // baseline and hand it to all of them, buffering events until it lands.
+        // A null snapshot would leave the newcomer with an empty conversation.
+        start(uri, generation);
       }
 
       let holding = true;
