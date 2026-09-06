@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, it, beforeAll, afterAll } from 'vitest';
-import { mkdtemp, rm, writeFile, readFile, mkdir } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile, readFile, mkdir, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { publish, publishedUnder } from '../src/ahp/publish.js';
@@ -316,4 +316,36 @@ describe('a refusal reaches the host as the code it was refused with', () => {
     expect(error.code).toBe(-32601);
     await host.close();
   });
+});
+
+it('keeps every publication operation inside the real directory', async () => {
+  const outside = await mkdtemp(path.join(tmpdir(), 'ahpc-outside-'));
+  try {
+    const target = path.join(outside, 'sentinel');
+    await writeFile(target, 'outside');
+    await symlink(outside, path.join(root, 'outside-dir'));
+    await symlink(target, path.join(root, 'outside-file'));
+    await symlink(path.join(outside, 'absent'), path.join(root, 'outside-dangling'));
+    const uri = (name: string) => `${PUBLISH_PREFIX}${name}`;
+    for (const writable of [false, true]) {
+      const handlers = publish({ root, writable }).handlers();
+      for (const name of ['outside-file', 'outside-dir/sentinel', 'outside-dangling']) {
+        for (const method of ['resourceRead', 'resourceResolve', 'resourceWrite', 'resourceDelete', 'resourceMkdir']) {
+          expect(await refused(() => handlers[method]!({ uri: uri(name), data: 'changed', recursive: true }))).toBe(-32009);
+        }
+        for (const method of ['resourceCopy', 'resourceMove']) {
+          expect(await refused(() => handlers[method]!({ source: uri('note.txt'), destination: uri(name) }))).toBe(-32009);
+          expect(await refused(() => handlers[method]!({ source: uri(name), destination: uri('copy.txt') }))).toBe(-32009);
+        }
+      }
+      expect(await refused(() => handlers.resourceList!({ uri: uri('outside-dir') }))).toBe(-32009);
+    }
+    expect(await readFile(target, 'utf8')).toBe('outside');
+  } finally { await rm(outside, { recursive: true, force: true }); }
+});
+
+it('can read a link whose destination is still published', async () => {
+  await symlink(path.join(root, 'note.txt'), path.join(root, 'inside-link'));
+  const handlers = publish({ root }).handlers();
+  expect(await handlers.resourceRead!({ uri: `${PUBLISH_PREFIX}inside-link` })).toMatchObject({ data: 'hello' });
 });

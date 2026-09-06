@@ -15,8 +15,9 @@
  * says is the receiver's job whichever peer initiated.
  */
 
-import { copyFile, mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, open, readdir, realpath, rename, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
+import { constants } from 'node:fs';
 
 /**
  * The authority a client publishes under is its own `clientId`.
@@ -84,7 +85,7 @@ export function publish(options: { root?: string; writable?: boolean; clientId?:
    * the resolved path rather than on the text: `a/../../etc` is only visibly
    * outside once it has been resolved.
    */
-  const where = (uri: unknown): string => {
+  const where = async (uri: unknown, linkItself = false): Promise<string> => {
     if (root === null) {
       throw new PublishRefusal(PERMISSION_DENIED, 'This client publishes nothing. Start it with --publish.');
     }
@@ -117,7 +118,32 @@ export function publish(options: { root?: string; writable?: boolean; clientId?:
     if (inside !== root && !inside.startsWith(`${root}${path.sep}`)) {
       throw new PublishRefusal(PERMISSION_DENIED, 'That is outside what this client published.');
     }
-    return inside;
+    const boundary = await realpath(root);
+    let ancestor = inside;
+    const missing: string[] = [];
+    for (;;) {
+      try {
+        const resolved = await realpath(ancestor);
+        if (resolved !== boundary && !resolved.startsWith(`${boundary}${path.sep}`)) {
+          throw new PublishRefusal(PERMISSION_DENIED, 'That is outside what this client published.');
+        }
+        if (linkItself && missing.length === 0) {
+          return path.join(await realpath(path.dirname(inside)), path.basename(inside));
+        }
+        return path.join(resolved, ...missing.reverse());
+      } catch (error) {
+        if (error instanceof PublishRefusal) throw error;
+        // A dangling link has a destination too. Never treat it as a new file.
+        if (await lstat(ancestor).then((entry) => entry.isSymbolicLink(), () => false)) {
+          throw new PublishRefusal(PERMISSION_DENIED, 'That is a dangling symbolic link.');
+        }
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+        const parent = path.dirname(ancestor);
+        if (parent === ancestor) throw error;
+        missing.push(path.basename(ancestor));
+        ancestor = parent;
+      }
+    }
   };
 
   const mutable = (): void => {
@@ -140,9 +166,12 @@ export function publish(options: { root?: string; writable?: boolean; clientId?:
     handlers: () => ({
       resourceRead: async (params: unknown) => {
         const uri = (params as { uri?: unknown }).uri;
-        const at = where(uri);
+        const at = await where(uri);
         let body: Buffer;
-        try { body = await readFile(at); }
+        try {
+          const file = await open(at, constants.O_RDONLY | constants.O_NOFOLLOW);
+          try { body = await file.readFile(); } finally { await file.close(); }
+        }
         catch { return gone(uri); }
         // Binary MUST be base64 and text MAY be utf-8. A NUL byte is the cheap
         // test, and a host handed a PNG as utf-8 receives something that is
@@ -154,12 +183,13 @@ export function publish(options: { root?: string; writable?: boolean; clientId?:
 
       resourceList: async (params: unknown) => {
         const uri = (params as { uri?: unknown }).uri;
-        const at = where(uri);
+        const at = await where(uri);
         try {
           const found = await readdir(at, { withFileTypes: true });
+          const boundary = await realpath(root as string);
           return {
             entries: found.map((entry) => ({
-              uri: `${PREFIX}${path.relative(root as string, path.join(at, entry.name))}`,
+              uri: `${PREFIX}${path.relative(boundary, path.join(at, entry.name))}`,
               name: entry.name,
               type: entry.isDirectory() ? 'directory' : 'file',
             })),
@@ -170,7 +200,7 @@ export function publish(options: { root?: string; writable?: boolean; clientId?:
 
       resourceResolve: async (params: unknown) => {
         const uri = (params as { uri?: unknown }).uri;
-        const at = where(uri);
+        const at = await where(uri);
         try {
           const found = await stat(at);
           return {
@@ -201,37 +231,51 @@ export function publish(options: { root?: string; writable?: boolean; clientId?:
       resourceWrite: async (params: unknown) => {
         const { uri, data, encoding } = params as { uri?: unknown; data?: unknown; encoding?: unknown };
         mutable();
-        const at = where(uri);
-        await writeFile(at, encoding === 'base64'
-          ? Buffer.from(String(data), 'base64')
-          : Buffer.from(String(data), 'utf8'));
+        const at = await where(uri);
+        const file = await open(at, constants.O_WRONLY | constants.O_CREAT | constants.O_NOFOLLOW);
+        try {
+          await file.truncate(0);
+          await file.writeFile(encoding === 'base64'
+            ? Buffer.from(String(data), 'base64')
+            : Buffer.from(String(data), 'utf8'));
+        } finally { await file.close(); }
         return {};
       },
 
       resourceDelete: async (params: unknown) => {
         const { uri, recursive } = params as { uri?: unknown; recursive?: unknown };
         mutable();
-        await rm(where(uri), { recursive: recursive === true });
+        await rm(await where(uri, true), { recursive: recursive === true });
         return {};
       },
 
       resourceMkdir: async (params: unknown) => {
         mutable();
-        await mkdir(where((params as { uri?: unknown }).uri), { recursive: true });
+        await mkdir(await where((params as { uri?: unknown }).uri), { recursive: true });
         return {};
       },
 
       resourceMove: async (params: unknown) => {
         const { source, destination } = params as { source?: unknown; destination?: unknown };
         mutable();
-        await rename(where(source), where(destination));
+        await rename(await where(source, true), await where(destination, true));
         return {};
       },
 
       resourceCopy: async (params: unknown) => {
         const { source, destination } = params as { source?: unknown; destination?: unknown };
         mutable();
-        await copyFile(where(source), where(destination));
+        const from = await where(source);
+        const to = await where(destination);
+        const input = await open(from, constants.O_RDONLY | constants.O_NOFOLLOW);
+        try {
+          const output = await open(to, constants.O_WRONLY | constants.O_CREAT | constants.O_NOFOLLOW);
+          try {
+            const bytes = await input.readFile();
+            await output.truncate(0);
+            await output.writeFile(bytes);
+          } finally { await output.close(); }
+        } finally { await input.close(); }
         return {};
       },
     }),
