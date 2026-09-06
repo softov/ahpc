@@ -8,6 +8,11 @@ import { ago, archived, branch, json, line, mark, project, table } from './rende
 import type { HostConnection, HostEvent } from '../ahp/connection.js';
 import { operate } from '../ahp/operate.js';
 import { SWITCHES } from '../flags.js';
+import { spoken, turn as runTurn, until } from '../wait.js';
+import { TOOLS } from '../mcp/tools.js';
+import { SERVER } from '../mcp/serve.js';
+import { stdio } from '../mcp/stdio.js';
+import { serve as serveHttp } from '../mcp/http.js';
 import type { Answer, ModelSelection, SessionUri, Turn } from '../ahp/types.js';
 
 export const HELP = `ahpc - drive an agent host from a shell
@@ -106,6 +111,13 @@ Terminals
 Recording
   AHPC_RECORD=<file>           append every frame, both directions, for
                                'npm run wire' to check against the protocol
+
+Serving these sessions to something else
+  mcp                          MCP on stdin and stdout, for a client that
+                               launches this process
+  serve                        the same tools on a socket, shared
+                               [--serve-host H] [--serve-port N] [--serve-token T]
+                               /mcp is MCP; /api/<tool> is plain JSON
 
 Anything else
   dispatch <uri> <type>        send one action verbatim  [--field k=v]… [--chat]
@@ -223,56 +235,6 @@ const needs = (args: Args, index: number, what: string): string => {
 };
 
 /**
- * Watch one session until it does something, then stop watching.
- *
- * Every streaming command is this with a different stopping condition, so it
- * is written once. The subscription is always closed - a CLI that left one
- * open would be a process that never exits, which is the one thing a shell
- * cannot work around.
- */
-function until(
-  host: HostConnection,
-  uri: SessionUri,
-  done: (event: HostEvent) => boolean,
-  options: { onEvent?(event: HostEvent): void; timeoutSeconds?: number } = {},
-): Promise<HostEvent | undefined> {
-  return new Promise((answer) => {
-    let closed = false;
-    /*
-     * The handle may not exist yet when this runs.
-     *
-     * A host is entitled to deliver the opening snapshot *synchronously*
-     * inside `subscribe` - the scripted one does, and it is the honest thing
-     * for a host holding the state already - so a condition satisfied by that
-     * first event fires before `subscribe` has returned anything to close.
-     * Reading the handle there threw, which made every waiting command fail
-     * against the scripted host and work against a socket, purely because one
-     * of them answers a tick later.
-     */
-    let handle: { close(): void } | undefined;
-    const finish = (event: HostEvent | undefined): void => {
-      if (closed) return;
-      closed = true;
-      clearTimeout(timer);
-      handle?.close();
-      answer(event);
-    };
-    const timer = setTimeout(
-      () => finish(undefined),
-      Math.max(1, (options.timeoutSeconds ?? 900)) * 1000,
-    );
-    timer.unref?.();
-    handle = host.subscribe(uri, (event) => {
-      options.onEvent?.(event);
-      if (done(event)) finish(event);
-    });
-    // Already over, before there was a handle to close. Closing it now is what
-    // `finish` could not do.
-    if (closed) handle.close();
-  });
-}
-
-/**
  * Ask again once the catalogue moves, for an answer that starts out empty.
  *
  * A harness enumerates its models once its host has asked one, and a host that
@@ -317,12 +279,6 @@ const snapshot = async (host: HostConnection, uri: SessionUri): Promise<Extract<
   return event?.type === 'snapshot' ? event : undefined;
 };
 
-/** A turn, as a line of prose rather than a tree of parts. */
-const spoken = (turn: Turn): string => turn.parts
-  .map((part) => (part.kind === 'markdown' ? part.content : ''))
-  .join('')
-  .trim();
-
 /**
  * One command, and then the process is done.
  *
@@ -362,6 +318,46 @@ export async function cli(command: string, rest: string[]): Promise<number> {
         line(`${host.state()}  ${host.url || '(scripted host)'}`);
         line(`${rows.length} session(s)`);
         break;
+      }
+
+      /*
+       * The tool server, on whichever transport was asked for.
+       *
+       * Both serve the same table from `mcp/tools.ts`. `mcp` is stdio and is
+       * owned by the client that launched this process; `serve` is a socket
+       * several callers share, speaking MCP at `/mcp` and a plain JSON API at
+       * `/api/<tool>` for anything that is not an MCP client.
+       */
+      case 'mcp': {
+        // Nothing but JSON-RPC on stdout, ever: a stray line here is a parse
+        // error at the other end of a pipe nobody can see.
+        process.stderr.write(`ahpc mcp on ${host.url || '(scripted host)'}, ${TOOLS.length} tools\n`);
+        await stdio(host, { ...SERVER, onProblem: (said) => process.stderr.write(`${said}\n`) });
+        return 0;
+      }
+      case 'serve': {
+        const at = await serveHttp(host, {
+          ...SERVER,
+          host: args.value('--serve-host') ?? '127.0.0.1',
+          port: Number(args.value('--serve-port') ?? 7431),
+          ...(args.value('--serve-token') === undefined ? {} : { token: args.value('--serve-token') as string }),
+          onProblem: (said) => process.stderr.write(`${said}\n`),
+        });
+        line(`ahpc on http://${at.host}:${at.port} against ${host.url || '(scripted host)'}`);
+        line(`  /mcp        MCP, ${TOOLS.length} tools`);
+        line('  /api/<tool> the same tools as plain JSON');
+        if (args.value('--serve-token') === undefined && at.host !== '127.0.0.1' && at.host !== '::1') {
+          // Said rather than refused: binding wide open is a decision somebody
+          // may have made on purpose behind something else.
+          line('  no token: anyone who can reach this port can drive every session on the host');
+        }
+        // Until it is stopped. There is no work left to return to.
+        await new Promise<void>((forever) => {
+          const stop = (): void => { void at.close().then(() => forever()); };
+          process.on('SIGINT', stop);
+          process.on('SIGTERM', stop);
+        });
+        return 0;
       }
 
       case 'session': return await sessions(host, args, wants);
@@ -1205,51 +1201,26 @@ async function turns(host: HostConnection, command: string, args: Args, wants: b
    * second answer to the same question. So "what is new" is the part of the
    * running turn not yet printed, which is a length rather than an event.
    */
+  /*
+   * Say something and wait for the answer, printing it as it arrives.
+   *
+   * The waiting is `wait.ts`, which the tool server uses too; what is here is
+   * the part that is about a terminal. `--json` prints the finished turn
+   * instead, so the stream is suppressed rather than interleaved with it.
+   */
   const run = async (uri: SessionUri, text: string): Promise<Turn | undefined> => {
-    let printed = 0;
-    let sawActive = false;
-    let before = new Set<string>();
-    let first = true;
-    let noted: string | undefined;
-    let answer: Turn | undefined;
-
-    // Subscribed before saying anything: the first snapshot is the baseline
-    // that says which turns were already there, and one taken afterwards
-    // would count the new turn among them.
-    const finished = until(host, uri, (event) => {
-      if (event.type !== 'snapshot') return false;
-      if (first) { first = false; before = new Set(event.turns.map((turn) => turn.id)); }
-
-      if (event.active) {
-        sawActive = true;
-        if (!wants) {
-          const now = spoken(event.active);
-          if (now.length > printed) { process.stdout.write(now.slice(printed)); printed = now.length; }
-          // On stderr, so a pipe still gets only the answer while a person
-          // watching sees why it stopped.
-          const call = event.active.parts.find((part) => part.kind === 'toolCall'
-            && part.call.status === 'pending-confirmation');
-          if (call?.kind === 'toolCall' && noted !== call.call.id) {
-            noted = call.call.id;
-            process.stderr.write(`  · waiting on ${call.call.name}  ${call.call.id}\n`);
-          }
-        }
-        return false;
-      }
-      // Something wants a person. Not finished, and not this command's to answer.
-      if (event.input) return false;
-
-      // Nothing running. Done once a turn of *ours* has finished - one that
-      // was not in the baseline, rather than merely the last in the list.
-      const fresh = event.turns.filter((turn) => turn.role === 'agent' && !before.has(turn.id));
-      if (!sawActive && fresh.length === 0) return false;
-      answer = fresh[fresh.length - 1];
-      return true;
-    }, { timeoutSeconds: Number(args.value('--timeout') ?? 900) });
-
-    host.say(uri, text, selected(args));
-    await finished;
-    if (!wants && printed > 0) line();
+    let printed = false;
+    const answer = await runTurn(host, uri, text, {
+      model: selected(args),
+      timeoutSeconds: Number(args.value('--timeout') ?? 900),
+      ...(wants ? {} : {
+        onDelta: (part) => { printed = true; process.stdout.write(part); },
+        // On stderr, so a pipe still gets only the answer while a person
+        // watching sees why it stopped.
+        onWaiting: (call) => process.stderr.write(`  \u00b7 waiting on ${call.name}  ${call.id}\n`),
+      }),
+    });
+    if (!wants && printed) line();
     return answer;
   };
 

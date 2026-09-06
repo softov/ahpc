@@ -28,6 +28,7 @@ export const COMMANDS: ReadonlySet<string> = new Set([
   'agents', 'models', 'commands', 'customizations', 'completions', 'changes', 'content',
   'prompt', 'exec', 'cancel', 'queue', 'unqueue',
   'watch', 'confirm', 'answer', 'dispatch',
+  'mcp', 'serve',
 ]);
 
 /**
@@ -54,6 +55,9 @@ export const SWITCHES: ReadonlySet<string> = new Set([
   '--operations', '--markdown',
   // Asking rather than doing, and agreeing in advance.
   '--list', '--yes',
+  // Which transport the tool server speaks. Neither takes a value, and the
+  // ports it listens on are `--serve-host` and `--serve-port`, which do.
+  '--stdio', '--http',
 ]);
 
 /**

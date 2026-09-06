@@ -209,6 +209,13 @@ Writes are guarded by the file's etag unless you pass `--force`, so two clients 
 | `automation enable <uri>` / `disable <uri>` | Enable or disable it | |
 | `automation rm <uri>` | Delete it | |
 
+### Serving these sessions to something else
+
+| Command | | |
+|---|---|---|
+| `mcp` | MCP on stdin and stdout, for a client that launches this process | |
+| `serve` | The same tools on a socket, shared | `--serve-host H` `--serve-port N` `--serve-token T` |
+
 ### Anything else
 
 | Command | | |
@@ -216,6 +223,37 @@ Writes are guarded by the file's etag unless you pass `--force`, so two clients 
 | `dispatch <uri> <type>` | Send a raw protocol action | `--field k=v` `--chat` |
 | `config` | Show the config file path and current values | `--json` |
 | `help` | Print this command list | |
+
+## As a tool server
+
+The other direction: an agent somewhere else driving the sessions on your host, through this client. Twelve tools - list, create and dispose a session, read its transcript, say something and wait for the answer, and answer what the agent stops to ask.
+
+`ahpc mcp` speaks MCP on stdin and stdout, which is what an MCP client that launches the process expects:
+
+```json
+{
+  "mcpServers": {
+    "ahp": { "command": "ahpc", "args": ["--host", "ws://127.0.0.1:9187", "mcp"] }
+  }
+}
+```
+
+`ahpc serve` is the same twelve tools on a socket that several callers share, and it stays up until it is stopped:
+
+```sh
+ahpc --host ws://127.0.0.1:9187 serve --serve-port 7431
+```
+
+`POST /mcp` is MCP for a client that speaks it. `POST /api/<tool>` is the same tool with the arguments as the body and the answer as the body, for everything that is not one - a shell script, a webhook, a program in another language. `GET /api` lists what there is.
+
+```sh
+curl -XPOST localhost:7431/api/new_session -d '{"workingDirectory":"/work"}'
+curl -XPOST localhost:7431/api/send_turn -d '{"session":"claude:/…","text":"what is in this directory"}'
+```
+
+`send_turn` blocks until the turn ends and returns what the agent said. A turn that stops to ask a person something is not finished: `wait_for_attention` says what it wants, and `confirm_tool_call` and `answer_question` answer it.
+
+It binds to `127.0.0.1` unless told otherwise, because anybody who can reach the port can drive every session on the host. `--serve-token` sets a bearer token, which is what makes `--serve-host 0.0.0.0` defensible.
 
 ## AHP support
 
