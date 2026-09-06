@@ -1377,26 +1377,51 @@ describe('the handshake asks for what it needs in one round trip', () => {
     await host.close();
   });
 
+  /**
+   * The three variables `locale()` reads, set together and restored together.
+   *
+   * All three, never one: `LC_ALL` outranks `LC_MESSAGES` and both outrank
+   * `LANG`, so a test that sets `LANG` alone asserts about a value the client
+   * never looks at on any machine whose shell exports either of the others.
+   */
+  const withLocale = async (
+    wanted: { LC_ALL?: string; LC_MESSAGES?: string; LANG?: string },
+    run: () => Promise<void>,
+  ): Promise<void> => {
+    const names = ['LC_ALL', 'LC_MESSAGES', 'LANG'] as const;
+    const was = names.map((name) => [name, process.env[name]] as const);
+    const put = (name: typeof names[number], value: string | undefined): void => {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    };
+    for (const name of names) put(name, wanted[name]);
+    try { await run(); }
+    finally { for (const [name, value] of was) put(name, value); }
+  };
+
   it('sends a language tag the server can read', async () => {
-    const was = process.env.LANG;
-    process.env.LANG = 'pt_BR.UTF-8';
-    try {
+    await withLocale({ LANG: 'pt_BR.UTF-8' }, async () => {
       const { host, scripted } = await connect();
       await settle();
       const hello = scripted.asked.find((frame) => frame.method === 'initialize');
       // POSIX spells it `pt_BR.UTF-8`; BCP 47 wants `pt-BR`.
       expect(hello?.params?.locale).toBe('pt-BR');
       await host.close();
-    }
-    finally { process.env.LANG = was; }
+    });
+  });
+
+  it('reads the variables in the order POSIX gives them', async () => {
+    await withLocale({ LC_ALL: 'de_DE.UTF-8', LC_MESSAGES: 'fr_FR.UTF-8', LANG: 'pt_BR.UTF-8' }, async () => {
+      const { host, scripted } = await connect();
+      await settle();
+      const hello = scripted.asked.find((frame) => frame.method === 'initialize');
+      expect(hello?.params?.locale).toBe('de-DE');
+      await host.close();
+    });
   });
 
   it('says nothing where the environment names no language', async () => {
-    const was = { lang: process.env.LANG, all: process.env.LC_ALL, messages: process.env.LC_MESSAGES };
-    process.env.LANG = 'C';
-    delete process.env.LC_ALL;
-    delete process.env.LC_MESSAGES;
-    try {
+    await withLocale({ LANG: 'C' }, async () => {
       const { host, scripted } = await connect();
       await settle();
       const hello = scripted.asked.find((frame) => frame.method === 'initialize');
@@ -1404,12 +1429,7 @@ describe('the handshake asks for what it needs in one round trip', () => {
       // than no tag at all.
       expect(hello?.params?.locale).toBeUndefined();
       await host.close();
-    }
-    finally {
-      if (was.lang === undefined) delete process.env.LANG; else process.env.LANG = was.lang;
-      if (was.all !== undefined) process.env.LC_ALL = was.all;
-      if (was.messages !== undefined) process.env.LC_MESSAGES = was.messages;
-    }
+    });
   });
 });
 
