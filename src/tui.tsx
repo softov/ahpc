@@ -109,6 +109,9 @@ What this client serves back
                         virtual://<clientId>/. Nothing is served without
                         it, and every such request is refused.
   --publish-writable    Let the host write into it. Read-only otherwise.
+                        Serving lasts as long as the screen does: with no
+                        terminal attached this prints one frame and exits,
+                        so a background shell publishes nothing.
 
 Appearance
   --theme <name>        workbench, paper-light, ...

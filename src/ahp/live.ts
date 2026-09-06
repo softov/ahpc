@@ -2,6 +2,7 @@ import { appendFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { openChannels } from './channels.js';
 import { publish } from './publish.js';
+import { PublishRefusal } from './publish.js';
 import type { Published } from './publish.js';
 import type { HostConnection, HostEvent } from './connection.js';
 import type {
@@ -252,6 +253,14 @@ interface Mirror {
 interface Loaded {
   Client: new (transport: unknown, config?: unknown) => Client;
   createResourceRequestHandler(handlers: Record<string, (params: unknown) => Promise<unknown>>): unknown;
+  /**
+   * The only error the package reads a code off.
+   *
+   * A handler that throws anything else is answered `-32603 InternalError`
+   * whatever it meant, so a refusal has to be raised as this to reach the
+   * host as the code the specification declares for it.
+   */
+  RpcError: new (code: number, message: string, data?: unknown) => Error;
   Mirror: new () => Mirror;
   connect(url: string): Promise<unknown>;
   automationReducer(state: unknown, action: unknown): unknown;
@@ -419,6 +428,36 @@ function expandLevel(template: string, level?: string): string {
     .replace(/\{level\}/g, value);
 }
 
+/**
+ * The published directory's refusals, as codes the host receives.
+ *
+ * `publish.ts` raises a `PublishRefusal` carrying the code the specification
+ * declares - `-32009` for what this client will not serve, `-32008` for what
+ * is not there. The package reads a code only off its own `RpcError` and
+ * answers `-32603 InternalError` for everything else, so without this the
+ * message arrives and the code does not, and a host cannot tell a read-only
+ * refusal from a path that does not exist.
+ *
+ * Mapped here rather than in `publish.ts`, which imports nothing from the
+ * protocol package and is tested without it.
+ */
+function coded(
+  ahp: Loaded,
+  handlers: Record<string, (params: unknown) => Promise<unknown>>,
+): Record<string, (params: unknown) => Promise<unknown>> {
+  const out: Record<string, (params: unknown) => Promise<unknown>> = {};
+  for (const [method, handler] of Object.entries(handlers)) {
+    out[method] = async (params) => {
+      try { return await handler(params); }
+      catch (error) {
+        if (error instanceof PublishRefusal) throw new ahp.RpcError(error.code, error.message);
+        throw error;
+      }
+    };
+  }
+  return out;
+}
+
 async function load(): Promise<Loaded> {
   const base: string = '@microsoft/agent-host-protocol';
   try {
@@ -430,6 +469,7 @@ async function load(): Promise<Loaded> {
       Client: client.AhpClient as unknown as Loaded['Client'],
       createResourceRequestHandler:
         client.createResourceRequestHandler as unknown as Loaded['createResourceRequestHandler'],
+      RpcError: client.RpcError as unknown as Loaded['RpcError'],
       Mirror: client.AhpStateMirror as unknown as Loaded['Mirror'],
       connect: (url) => transport.connect(url),
       automationReducer: core.automationReducer as unknown as Loaded['automationReducer'],
@@ -1197,7 +1237,7 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
    */
   // Under this connection's own id, which is the authority a host routes on.
   const serving = (options.publish ?? publish()).as(clientId);
-  const answering = ahp.createResourceRequestHandler(serving.handlers());
+  const answering = ahp.createResourceRequestHandler(coded(ahp, serving.handlers()));
   const mirror = new ahp.Mirror();
   client.setServerRequestHandler(answering);
   client.connect();

@@ -156,3 +156,95 @@ describe('the authority is the client id a host routes on', () => {
     expect(found?.[2]).toBe('ahpc-3f2a1b0c');
   });
 });
+
+/*
+ * The code a host actually receives, which is not the code that was thrown.
+ *
+ * Everything above calls the handlers directly, so a refusal was tested by
+ * reading `error.code` off a rejected promise. The package answers a
+ * host-initiated request by reading a code off its own `RpcError` and calling
+ * anything else `-32603 InternalError`, so both refusals arrived as internal
+ * errors with their messages intact and their codes gone - a host could read
+ * the sentence and not tell "read-only" from "not there". Nothing here saw it,
+ * because nothing here went through the wire.
+ */
+describe('a refusal reaches the host as the code it was refused with', () => {
+  /** A host that completes a handshake and can put a question to the client. */
+  const hosted = async (options: { root?: string; writable?: boolean }) => {
+    const { InMemoryTransport } = await import('@microsoft/agent-host-protocol/client');
+    const { liveHost } = await import('../src/ahp/live.js');
+    const [mine, theirs] = InMemoryTransport.pair() as [
+      { send(text: string): Promise<void>; recv(): Promise<unknown>; close(): Promise<void> },
+      { send(text: string): Promise<void>; recv(): Promise<unknown>; close(): Promise<void> },
+    ];
+
+    const answers = new Map<number, (message: Record<string, unknown>) => void>();
+    let next = 9000;
+    void (async () => {
+      for (;;) {
+        const frame = await theirs.recv().catch(() => null) as
+          { kind: string; text?: string; message?: unknown } | null;
+        if (frame === null) return;
+        const text = frame.kind === 'text' ? frame.text as string : JSON.stringify(frame.message);
+        let message: Record<string, unknown>;
+        try { message = JSON.parse(text) as Record<string, unknown>; }
+        catch { continue; }
+        const { id, method } = message as { id?: number; method?: string };
+        // The client's answer to something this host asked.
+        if (method === undefined && typeof id === 'number') { answers.get(id)?.(message); continue; }
+        if (id === undefined || method === undefined) continue;
+        const result = method === 'initialize'
+          ? { protocolVersion: '0.9.0', serverSeq: 1, snapshots: [] }
+          : {};
+        await theirs.send(JSON.stringify({ jsonrpc: '2.0', id, result }));
+      }
+    })();
+
+    const host = await liveHost({
+      url: 'ws://scripted',
+      clientId: 'ahpc-codes',
+      backoff: [0],
+      keepaliveMs: 0,
+      lingerMs: 0,
+      publish: publish({ ...(options.root === undefined ? {} : { root: options.root }), ...(options.writable ? { writable: true } : {}) }),
+      connect: async () => mine as never,
+    } as never);
+
+    /** Ask the client something, the way a host does, and read its answer. */
+    const ask = async (method: string, params: unknown): Promise<{ code?: number; message?: string }> => {
+      const id = next += 1;
+      const got = new Promise<Record<string, unknown>>((resolve) => answers.set(id, resolve));
+      await theirs.send(JSON.stringify({ jsonrpc: '2.0', id, method, params }));
+      const answer = await got;
+      return (answer.error ?? {}) as { code?: number; message?: string };
+    };
+
+    return { host, ask };
+  };
+
+  it('says -32009 for what it will not serve, not -32603', async () => {
+    const { host, ask } = await hosted({ root });
+    const error = await ask('resourceWrite', {
+      uri: `${publishedUnder('ahpc-codes')}note.txt`,
+      data: 'x',
+      encoding: 'utf-8',
+    });
+    expect(error.code).toBe(-32009);
+    expect(error.message).toContain('read-only');
+    await host.close();
+  });
+
+  it('says -32008 for what is not there', async () => {
+    const { host, ask } = await hosted({ root, writable: true });
+    const error = await ask('resourceResolve', { uri: `${publishedUnder('ahpc-codes')}absent.txt` });
+    expect(error.code).toBe(-32008);
+    await host.close();
+  });
+
+  it('still answers -32601 for the method it does not implement', async () => {
+    const { host, ask } = await hosted({ root });
+    const error = await ask('createResourceWatch', { uri: `${publishedUnder('ahpc-codes')}note.txt` });
+    expect(error.code).toBe(-32601);
+    await host.close();
+  });
+});
