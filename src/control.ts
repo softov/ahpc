@@ -1426,9 +1426,19 @@ function commands(
           await writeFile(file, app.store.get<string>(DRAFT) ?? '');
           await app.suspend(async () => {
             await new Promise<void>((resolve) => {
-              // Through the shell, because `$EDITOR` is a command line and not
-              // a path: `code -w` and `nvim -c ...` are both ordinary values.
-              const child = spawn(`${editor} "$1"`, ['--', file], { stdio: 'inherit', shell: true });
+              /*
+               * One string, through the shell.
+               *
+               * `$EDITOR` is a command line rather than a path - `code -w` and
+               * `nvim -c startinsert` are both ordinary values - so it cannot
+               * be spawned as a program with arguments. And the file has to be
+               * part of that string: Node's `shell` option joins the argument
+               * array onto the command rather than passing it to the shell, so
+               * a `"$1"` placeholder is never substituted and the editor opens
+               * with no file at all.
+               */
+              const quoted = `"${file.replace(/(["\\$`])/g, '\\$1')}"`;
+              const child = spawn(`${editor} ${quoted}`, { stdio: 'inherit', shell: true });
               child.on('close', () => { resolve(); });
               child.on('error', () => { resolve(); });
             });

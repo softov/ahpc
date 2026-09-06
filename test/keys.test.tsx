@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { renderApp } from '@textui/testing';
 import { registerChat } from '../src/app.js';
-import { HOST_ERROR, SCREEN } from '../src/state.js';
+import { DRAFT, HOST_ERROR, SCREEN } from '../src/state.js';
 import { fakeHost } from '../src/ahp/fake.js';
 
 /*
@@ -74,6 +74,28 @@ describe('the editor command', () => {
     const t = await running();
     expect(t.app.commands.get('editor.open')).toBeTruthy();
     await t.unmount();
+  });
+
+  it('puts what the editor wrote into the draft', async () => {
+    const t = await running();
+    const was = { visual: process.env.VISUAL, editor: process.env.EDITOR };
+    // An "editor" that writes a message and exits, which is all the command
+    // needs one to do: open the file it is handed, and leave it changed.
+    process.env.VISUAL = `node -e "require('node:fs').writeFileSync(process.argv[1], 'from the editor\\n')"`;
+    delete process.env.EDITOR;
+    try {
+      t.app.store.set(DRAFT, 'half typed');
+      await t.app.commands.get('editor.open')?.run({}, { app: t.app } as never);
+      for (let i = 0; i < 6; i += 1) await t.settle();
+      // The trailing newline is the editor's convention, not part of what
+      // anybody typed.
+      expect(t.app.store.get<string>(DRAFT)).toBe('from the editor');
+    }
+    finally {
+      if (was.visual === undefined) delete process.env.VISUAL; else process.env.VISUAL = was.visual;
+      if (was.editor !== undefined) process.env.EDITOR = was.editor;
+      await t.unmount();
+    }
   });
 
   it('says so when there is no editor to open', async () => {
