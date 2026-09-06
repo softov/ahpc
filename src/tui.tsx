@@ -76,6 +76,16 @@ interface Options {
    * naming a directory that does not exist there.
    */
   path?: string;
+  /**
+   * A directory on *this* machine to serve back to the host.
+   *
+   * The screen rather than the CLI, because a published directory is only
+   * reachable while a connection is open: `ahpc session list` answers and
+   * exits, so a host has nothing left to ask. Absent means nothing is served.
+   */
+  publish?: string;
+  /** Whether the host may write into it. Read-only otherwise. */
+  publishWritable?: boolean;
   help: boolean;
 }
 
@@ -93,6 +103,12 @@ Where the agent works
   --path <dir>          A path on the host, not on this machine. The host
                         has to serve it, and says so if it does not.
                         Left out, the host decides.
+
+What this client serves back
+  --publish <dir>       Serve this directory to the host under
+                        virtual://<clientId>/. Nothing is served without
+                        it, and every such request is refused.
+  --publish-writable    Let the host write into it. Read-only otherwise.
 
 Appearance
   --theme <name>        workbench, paper-light, ...
@@ -124,7 +140,7 @@ Commands
                         them: sessions, prompts, approvals, terminals.
 `;
 
-function parse(argv: string[]): Options {
+export function parse(argv: string[]): Options {
   const options: Options = {
     static_: false,
     width: process.stdout.columns ?? 100,
@@ -163,6 +179,8 @@ function parse(argv: string[]): Options {
       case '--token': options.token = String(argv[++i]); break;
       case '--config-file': options.configFile = String(argv[++i]); break;
       case '--path': options.path = String(argv[++i]); break;
+      case '--publish': options.publish = String(argv[++i]); break;
+      case '--publish-writable': options.publishWritable = true; break;
       case '--help': case '-h': options.help = true; break;
       // A flag nobody reads is a flag nobody can rely on: an unknown one is
       // said so rather than silently doing what the defaults would have done.

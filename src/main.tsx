@@ -32,7 +32,7 @@ const COMMANDS = new Set([
 const SWITCHES = new Set([
   '--static', '-s', '--settled', '--approve', '--answer', '--bood',
   '--help', '-h', '--json', '--full', '--archived', '--unread', '--undo',
-  '--off', '--deny', '--reject', '--chat',
+  '--off', '--deny', '--reject', '--chat', '--publish-writable',
 ]);
 
 /**
