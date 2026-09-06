@@ -230,7 +230,14 @@ describe('a refusal reaches the host as the code it was refused with', () => {
       encoding: 'utf-8',
     });
     expect(error.code).toBe(-32009);
-    expect(error.message).toContain('read-only');
+    /*
+     * The whole message and not a fragment of it. `toContain` passed while
+     * the wire carried `RPC error -32009: What this client published is
+     * read-only.` - the package's own constructor formats the message it is
+     * given and the client sends that formatted string, so the code arrives
+     * twice and the receiver prefixes it a third time on the way in.
+     */
+    expect(error.message).toBe('What this client published is read-only.');
     await host.close();
   });
 

@@ -450,7 +450,22 @@ function coded(
     out[method] = async (params) => {
       try { return await handler(params); }
       catch (error) {
-        if (error instanceof PublishRefusal) throw new ahp.RpcError(error.code, error.message);
+        if (error instanceof PublishRefusal) {
+          const refusal = new ahp.RpcError(error.code, error.message);
+          /*
+           * The message back to what was written.
+           *
+           * `RpcError`'s constructor formats it - `RPC error <code>: <text>` -
+           * and the client puts `err.message` straight into the JSON-RPC
+           * `message` field, so the prefix travels. The receiver then builds
+           * its own `RpcError` from what arrived and prefixes again, and a
+           * refusal reads `RPC error -32009: RPC error -32009: ...`. The type
+           * is what carries the code, so this keeps the type and sends the
+           * sentence somebody wrote.
+           */
+          refusal.message = error.message;
+          throw refusal;
+        }
         throw error;
       }
     };
