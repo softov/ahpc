@@ -89,6 +89,55 @@ describe('a published directory serves what is inside it', () => {
   });
 });
 
+describe('the root is the root with or without its slash', () => {
+  /*
+   * RFC 3986 6.2.3 - an empty path with an authority present is `/`. Anything
+   * composing the root out of a client id read off `initialize` produces the
+   * bare form, so refusing it made the publication unlistable to every caller
+   * that had not thought to append a slash.
+   */
+  const bare = PUBLISH_PREFIX.slice(0, -1);
+
+  it('lists the publication addressed without a trailing slash', async () => {
+    const handlers = publish({ root }).handlers();
+    const listed = await handlers.resourceList?.({ uri: bare }) as { entries: { name: string }[] };
+    const withSlash = await handlers.resourceList?.({ uri: PUBLISH_PREFIX }) as { entries: { name: string }[] };
+    expect(listed.entries.map((one) => one.name).sort())
+      .toEqual(withSlash.entries.map((one) => one.name).sort());
+    expect(listed.entries.length).toBeGreaterThan(0);
+  });
+
+  it('resolves it as the directory it is', async () => {
+    const handlers = publish({ root }).handlers();
+    const found = await handlers.resourceResolve?.({ uri: bare }) as { type: string };
+    expect(found.type).toBe('directory');
+  });
+
+  it('does not let the bare form match a longer client id', async () => {
+    // `virtual://ahpc` and `virtual://ahpc-other` share a prefix and are two
+    // different clients. Equality rather than a prefix test is what keeps them
+    // apart.
+    const handlers = publish({ root }).handlers();
+    expect(await refused(() => handlers.resourceList?.({ uri: `${bare}-other/` }) as Promise<unknown>))
+      .toBe(-32009);
+  });
+
+  it('still refuses an absolute path smuggled in after the authority', async () => {
+    // `virtual://ahpc//etc/passwd` leaves `/etc/passwd`, which `path.resolve`
+    // returns unchanged rather than joining. The containment check is what
+    // catches it, and it is the reason that check reads the resolved path.
+    const handlers = publish({ root }).handlers();
+    expect(await refused(() => handlers.resourceRead?.({ uri: `${bare}//etc/passwd` }) as Promise<unknown>))
+      .toBe(-32009);
+  });
+
+  it('reads through a dot segment, which resolves to the same file', async () => {
+    const handlers = publish({ root }).handlers();
+    const answer = await handlers.resourceRead?.({ uri: `${PUBLISH_PREFIX}./note.txt` });
+    expect(answer).toEqual({ data: 'hello', encoding: 'utf-8' });
+  });
+});
+
 describe('writing is a second decision, not part of publishing', () => {
   it('refuses a write into a read-only publication', async () => {
     const handlers = publish({ root }).handlers();

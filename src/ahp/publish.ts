@@ -88,10 +88,32 @@ export function publish(options: { root?: string; writable?: boolean; clientId?:
     if (root === null) {
       throw new PublishRefusal(PERMISSION_DENIED, 'This client publishes nothing. Start it with --publish.');
     }
-    if (typeof uri !== 'string' || !uri.startsWith(PREFIX)) {
+    /*
+     * The publication's own root, with or without the trailing slash.
+     *
+     * RFC 3986 6.2.3: where an authority is present, an empty path is
+     * equivalent to `/`. `virtual://<clientId>` and `virtual://<clientId>/`
+     * are one resource, so refusing the first is this publisher being wrong
+     * about a URI rather than the caller being sloppy - and a caller cannot
+     * fix it, because anything composing the root out of a client id read off
+     * `initialize` produces the bare form.
+     */
+    const bare = PREFIX.slice(0, -1);
+    const rest = typeof uri !== 'string' ? null
+      : uri === bare ? ''
+        : uri.startsWith(PREFIX) ? uri.slice(PREFIX.length)
+          : null;
+    if (rest === null) {
       throw new PublishRefusal(PERMISSION_DENIED, `This client serves only ${PREFIX}`);
     }
-    const inside = path.resolve(root, decodeURIComponent(uri.slice(PREFIX.length)));
+    /*
+     * Resolved against the root, and a leading slash is why that is not
+     * enough on its own: `virtual://<id>//etc/passwd` leaves `/etc/passwd`,
+     * which `path.resolve` treats as absolute and returns unchanged. The
+     * containment check below is what refuses it, so it is a guard rather
+     * than a tidy-up.
+     */
+    const inside = path.resolve(root, decodeURIComponent(rest));
     if (inside !== root && !inside.startsWith(`${root}${path.sep}`)) {
       throw new PublishRefusal(PERMISSION_DENIED, 'That is outside what this client published.');
     }
