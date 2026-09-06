@@ -77,7 +77,7 @@ Before the first message, a new session asks the agent, the model and its option
 | `alt+enter` | Newline |
 | `tab` | Move to the options row |
 | `esc` | Close the menu, then leave the field, then go back |
-| `/` | Slash commands, from the host and from `ahpc` |
+| `/` | Slash commands, from the host and from `ahpc` — `/config` opens the settings palette |
 | `@` | Complete a file path on the host |
 | `ctrl+g` | Edit the message in `$VISUAL` or `$EDITOR` |
 | `ctrl+p` | Command palette |

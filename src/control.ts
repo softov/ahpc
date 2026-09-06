@@ -666,7 +666,19 @@ export function createController(
       const trimmed = text.trim();
       if (!uri || trimmed === '') return;
 
+      /*
+       * The draft is cleared here and at the host, and the pending sync is
+       * dropped.
+       *
+       * `draft()` debounces, so at the moment a message is sent there is
+       * usually a timer holding the text that was just sent. Left to fire it
+       * tells the host that is the draft; the host stores it and echoes
+       * `chat/draftChanged` back, and the message reappears in the composer a
+       * moment after it was sent - which reads as the send having failed.
+       */
+      clearTimeout(draftTimer);
       app.store.set(DRAFT, '');
+      host.setDraft(uri, '');
       const history = app.store.get<string[]>('$/chat/ui/history') ?? [];
       app.store.set('$/chat/ui/history', [...history, trimmed]);
 
@@ -1006,7 +1018,7 @@ function commands(
       id: 'bood.toggle',
       title: 'Show the creature',
       category: 'View',
-      slots: ['palette'],
+      slots: ['palette', 'config'],
       run: () => {
         const showing = app.store.get<boolean>(BOOD_FLOAT) ?? false;
         app.store.set(BOOD_FLOAT, !showing);
@@ -1028,6 +1040,41 @@ function commands(
             component: 'CommandPalette',
             width: 62,
             commands: app.commands.list({ slot: 'palette', enabledOnly: true }),
+            onClose: { handler: () => app.layers.close('palette') },
+          },
+        });
+      },
+    },
+    /*
+     * The palette, with only the commands that configure this client in it.
+     *
+     * A slot rather than a screen of its own. Every one of these already
+     * answers a question about how the client looks or behaves, and a second
+     * place to ask them would be a second place to keep in step - so `config`
+     * is a second slot on the same commands, and this opens the same palette
+     * over a narrower list. A command joins it by naming the slot.
+     *
+     * `/config` finds it by id, the way every other client command in the
+     * slash menu is found.
+     */
+    {
+      id: 'app.config',
+      title: 'Configuration',
+      category: 'Navigation',
+      description: 'Theme, layout and the rest of what this client decides',
+      slots: ['palette'],
+      run: () => {
+        app.layers.open({
+          id: 'palette',
+          layer: 'modal',
+          scrim: true,
+          trapFocus: true,
+          dismissOnEscape: true,
+          node: {
+            component: 'CommandPalette',
+            width: 62,
+            placeholder: 'Configure',
+            commands: app.commands.list({ slot: 'config', enabledOnly: true }),
             onClose: { handler: () => app.layers.close('palette') },
           },
         });
@@ -1355,7 +1402,7 @@ function commands(
       title: 'Session settings',
       category: 'Screens',
       description: 'Settings for this session',
-      slots: ['palette'],
+      slots: ['palette', 'config'],
       when: `${OPEN}`,
       run: () => app.screens.push('settings'),
     },
@@ -1386,7 +1433,7 @@ function commands(
       title: 'Markdown or raw text',
       category: 'View',
       description: 'Draw what the agent said as markdown, or as it typed it',
-      slots: ['palette'],
+      slots: ['palette', 'config'],
       run: () => {
         const on = app.store.get<boolean>(MARKDOWN) ?? true;
         app.store.set(MARKDOWN, !on);
@@ -1459,7 +1506,7 @@ function commands(
       title: 'Theme',
       category: 'View',
       description: 'Change the colors and shapes',
-      slots: ['palette'],
+      slots: ['palette', 'config'],
       // The command says what it needs and the palette asks. Wearing it while
       // the highlight moves is what makes a theme choosable at all: the names
       // mean nothing until the screen is in one.
@@ -1489,7 +1536,7 @@ function commands(
       title: 'Layout',
       category: 'View',
       description: 'Change the layout and controls',
-      slots: ['palette'],
+      slots: ['palette', 'config'],
       args: [{
         name: 'id',
         type: 'string' as const,
@@ -1951,6 +1998,9 @@ function commands(
       category: 'Session',
       description: 'Show the detail pane, and read it',
       slots: ['palette'],
+      // The pane is the catalogue's, so the command is too. Without this it
+      // was offered on every screen and did nothing on all but one.
+      when: `${SCREEN} == 'sessions'`,
       run: () => {
         app.store.set(SIDEBAR, true);
         app.focus.focus('chat.details');
@@ -1962,6 +2012,7 @@ function commands(
       category: 'Session',
       description: 'Hide the detail pane, and give the list the width',
       slots: ['palette'],
+      when: `${SCREEN} == 'sessions'`,
       run: () => {
         // The focus first. Unmounting the pane the keyboard is in leaves the
         // focus on a node that is no longer there, and the next key goes

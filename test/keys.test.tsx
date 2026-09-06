@@ -118,3 +118,65 @@ describe('the editor command', () => {
     }
   });
 });
+
+/*
+ * `/config` and the palette it opens.
+ *
+ * Typing `/config` used to match no command, so it went out as a message. The
+ * commands that configure this client now carry a second slot, and this opens
+ * the same palette over that slot rather than a screen of its own - so a
+ * command joins the config list by naming the slot and nothing else has to be
+ * kept in step.
+ */
+describe('config is the palette, over the commands that configure the client', () => {
+  it('is a command, so a slash finds it instead of sending a message', async () => {
+    const t = await running();
+    expect(t.app.commands.get('app.config')).toBeTruthy();
+    // The slash menu matches on the id, which is how `/config` reaches it.
+    expect(t.app.commands.get('app.config')?.id).toContain('config');
+    await t.unmount();
+  });
+
+  it('lists what this client decides, and not every command', async () => {
+    const t = await running();
+    const all = t.app.commands.list({ slot: 'palette', enabledOnly: true });
+    const config = t.app.commands.list({ slot: 'config', enabledOnly: true });
+    expect(config.length).toBeGreaterThan(0);
+    // A narrower list, or the slot is doing nothing.
+    expect(config.length).toBeLessThan(all.length);
+    const ids = config.map((one) => one.id);
+    expect(ids).toContain('view.theme');
+    expect(ids).toContain('view.shell');
+    // Not a thing you configure: it acts on the session in front of you.
+    expect(ids).not.toContain('session.dispose');
+    await t.unmount();
+  });
+});
+
+/*
+ * A command offered where it cannot work.
+ *
+ * `session.openDetails` shows the catalogue's detail pane. It was offered on
+ * every screen and did nothing on all but one, which from the palette is
+ * indistinguishable from the client being broken.
+ */
+describe('a command is offered where it works', () => {
+  const offered = (t: { app: { commands: { list(o: unknown): { id: string }[] } } }): string[] =>
+    t.app.commands.list({ slot: 'palette', enabledOnly: true }).map((one) => one.id);
+
+  it('keeps the detail-pane commands to the screen that has one', async () => {
+    const t = await running();
+    // The client opens on the composer, where there is no detail pane.
+    expect(t.app.store.get<string>(SCREEN)).toBe('new');
+    expect(offered(t)).not.toContain('session.openDetails');
+    expect(offered(t)).not.toContain('session.closeDetails');
+
+    await t.app.commands.get('go.sessions')?.run({}, { app: t.app } as never);
+    for (let i = 0; i < 4; i += 1) await t.settle();
+    expect(t.app.store.get<string>(SCREEN)).toBe('sessions');
+    // On the catalogue, where the pane is, both are there to be picked.
+    expect(offered(t)).toContain('session.openDetails');
+    expect(offered(t)).toContain('session.closeDetails');
+    await t.unmount();
+  });
+});
