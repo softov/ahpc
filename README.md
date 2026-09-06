@@ -1,5 +1,10 @@
 # ahpc
 
+![license MIT](https://img.shields.io/badge/license-MIT-blue)
+![node >=22](https://img.shields.io/badge/node-%3E%3D22-5fa04e)
+![Agent Host Protocol 0.9.0](https://img.shields.io/badge/AHP-0.9.0-0b7285)
+![built with TextUI](https://img.shields.io/badge/built%20with-TextUI-7048e8)
+
 A terminal client for the [Agent Host Protocol](https://microsoft.github.io/agent-host-protocol/).
 It can be used as cli (commands) or tui (interactive chat).
 
@@ -8,6 +13,8 @@ Connect to an AHP host, manage sessions, and work with agents directly from your
 > [!NOTE]
 > `ahpc` is a client. It does not run agents or models itself.
 > You need an AHP-compatible host to connect to.
+
+The interface is built with [TextUI](https://github.com/softov/textui), a component toolkit for terminal applications.
 
 ## Quick start
 
@@ -225,7 +232,7 @@ Precedence: a flag overrides an environment variable, which overrides the file.
 ## Development
 
 ```sh
-npm test          # 380 tests
+npm test
 npm run typecheck
 npm run build
 ```
@@ -238,6 +245,8 @@ npm run wire -- <capture>   # check a recording against it
 ```
 
 `AHPC_RECORD=<file>` appends every frame sent and received. `test/conformance.test.ts` runs the same check against frames produced by the test run itself, so it cannot pass on a stale recording.
+
+The screens, widgets and input handling come from [TextUI](https://github.com/softov/textui) — `@textui/core` for components and state, `@textui/widgets` for the catalog, `@textui/terminal` for rendering and key decoding, and `@textui/testing` for the harness the tests run in. `ahpc` began as an example inside it.
 
 [docs/DESIGN.md](docs/DESIGN.md) covers why the client is built this way: how a terminal handles a transcript differently from a browser, and what the widget catalog was missing.
 
