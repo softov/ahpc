@@ -10,9 +10,9 @@ Open scopes only. A row comes out when the work lands, and git keeps what was he
 
 ## The tool server
 
-`src/mcp` serves twelve tools - enough for an agent elsewhere to drive a session to completion. Files, terminals, automations and changesets are not among them: a tool table is read by a model alongside everything else it has been given, and forty tools is a worse server than twelve. If they are wanted, the shape is groups behind a flag (`--tools resources,terminals`) rather than all of them always on.
+`src/mcp` serves twelve tools - enough for an agent elsewhere to drive a session to completion. Files, terminals, automations and changesets are not among them: a tool table is read by a model alongside everything else it has been given, and forty tools is a worse server than twelve. If anybody asks for them, the shape is opt-*in* groups behind `--mcp-tools resources,terminals` - named that way so it does not read as an AHP thing - rather than all of them on by default.
 
-Two things it does not do. `send_turn` blocks until the turn ends and returns the final text, because a tool call has no channel to stream deltas into - so an MCP client cannot watch a long turn, only wait for it. And `/mcp` answers a request per POST with no SSE stream, which is within the transport but means no server-initiated messages.
+What it still does not do is stream the reply. A `progressToken` gets a `notifications/progress` line per tool the agent reaches for, and on HTTP that is what opens an SSE stream, but MCP defines no way to send partial *result* content - so the text itself arrives whole at the end however long the turn took.
 
 ## Deliberate duplication
 
