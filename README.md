@@ -23,28 +23,28 @@ A scripted host is built in, so the screen runs with nothing else installed:
 node dist/src/main.js
 ```
 
-Point it at a real host to do work:
+Point it at a real host:
 
 ```sh
 node dist/src/main.js --host ws://127.0.0.1:9187
 node dist/src/main.js session list --host ws://127.0.0.1:9187
 ```
 
-[`ahpd`](https://github.com/softov/ahpd) is one such host. VS Code's agent host is another.
+[`ahpd`](https://github.com/softov/ahpd) and VS Code's agent host are both AHP hosts.
 
 ## What it does
 
 | | |
 |---|---|
-| Sessions | List, open, create, configure, archive and dispose the sessions a host holds. |
-| Turns | Send a prompt and stream the answer, queue one behind a running turn, cancel. |
-| Answering | Approve or deny a tool call, and answer a question the agent asks mid-turn. |
-| Chats | Several conversations inside one session. |
-| Changes and files | The files a session touched, their diffs, and the host's own filesystem. |
-| Terminals | Shells the host is running, and their output. |
-| Automations | What the host runs on its own, its triggers and its run history. |
-| Customizations | Skills, prompts, agents and MCP servers, with the ones you want switched on. |
-| Telemetry | The host's log, streamed. |
+| Sessions | List, create, configure, archive and delete sessions on a host. |
+| Turns | Send a prompt, stream the reply, queue follow-ups, cancel. |
+| Answering | Approve or deny tool calls, and answer questions the agent asks mid-turn. |
+| Chats | Multiple conversations in one session. |
+| Changes and files | Files a session changed, their diffs, and the host's filesystem. |
+| Terminals | Shells running on the host, and their output. |
+| Automations | Scheduled and triggered runs, with their history. |
+| Customizations | Skills, prompts, agents and MCP servers, and which are enabled. |
+| Telemetry | Stream the host's log. |
 
 ## Interactive
 
@@ -52,11 +52,11 @@ node dist/src/main.js session list --host ws://127.0.0.1:9187
 
 ![A session, its transcript and the facts about it](docs/img/session.svg)
 
-The header carries what the turn will cost you: which model, its thinking level, the permission mode, the workspace and the branch. Every one of those is what the host reported rather than what this client assumed.
+The header shows the model, thinking level, permission mode, workspace and branch. All of it comes from the host, not from local guesses.
 
 ![Starting a session, and the questions the host asks first](docs/img/compose.svg)
 
-A new session asks the host's own questions before the first message — the agent, the model and its options, the permission mode and the workspace. Which questions appear is the host's `configSchema`, so a host offering something this client has never heard of still gets a row.
+Before the first message, a new session asks the agent, the model and its options, the permission mode and the workspace. The questions come from the host's `configSchema`, so options `ahpc` has never seen still get a row.
 
 ### Keys
 
@@ -64,55 +64,55 @@ A new session asks the host's own questions before the first message — the age
 |---|---|
 | `enter` | Send |
 | `alt+enter` | Newline |
-| `tab` | The options row |
-| `esc` | Back, or to the sessions you already have |
-| `/` | Commands the host offers, and this client's own |
-| `@` | Complete a path on the host |
-| `ctrl+p` | The command palette |
+| `tab` | Move to the options row |
+| `esc` | Close the menu, then leave the field, then go back |
+| `/` | Slash commands, from the host and from `ahpc` |
+| `@` | Complete a file path on the host |
+| `ctrl+p` | Command palette |
 | `ctrl+n` | New session |
 | `ctrl+r` | Refresh |
 | `alt+t` | Theme |
 | `alt+m` | Markdown on or off |
-| `ctrl+c` | Stop the running turn, or quit |
+| `ctrl+c` | Cancel the running turn, or quit |
 
-A tool call waiting on you takes `a` to approve, `d` to deny and `1`-`9` for an option it offered. A question takes `tab` between fields, `space` to choose and `enter` to send.
+When a tool call is waiting: `a` approves, `d` denies, `1`-`9` pick an offered option. When the agent asks a question: `tab` moves between fields, `space` selects, `enter` sends.
 
 ## Commands
 
-`ahpc <command>` runs without the screen. Output is for reading; `--json` is the same answer for a program.
+`ahpc <command>` runs without the screen. Output is formatted for reading; `--json` gives the same data for scripts.
 
 ### Sessions
 
 | Command | | |
 |---|---|---|
-| `session list` | The catalogue, newest first | `--archived` `--json` |
-| `session show <uri>` | What the host says about one | `--full` `--json` |
-| `session new` | Start one | `--agent` `--cwd` `--set k=v` `--json` |
-| `session rm <uri>` | Dispose it | |
-| `session history <uri>` | Its turns | `--all` `--full` `--json` |
-| `session config <uri>` | The schema, and what is in force | `--json` |
-| `session set <uri> <k> <v>` | Change one config key | |
-| `session read <uri>` | Mark read | `--unread` |
-| `session archive <uri>` | Put it away | `--undo` |
-| `session customizations <uri>` | Skills, prompts, agents, servers | `--json` |
-| `session export <uri>` | The whole session as one document | `--json` `--markdown` |
-| `session toggle <uri> <id>` | Turn one on | `--off` |
+| `session list` | List sessions, newest first | `--archived` `--json` |
+| `session show <uri>` | Session details | `--full` `--json` |
+| `session new` | Create a new session | `--agent` `--cwd` `--set k=v` `--json` |
+| `session rm <uri>` | Delete a session | |
+| `session read <uri>` | Mark as read | `--unread` |
+| `session archive <uri>` | Archive a session | `--undo` |
+| `session history <uri>` | Show turns history | `--all` `--full` `--json` |
+| `session config <uri>` | Show the config schema and current values | `--json` |
+| `session set <uri> <k> <v>` | Change one config property | |
+| `session customizations <uri>` | List skills, prompts, agents and MCP servers | `--json` |
+| `session toggle <uri> <id>` | Toggle customization on/off | `--off` |
+| `session export <uri>` | Export the session as one document | `--json` `--markdown` |
 
 ### Turns
 
 | Command | | |
 |---|---|---|
-| `prompt <uri> <text>` | Say it and stream the answer | `--model` `--json` |
-| `exec <text>` | A session, one turn, and dispose it | `--agent` `--cwd` `--model` `--json` |
-| `cancel <uri>` | Stop the running turn | |
-| `queue <uri> <text>` | Say it after the one running | `--model` |
-| `unqueue <uri> <id>` | Take it back | |
+| `prompt <uri> <text>` | Send a prompt and stream the reply | `--model` `--json` |
+| `exec <text>` | Run one prompt in a throwaway session | `--agent` `--cwd` `--model` `--json` |
+| `cancel <uri>` | Cancel the running turn | |
+| `queue <uri> <text>` | Queue a prompt behind the running turn | `--model` |
+| `unqueue <uri> <id>` | Remove a queued prompt | |
 
 ### Answering
 
 | Command | | |
 |---|---|---|
-| `watch <uri>` | Block until something wants a person, print, exit | `--until turn\|input\|idle` `--timeout` `--json` |
+| `watch <uri>` | Block until the agent needs input, print it, exit | `--until turn\|input\|idle` `--timeout` `--json` |
 | `confirm <uri> <toolCallId>` | Approve a tool call | `--deny` `--option` |
 | `answer <uri> <requestId>` | Answer a question | `--field k=v` `--reject` |
 
@@ -120,84 +120,84 @@ A tool call waiting on you takes `a` to approve, `d` to deny and `1`-`9` for an 
 
 | Command | | |
 |---|---|---|
-| `chat list <uri>` | The conversations in a session | `--json` |
-| `chat new <uri> [text]` | Another one beside it | |
-| `chat rm <chatUri>` | Close one | |
+| `chat list <uri>` | List the chats in a session | `--json` |
+| `chat new <uri> [text]` | Start another chat | |
+| `chat rm <chatUri>` | Close a chat | |
 
 ### The host
 
 | Command | | |
 |---|---|---|
-| `agents` | What it serves, and each one's models | `--json` |
-| `models` | Every model, by agent | `--json` |
-| `commands` | What a slash offers | `--json` |
-| `customizations` | Skills, prompts, agents and MCP servers | `--kind` `--json` |
-| `completions <uri> <text>` | What the host would complete | `--offset` `--json` |
-| `logs` | What the host is saying | `--level` `--follow` |
-| `auth` | What this host protects | `--json` |
-| `auth <resource>` | Push a token | `--token` `--expires-in` |
-| `status` | What this client is connected to | `--json` |
+| `agents` | List the agents the host serves, with their models | `--json` |
+| `models` | List every model, grouped by agent | `--json` |
+| `commands` | List the slash commands the host offers | `--json` |
+| `customizations` | List skills, prompts, agents and MCP servers | `--kind` `--json` |
+| `completions <uri> <text>` | Show what the host would complete | `--offset` `--json` |
+| `logs` | Stream the host's log | `--level` `--follow` |
+| `auth` | List the resources this host protects | `--json` |
+| `auth <resource>` | Send a token for one | `--token` `--expires-in` |
+| `status` | Show the current connection | `--json` |
 
 ### Changes and files
 
 | Command | | |
 |---|---|---|
-| `changes <uri>` | The files a session touched | `--list` `--scope` `--reviewed` `--unreviewed` `--operations` `--run` `--json` |
-| `content <uri> <file>` | One of them, in full | |
-| `resource list <uri>` | A directory the host serves | `--json` |
-| `resource read <uri>` | A file on the host | |
-| `resource stat <uri>` | What it is, without reading it | `--json` |
-| `resource write <uri> [file]` | From a file, or from stdin | `--create-only` `--force` |
-| `resource rm <uri>` | Delete it | `--recursive` |
-| `resource mkdir <uri>` | Make a directory | |
-| `resource mv <uri> <to>` | Move it | `--fail-if-exists` |
-| `resource cp <uri> <to>` | Copy it | `--fail-if-exists` |
+| `changes <uri>` | List the files a session changed | `--list` `--scope` `--reviewed` `--unreviewed` `--operations` `--run` `--json` |
+| `content <uri> <file>` | Print one changed file in full | |
+| `resource list <uri>` | List a directory on the host | `--json` |
+| `resource read <uri>` | Read a file on the host | |
+| `resource stat <uri>` | Show a file's type and size | `--json` |
+| `resource write <uri> [file]` | Write a file, from a path or stdin | `--create-only` `--force` |
+| `resource rm <uri>` | Delete a file or directory | `--recursive` |
+| `resource mkdir <uri>` | Create a directory | |
+| `resource mv <uri> <to>` | Move or rename | `--fail-if-exists` |
+| `resource cp <uri> <to>` | Copy | `--fail-if-exists` |
 
-A write is guarded by the file's etag unless `--force`, so two clients editing one file do not silently overwrite each other.
+Writes are guarded by the file's etag unless you pass `--force`, so two clients editing the same file cannot silently overwrite each other.
 
 ### Terminals
 
 | Command | | |
 |---|---|---|
-| `terminal list` | What is running | `--json` |
+| `terminal list` | List running terminals | `--json` |
 | `terminal new` | Open a shell | `--cwd` `--name` |
-| `terminal rm <uri>` | Kill it | |
-| `terminal send <uri> <text>` | Type into it | |
-| `terminal watch <uri>` | Follow its output | `--timeout` |
+| `terminal rm <uri>` | Close a terminal | |
+| `terminal send <uri> <text>` | Send input to a terminal | |
+| `terminal watch <uri>` | Follow a terminal's output | `--timeout` |
 
 ### Automations
 
 | Command | | |
 |---|---|---|
-| `automation list` | What runs on its own | `--json` |
-| `automation show <uri>` | One of them | `--json` |
-| `automation triggers` | What this host can trigger on | `--json` |
-| `automation runs <uri>` | Its history, every page | `--json` |
-| `automation run <uri>` | Start it now | |
-| `automation enable <uri>` / `disable <uri>` | Switch it | |
-| `automation rm <uri>` | Forget it | |
+| `automation list` | List automations | `--json` |
+| `automation show <uri>` | Show one automation | `--json` |
+| `automation triggers` | List the triggers this host supports | `--json` |
+| `automation runs <uri>` | Show an automation's run history | `--json` |
+| `automation run <uri>` | Run it now | |
+| `automation enable <uri>` / `disable <uri>` | Enable or disable it | |
+| `automation rm <uri>` | Delete it | |
 
 ### Anything else
 
 | Command | | |
 |---|---|---|
-| `dispatch <uri> <type>` | Send one action verbatim | `--field k=v` `--chat` |
-| `config` | Where the config file is, and what is in force | `--json` |
-| `help` | The list above | |
+| `dispatch <uri> <type>` | Send a raw protocol action | `--field k=v` `--chat` |
+| `config` | Show the config file path and current values | `--json` |
+| `help` | Print this command list | |
 
 ## AHP support
 
-All 30 client-to-server requests are reachable, and 21 of the 45 client-dispatchable actions are dispatched. The channels this client subscribes to are the root, session, chat, terminal and automation ones, plus the telemetry channel the host advertises for its log.
+All 30 client-to-server requests are implemented, and 21 of the 45 client-dispatchable actions are used. `ahpc` subscribes to the root, session, chat, terminal and automation channels, plus the telemetry channel the host advertises for its log.
 
-AHP is symmetrical, so a host may ask this client for things too. Nine of the ten server-initiated methods are answered; `createResourceWatch` is not. Nothing is served until `--publish <dir>` names a directory, and it is read-only until `--publish-writable`:
+AHP is symmetrical, so a host can also request things from the client. Nine of the ten server-initiated methods are implemented; `createResourceWatch` is not. Nothing is shared until `--publish <dir>` names a directory, and it stays read-only without `--publish-writable`:
 
 ```sh
 node dist/src/main.js --host ws://127.0.0.1:9187 --publish ~/notes
 ```
 
-The host then reads those files at `virtual://<clientId>/<path>`. Serving lasts as long as the screen does.
+The host reads those files at `virtual://<clientId>/<path>`. Publishing lasts only while the screen is open.
 
-[docs/CONFORMANCE.md](docs/CONFORMANCE.md) has the whole surface: which actions are dispatched and which are not, four divergences and the reason for each, the fields hosts send that no version of the protocol declares, and three findings that belong to the protocol package rather than to any implementation.
+[docs/CONFORMANCE.md](docs/CONFORMANCE.md) covers the full surface: which actions are dispatched, four divergences and why, undeclared fields hosts send in practice, and three defects that belong to the protocol package rather than any implementation.
 
 ## Configuration
 
@@ -207,7 +207,7 @@ The host then reads those files at `virtual://<clientId>/<path>`. Serving lasts 
 { "host": "ws://127.0.0.1:9187", "theme": "paper-light" }
 ```
 
-A flag beats an environment variable beats the file, because each is narrower than the one below it.
+Precedence: a flag overrides an environment variable, which overrides the file.
 
 | | |
 |---|---|
@@ -216,7 +216,7 @@ A flag beats an environment variable beats the file, because each is narrower th
 | `AHPC_TOKEN_<RESOURCE>` | A token for one protected resource |
 | `--config-file` | Read this file instead |
 
-`ahpc config` says where the file is and what is in force, and answers without a host — which is what you want when the host is the thing that is wrong.
+`ahpc config` prints the file path and the values in force. It works without a host, which is what you need when the host is the problem.
 
 ## Development
 
@@ -226,16 +226,16 @@ npm run typecheck
 npm run build
 ```
 
-Two tools check this client against the protocol rather than against itself:
+Two tools check the client against the protocol itself:
 
 ```sh
 npm run schema              # a strict JSON Schema from the package's own declarations
 npm run wire -- <capture>   # check a recording against it
 ```
 
-`AHPC_RECORD=<file>` makes the client append every frame it sends and receives. `test/conformance.test.ts` runs the same check over the frames a test run just produced, so it cannot pass against a recording of yesterday's behaviour.
+`AHPC_RECORD=<file>` appends every frame sent and received. `test/conformance.test.ts` runs the same check against frames produced by the test run itself, so it cannot pass on a stale recording.
 
-[docs/DESIGN.md](docs/DESIGN.md) is why the client is shaped the way it is: what a terminal does with a transcript that a browser does not, and what the widget catalog was missing.
+[docs/DESIGN.md](docs/DESIGN.md) covers why the client is built this way: how a terminal handles a transcript differently from a browser, and what the widget catalog was missing.
 
 ## License
 
