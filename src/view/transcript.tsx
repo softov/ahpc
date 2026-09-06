@@ -32,6 +32,14 @@ export interface ChatTranscriptProps extends BoxProps {
    */
   match?: string;
   /**
+   * Keep the cursor in view rather than only when it moves.
+   *
+   * For the find box, which drives the cursor: its first hit is often the
+   * block the cursor is already on, and a feed that only scrolls on a change
+   * would leave that one off screen while the box counted it.
+   */
+  pinCursor?: boolean;
+  /**
    * What this conversation is, as the first thing in it.
    *
    * Inside the scrolling region rather than pinned above it: a caption outside
@@ -49,7 +57,7 @@ export interface ChatTranscriptProps extends BoxProps {
 export const ChatTranscript: (props: ChatTranscriptProps) => RenderOutput =
   defineComponent<ChatTranscriptProps>('ChatTranscript', (props) => {
     const {
-      blocks, expanded, onToggle, cursor, onCursor, head, match,
+      blocks, expanded, onToggle, cursor, onCursor, head, match, pinCursor,
       focusId = 'chat.transcript', ...rest
     } = props;
 
@@ -67,6 +75,7 @@ export const ChatTranscript: (props: ChatTranscriptProps) => RenderOutput =
         // keyboard off the field to use them is what a reader is avoiding.
         pageKeys="always"
         {...(cursor !== undefined ? { selectedIndex: cursor + lead } : {})}
+        {...(pinCursor ? { pinSelection: true } : {})}
         {...(onCursor ? { onSelect: (index: number) => onCursor(Math.max(0, index - lead)) } : {})}
         onActivate={(index: number) => {
           const block = blocks[index - lead];

@@ -848,7 +848,7 @@ export const ChatScreen: (props: Record<string, never>) => RenderOutput =
           flex={1}
           blocks={blocks}
           expanded={expanded}
-          {...(finding && query.trim() !== '' ? { match: query.trim() } : {})}
+          {...(finding && query.trim() !== '' ? { match: query.trim(), pinCursor: true } : {})}
           cursor={cursor ?? 0}
           onCursor={onCursor}
           onToggle={onToggle}

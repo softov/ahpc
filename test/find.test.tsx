@@ -123,6 +123,42 @@ describe('the find box walks the matches', () => {
     await t.unmount();
   });
 
+  it('scrolls the conversation to the match', async () => {
+    // The counter moving is not the feature. A find that says `1 of 5` while
+    // the transcript stays where it was has told you there is something to
+    // read and not shown it to you.
+    const t = await inSession();
+    // The tail, which is where a conversation opens.
+    expect(t.hasText('EVFILT_FS never fires on Linux')).toBe(false);
+
+    await t.press('ctrl+f');
+    await settle(t);
+    t.type('EVFILT_FS');
+    await settle(t);
+    // The first block of the conversation, brought up from the top of it -
+    // and the cursor never moved, because it was already there.
+    expect(t.hasText('EVFILT_FS never fires on Linux')).toBe(true);
+    await t.unmount();
+  });
+
+  it('scrolls again on the way to the next one', async () => {
+    const t = await inSession();
+    await t.press('ctrl+f');
+    await settle(t);
+    t.type('kqueue');
+    await settle(t);
+    expect(t.hasText('EVFILT_FS never fires on Linux')).toBe(true);
+
+    // Enter walks off the top of the conversation and the feed comes with it.
+    await t.press('enter');
+    await t.press('enter');
+    await t.press('enter');
+    await t.press('enter');
+    await settle(t);
+    expect(t.hasText('EVFILT_FS never fires on Linux')).toBe(false);
+    await t.unmount();
+  });
+
   it('colours the term where it appears in the conversation', async () => {
     const t = await search('linux');
     const lines = t.lines();
