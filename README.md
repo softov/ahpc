@@ -90,6 +90,7 @@ Before the first message, a new session asks the agent, the model and its option
 | `ctrl+p` | Command palette |
 | `f1` | Every key that works where you are |
 | `ctrl+f` | Filter the session list, or find in the open conversation |
+| `l` | Follow an `agent-host-session://` link in the open conversation: the links the agent's session tools answered with, as a list, and one chosen opens the session or the chat it names. `--session` and every `<uri>` on the command line take a link too |
 | `ctrl+n` | New session |
 | `ctrl+r` | Refresh |
 | `alt+t` | Theme |

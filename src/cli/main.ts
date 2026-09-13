@@ -8,6 +8,7 @@ import { ago, archived, branch, json, line, mark, project, table } from './rende
 import type { HostConnection, HostEvent } from '../ahp/connection.js';
 import { operate } from '../ahp/operate.js';
 import { SWITCHES } from '../flags.js';
+import { parseSessionLink, sessionOfLink } from '../links.js';
 import { spoken, turn as runTurn, until } from '../wait.js';
 import { GROUPS, served } from '../mcp/tools.js';
 import type { Group } from '../mcp/tools.js';
@@ -132,6 +133,8 @@ Serving these sessions to something else
 
 Anything else
   dispatch <uri> <type>        send one action verbatim  [--field k=v]… [--chat]
+  <uri>, anywhere above        a session URI, or the agent-host-session://
+                               link the host's session tools answer with
   status                       what this client is connected to       [--json]
   --version                    what version this is
   help                         this
@@ -156,7 +159,19 @@ Output is for reading. --json is the same answer for a program.
  * a dependency for its own sake.
  */
 class Args {
-  constructor(private readonly rest: string[]) {}
+  constructor(private rest: string[]) {}
+  /** Every positional that is a link, replaced by what it names. */
+  async resolveLinks(resolve: (link: string) => Promise<string | undefined>): Promise<void> {
+    const next = [...this.rest];
+    for (let i = 0; i < next.length; i++) {
+      const word = next[i] as string;
+      if (word.startsWith('--')) { if (!SWITCHES.has(word)) i++; continue; }
+      if (!/^agent-host-session:\/\//i.test(word)) continue;
+      const found = await resolve(word);
+      if (found !== undefined) next[i] = found;
+    }
+    this.rest = next;
+  }
   /** The nth thing that is not a flag or a flag's value. */
   positional(index: number): string | undefined {
     const found: string[] = [];
@@ -350,6 +365,23 @@ export async function cli(command: string, rest: string[]): Promise<number> {
 
   const host = await connect(where(args));
   try {
+    /*
+     * A link where a URI is wanted.
+     *
+     * The reference host's session tools answer with `agent-host-session://`
+     * links, and a person pasting one into `session show` should get the
+     * session it names rather than a refusal about the scheme. Resolved once,
+     * against the catalogue, before any command reads its arguments; a link
+     * nobody on this host answers to is a sentence rather than a lookup that
+     * silently found nothing.
+     */
+    await args.resolveLinks(async (link) => {
+      const parsed = parseSessionLink(link);
+      if (parsed === undefined) return undefined;
+      const row = sessionOfLink(parsed, await host.listSessions());
+      if (row === undefined) throw new Fault(`No session on this host matches ${link}.`);
+      return row.resource;
+    });
     switch (command) {
       case 'status': {
         const rows = await host.listSessions().catch(() => []);

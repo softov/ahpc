@@ -5,6 +5,7 @@ import {
   bufferToSvg, createNodeTerminal, createWriter, renderStill,
 } from '@textui/terminal';
 import { registerChat } from './app.js';
+import { parseSessionLink } from './links.js';
 import { CONTROLLER } from './control.js';
 import { connect, sink } from './connect.js';
 import { loadConfig } from './config.js';
@@ -130,7 +131,8 @@ Appearance
   --bood                Let the creature loose on the whole screen. It
                         keeps off the composer and off anything asking
                         a question, and alt+g turns it off again.
-  --session <uri>       Open this session
+  --session <uri>       Open this session, by its URI or by an
+                        agent-host-session:// link
 
 Stills, for a README or a test
   --static, -s          One frame to stdout instead of running
@@ -247,9 +249,13 @@ async function still(options: Options): Promise<void> {
     // of scripted words rather than all of them, and the caret is wherever the
     // agent had got to. `--settled` runs until the script has nothing left it
     // can do without being answered, which is how the confirmation is reached.
-    before: (app) => {
+    before: async (app) => {
       const controller = app.services.require(CONTROLLER);
-      if (options.session) controller.open(options.session);
+      // A URI, or the link the reference host's tools answer with.
+      if (options.session) {
+        if (parseSessionLink(options.session)) await controller.openLink(options.session);
+        else controller.open(options.session);
+      }
       /*
        * Pushed when asked for, and not otherwise.
        *
@@ -388,6 +394,15 @@ export async function tui(argv: string[]): Promise<void> {
   app.services.provide(WRITER_KEY, createWriter(terminal.capabilities()));
   sink.report = (message) => reportHostError(app.store, message);
   await app.start();
+
+  // `--session`, on the screen as well as in a still: the conversation named,
+  // by its URI or by an `agent-host-session://` link, opened on arrival.
+  if (options.session) {
+    const controller = app.services.require(CONTROLLER);
+    const named = options.session;
+    const opened = parseSessionLink(named) ? controller.openLink(named) : (controller.open(named), Promise.resolve(true));
+    void opened.then((ok) => { if (ok) app.screens.push('chat'); });
+  }
 
   /**
    * The last resort, and the reason it exists at all.

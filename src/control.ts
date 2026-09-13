@@ -12,6 +12,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { confirm } from '@textui/widgets';
 import { findBlocks, toBlocks } from './blocks.js';
+import { chatMatches, linksIn, parseSessionLink, sessionOfLink } from './links.js';
 import { operate } from './ahp/operate.js';
 import type { HostConnection } from './ahp/connection.js';
 import type { Terminals } from './terminal.js';
@@ -49,6 +50,12 @@ import {
 export interface Controller {
   refresh(): Promise<void>;
   open(uri: SessionUri): void;
+  /**
+   * Open what an `agent-host-session://` link names: the session, and the
+   * chat in it when the link says one. False when this host has no such
+   * session, said out loud as well.
+   */
+  openLink(link: string): Promise<boolean>;
   close(): void;
   /** Send, or queue when a turn is already running. */
   send(text: string): void;
@@ -589,6 +596,46 @@ export function createController(
         .filter((resource) => resource !== chat);
       const next = left[0];
       if (next) controller.openChat(next);
+    },
+
+    async openLink(link) {
+      const parsed = parseSessionLink(link);
+      if (parsed === undefined) {
+        failed(new Error(`${link} is not an agent-host-session:// link`));
+        return false;
+      }
+      // The catalogue as held, then as the host has it now: a session the
+      // agent made a moment ago may not have reached the list yet.
+      let row = sessionOfLink(parsed, sessions(app.store));
+      if (row === undefined) {
+        await controller.refresh();
+        row = sessionOfLink(parsed, sessions(app.store));
+      }
+      if (row === undefined) {
+        failed(new Error(`No session on this host matches ${link}`));
+        return false;
+      }
+      controller.open(row.resource as SessionUri);
+      if (parsed.chatId === undefined) return true;
+      /*
+       * The chat, once the session has said which chats it has.
+       *
+       * The list arrives with the snapshot, a moment after `open`, and a chat
+       * URI is not something to build here - the host names them. Waited for,
+       * briefly; a chat the session no longer has is the session itself,
+       * which is the reference window's answer too.
+       */
+      const wanted = parsed.chatId;
+      for (let i = 0; i < 40; i++) {
+        if (app.store.get<SessionUri>(OPEN) !== row.resource) return true;
+        // Not before the default chat is known: `open` sets it when the
+        // detail lands, and a switch made earlier is a switch it undoes.
+        const settled = app.store.get<string | null>(CHAT_URI) !== null;
+        const chat = (app.store.get<{ resource: string }[]>(CHATS) ?? []).find((entry) => chatMatches(entry.resource, wanted));
+        if (settled && chat !== undefined) { controller.openChat(chat.resource); return true; }
+        await new Promise((resolve) => { setTimeout(resolve, 50); });
+      }
+      return true;
     },
 
     open(uri) {
@@ -1254,6 +1301,38 @@ function commands(
       description: 'Start a new conversation',
       slots: ['palette'],
       run: () => { app.screens.reset('new'); app.focus.focus('chat.composer'); },
+    },
+    {
+      /*
+       * A link in the transcript, followed.
+       *
+       * The reference host's session tools answer with an
+       * `agent-host-session://` link, and its window makes one a click. A
+       * terminal has no click, so the links in the open transcript are the
+       * choices, and one chosen opens the session or the chat it names. One
+       * typed is followed the same way, which is how a link from somewhere
+       * else gets opened.
+       */
+      id: 'chat.openLink',
+      title: 'Open a session link',
+      category: 'Session',
+      description: 'Follow an agent-host-session:// link in this transcript',
+      slots: ['palette'],
+      when: `${OPEN}`,
+      args: [{
+        name: 'link',
+        type: 'string' as const,
+        required: true,
+        description: 'The link to follow',
+        choices: () => linksIn(app.store.get<Turn[]>(TURNS) ?? []).map((found) => ({
+          value: found.link,
+          label: found.link.replace(/^agent-host-session:\/\//, ''),
+          ...(found.context ? { description: found.context } : {}),
+        })),
+      }],
+      run: (args: Record<string, unknown>) => {
+        void controller.openLink(String(args.link ?? '')).then((opened) => { if (opened) app.screens.push('chat'); });
+      },
     },
     {
       id: 'go.changes',
@@ -2366,6 +2445,7 @@ function shipped(): Binding[] {
     // out of it is escape - the pair that makes every other letter reachable.
     { keys: 'c', commandId: 'go.changes', scopeId: CHAT_SCOPE },
     { keys: 'f', commandId: 'go.files', scopeId: CHAT_SCOPE },
+    { keys: 'l', commandId: 'chat.openLink', scopeId: CHAT_SCOPE },
     /*
      * On the changes screen, and nowhere else.
      *

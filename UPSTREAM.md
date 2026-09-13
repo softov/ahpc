@@ -8,7 +8,7 @@ Same revisions as Pass 2. Not a change upstream made but a gap the review left: 
 
 - [x] **`--wire <file>` writes every frame, both directions, as JSONL.** `AHPC_RECORD` already did this, undocumented outside the conformance section and with the frame as a string; now a flag on both front ends as well, with `peer` (the host URL) and the frame parsed: `{ "at": <ISO time>, "from": "client" | "host", "peer": <host URL>, "frame": <the JSON-RPC message> }`, the lines `ahpd --wire` writes, so either validator reads a capture from either end and `jq` reads both. Across reconnects, since the reconnect is the part worth capturing.
 - [x] **`ahpc wire <file>` tails a capture live.** One row per frame: time, direction, method or action type, channel; a row opens to the payload. Filter by channel and by method, the way the catalogue filters. Reads a file `ahpd` or this client is still writing, so the two ends can be watched side by side.
-- [ ] **`agent-host-session://` links open here.** The reference host's tools answer with `openLink` in that scheme (`common/openSessionLink.ts`); VS Code's window turns one into a click that opens the session or chat. A link in a transcript here opens the same thing.
+- [x] **`agent-host-session://` links open here.** The reference host's tools answer with `openLink` in that scheme (`common/openSessionLink.ts`); VS Code's window turns one into a click that opens the session or chat. A link in a transcript here opens the same thing.
 
 ## Pass 2 - 2026-09-13
 
