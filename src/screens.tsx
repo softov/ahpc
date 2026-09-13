@@ -512,14 +512,16 @@ function useComposerOptions(): ComposerOption[] {
   // isolation is `worktree`, and the reference host rewrites the schema on
   // `resolveSessionConfig` to say so. On what the values say rather than the
   // object, since the host's echo of the same answers is a new object every
-  // time and would ask forever. An open session's config arrives on its own
-  // channel, and asking for it after every change would answer with the
-  // value the host held before the change reached it.
+  // time and would ask forever. And again when the directory changes, since
+  // isolation and the branches are questions about one repository. An open
+  // session's config arrives on its own channel, and asking for it after
+  // every change would answer with the value the host held before the
+  // change reached it.
   const answered = open ? '' : JSON.stringify(settings);
   useEffect(() => {
     void controller.settings().then(setConfig)
       .catch((error: unknown) => controller.report(error));
-  }, [provider, open, answered]);
+  }, [provider, open, answered, open ? '' : workspace]);
 
   const agent = agents.find((found) => found.provider === provider);
   // A harness with no models is the ordinary answer for one nobody has signed

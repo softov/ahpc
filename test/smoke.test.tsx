@@ -1570,9 +1570,10 @@ describe('the composer is the front door', () => {
 
     await t.app.execute('compose.set.isolation', { value: 'worktree' });
     for (let i = 0; i < 10; i++) await t.settle();
-    // Asked again after the answer, the schema now offers the branch - and
-    // tab reaches it, after the directory and the isolation it belongs to.
-    expect(bar()[1]).toContain('Branch');
+    // Asked again after the answer, the schema now offers the branch, on
+    // the one checked out there - and tab reaches it, after the directory
+    // and the isolation it belongs to.
+    expect(bar()[1]).toContain('main');
     expect(bar()[1]).toContain('Worktree');
     t.focus('chat.composer');
     await t.settle();
@@ -1583,6 +1584,39 @@ describe('the composer is the front door', () => {
       'chat.option.workspace', 'chat.option.isolation', 'chat.option.branch',
       'chat.composer',
     ]);
+    await t.unmount();
+  });
+
+  /**
+   * A different directory is a different set of answers.
+   *
+   * Isolation and the branch are questions about one repository: the host is
+   * asked again when the workspace changes, and what was answered about the
+   * old one does not ride along as the answer for the new one. The reference
+   * host would echo `branch: main` back for a repository on `cleanup`, and
+   * the session would start from a branch nobody chose.
+   */
+  it('asks the host again about where, when where changes', async () => {
+    const { t } = await open({ width: 100, height: 30 });
+    const bar = () => t.lines().slice(-5, -3);
+    await t.app.execute('compose.set.isolation', { value: 'worktree' });
+    for (let i = 0; i < 10; i++) await t.settle();
+    expect(bar()[1]).toContain('main');
+    await t.app.execute('compose.workspace.path', { path: '/brb_main/src/brb_backend' });
+    for (let i = 0; i < 10; i++) await t.settle();
+    // The branch checked out in the new directory, and the isolation back to
+    // what the host offers first.
+    expect(bar()[1]).toContain('brb_backend');
+    expect(bar()[1]).toContain('Workspace');
+    expect(bar()[1]).not.toContain('Worktree');
+    expect(t.store.get<Record<string, string>>(SETTINGS)?.branch).toBe('cleanup/compile-script');
+    // What was about the harness stays answered.
+    await t.app.execute('compose.set.permissionMode', { value: 'plan' });
+    for (let i = 0; i < 10; i++) await t.settle();
+    await t.app.execute('compose.workspace.path', { path: '/github/textui' });
+    for (let i = 0; i < 10; i++) await t.settle();
+    expect(bar()[0]).toContain('Plan only');
+    expect(t.store.get<Record<string, string>>(SETTINGS)?.branch).toBe('main');
     await t.unmount();
   });
 

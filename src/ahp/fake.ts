@@ -96,7 +96,7 @@ const EFFORTS: { value: string; label: string }[] = [
  * checked out. `worktreeCreateNewBranch` is one of the values it seeds from
  * the client's own settings and never asks about.
  */
-const configOf = (values: Record<string, string>): SessionConfig['properties'] => [
+const configOf = (values: Record<string, string>, branch: string): SessionConfig['properties'] => [
   {
     key: 'branch',
     title: 'Branch',
@@ -105,6 +105,7 @@ const configOf = (values: Record<string, string>): SessionConfig['properties'] =
     // reference host marks exactly this property this way.
     values: [],
     enumDynamic: true,
+    default: branch,
     ...(values.isolation === 'worktree' ? {} : { readOnly: true }),
     sessionMutable: false,
   },
@@ -143,9 +144,17 @@ const configOf = (values: Record<string, string>): SessionConfig['properties'] =
   },
 ];
 const DEFAULTS = { permissionMode: 'default', isolation: 'workspace' };
-const configFor = (values: Record<string, string>): SessionConfig => {
-  const held = { ...DEFAULTS, ...values };
-  return { properties: configOf(held), values: held };
+/**
+ * The questions, answered so far, about one directory.
+ *
+ * `branch` is the directory's: a real host starts from the branch that is
+ * checked out there, so asking about another directory is asking a different
+ * question, and this fixture answers it from what the session in that
+ * directory said it was on.
+ */
+const configFor = (values: Record<string, string>, branch = 'main'): SessionConfig => {
+  const held = { ...DEFAULTS, branch, ...values };
+  return { properties: configOf(held, branch), values: held };
 };
 
 let counter = 0;
@@ -1320,8 +1329,14 @@ export function fakeHost(): FakeHost {
 
     // Iterative, as a real host's is: what has been answered comes back
     // answered. A fixture that returns its defaults every time quietly undoes
-    // every choice the moment anything asks the question again.
-    resolveConfig: async ({ values }): Promise<SessionConfig> => configFor(values ?? {}),
+    // every choice the moment anything asks the question again. About the
+    // directory asked about, as a real host's is: the branch is what is
+    // checked out there.
+    resolveConfig: async ({ workingDirectory, values }): Promise<SessionConfig> => {
+      const there = [...summaries.values()].find((one) => one.workingDirectories[0] === `file://${workingDirectory ?? ''}`);
+      const meta = there?._meta as { git?: { branchName?: string } } | undefined;
+      return configFor(values ?? {}, meta?.git?.branchName ?? 'main');
+    },
 
     automations: async () => [...automations.values()],
 

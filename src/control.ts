@@ -1047,6 +1047,29 @@ function commands(
    */
   const provider = (): string => app.store.get<string>(PROVIDER) ?? 'claude';
   const agent = (): Agent | undefined => known.agents.find((found) => found.provider === provider());
+  /**
+   * The keys of a session's config that are about its directory.
+   *
+   * The host's own, named in the reference client's `sessionConfigKeys.ts`:
+   * whether to work in a worktree, from which branch, and how that worktree
+   * is made. An answer to any of them is an answer about one repository.
+   */
+  const ABOUT_WHERE = ['isolation', 'branch', 'worktreeBranchPrefix', 'worktreeBranchTrack', 'worktreeCreateNewBranch', 'worktreeIncludeFiles'];
+  /**
+   * Point the next session somewhere else.
+   *
+   * What was answered about the old directory goes with it: `branch: main`
+   * chosen in one repository would be sent back to the host as the answer
+   * for the next, and the host echoes what it is told - so the composer
+   * would show a branch the new repository may not have, and start from it.
+   * The rest of the answers are about the harness, not the directory, and
+   * stay.
+   */
+  const workspace = (path: string): void => {
+    app.store.set(WORKSPACE, path);
+    const held = app.store.get<Record<string, string>>(SETTINGS) ?? {};
+    app.store.set(SETTINGS, Object.fromEntries(Object.entries(held).filter(([key]) => !ABOUT_WHERE.includes(key))));
+  };
 
   const listAgents = async (): Promise<ArgChoices> => {
     try {
@@ -1943,7 +1966,7 @@ function commands(
         const listable = held !== '' && await controller.files(at).then(() => true, () => false);
         const start = listable ? at : served ?? at;
         const picked = await pick(app, { start, wants: 'directory', title: 'Workspace', placeholder: 'Filter this directory…' });
-        if (picked !== null) app.store.set(WORKSPACE, decodeURIComponent(picked.replace(/^file:\/\//, '')));
+        if (picked !== null) workspace(decodeURIComponent(picked.replace(/^file:\/\//, '')));
       },
     },
     {
@@ -1963,7 +1986,7 @@ function commands(
       }],
       run: (args: Record<string, unknown>) => {
         const path = String(args.path ?? '').trim();
-        if (path) app.store.set(WORKSPACE, path);
+        if (path) workspace(path);
       },
     },
     {
