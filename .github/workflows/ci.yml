@@ -27,8 +27,8 @@ jobs:
 
       # `npm ci` rather than `npm install`, so a lockfile that does not match
       # package.json fails here rather than resolving to something nobody
-      # wrote down. This repository keeps a pnpm and a deno lockfile too and
-      # neither is current; `package-lock.json` is the one that installs.
+      # wrote down. This repository keeps a deno lockfile too and it is not
+      # current; `package-lock.json` is the one that installs.
       - run: npm ci
 
       - run: npm run typecheck
