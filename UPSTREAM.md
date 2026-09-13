@@ -12,7 +12,7 @@ VS Code `3aa54039` (2026-08-29) to `8e35945b` (2026-09-12), 206 agentHost commit
 
 ### What the reference host now puts on the wire
 
-- [ ] **`_meta.progressMessage` on a running tool call** is drawn as the running line. Transient, meaningful only while the call is `running`; upstream `dd12d29d`.
+- [x] **`_meta.progressMessage` on a running tool call** is drawn as the running line. Transient, meaningful only while the call is `running`; upstream `dd12d29d`.
 - [ ] **A message carrying `_meta['vscode.chat.requestHiddenFromTranscript']`** keeps its response and loses its request row. Upstream's host-notice turns (Agent Merge status, workspace transitions) arrive as `systemNotification` messages the host appended to carry a message, and drawing the request as though somebody typed it is wrong.
 - [ ] **`_meta.git.pullRequestState`** (`open`, `closed`, `merged`) beside the branch in the sessions catalogue, where the host reports it.
 

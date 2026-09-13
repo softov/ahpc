@@ -134,6 +134,16 @@ export interface ToolCall {
   input?: string;
   /** What it meant to do. Markdown. */
   intention?: string;
+  /**
+   * What it is doing right now, while it runs.
+   *
+   * `_meta.progressMessage`, the reference host's key for a line drawn on a
+   * running row and dropped when the row ends: a subagent's own summary of
+   * how far it has got, the last tool it reached for. Read only while
+   * `running`; a host that leaves it on a finished call is still describing
+   * a state the call is no longer in.
+   */
+  progress?: string;
   /** What it did, past tense. */
   outcome?: string;
   /** What came back. */

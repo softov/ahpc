@@ -109,3 +109,23 @@ describe('a tool call row', () => {
     await t.unmount();
   });
 });
+
+describe('a tool call that is still running', () => {
+  const RUNNING: Partial<ToolCall> = {
+    name: 'Explore', toolName: 'Task', status: 'running',
+    input: undefined, output: undefined, intention: 'look for the bug',
+  };
+
+  it('says what it is doing, when the host says', async () => {
+    const t = await open({ ...RUNNING, progress: 'Grep: reading input.c' });
+    expect(t.line(0)).toContain('Grep: reading input.c');
+    expect(t.line(0)).not.toContain('look for the bug');
+    await t.unmount();
+  });
+
+  it('falls back to what it was asked, when the host has not', async () => {
+    const t = await open(RUNNING);
+    expect(t.line(0)).toContain('look for the bug');
+    await t.unmount();
+  });
+});

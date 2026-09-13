@@ -61,7 +61,10 @@ export const ToolCallRow: (props: ToolCallRowProps) => RenderOutput =
     const glyph = theme.glyphs[look.glyph];
     const chevron = expanded ? theme.glyphs.chevronDown : theme.glyphs.chevronRight;
     const failed = call.status === 'failed' || (call.exitCode !== undefined && call.exitCode !== 0);
-    const summary = oneLine(call.input ?? call.intention ?? '');
+    // What it is doing beats what it was asked, for as long as it is doing
+    // it: a subagent's row that says "look for the bug" for a minute is a
+    // row that says nothing, and the host has a line for what it is up to.
+    const summary = oneLine(call.progress ?? call.input ?? call.intention ?? '');
     // Only when there is something under it. A chevron on a row that opens on
     // to nothing is a promise the row cannot keep.
     const opens = Boolean(call.intention ?? call.input ?? call.output ?? call.outcome

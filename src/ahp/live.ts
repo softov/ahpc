@@ -542,17 +542,21 @@ function toolCall(value: unknown): ToolCall {
     .map((entry) => str(bag(bag(entry).file).uri) ?? str(bag(entry).uri))
     .filter((entry): entry is string => entry !== undefined);
 
+  const status = (str(call.status) ?? 'running') as ToolCallStatus;
+  const progress = status === 'running' ? plain(bag(call._meta).progressMessage) : undefined;
+
   return {
     id: str(call.toolCallId) ?? randomUUID(),
     name: str(call.displayName) ?? str(call.toolName) ?? 'tool',
     toolName: str(call.toolName) ?? 'tool',
-    status: (str(call.status) ?? 'running') as ToolCallStatus,
+    status,
     // A `ContentRef` is a promise of content rather than content: reporting
     // nothing is better than reporting the reference as if it were the command.
     ...(typeof input === 'string' ? { input } : {}),
     ...(plain(call.intention) ?? plain(call.invocationMessage)
       ? { intention: (plain(call.intention) ?? plain(call.invocationMessage)) as string }
       : {}),
+    ...(progress !== undefined ? { progress } : {}),
     ...(plain(call.pastTenseMessage) ? { outcome: plain(call.pastTenseMessage) as string } : {}),
     ...(text ? { output: text } : {}),
     ...(files.length > 0 ? { files } : {}),
