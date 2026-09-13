@@ -4,7 +4,7 @@ import type { ListItem, ListItemState } from '@textui/widgets';
 import { Badge, Column, List, Marquee, Row } from '@textui/widgets';
 import type { SessionSummary } from '../ahp/types.js';
 import { decodeStatus } from '../ahp/status.js';
-import { branchName, projectName } from '../state.js';
+import { branchName, projectName, pullRequestLabel } from '../state.js';
 
 /**
  * The catalogue.
@@ -60,8 +60,9 @@ export const SessionList: (props: SessionListProps) => RenderOutput =
           // The project, then the branch it is on - a catalogue spanning
           // several repositories is read by which one each row is in, and a
           // list of them all on `main` is a list that needs opening to tell
-          // apart.
-          [projectName(session), branchName(session)].filter(Boolean).join(' '),
+          // apart. Then the pull request the branch became, where the host
+          // found one: a merged branch is a finished row.
+          [projectName(session), branchName(session), pullRequestLabel(session)].filter(Boolean).join(' '),
           changes?.files
             ? `${changes.files} files  +${changes.additions ?? 0} -${changes.deletions ?? 0}`
             : '',

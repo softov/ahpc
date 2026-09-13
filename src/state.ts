@@ -526,7 +526,10 @@ export function projectName(session: SessionSummary): string {
  * anything here, including a `git` that is not an object.
  */
 function git(session: SessionSummary): Record<string, unknown> {
-  const found = session._meta?.git;
+  return objectAt(session._meta?.git);
+}
+
+function objectAt(found: unknown): Record<string, unknown> {
   return typeof found === 'object' && found !== null && !Array.isArray(found)
     ? found as Record<string, unknown>
     : {};
@@ -554,6 +557,56 @@ export function branchName(session: SessionSummary): string | undefined {
     if (typeof name === 'string' && name !== '') return name;
   }
   return undefined;
+}
+
+/** A pull request the session's branch is known by, and what became of it. */
+export interface PullRequest {
+  /** The number in its URL, which is how a person names one. */
+  number: string;
+  /** The last state the host observed, where it observed one. */
+  state?: 'open' | 'closed' | 'merged';
+}
+
+/** The key two spellings of one pull request URL share: case and a trailing slash. */
+const urlKey = (url: string): string => url.trim().replace(/\/+$/, '').toLowerCase();
+
+/**
+ * The pull request the reference host found for this session, if it applies.
+ *
+ * `_meta.github` is the reference host's, the way `_meta.git` is: a
+ * convention read by its own window, not a declaration. `pullRequestUrls` is
+ * the history, most recent first, and only the most recent counts. Two
+ * checks are the host's own, and are kept here so a row never says more than
+ * the host would: a request found for another branch is not this branch's
+ * (`pullRequestBranchName`, when the host has recorded one), and a state is
+ * only the state of the URL it was observed on (`pullRequestStateUrl`) - the
+ * host keeps reporting the last request it knew while it looks for one on the
+ * branch the checkout moved to, and "merged" beside the wrong number is worse
+ * than no state at all.
+ */
+export function pullRequest(session: SessionSummary): PullRequest | undefined {
+  const found = objectAt(session._meta?.github);
+  const urls = Array.isArray(found.pullRequestUrls)
+    ? found.pullRequestUrls.filter((url): url is string => typeof url === 'string')
+    : typeof found.pullRequestUrl === 'string' ? [found.pullRequestUrl] : [];
+  const url = urls[0];
+  if (url === undefined) return undefined;
+  const branch = found.pullRequestBranchName;
+  if (typeof branch === 'string' && branch !== branchName(session)) return undefined;
+  const number = /\/pull\/(\d+)\/?$/.exec(url)?.[1];
+  if (number === undefined) return undefined;
+  const state = found.pullRequestState;
+  const applies = typeof found.pullRequestStateUrl === 'string' && urlKey(found.pullRequestStateUrl) === urlKey(url);
+  return {
+    number,
+    ...(applies && (state === 'open' || state === 'closed' || state === 'merged') ? { state } : {}),
+  };
+}
+
+/** The pull request as a row says it: the number, and its state where known. */
+export function pullRequestLabel(session: SessionSummary): string | undefined {
+  const found = pullRequest(session);
+  return found === undefined ? undefined : [`#${found.number}`, found.state].filter(Boolean).join(' ');
 }
 
 /**

@@ -19,7 +19,7 @@ import { PRESETS, presetFor, scheduleProblem, zoneIsKnownHere } from './schedule
 import {
   AUTOMATIONS_SCOPE, CHANGES_SCOPE, CHAT_SCOPE, CONTROLLER, MCP_SCOPE, SESSIONS_SCOPE, SKILLS_SCOPE, modelCommand, settingCommand,
 } from './control.js';
-import { branchName, branchDrift,
+import { branchName, branchDrift, pullRequestLabel,
   ARCHIVED, AUTOMATIONS, AUTOMATION_ROW, CHANGES, CUSTOMIZATIONS, DRAFT, EXPANDED, FILTER, FOCUS, HISTORY, HOST, INPUT,
   CHANGE_AT, CHANGE_ROW, CHANGE_SCOPES, FILES_AT, FILES_ENTRIES, FILES_OPEN,
   MODEL, MODEL_CONFIG, OPEN, OPEN_FILE, CHAT_URI, PROVIDER, QUEUE, SELECTED, SESSIONS, SETTINGS, SIDEBAR,
@@ -123,7 +123,7 @@ function describe(session: SessionSummary, detail: SessionDetail | null): Detail
     {
       id: 'branch',
       label: 'Branch',
-      value: [branchName(session), branchDrift(session)].filter(Boolean).join('  '),
+      value: [branchName(session), branchDrift(session), pullRequestLabel(session)].filter(Boolean).join('  '),
       absent: 'not a repository, or the host does not say',
     },
     // The identifiers, in full and copyable. A URI you can read half of is

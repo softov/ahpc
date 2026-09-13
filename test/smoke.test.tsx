@@ -859,6 +859,22 @@ describe('the catalogue', () => {
   });
 
   /**
+   * What became of the branch, beside its name.
+   *
+   * The reference host finds the pull request for a session's branch and
+   * keeps its last state in `_meta.github`; a merged one is a finished row,
+   * and a catalogue that draws the branch alone leaves that for the reader
+   * to go and find out.
+   */
+  it('puts the pull request and its state beside the branch', async () => {
+    const { t } = await catalogue({ width: 140, height: 30 });
+    await t.app.execute('session.toggleArchived');
+    for (let i = 0; i < 4; i++) await t.settle();
+    expect(t.hasText('cleanup/compile-script #412 merged')).toBe(true);
+    await t.unmount();
+  });
+
+  /**
    * A row is two lines, and the first one is why.
    *
    * A title, a harness, a workspace and a status sharing a pane that is also

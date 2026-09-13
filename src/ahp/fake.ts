@@ -487,6 +487,8 @@ export function fakeHost(): FakeHost {
     branch?: string;
     /** Ahead, behind and uncommitted, in that order. */
     drift?: [number, number, number];
+    /** A pull request the host found for the branch, as `_meta.github`. */
+    pullRequest?: { url: string; state?: 'open' | 'closed' | 'merged' };
   }): void => {
     const { id } = options;
     flags.set(id, (options.read === false ? 0 : SessionFlag.IsRead)
@@ -597,6 +599,19 @@ export function fakeHost(): FakeHost {
           outgoingChanges: options.drift?.[0] ?? 0,
           uncommittedChanges: options.drift?.[2] ?? 0,
         },
+        // The reference host's other well-known key: what GitHub knows about
+        // the branch. Copied from a capture the same way `git` is.
+        ...(options.pullRequest
+          ? {
+            github: {
+              pullRequestUrls: [options.pullRequest.url],
+              pullRequestBranchName: options.branch ?? 'main',
+              ...(options.pullRequest.state
+                ? { pullRequestState: options.pullRequest.state, pullRequestStateUrl: options.pullRequest.url }
+                : {}),
+            },
+          }
+          : {}),
       },
       ...(options.activity ? { activity: options.activity } : {}),
       ...(options.origin ? { origin: options.origin } : {}),
@@ -775,6 +790,8 @@ export function fakeHost(): FakeHost {
     dir: 'file:///brb_main/src/brb_backend',
     model: 'claude-sonnet-5',
     archived: true,
+    branch: 'cleanup/compile-script',
+    pullRequest: { url: 'https://github.com/brbyte/brb_backend/pull/412', state: 'merged' },
     turns: [
       {
         id: 's5-t1', role: 'user', message: 'Delete compileFramework.sh from the Linux path.',
