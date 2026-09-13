@@ -89,6 +89,8 @@ interface Options {
   publish?: string;
   /** Whether the host may write into it. Read-only otherwise. */
   publishWritable?: boolean;
+  /** A file every frame is appended to, both directions, as JSON lines. */
+  wire?: string;
   help: boolean;
 }
 
@@ -115,6 +117,11 @@ What this client serves back
                         Serving lasts as long as the screen does: with no
                         terminal attached this prints one frame and exits,
                         so a background shell publishes nothing.
+
+Seeing the wire
+  --wire <file>         Append every frame, both directions, as JSON lines:
+                        { at, from, peer, frame }. AHPC_RECORD=<file> is
+                        the same thing from a shell.
 
 Appearance
   --theme <name>        workbench, paper-light, ...
@@ -187,6 +194,7 @@ export function parse(argv: string[]): Options {
       case '--path': options.path = String(argv[++i]); break;
       case '--publish': options.publish = String(argv[++i]); break;
       case '--publish-writable': options.publishWritable = true; break;
+      case '--wire': options.wire = String(argv[++i]); break;
       case '--help': case '-h': options.help = true; break;
       // A flag nobody reads is a flag nobody can rely on: an unknown one is
       // said so rather than silently doing what the defaults would have done.

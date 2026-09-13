@@ -15,7 +15,8 @@ August never reached the repository's `main`.
 `npm run schema` generates a strict JSON Schema from the package's own
 declarations - closing every object, which the shipped `state.schema.json`
 never does - and `npm run wire -- <capture>` checks a recording against it.
-`AHPC_RECORD=<file>` makes this client record its own frames, both directions.
+`--wire <file>`, or `AHPC_RECORD=<file>`, makes this client record its own
+frames, both directions, in the lines `ahpd --wire` writes.
 
 `test/conformance.test.ts` is the same checker in the suite, over the frames a
 run just produced, in memory. Not a committed fixture: a recording on disk is

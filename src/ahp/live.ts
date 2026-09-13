@@ -48,6 +48,13 @@ export interface LiveHostOptions {
   /** A bearer token, if the host is behind one. Appended as `?tkn=`. */
   token?: string;
   clientId?: string;
+  /**
+   * A file every frame is appended to, both directions, one JSON line each.
+   *
+   * `{ at, from, peer, frame }`, the lines `ahpd --wire` writes. `AHPC_RECORD`
+   * in the environment is the same thing spelt for a shell.
+   */
+  wire?: string;
   /** Told when the socket drops, so the badge can stop claiming otherwise. */
   onState?(state: 'connecting' | 'connected' | 'offline'): void;
   /**
@@ -317,21 +324,28 @@ interface Framed {
   close(): Promise<void> | void;
 }
 
-function tee(inner: Framed, heard: (method: string, params: Bag) => void): Framed {
+function tee(inner: Framed, heard: (method: string, params: Bag) => void, wire: { file?: string; peer: string }): Framed {
   /*
-   * Every frame, to a file, when `AHPC_RECORD` names one.
+   * Every frame, to a file, when `--wire` or `AHPC_RECORD` names one.
    *
    * Both directions: `tools/validate.mjs` checks what a host sent *and* what
    * this client sent, and until this existed the only captures to check were
-   * another client's traffic. Appended synchronously and deliberately - a
-   * recording that lost the frame a crash happened on would be a recording of
-   * everything except the interesting part.
+   * another client's traffic. The lines are the ones `ahpd --wire` writes -
+   * `at`, `from`, `peer`, `frame` - so one reader serves a capture from either
+   * end, and `peer` is the host's URL so a capture across two hosts can be
+   * read apart. Appended synchronously and deliberately - a recording that
+   * lost the frame a crash happened on would be a recording of everything
+   * except the interesting part.
    */
-  const recording = process.env.AHPC_RECORD;
-  const write = (from: 'client' | 'host', frame: unknown): void => {
+  const recording = wire.file ?? process.env.AHPC_RECORD;
+  const write = (from: 'client' | 'host', text: string): void => {
     if (recording === undefined || recording === '') return;
+    // Parsed, so `jq` reads the file; kept as text when it is not JSON, since
+    // a frame that is not is exactly what a capture is for.
+    let frame: unknown = text;
+    try { frame = JSON.parse(text); } catch { /* kept as text */ }
     try {
-      appendFileSync(recording, `${JSON.stringify({ at: new Date().toISOString(), from, frame })}\n`);
+      appendFileSync(recording, `${JSON.stringify({ at: new Date().toISOString(), from, peer: wire.peer, frame })}\n`);
     }
     catch { /* a recording is a convenience, never a reason to fail a call */ }
   };
@@ -345,7 +359,7 @@ function tee(inner: Framed, heard: (method: string, params: Bag) => void): Frame
     recv: async () => {
       const frame = await inner.recv();
       if (frame === null) return null;
-      write('host', frame.kind === 'text' ? frame.text : JSON.stringify(frame.message));
+      write('host', frame.kind === 'text' ? frame.text ?? '' : JSON.stringify(frame.message));
       try {
         const message = frame.kind === 'parsed'
           ? bag(frame.message)
@@ -1266,6 +1280,7 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
    */
   const clientId = options.clientId ?? `ahpc-${randomUUID().slice(0, 8)}`;
   const openTransport = options.connect ?? (() => ahp.connect(endpoint));
+  const wiring = { ...(options.wire !== undefined ? { file: options.wire } : {}), peer: options.url };
   const backoff = options.backoff ?? BACKOFF;
   const keepaliveMs = options.keepaliveMs ?? KEEPALIVE_MS;
 
@@ -1322,7 +1337,7 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
     options.onProgress?.(token, `${said}${share}`);
   };
 
-  const transport = tee(await openTransport() as Framed, notified);
+  const transport = tee(await openTransport() as Framed, notified, wiring);
   let client = new ahp.Client(transport, {});
   /*
    * What a host may ask this client for.
@@ -1609,7 +1624,7 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
         await pause(backoff[Math.min(attempt, backoff.length - 1)] ?? 0);
         if (finished) return;
         try {
-          const socket = tee(await openTransport() as Framed, notified);
+          const socket = tee(await openTransport() as Framed, notified, wiring);
           const fresh = new ahp.Client(socket, {});
           fresh.setServerRequestHandler(answering);
           fresh.connect();

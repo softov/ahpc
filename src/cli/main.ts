@@ -110,8 +110,10 @@ Terminals
   terminal watch <uri>         follow its output   [--timeout S]
 
 Recording
-  AHPC_RECORD=<file>           append every frame, both directions, for
-                               'npm run wire' to check against the protocol
+  --wire <file>                append every frame, both directions, as JSON
+                               lines: { at, from, peer, frame }, for
+                               'npm run wire' to check against the protocol.
+                               AHPC_RECORD=<file> is the same, from a shell
 
 Serving these sessions to something else
   mcp                          MCP on stdin and stdout, for a client that
@@ -211,6 +213,7 @@ const where = (args: Args): Where => {
     // write into it. Both off unless asked for.
     ...(args.value('--publish') ? { publish: args.value('--publish') as string } : {}),
     ...(args.has('--publish-writable') ? { publishWritable: true } : {}),
+    ...(args.value('--wire') ? { wire: args.value('--wire') as string } : {}),
   };
 };
 

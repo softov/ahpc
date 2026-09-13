@@ -34,6 +34,8 @@ export interface Where {
   publish?: string;
   /** Whether the published directory may be written to. Read-only otherwise. */
   publishWritable?: boolean;
+  /** A file every frame is appended to, both directions, as JSON lines. */
+  wire?: string;
 }
 
 /**
@@ -61,6 +63,7 @@ export async function connect(options: Where): Promise<HostConnection & { pump?(
     return await liveHost({
       url: options.host,
       ...(options.token ? { token: options.token } : {}),
+      ...(options.wire ? { wire: options.wire } : {}),
       onRefusal: (_uri, message) => sink.report(message),
       onLimit: (message) => sink.report(message),
       // Work the host is doing under a token of its own. Reported while it

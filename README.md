@@ -353,7 +353,7 @@ npm run schema              # a strict JSON Schema from the package's own declar
 npm run wire -- <capture>   # check a recording against it
 ```
 
-`AHPC_RECORD=<file>` appends every frame sent and received. `test/conformance.test.ts` runs the same check against frames produced by the test run itself, so it cannot pass on a stale recording.
+`--wire <file>` (or `AHPC_RECORD=<file>`) appends every frame sent and received as one JSON line each, `{ at, from, peer, frame }`, the lines `ahpd --wire` writes, so a capture from either end reads the same and `jq` reads both. `test/conformance.test.ts` runs the same check against frames produced by the test run itself, so it cannot pass on a stale recording.
 
 The screens, widgets and input handling come from [TextUI](https://github.com/softov/textui) — `@textui/core` for components and state, `@textui/widgets` for the catalog, `@textui/terminal` for rendering and key decoding, and `@textui/testing` for the harness the tests run in. `ahpc` began as an example inside it.
 
