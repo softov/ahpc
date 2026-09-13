@@ -151,6 +151,7 @@ captures, and none is declared in 0.9.0.
 | `SessionState.model` | ahpd (now `_meta.model`) | yes, both spellings |
 | `_meta.git.*` | both, with different keys | `branchName`/`branch` and the drift counts |
 | tool call `_meta.progressMessage` | both | yes, while `running` |
+| message `_meta['vscode.chat.hiddenFromTranscript']`, `requestHiddenFromTranscript` | VS Code | yes, and the text-prefix spellings |
 | skill `argumentHint` | ahpd (now `_meta.argumentHint`) | no |
 | customization `enabled` on a container | ahpd | no |
 | customization `nonce`, `childEnablement` | VS Code | no |

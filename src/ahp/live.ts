@@ -675,8 +675,10 @@ function transcript(chat: Bag): Turn[] {
   const built = (value: unknown, running: boolean): Turn[] => {
     const rows: Turn[] = [];
     const found = bag(value);
+    const hidden = hiddenOf(bag(found.message));
+    if (hidden === 'turn') return rows;
     const said = str(bag(found.message).text);
-    if (said) {
+    if (said && hidden !== 'request') {
       rows.push({
         id: `${str(found.id) ?? ''}:said`,
         role: 'user',
@@ -741,6 +743,27 @@ function transcript(chat: Bag): Turn[] {
   // would be a write per token and a hit never.
   if (chat.activeTurn) out.push(...built(chat.activeTurn, true));
   return out;
+}
+
+/**
+ * Whether the reference client would draw a message, and how much of it.
+ *
+ * Two well-known keys on a message's `_meta`, VS Code's own, each with a
+ * text-prefix spelling for a host that cannot write `_meta`: one hides the
+ * whole turn, the other only the request row and leaves the answer. They are
+ * how the editor keeps its own house out of the transcript - a "Couldn't open
+ * session" notice, an Agent Merge status - which the host appended as a turn
+ * because that is the one thing a host can append. Read at the projection
+ * rather than the view: a turn nobody would draw is a turn that is not there.
+ */
+function hiddenOf(message: Bag): 'turn' | 'request' | undefined {
+  const meta = bag(message._meta);
+  const text = str(message.text) ?? '';
+  if (meta['vscode.chat.hiddenFromTranscript'] === true
+    || text.startsWith('<!-- vscode-hidden-from-transcript -->\n')) return 'turn';
+  if (meta['vscode.chat.requestHiddenFromTranscript'] === true
+    || text.startsWith('<!-- vscode-request-hidden-from-transcript -->\n')) return 'request';
+  return undefined;
 }
 
 /** What `transcript` has already built for a finished turn. See the note in it. */
@@ -2460,7 +2483,9 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
           status: activityOf(
             typeof session.status === 'number' ? session.status : 1,
             Boolean(asked),
-            active !== undefined,
+            // From the wire, not from `active`: a running turn the reference
+            // client hides is still a turn the session is working on.
+            Boolean(chat.activeTurn),
             all[all.length - 1]?.state === 'failed',
           ),
           queued: queued(chat),

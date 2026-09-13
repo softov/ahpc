@@ -105,3 +105,73 @@ describe('a running tool call with a progress line', () => {
     await host.close();
   });
 });
+
+describe('a message the reference client keeps out of the transcript', () => {
+  const NOTICE = { kind: 'markdown', id: 'p1', content: 'Agent Merge: the branch was merged.' };
+  const turnWith = (id: string, message: Record<string, unknown>) => ({
+    id, startedAt: new Date().toISOString(), state: 'complete',
+    message: { text: 'merge status', origin: { kind: 'user' }, ...message },
+    responseParts: [{ ...NOTICE, id: `${id}-p1` }],
+  });
+  const opened = async (turns: unknown[]) => {
+    const { host, scripted, read } = await connect();
+    scripted.states.set(SESSION, { defaultChat: CHAT, chats: [{ resource: CHAT, title: 'Chat' }], status: 1 });
+    scripted.states.set(CHAT, { turns });
+    const reader = read();
+    await settle();
+    return { host, reader };
+  };
+
+  it('loses its request row and keeps its answer', async () => {
+    const { host, reader } = await opened([
+      turnWith('t1', { _meta: { 'vscode.chat.requestHiddenFromTranscript': true } }),
+    ]);
+    const turns = reader.view()?.turns ?? [];
+    expect(turns.map((turn) => turn.role)).toEqual(['agent']);
+    expect(turns[0]?.parts).toHaveLength(1);
+    reader.close();
+    await host.close();
+  });
+
+  it('is read from the text prefix too, for a host that cannot write _meta', async () => {
+    const { host, reader } = await opened([
+      turnWith('t1', { text: '<!-- vscode-request-hidden-from-transcript -->\nmerge status' }),
+    ]);
+    expect((reader.view()?.turns ?? []).map((turn) => turn.role)).toEqual(['agent']);
+    reader.close();
+    await host.close();
+  });
+
+  it('goes whole when the whole message is hidden, and the turns around it stay', async () => {
+    const { host, reader } = await opened([
+      turnWith('t0', {}),
+      turnWith('t1', { _meta: { 'vscode.chat.hiddenFromTranscript': true } }),
+      turnWith('t2', { text: '<!-- vscode-hidden-from-transcript -->\nsetup' }),
+      turnWith('t3', {}),
+    ]);
+    const turns = reader.view()?.turns ?? [];
+    expect(turns.map((turn) => turn.id)).toEqual(['t0:said', 't0', 't3:said', 't3']);
+    reader.close();
+    await host.close();
+  });
+
+  it('still says the session is working while a hidden turn runs', async () => {
+    const { host, scripted, read } = await connect();
+    scripted.states.set(SESSION, { defaultChat: CHAT, chats: [{ resource: CHAT, title: 'Chat' }], status: 1 });
+    scripted.states.set(CHAT, { turns: [] });
+    const reader = read();
+    await settle();
+    await scripted.act(CHAT, {
+      type: 'chat/turnStarted', turnId: 't1', startedAt: new Date().toISOString(),
+      message: { text: 'setup', origin: { kind: 'user' }, _meta: { 'vscode.chat.hiddenFromTranscript': true } },
+    });
+    await settle();
+    const view = reader.view();
+    expect(view?.active).toBeUndefined();
+    expect(view?.turns).toHaveLength(0);
+    // The in-progress bit, from the wire rather than from the rows drawn.
+    expect((view?.status ?? 0) & 8).toBe(8);
+    reader.close();
+    await host.close();
+  });
+});
