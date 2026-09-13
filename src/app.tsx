@@ -10,6 +10,7 @@ import {
 import { KeyHints, Row, registerBuiltins } from '@textui/widgets';
 import { CONTROLLER, createController } from './control.js';
 import { fakeHost } from './ahp/fake.js';
+import { hostResources } from './resources.js';
 import type { HostConnection } from './ahp/connection.js';
 import {
   BOOD, BOOD_FLOAT, BOOD_FLOOR, BOOD_INLINE, FOCUS, HOST, HOST_ERROR, INPUT, INPUT_STATUS, OPEN, RUNNING, SCREEN,
@@ -480,6 +481,9 @@ export function registerChat(app: TextUIApp, options: ChatOptions = {}): Disposa
   app.store.set(BOOD_FLOAT, options.boodFloat ?? false);
   bag.add(controller);
   bag.add(app.services.provide(CONTROLLER, controller));
+  // `file:` is the host's disk from here on, for the picker and anything
+  // else in textui that reads the resource registry.
+  bag.add(app.resources.registerProvider(hostResources(host)));
 
   for (const [component, render] of [
     ['ChatBubble', ChatBubble],

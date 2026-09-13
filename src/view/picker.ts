@@ -1,4 +1,5 @@
 import type { TextUIApp } from '@textui/core';
+import { argumentOf } from '@textui/widgets';
 
 /**
  * The palette, moved.
@@ -46,6 +47,10 @@ export interface PickerOptions {
 export function openPicker(app: TextUIApp, options: PickerOptions): void {
   const command = app.commands.get(options.commandId);
   if (!command) return;
+  // A chip whose command has no question to ask runs it: the workspace chip
+  // opens a dialog of its own, and a palette drilled into nothing is a list
+  // of one row that runs it anyway.
+  if (!argumentOf(command)) { void app.execute(options.commandId, undefined, 'menu'); return; }
 
   // The chip that opened this one closes it. A control whose panel is already
   // showing is a toggle - clicking it again to make it go away is the first

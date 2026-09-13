@@ -1397,7 +1397,7 @@ describe('the composer is the front door', () => {
 
   it('takes a typed answer where the argument has no choices', async () => {
     const { t } = await open();
-    await t.app.execute('compose.workspace', { path: '/brb_main/src/brb_framework' });
+    await t.app.execute('compose.workspace.path', { path: '/brb_main/src/brb_framework' });
     for (let i = 0; i < 6; i++) await t.settle();
     // The same overlay either way: an argument with choices is picked from and
     // one without is typed into, which is what makes a workspace list a later
@@ -1620,6 +1620,63 @@ describe('the composer is the front door', () => {
     expect(t.app.focus.focused()).toBe('chat.composer');
     expect(t.app.screens.current()?.id).toBe('new');
     expect(footer()).toContain('alt+enter newline');
+    await t.unmount();
+  });
+
+  /**
+   * The workspace is picked by looking at the host's directories.
+   *
+   * The reference client lists folders in the same chip, and a folder on a
+   * host is something `resourceList` answers about: the picker is textui's,
+   * over a `file:` provider that is the host's disk, and it starts where the
+   * chip points when the host will list that.
+   */
+  it('picks the workspace from the host\'s directories', async () => {
+    const { t } = await open({ width: 100, height: 26 });
+    t.app.store.set(WORKSPACE, '/github/textui');
+    for (let i = 0; i < 4; i++) await t.settle();
+    t.focus('chat.composer');
+    await t.settle();
+    for (let i = 0; i < 4; i++) { t.press('tab'); await t.settle(); }
+    expect(t.app.focus.focused()).toBe('chat.option.workspace');
+    t.press('enter');
+    for (let i = 0; i < 10; i++) await t.settle();
+    expect(t.hasText('file:///github/textui')).toBe(true);
+    expect(t.hasText('Use this folder')).toBe(true);
+    expect(t.hasText('src')).toBe(true);
+    // Into `src`, and then that folder is the answer.
+    t.press('down'); t.press('down'); t.press('enter');
+    for (let i = 0; i < 10; i++) await t.settle();
+    expect(t.hasText('file:///github/textui/src')).toBe(true);
+    t.press('enter');
+    for (let i = 0; i < 10; i++) await t.settle();
+    expect(t.store.get<string>(WORKSPACE)).toBe('/github/textui/src');
+    expect(t.hasText('Use this folder')).toBe(false);
+    // Back on the chip that asked, which now says where.
+    expect(t.app.focus.focused()).toBe('chat.option.workspace');
+    expect(t.lines().slice(-4, -3)[0]).toContain('src');
+    await t.unmount();
+  });
+
+  it('starts the picker somewhere the host serves when the chip points elsewhere', async () => {
+    const { t } = await open({ width: 100, height: 26 });
+    // The client's own cwd, which is what the chip holds before anybody
+    // says otherwise, and which the host has never heard of.
+    t.app.store.set(WORKSPACE, '/nowhere/on/the/host');
+    for (let i = 0; i < 4; i++) await t.settle();
+    await t.app.execute('go.sessions');
+    for (let i = 0; i < 6; i++) await t.settle();
+    await t.app.execute('session.new');
+    for (let i = 0; i < 6; i++) await t.settle();
+    void t.app.execute('compose.workspace');
+    for (let i = 0; i < 10; i++) await t.settle();
+    expect(t.hasText('Use this folder')).toBe(true);
+    expect(t.hasText('/nowhere/on/the/host')).toBe(false);
+    // A directory some session in the catalogue is in.
+    expect(t.lines().some((line) => /file:\/\/\/\S+/.test(line))).toBe(true);
+    t.press('escape');
+    for (let i = 0; i < 6; i++) await t.settle();
+    expect(t.store.get<string>(WORKSPACE)).toBe('/nowhere/on/the/host');
     await t.unmount();
   });
 

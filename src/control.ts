@@ -10,7 +10,7 @@ import { spawn } from 'node:child_process';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { confirm } from '@textui/widgets';
+import { confirm, pick } from '@textui/widgets';
 import { findBlocks, toBlocks } from './blocks.js';
 import { chatMatches, linksIn, parseSessionLink, sessionOfLink } from './links.js';
 import { operate } from './ahp/operate.js';
@@ -1921,13 +1921,41 @@ function commands(
       id: 'compose.workspace',
       title: 'Workspace',
       category: 'Compose',
-      description: 'Select the workspace',
+      description: 'Choose the directory the session works in, from the host\'s own',
       slots: ['palette'],
       when: `!${OPEN}`,
-      // No `choices`, so the palette asks for it as text - the same overlay,
-      // with its field as the answer rather than as a filter. Give it a
-      // `choices` function later and the same chip becomes a list of
-      // workspaces without anything else changing.
+      /*
+       * Picked by looking, the way the reference client picks a folder: it
+       * lists the host's directories over `resourceList`, and so does this,
+       * through the `file:` provider `registerChat` mounts. The dialog is
+       * textui's, which walks the resource registry and never the disk this
+       * client is on - a path typed blind was the only way before, and it
+       * had to be a path on a machine you could not see.
+       *
+       * Started where the chip already points, when the host will list it;
+       * a served directory off the catalogue otherwise, since the served set
+       * is the one thing a host does not announce.
+       */
+      run: async () => {
+        const held = app.store.get<string>(WORKSPACE) ?? '';
+        const at = `file://${held}`;
+        const served = sessions(app.store).flatMap((one) => one.workingDirectories)[0];
+        const listable = held !== '' && await controller.files(at).then(() => true, () => false);
+        const start = listable ? at : served ?? at;
+        const picked = await pick(app, { start, wants: 'directory', title: 'Workspace', placeholder: 'Filter this directory…' });
+        if (picked !== null) app.store.set(WORKSPACE, decodeURIComponent(picked.replace(/^file:\/\//, '')));
+      },
+    },
+    {
+      id: 'compose.workspace.path',
+      title: 'Workspace path',
+      category: 'Compose',
+      description: 'Type the directory the session works in',
+      slots: ['palette'],
+      when: `!${OPEN}`,
+      // For a directory the host serves and the picker cannot reach: the
+      // picker starts from what it can list, and a served directory nothing
+      // has been started in yet is not on its way anywhere.
       args: [{
         name: 'path',
         type: 'string' as const,
