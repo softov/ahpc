@@ -2,6 +2,14 @@
 
 What VS Code's agent host changed since this client was last read against it, and what each change asks of this repository. One pass per review; a box is ticked by the commit that lands the work. The host side of the same pass is `UPSTREAM.md` in `ahpd`, and the method - which clone, which directories, in what order - is in that repository's `REFERENCE.md`.
 
+## Pass 3 - 2026-09-13, seeing the wire
+
+Same revisions as Pass 2. Not a change upstream made but a gap the review left: there is no way to see what this client and a host say to each other while it runs, so every question about the wire has been answered by reading source. The host side is the same pass in `ahpd`, and the format is shared.
+
+- [ ] **`--wire <file>` writes every frame, both directions, as JSONL.** One line per frame: `{ "at": <ISO time>, "dir": "in" | "out", "peer": <host URL>, "frame": <the JSON-RPC message as sent> }`, the format `ahpd --wire` writes, so `ahpd`'s `tools/validate.mjs` reads a capture from either end. Across reconnects, since the reconnect is the part worth capturing.
+- [ ] **`ahpc wire <file>` tails a capture live.** One row per frame: time, direction, method or action type, channel; a row opens to the payload. Filter by channel and by method, the way the catalogue filters. Reads a file `ahpd` or this client is still writing, so the two ends can be watched side by side.
+- [ ] **`agent-host-session://` links open here.** The reference host's tools answer with `openLink` in that scheme (`common/openSessionLink.ts`); VS Code's window turns one into a click that opens the session or chat. A link in a transcript here opens the same thing.
+
 ## Pass 2 - 2026-09-13
 
 VS Code `3aa54039` (2026-08-29) to `8e35945b` (2026-09-12), 206 agentHost commits. Protocol repository `fd0471d` to `a21274d`, dependabot only: `@microsoft/agent-host-protocol@0.9.0` is still current.
