@@ -5,6 +5,7 @@ import { fakeHost } from '../src/ahp/fake.js';
 import { CONTROLLER } from '../src/control.js';
 import { sessions } from '../src/state.js';
 import { activityOf } from '../src/ahp/live.js';
+import { CHAT, SESSION, connect } from './scenario.js';
 
 /*
  * A catalogue is only as fresh as what it was last told.
@@ -236,5 +237,31 @@ describe('the state a live session reports', () => {
   it('carries the session flags through untouched', () => {
     expect(activityOf(1 | READ | ARCHIVED, false, true, false)).toBe(8 | READ | ARCHIVED);
     expect(activityOf(2 | READ, false, false, false)).toBe(1 | READ);
+  });
+});
+
+describe('the config a live session reports', () => {
+  it('keeps one-value answers and leaves the objects to the host', async () => {
+    const { host, scripted } = await connect();
+    // Claude's schema, as ahpd sends it: `permissions` is an object and
+    // `shellInitScripts` a list. Stringified, they went back to the host on
+    // the next `resolveSessionConfig` and on `createSession` as
+    // `[object Object]` - an answer to a question nobody was asked.
+    scripted.states.set(SESSION, {
+      defaultChat: CHAT, chats: [{ resource: CHAT, title: 'Chat' }], status: 1,
+      config: {
+        schema: { type: 'object', properties: {
+          permissionMode: { type: 'string', enum: ['default', 'plan'], sessionMutable: true },
+          permissions: { type: 'object', sessionMutable: true },
+          shellInitScripts: { type: 'array', readOnly: true },
+        } },
+        values: { permissionMode: 'default', permissions: { allow: [], deny: [] }, shellInitScripts: [] },
+      },
+    });
+    scripted.states.set(CHAT, { turns: [] });
+    const config = await host.config(SESSION as never);
+    expect(config.values).toEqual({ permissionMode: 'default' });
+    expect(config.properties.map((property) => property.key)).toEqual(['permissionMode', 'permissions', 'shellInitScripts']);
+    await host.close();
   });
 });

@@ -1016,7 +1016,13 @@ function config(value: unknown): SessionConfig {
         ...(str(property.default) ? { default: str(property.default) as string } : {}),
       };
     }),
-    values: Object.fromEntries(Object.entries(values).map(([key, entry]) => [key, String(entry)])),
+    // What is on a chip, and what goes back to the host as answered: one
+    // value each. `permissions` is an object and `shellInitScripts` a list,
+    // and neither is a control here - stringified they went back to the host
+    // as `[object Object]`, an answer to a question nobody was asked.
+    values: Object.fromEntries(Object.entries(values)
+      .filter(([, entry]) => typeof entry === 'string' || typeof entry === 'number' || typeof entry === 'boolean')
+      .map(([key, entry]) => [key, String(entry)])),
   };
 }
 
