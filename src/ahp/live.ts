@@ -1012,6 +1012,7 @@ function config(value: unknown): SessionConfig {
         })),
         sessionMutable: property.sessionMutable === true,
         ...(property.enumDynamic === true ? { enumDynamic: true } : {}),
+        ...(property.readOnly === true ? { readOnly: true } : {}),
         ...(str(property.default) ? { default: str(property.default) as string } : {}),
       };
     }),

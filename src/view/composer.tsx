@@ -1,5 +1,5 @@
 import type { BoxProps, RenderOutput } from '@textui/core';
-import { defineComponent, useEffect, useMeasure, useSize, useState, useTheme } from '@textui/core';
+import { defineComponent, useApp, useEffect, useMeasure, useSize, useState, useTheme } from '@textui/core';
 import type { ListItem } from '@textui/widgets';
 import { Column, Divider, List, TextArea } from '@textui/widgets';
 import type { Completion, SlashCommand } from '../ahp/types.js';
@@ -18,11 +18,11 @@ const VISIBLE = 8;
 
 /**
  * Rows the composer itself takes: two border, two divider, the field and the
- * bar under it. Eight menu rows on a terminal twelve high left four for all
- * of that and drew an empty box - a menu on top of a field with no room to
- * type in it.
+ * two control rows under it. Eight menu rows on a terminal twelve high left
+ * four for all of that and drew an empty box - a menu on top of a field with
+ * no room to type in it.
  */
-const COMPOSER_ROWS = 6;
+const COMPOSER_ROWS = 7;
 
 /** The menu's own frame, which is height the list does not get. */
 const MENU_BORDER = 2;
@@ -107,6 +107,7 @@ export const ChatComposer: (props: ChatComposerProps) => RenderOutput =
       focusId = 'chat.composer', ...rest
     } = props;
     const theme = useTheme();
+    const app = useApp();
 
     // A slash menu is a completion over what is already typed, not a mode.
     const slash = value.startsWith('/') && !value.includes(' ') ? value.slice(1).toLowerCase() : null;
@@ -287,6 +288,7 @@ export const ChatComposer: (props: ChatComposerProps) => RenderOutput =
             options={options}
             onOpen={(option, anchorId) => onOption?.(option, anchorId)}
             onSend={() => onSubmit(value)}
+            onLeave={() => app.focus.focus(focusId)}
             {...(running ? { running: true } : {})}
             queued={queued}
             sendDisabled={value.trim() === ''}

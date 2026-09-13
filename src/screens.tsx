@@ -1,4 +1,4 @@
-import type { ArgSpec, BindingPath, RenderOutput, SemanticVariant, TextUIApp } from '@textui/core';
+import type { ArgSpec, BindingPath, RenderOutput, SemanticVariant, TextUIApp, UnicodeLevel } from '@textui/core';
 import {
   defineComponent,
   useApp,
@@ -31,7 +31,7 @@ import { findBlocks, toBlocks } from './blocks.js';
 import type {
   Agent, Automation, Changeset, ChangesetScope, Completion, ContentRef, Customization, FileContent, PendingInput, QueuedMessage, ResourceEntry,
   TerminalRow, TerminalState,
-  SessionConfig, SessionDetail, SessionSummary, SlashCommand, Turn,
+  ModelRow, SessionConfig, SessionDetail, SessionSummary, SlashCommand, Turn,
 } from './ahp/types.js';
 import { decodeStatus } from './ahp/status.js';
 import { ChatTranscript } from './view/transcript.js';
@@ -66,6 +66,16 @@ import type { ComposerOption } from './view/controls.js';
  * Every screen is composition. The parts are in `view/`, the actions are in
  * `control.ts`, and what is left here is which part goes where.
  */
+
+/**
+ * Keys the reference host seeds from the client's own settings and never asks
+ * about (`WELL_KNOWN_PICKER_PROPERTIES` in `agentHostChatInputPicker.ts`):
+ * how a worktree's branch is named and tracked, which ignored files come
+ * along, the shell's init script. Declared so the value rides in the config
+ * bag; drawn, they are five chips nobody can change, which is what "too many
+ * options" looked like.
+ */
+const SEEDED = new Set(['worktreeBranchPrefix', 'worktreeBranchTrack', 'worktreeCreateNewBranch', 'worktreeIncludeFiles', 'shellInitScripts']);
 
 /**
  * Everything the catalogue knows about one session, as rows.
@@ -113,7 +123,7 @@ function describe(session: SessionSummary, detail: SessionDetail | null): Detail
     // how the pane came to show a blank "Permissions" against a host whose key
     // for it is `autoApprove`.
     ...(detail?.config.properties ?? [])
-      .filter((property) => property.values.length > 0)
+      .filter((property) => property.values.length > 0 && !SEEDED.has(property.key))
       .map((property) => ({
         id: `config.${property.key}`,
         label: property.title,
@@ -472,6 +482,14 @@ function useHarnessCommands(): Customization[] {
   return items;
 }
 
+
+/**
+ * The keys that say where a session runs, which get a row of their own, in
+ * the order they read: after the directory, whether the session sits in it
+ * or in a worktree of it, and then the branch a worktree starts from.
+ */
+const WHERE = ['isolation', 'branch'];
+
 function useComposerOptions(): ComposerOption[] {
   const unicode = useCapabilities().unicode;
   const controller = useRequiredService(CONTROLLER);
@@ -489,16 +507,26 @@ function useComposerOptions(): ComposerOption[] {
   }, []);
   // Asking is also what registers a command per property, so the chips below
   // have something to open and the palette has the same questions in it.
+  // Asked again after every answer while there is no session yet, because
+  // the questions depend on the answers: `branch` is read-only until
+  // isolation is `worktree`, and the reference host rewrites the schema on
+  // `resolveSessionConfig` to say so. On what the values say rather than the
+  // object, since the host's echo of the same answers is a new object every
+  // time and would ask forever. An open session's config arrives on its own
+  // channel, and asking for it after every change would answer with the
+  // value the host held before the change reached it.
+  const answered = open ? '' : JSON.stringify(settings);
   useEffect(() => {
     void controller.settings().then(setConfig)
       .catch((error: unknown) => controller.report(error));
-  }, [provider, open]);
+  }, [provider, open, answered]);
 
   const agent = agents.find((found) => found.provider === provider);
   // A harness with no models is the ordinary answer for one nobody has signed
   // into, so the chip says so rather than opening on an empty list. Until the
   // catalogue has arrived there is no harness to say it about.
   const models = agent ? agent.models : null;
+  const fromConfig = fromConfigOf(unicode, config, models, model, settings, open);
 
   return [
     {
@@ -546,41 +574,58 @@ function useComposerOptions(): ComposerOption[] {
           commandId: modelCommand(property.key),
         };
       }),
-    ...(config?.properties ?? [])
-      .filter((property) => property.values.length > 0)
-      // A key the model also asks about is the model's to answer: the session
-      // key is the whole harness's default and the model's is what this
-      // message runs at, and drawing both put two controls on one row
-      // disagreeing about the same setting.
-      .filter((property) => !(models?.find((found) => found.id === model)?.options ?? [])
-        .some((one) => one.key === property.key))
-      .map((property): ComposerOption => {
-        const value = settings[property.key];
-        const chosen = property.values.find((found) => found.value === value);
-        return {
-          id: property.key,
-          // The value's own mark where it has one - which of five approval
-          // modes is in force is the thing worth reading from the row itself.
-          // The question's mark otherwise, so a branch chip is still a branch.
-          icon: (value !== undefined
-            ? valueIcon(unicode, value, chosen?.label)
-            : undefined)
-            ?? settingIcon(unicode, property.key, property.title),
-          label: chosen?.label ?? value ?? property.title,
-          // The question, for anything showing these with room for the pair.
-          title: property.title,
-          // Shown but not asked where the host says it cannot be changed on a
-          // running session: offering it produces a refusal, not an edit.
-          ...(open && !property.sessionMutable ? {} : { commandId: settingCommand(property.key) }),
-        };
-      }),
+    ...fromConfig.filter((option) => !option.where),
     {
       id: 'workspace',
       icon: settingIcon(unicode, 'workspace'),
       label: workspaceName(workspace ? `file://${workspace}` : undefined),
+      where: true,
       ...(open ? {} : { commandId: 'compose.workspace' }),
     },
+    ...fromConfig.filter((option) => option.where)
+      .sort((a, b) => WHERE.indexOf(a.id) - WHERE.indexOf(b.id)),
   ];
+}
+
+/** The session's own questions, as chips. */
+function fromConfigOf(unicode: UnicodeLevel, config: SessionConfig | null, models: ModelRow[] | null, model: string, settings: Record<string, string>, open: string | null): ComposerOption[] {
+  return (config?.properties ?? [])
+    // Something to choose from, or a host that said to ask it: `branch` is
+    // `enumDynamic` with its values behind `sessionConfigCompletions`, and
+    // a chip that needed the list up front never showed the one question
+    // that has more answers than a schema holds.
+    .filter((property) => (property.values.length > 0 || property.enumDynamic === true) && !SEEDED.has(property.key))
+    // A key the model also asks about is the model's to answer: the session
+    // key is the whole harness's default and the model's is what this
+    // message runs at, and drawing both put two controls on one row
+    // disagreeing about the same setting.
+    .filter((property) => !(models?.find((found) => found.id === model)?.options ?? [])
+      .some((one) => one.key === property.key))
+    // Shown but not asked where the host says it cannot be changed on a
+    // running session, or at all: offering it produces a refusal, not an
+    // edit. And a value that is neither askable nor known is nothing to
+    // draw: a read-only `branch` with no default is a chip saying "Branch".
+    .map((property) => ({ property, asked: !((open && !property.sessionMutable) || property.readOnly === true) }))
+    .filter(({ property, asked }) => asked || settings[property.key] !== undefined)
+    .map(({ property, asked }): ComposerOption => {
+      const value = settings[property.key];
+      const chosen = property.values.find((found) => found.value === value);
+      return {
+        id: property.key,
+        // The value's own mark where it has one - which of five approval
+        // modes is in force is the thing worth reading from the row itself.
+        // The question's mark otherwise, so a branch chip is still a branch.
+        icon: (value !== undefined
+          ? valueIcon(unicode, value, chosen?.label)
+          : undefined)
+          ?? settingIcon(unicode, property.key, property.title),
+        label: chosen?.label ?? value ?? property.title,
+        // The question, for anything showing these with room for the pair.
+        title: property.title,
+        ...(WHERE.includes(property.key) ? { where: true } : {}),
+        ...(asked ? { commandId: settingCommand(property.key) } : {}),
+      };
+    });
 }
 
 // -------------------------------------------------------------------- 2. chat

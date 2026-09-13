@@ -24,6 +24,7 @@ import {
 } from './screens.js';
 import { ChatBubble, ReasoningBlock, StreamingText } from './view/bubble.js';
 import { ChatComposer } from './view/composer.js';
+import { SEND_ID } from './view/controls.js';
 import { ChatHitl } from './view/hitl.js';
 import { ChatTranscript } from './view/transcript.js';
 import { BoodSprite, Creature, moodOf, pickBood } from './view/creature.js';
@@ -166,6 +167,7 @@ const Header = defineComponent<Record<string, never>>('ChatHeader', () => {
  */
 const Hints = defineComponent<BoxProps>('ChatHints', (props) => {
   const theme = useTheme();
+  const app = useApp();
   /**
    * Which key the footer names for a newline.
    *
@@ -195,8 +197,19 @@ const Hints = defineComponent<BoxProps>('ChatHints', (props) => {
   // it, escape leaves the field; from the transcript, escape leaves the
   // screen - and a hint row that said one of those in both places is wrong
   // half the time.
-  const focused = useStoreValue<string | null>(FOCUS, null);
+  const focused = useStoreValue<string | null>(FOCUS, null) ?? null;
   const composing = focused === 'chat.composer';
+  // The control rows under the field are their own place: enter there opens
+  // a chip's panel or sends, and "alt+enter newline" is a key for a field
+  // the keyboard has left.
+  const onChip = focused !== null && focused.startsWith('chat.option.');
+  const onSend = focused === SEND_ID;
+  // A panel over the screen - a chip's picker, the palette - holds the
+  // keyboard, and the keys are the panel's until it closes. Read off the
+  // layers when the focus moves, which a panel that traps it does on the way
+  // in and on the way out; the layers themselves are not something a
+  // component can subscribe to.
+  const inPanel = app.layers.entries().some((entry) => entry.trapFocus === true);
 
   // A question is not a confirmation, and the keys are not the same either.
   // Offering "a approve" over an elicitation is the same mistake as rendering
@@ -224,6 +237,34 @@ const Hints = defineComponent<BoxProps>('ChatHints', (props) => {
           { keys: 'space', label: 'choose' },
           { keys: 'enter', label: 'send answers' },
           { keys: 'esc', label: 'read' },
+        ]}
+      />
+    );
+  }
+
+  if (inPanel) {
+    return (
+      <KeyHints
+        {...props}
+        hints={[
+          { keys: upDown, label: 'move' },
+          { keys: 'enter', label: 'choose' },
+          { keys: 'esc', label: 'back' },
+          { keys: 'ctrl+c', label: running ? 'stop' : 'quit' },
+        ]}
+      />
+    );
+  }
+
+  if ((screen === 'chat' || screen === 'new') && (onChip || onSend)) {
+    return (
+      <KeyHints
+        {...props}
+        hints={[
+          { keys: 'enter', label: onSend ? (screen === 'new' ? 'start' : running ? 'queue' : 'send') : 'open' },
+          { keys: 'tab', label: 'next option' },
+          { keys: 'esc', label: 'write' },
+          { keys: 'ctrl+c', label: running ? 'stop' : 'quit' },
         ]}
       />
     );

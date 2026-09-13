@@ -87,7 +87,16 @@ const EFFORTS: { value: string; label: string }[] = [
   { value: 'max', label: 'Max' },
 ];
 
-const CONFIG: SessionConfig['properties'] = [
+/**
+ * The session's questions, as the reference host asks them.
+ *
+ * A function of the answers so far rather than a table: `branch` is a
+ * question only while a worktree is being made, and the reference host marks
+ * it read-only otherwise, because a folder session works on whatever is
+ * checked out. `worktreeCreateNewBranch` is one of the values it seeds from
+ * the client's own settings and never asks about.
+ */
+const configOf = (values: Record<string, string>): SessionConfig['properties'] => [
   {
     key: 'branch',
     title: 'Branch',
@@ -96,6 +105,18 @@ const CONFIG: SessionConfig['properties'] = [
     // reference host marks exactly this property this way.
     values: [],
     enumDynamic: true,
+    ...(values.isolation === 'worktree' ? {} : { readOnly: true }),
+    sessionMutable: false,
+  },
+  {
+    key: 'worktreeCreateNewBranch',
+    title: 'Create a branch',
+    values: [
+      { value: 'true', label: 'Create one' },
+      { value: 'false', label: 'Continue the chosen branch' },
+    ],
+    default: 'true',
+    readOnly: true,
     sessionMutable: false,
   },
   {
@@ -121,6 +142,11 @@ const CONFIG: SessionConfig['properties'] = [
     ],
   },
 ];
+const DEFAULTS = { permissionMode: 'default', isolation: 'workspace' };
+const configFor = (values: Record<string, string>): SessionConfig => {
+  const held = { ...DEFAULTS, ...values };
+  return { properties: configOf(held), values: held };
+};
 
 let counter = 0;
 const nextId = (prefix: string): string => `${prefix}${++counter}`;
@@ -1295,10 +1321,7 @@ export function fakeHost(): FakeHost {
     // Iterative, as a real host's is: what has been answered comes back
     // answered. A fixture that returns its defaults every time quietly undoes
     // every choice the moment anything asks the question again.
-    resolveConfig: async ({ values }): Promise<SessionConfig> => ({
-      properties: CONFIG,
-      values: { permissionMode: 'default', isolation: 'workspace', ...values },
-    }),
+    resolveConfig: async ({ values }): Promise<SessionConfig> => configFor(values ?? {}),
 
     automations: async () => [...automations.values()],
 
@@ -2118,10 +2141,7 @@ export function fakeHost(): FakeHost {
         chat,
         chats: chatsOf(uri),
         lifecycle: summaries.has(uri) ? 'ready' : 'creating',
-        config: {
-          properties: CONFIG,
-          values: { permissionMode: 'default', isolation: 'workspace', ...(configs.get(uri) ?? {}) },
-        },
+        config: configFor(configs.get(uri) ?? {}),
         // The id a turn named, resolved against the catalogue - which is what
         // the live host does, and a fixture that answered a bare id would be
         // one where the screens were never asked to resolve anything.
@@ -2130,10 +2150,7 @@ export function fakeHost(): FakeHost {
       };
     },
 
-    config: async (uri): Promise<SessionConfig> => ({
-      properties: CONFIG,
-      values: { permissionMode: 'default', isolation: 'workspace', ...(configs.get(uri) ?? {}) },
-    }),
+    config: async (uri): Promise<SessionConfig> => configFor(configs.get(uri) ?? {}),
 
     setConfig: (uri, key, value) => {
       // One key, merged. Writing the whole object back is how a value another

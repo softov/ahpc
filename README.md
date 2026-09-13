@@ -74,7 +74,7 @@ Inside a session, the header shows the model, thinking level, permission mode, w
 
 ![Starting a session, and the questions the host asks first](docs/img/compose.svg)
 
-Before the first message, a new session asks the agent, the model and its options, the permission mode and the workspace. The questions come from the host's `configSchema`, so options `ahpc` has never seen still get a row.
+Before the first message, a new session asks the agent, the model and its options, the permission mode and the workspace. The questions come from the host's `configSchema`, so options `ahpc` has never seen still get a chip. Two rows under the field: what runs on the first, and where it runs on the second - the directory, in place or in a worktree of it, and the branch a worktree starts from. What the host marks `readOnly` is shown and not asked, and the worktree seeds the reference client never draws (`worktreeBranchPrefix`, `worktreeCreateNewBranch`, `worktreeBranchTrack`, `worktreeIncludeFiles`, `shellInitScripts`) are not drawn here either.
 
 ### Keys
 
@@ -82,8 +82,8 @@ Before the first message, a new session asks the agent, the model and its option
 |---|---|
 | `enter` | Send |
 | `alt+enter` | Newline |
-| `tab` | Move to the options row |
-| `esc` | Close the menu, then leave the field, then go back |
+| `tab` | Move through the option rows |
+| `esc` | Close the menu, then leave the field, then go back. On an option, back to the field |
 | `/` | Slash commands, from the host and from `ahpc` — `/config` opens the settings palette |
 | `@` | Complete a file path on the host |
 | `ctrl+g` | Edit the message in `$VISUAL` or `$EDITOR` |

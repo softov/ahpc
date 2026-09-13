@@ -537,6 +537,16 @@ export interface ConfigProperty {
    */
   enumDynamic?: boolean;
   /**
+   * Shown, never asked.
+   *
+   * The reference host puts this on a value the client seeds rather than a
+   * person picks - a branch prefix, whether a worktree gets a branch of its
+   * own - and on `branch` while isolation is `folder`, where the checkout
+   * decides and a control would change nothing. Offered anyway it produces a
+   * refusal, not an edit.
+   */
+  readOnly?: boolean;
+  /**
    * What the host opens with, where it said.
    *
    * Routinely absent, and absent is not "the first one": a model that takes a

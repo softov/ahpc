@@ -1506,12 +1506,14 @@ describe('the composer is the front door', () => {
     // Which chips exist is the host's answer, and it arrives a round trip
     // after the row is first drawn - so tab order is stated rather than left
     // to the order things happened to mount in.
+    // The first row, then the second: where the session runs comes after
+    // what runs it, and the directory before how the session sits in it.
     expect(walked).toEqual([
       'chat.option.harness',
       'chat.option.model',
       'chat.option.permissionMode',
-      'chat.option.isolation',
       'chat.option.workspace',
+      'chat.option.isolation',
     ]);
     await t.unmount();
   });
@@ -1539,6 +1541,85 @@ describe('the composer is the front door', () => {
     t.press('tab');
     await t.settle();
     expect(t.app.focus.focused()).toBe('chat.option.permissionMode');
+    await t.unmount();
+  });
+
+  /**
+   * Two rows, and the second is where.
+   *
+   * A host that answers every question the reference host asks - approvals,
+   * sandbox, isolation, branch, and three worktree seeds - put nine chips on
+   * one line and truncated each to its mark. What runs is one row and where
+   * it runs is the next; the seeds the reference host never draws are not
+   * drawn here either, and a read-only question is shown, not offered.
+   */
+  it('puts where the session runs on a row of its own, and asks only what the host asks', async () => {
+    const { t } = await open({ width: 100, height: 30 });
+    const bar = () => t.lines().slice(-5, -3);
+    // The directory leads the second row; the harness leads the first.
+    expect(bar()[0]).toContain('Claude Code');
+    expect(bar()[0]).toContain('Ask each time');
+    expect(bar()[1]).toContain('ahpc');
+    expect(bar()[1]).toContain('Workspace');
+    expect(bar()[0]).not.toContain('Workspace');
+    // The fake seeds `worktreeCreateNewBranch`, the way the reference host
+    // does: declared so the value rides in the config, never a chip.
+    expect(t.hasText('Create one')).toBe(false);
+    // `branch` is read-only until isolation is a worktree, and unknown: nothing.
+    expect(bar()[1]).not.toContain('Branch');
+
+    await t.app.execute('compose.set.isolation', { value: 'worktree' });
+    for (let i = 0; i < 10; i++) await t.settle();
+    // Asked again after the answer, the schema now offers the branch - and
+    // tab reaches it, after the directory and the isolation it belongs to.
+    expect(bar()[1]).toContain('Branch');
+    expect(bar()[1]).toContain('Worktree');
+    t.focus('chat.composer');
+    await t.settle();
+    const walked: (string | null)[] = [];
+    for (let i = 0; i < 7; i++) { t.press('tab'); await t.settle(); walked.push(t.app.focus.focused()); }
+    expect(walked).toEqual([
+      'chat.option.harness', 'chat.option.model', 'chat.option.permissionMode',
+      'chat.option.workspace', 'chat.option.isolation', 'chat.option.branch',
+      'chat.composer',
+    ]);
+    await t.unmount();
+  });
+
+  /**
+   * The footer says what the keys do where the keyboard is.
+   *
+   * On a chip, enter opens and escape is back to the field; "alt+enter
+   * newline" there is a key for a field the keyboard has left. In the panel
+   * the chip opened, the keys are the panel's.
+   */
+  it('names the keys for the row and the panel, not the field', async () => {
+    const { t } = await open();
+    const footer = () => t.lines().at(-2) ?? '';
+    expect(footer()).toContain('alt+enter newline');
+    t.press('tab');
+    await t.settle();
+    expect(t.app.focus.focused()).toBe('chat.option.harness');
+    expect(footer()).toContain('enter open');
+    expect(footer()).toContain('esc write');
+    expect(footer()).not.toContain('newline');
+
+    t.press('enter');
+    for (let i = 0; i < 8; i++) await t.settle();
+    expect(t.hasText('Which agent runs this')).toBe(true);
+    expect(footer()).toContain('enter choose');
+    expect(footer()).toContain('esc back');
+
+    // Escape closes the panel and lands on the chip; escape again is the
+    // field, not the catalogue.
+    t.press('escape');
+    for (let i = 0; i < 6; i++) await t.settle();
+    expect(t.app.focus.focused()).toBe('chat.option.harness');
+    t.press('escape');
+    for (let i = 0; i < 6; i++) await t.settle();
+    expect(t.app.focus.focused()).toBe('chat.composer');
+    expect(t.app.screens.current()?.id).toBe('new');
+    expect(footer()).toContain('alt+enter newline');
     await t.unmount();
   });
 
@@ -2005,8 +2086,13 @@ describe('the figure on an empty screen', () => {
  * fence, or reading a link's target rather than its label.
  */
 describe('what the agent said, as markdown or as typed', () => {
+  // A row taller than the usual size: the code span these look for is in the
+  // turn above the block waiting on a person, and the composer's two control
+  // rows leave it one row short of the screen at thirty.
+  const TALL = { width: 100, height: 32 };
+
   it('draws the emphasis rather than the asterisks', async () => {
-    const m = await conversation();
+    const m = await conversation(TALL);
     await run(m);
     // The transcript is scrolled to the newest turn, so this asserts on what
     // is actually on screen there: a code span, drawn as one.
@@ -2016,7 +2102,7 @@ describe('what the agent said, as markdown or as typed', () => {
   });
 
   it('shows the characters that arrived once it is switched off', async () => {
-    const m = await conversation();
+    const m = await conversation(TALL);
     await run(m);
     await m.t.app.execute('view.markdown');
     for (let i = 0; i < 6; i++) await m.t.settle();
@@ -2042,7 +2128,7 @@ describe('what the agent said, as markdown or as typed', () => {
    * `ctrl+m` is the one for terminals that can express it.
    */
   it('has a letter for it, because ctrl+m is not always a key', async () => {
-    const m = await conversation();
+    const m = await conversation(TALL);
     await run(m);
     m.t.focus('chat.transcript');
     for (let i = 0; i < 4; i++) await m.t.settle();
@@ -2061,7 +2147,7 @@ describe('what the agent said, as markdown or as typed', () => {
    * protocol, which is exactly where `ctrl+m` cannot work at all.
    */
   it('takes alt+m wherever the keyboard is, composer included', async () => {
-    const m = await conversation();
+    const m = await conversation(TALL);
     await run(m);
     m.t.focus('chat.composer');
     for (let i = 0; i < 4; i++) await m.t.settle();
@@ -2075,7 +2161,7 @@ describe('what the agent said, as markdown or as typed', () => {
   });
 
   it('leaves the letter alone while the composer has the keyboard', async () => {
-    const m = await conversation();
+    const m = await conversation(TALL);
     await run(m);
     m.t.focus('chat.composer');
     for (let i = 0; i < 4; i++) await m.t.settle();
