@@ -1848,7 +1848,7 @@ function commands(
       id: 'terminal.new',
       title: 'Open a terminal',
       category: 'Terminal',
-      description: 'Start a shell on the host, in a directory it serves',
+      description: 'Start a shell on the host, in the workspace directory',
       slots: ['palette'],
       run: () => {
         const where = app.store.get<string>(WORKSPACE);
@@ -1933,8 +1933,8 @@ function commands(
        * had to be a path on a machine you could not see.
        *
        * Started where the chip already points, when the host will list it;
-       * a served directory off the catalogue otherwise, since the served set
-       * is the one thing a host does not announce.
+       * a directory off the catalogue otherwise, which is somewhere on the
+       * host's machine that is known to exist.
        */
       run: async () => {
         const held = app.store.get<string>(WORKSPACE) ?? '';
@@ -1953,9 +1953,8 @@ function commands(
       description: 'Type the directory the session works in',
       slots: ['palette'],
       when: `!${OPEN}`,
-      // For a directory the host serves and the picker cannot reach: the
-      // picker starts from what it can list, and a served directory nothing
-      // has been started in yet is not on its way anywhere.
+      // For a host that lists nothing - one without the `resource*` family -
+      // and for a path already known, which is quicker typed than walked to.
       args: [{
         name: 'path',
         type: 'string' as const,
