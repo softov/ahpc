@@ -223,6 +223,7 @@ Writes are guarded by the file's etag unless you pass `--force`, so two clients 
 | Command | | |
 |---|---|---|
 | `dispatch <uri> <type>` | Send a raw protocol action | `--field k=v` `--chat` |
+| `wire <file>` | Watch a `--wire` capture as it is written, from either end: one row per frame, a row opens to the frame. Off a terminal, one line per frame | `--follow` `--filter text` `--json` |
 | `config` | Show the config file path and current values | `--json` |
 | `--version` | What version this is | |
 | `help` | Print this command list | |
@@ -353,7 +354,7 @@ npm run schema              # a strict JSON Schema from the package's own declar
 npm run wire -- <capture>   # check a recording against it
 ```
 
-`--wire <file>` (or `AHPC_RECORD=<file>`) appends every frame sent and received as one JSON line each, `{ at, from, peer, frame }`, the lines `ahpd --wire` writes, so a capture from either end reads the same and `jq` reads both. `test/conformance.test.ts` runs the same check against frames produced by the test run itself, so it cannot pass on a stale recording.
+`--wire <file>` (or `AHPC_RECORD=<file>`) appends every frame sent and received as one JSON line each, `{ at, from, peer, frame }`, the lines `ahpd --wire` writes, so a capture from either end reads the same and `jq` reads both. `ahpc wire <file>` watches one as it is written: a row per frame with the time, the direction, the method or action type and the channel, a filter over all of them, and the frame itself beside the list or, on a narrow terminal, under enter. Reading the host's capture and this client's side by side is what it is for. `test/conformance.test.ts` runs the same check against frames produced by the test run itself, so it cannot pass on a stale recording.
 
 The screens, widgets and input handling come from [TextUI](https://github.com/softov/textui) — `@textui/core` for components and state, `@textui/widgets` for the catalog, `@textui/terminal` for rendering and key decoding, and `@textui/testing` for the harness the tests run in. `ahpc` began as an example inside it.
 

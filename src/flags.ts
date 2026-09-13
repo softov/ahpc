@@ -28,7 +28,7 @@ export const COMMANDS: ReadonlySet<string> = new Set([
   'agents', 'models', 'commands', 'customizations', 'completions', 'changes', 'content',
   'prompt', 'exec', 'cancel', 'queue', 'unqueue',
   'watch', 'confirm', 'answer', 'dispatch',
-  'mcp', 'serve',
+  'mcp', 'serve', 'wire',
 ]);
 
 /**

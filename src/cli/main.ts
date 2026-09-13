@@ -114,6 +114,10 @@ Recording
                                lines: { at, from, peer, frame }, for
                                'npm run wire' to check against the protocol.
                                AHPC_RECORD=<file> is the same, from a shell
+  wire <file>                  watch a capture as it is written, from either
+                               end: one row per frame, a row opens to the
+                               frame. Off a terminal, one line per frame
+                               [--follow] [--filter text] [--json]
 
 Serving these sessions to something else
   mcp                          MCP on stdin and stdout, for a client that
@@ -315,6 +319,32 @@ export async function cli(command: string, rest: string[]): Promise<number> {
     const rows = Object.entries(file).map(([key, value]) => [key, String(value)]);
     if (rows.length === 0) line('  (nothing set)');
     else table(rows);
+    return 0;
+  }
+
+  /*
+   * A capture is a file, not a host.
+   *
+   * `ahpc wire out.jsonl` reads what `--wire` wrote - here or on the host -
+   * and needs no connection to do it; needing one would make it useless on
+   * exactly the capture of a host that would not answer.
+   */
+  if (command === 'wire') {
+    const file = args.positional(0);
+    if (file === undefined) throw new Fault('wire wants a file: ahpc wire <file>');
+    const settings = loadConfig('ahpc', args.value('--config-file'));
+    const { wireTui } = await import('../wiretui.js');
+    const theme = args.value('--theme') ?? settings.theme;
+    const shell = args.value('--shell') ?? settings.shell;
+    const filter = args.value('--filter');
+    await wireTui({
+      file,
+      follow: args.has('--follow'),
+      json: wants,
+      ...(filter === undefined ? {} : { filter }),
+      ...(theme === undefined ? {} : { theme }),
+      ...(shell === undefined ? {} : { shell }),
+    });
     return 0;
   }
 
