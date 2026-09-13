@@ -8,7 +8,7 @@ VS Code `3aa54039` (2026-08-29) to `8e35945b` (2026-09-12), 206 agentHost commit
 
 ### Protocol
 
-- [ ] **`1.0.0` comes out of `VERSIONS`.** VS Code's vendored `PROTOCOL_VERSION` went from `1.0.0` back to `0.9.0` when it resynced to protocol `fd0471d4`; the `1.0.0` this client was written around was a VS Code-local jump that never reached the protocol repository's `main`, and no host speaks it now. The host accepts `^0.9.0` and picks the highest compatible offer, so the entry was skipped rather than harmful, but the comment above the list says the opposite of what is true, and offering a version the installed types do not describe is the wrong kind of forward-compatibility. The automations normalisation stays - it is cheap and the old spelling is in Insiders builds from that window - with its comment corrected the same way.
+- [x] **`1.0.0` comes out of `VERSIONS`.** VS Code's vendored `PROTOCOL_VERSION` went from `1.0.0` back to `0.9.0` when it resynced to protocol `fd0471d4`; the `1.0.0` this client was written around was a VS Code-local jump that never reached the protocol repository's `main`, and no host speaks it now. The host accepts `^0.9.0` and picks the highest compatible offer, so the entry was skipped rather than harmful, but the comment above the list says the opposite of what is true, and offering a version the installed types do not describe is the wrong kind of forward-compatibility. The automations normalisation stays - it is cheap and the old spelling is in Insiders builds from that window - with its comment corrected the same way.
 
 ### What the reference host now puts on the wire
 

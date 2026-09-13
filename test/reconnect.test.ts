@@ -427,13 +427,15 @@ describe('history is read past the window a host opened with', () => {
   });
 });
 
-describe('the one thing that moved between 0.9.0 and 1.0.0', () => {
+describe('the one thing VS Code spelt differently for two weeks', () => {
   /*
-   * Everything else this client reads is byte-identical across the two
-   * versions - 96 action types, 41 method names, and the fields of
-   * `ChatState`, `Turn`, `ActiveTurn`, `SessionState` and `RootState`. What
-   * moved is the automations catalogue: `entries` under 0.9.0 and
-   * `automations` under 1.0.0, holding the very same automation shape.
+   * Its vendored copy of the protocol carried a `1.0.0` that never reached
+   * the repository's `main`, and everything this client reads was
+   * byte-identical across the two - 96 action types, 41 method names, and
+   * the fields of `ChatState`, `Turn`, `ActiveTurn`, `SessionState` and
+   * `RootState` - except the automations catalogue: `entries` in the
+   * protocol, `automations` there, holding the very same automation shape.
+   * It has gone back; the builds from that window have not all been updated.
    */
   const one = {
     resource: 'ahp-automation:/a1',
@@ -451,7 +453,7 @@ describe('the one thing that moved between 0.9.0 and 1.0.0', () => {
     return mine;
   };
 
-  it('reads a 0.9.0 catalogue', async () => {
+  it('reads the catalogue as the protocol spells it', async () => {
     const host = await liveHost({
       url: 'ws://scripted', clientId: 'ahpc-test', connect: open({ entries: [one] }),
       backoff: [0], keepaliveMs: 0,
@@ -461,7 +463,7 @@ describe('the one thing that moved between 0.9.0 and 1.0.0', () => {
     await host.close();
   });
 
-  it('reads a 1.0.0 catalogue, which is the one this client negotiates with VS Code', async () => {
+  it('reads the catalogue as those Insiders builds spell it', async () => {
     const host = await liveHost({
       url: 'ws://scripted', clientId: 'ahpc-test', connect: open({ automations: [one] }),
       backoff: [0], keepaliveMs: 0,

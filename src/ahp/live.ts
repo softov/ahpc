@@ -172,20 +172,23 @@ function isRpcRefusal(error: unknown): boolean {
 /**
  * Versions to offer at `initialize`, most preferred first.
  *
- * A host picks the first entry it also speaks, so this is a preference rather
- * than a floor. Offering one the installed library has no types for is safe:
- * every command used here is stable across all of them.
+ * A host picks the highest entry it also speaks, so this is a preference
+ * rather than a floor. `0.9.0` is the newest published and the version the
+ * package below is built from; the two behind it are what an older host
+ * answers with, and every command used here is stable across all three.
  *
- * `1.0.0` is not published - VS Code's host vendors the protocol from its
- * repository and runs ahead of npm - and it accepts `^1.0.0` and nothing 0.x.
- * Leaving it out is therefore not the conservative choice: it is every entry
- * refused with `-32005`, which arrives here looking like a host that is not
- * there. `0.9.0` is the newest published, and the version the package below
- * is built from.
+ * `1.0.0` was here for two weeks, first. VS Code's host vendors the protocol
+ * from its repository and for that long carried a `1.0.0` that never reached
+ * the repository's `main`; it accepted `^1.0.0` and refused every `0.x` with
+ * `-32005`, so offering it was the only way in. It has since resynced to the
+ * published `0.9.0`. Offering a version the installed types do not describe is
+ * the wrong kind of forward-compatibility - a host that took it could answer
+ * in a shape nothing here has heard of - so it came out the day no host
+ * needed it.
  *
  * This list is load-bearing, because there is no fallback behind it.
  */
-const VERSIONS = ['1.0.0', '0.9.0', '0.8.0', '0.7.0'];
+const VERSIONS = ['0.9.0', '0.8.0', '0.7.0'];
 
 const ROOT = 'ahp-root://';
 const AUTOMATIONS = 'ahp-automations://';
@@ -1435,20 +1438,19 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
    * become a different answer on the next keystroke.
    */
   /**
-   * The automations catalogue, under whichever name the host's version gives it.
+   * The automations catalogue, under whichever name the host gives it.
    *
-   * This is the whole of what changed between protocol 0.9.0 and 1.0.0 in
-   * anything this client reads. 0.9.0 calls the catalogue `AutomationState`
-   * and puts the automations in `entries`; 1.0.0 renames the catalogue to
-   * `AutomationCatalogState` and the field to `automations`, and moves the
-   * name `AutomationState` onto a single automation. The automations
-   * themselves did not move - 0.9.0's `AutomationEntry` and 1.0.0's
-   * `AutomationState` have the same fields, and every action on the channel
-   * kept its name and its shape.
+   * The protocol's `AutomationState` puts the automations in `entries`. For
+   * two weeks VS Code's vendored copy called the catalogue
+   * `AutomationCatalogState` with the field named `automations`, and moved
+   * the name `AutomationState` onto a single automation; it has since gone
+   * back, but Insiders builds from that window are still out there, and the
+   * automations themselves never moved - the same fields either way, and
+   * every action on the channel kept its name and its shape.
    *
    * So one field is normalised here, at the edge, and everything past this
-   * point - the reducer included, which is the 0.9.0 one and reads `entries` -
-   * carries on unaware there was ever a second spelling.
+   * point - the reducer included, which reads `entries` - carries on unaware
+   * there was ever a second spelling. It costs one line to keep.
    */
   const automationCatalogue = (state: Bag | null): Bag | null => {
     if (state === null) return null;

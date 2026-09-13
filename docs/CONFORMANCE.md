@@ -6,8 +6,9 @@ not have to re-derive it, and so a gap is a decision somebody made rather than
 one nobody noticed.
 
 Checked against `@microsoft/agent-host-protocol` 0.9.0 (the published package),
-the 1.0.0 vendored in VS Code, and the specification repository, which is ahead
-of both.
+the copy vendored in VS Code, and the specification repository. As of
+2026-09-13 all three say 0.9.0; the `1.0.0` VS Code carried for two weeks in
+August never reached the repository's `main`.
 
 ## How this was established
 
@@ -78,18 +79,17 @@ what an editor may do that a terminal client should not inherit.
 
 # Divergences
 
-Four, each with a reason and none by accident.
+Three, each with a reason and none by accident.
 
-**`1.0.0` is offered first, and this builds against `0.9.0`.** The registry
-says the first offered version MUST be the one the code speaks.
-`isCompatibleProtocolVersion` requires matching majors, so a host on `1.0.0`
-rejects every `0.x` outright - offering it is the only way to reach VS Code's
-host at all. The two were compared declaration by declaration across 54 file
-pairs: the same 96 action types, the same 41 methods, identical fields on
-`ChatState`, `Turn`, `SessionState` and `RootState`. The whole delta is one
-renamed field on the automations catalogue, normalised at the edge. Recheck
-with `npm view @microsoft/agent-host-protocol time` - while `time.modified`
-reads `2026-08-28T21:40:46Z`, nothing has published since.
+**The automations catalogue is read under two spellings.** `entries`, which is
+the protocol's, and `automations`, which is what VS Code's vendored copy
+called it while it carried a `1.0.0` of its own - two weeks in August 2026, and
+the only thing in anything this client reads that differed between the two.
+`1.0.0` was offered first for as long as that host refused every `0.x`; it
+came out of the list the day the host resynced to `0.9.0`, because offering a
+version the installed types do not describe is a host answering in a shape
+nothing here has heard of. The second spelling stays, normalised at the edge
+for one line, until the Insiders builds from that window are gone.
 
 **`expiresIn` is sent on `authenticate` and the published package does not
 declare it.** The specification repository does, and `authentication.md` has
@@ -144,7 +144,7 @@ checker switched off.
 # Private extensions in the wild
 
 Recorded so nobody reads them as protocol. All were found by validating
-captures, and none is declared in 0.9.0 or 1.0.0.
+captures, and none is declared in 0.9.0.
 
 | Field | Sent by | Read here |
 |---|---|---|
