@@ -193,7 +193,18 @@ describe('a turn the host could not finish', () => {
 
       // The host's own words, and the one thing a reader can act on: whether
       // there is anything left to carry on from.
-      expect(t.hasText('Sign in on the host, then run this turn again.')).toBe(true);
+      //
+      // Read across rows rather than on one. The row keeps the column the
+      // transcript's cursor is drawn in, so at 60 columns the sentence wraps
+      // - and what the test is for is that every word reaches the reader,
+      // not which cell the break falls on. The marker on the right of the
+      // first row is taken off before the rows are joined, so it does not
+      // land in the middle of the sentence.
+      const read = t.text().split('\n')
+        .map((row) => row.replace(/[│┃]/g, ' ').replace(/\s+resumable\s*$/, '').trim())
+        .join(' ')
+        .replace(/\s+/g, ' ');
+      expect(read).toContain('Sign in on the host, then run this turn again.');
       expect(t.hasText('resumable')).toBe(true);
       await t.unmount();
     });
