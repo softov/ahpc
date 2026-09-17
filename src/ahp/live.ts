@@ -1808,7 +1808,12 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
      */
     resourceList: async (uri) => {
       const result = bag(await client.request('resourceList', { channel: ROOT, uri }));
-      const parent = uri.replace(/\/+$/, '');
+      // A root's trailing slash is its whole path: `file:///` trimmed like a
+      // folder is `file:`, and every entry under it - and every folder walked
+      // to from there - was `file:/name`, which no host lists or starts a
+      // session in.
+      const root = /^[a-z][\w+.-]*:\/*$/i.test(uri);
+      const parent = root ? uri.replace(/\/*$/, '//') : uri.replace(/\/+$/, '');
       return list(result.entries).map((raw) => {
         const entry = bag(raw);
         return {
