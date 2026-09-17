@@ -11,7 +11,8 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { confirm, pick } from '@textui/widgets';
-import { findBlocks, toBlocks } from './blocks.js';
+import { findBlocks, valueIcon } from '@textui/chat';
+import { toBlocks } from './blocks.js';
 import { chatMatches, linksIn, parseSessionLink, sessionOfLink } from './links.js';
 import { operate } from './ahp/operate.js';
 import type { HostConnection } from './ahp/connection.js';
@@ -22,7 +23,6 @@ import type {
   SessionUri, Turn,
 } from './ahp/types.js';
 import { SessionFlag } from './ahp/types.js';
-import { valueIcon } from './view/icons.js';
 import {
   ARCHIVED, BOOD_FLOAT, CAN_ADD_CHAT, CAN_FORK, CAN_SIDE_CHAT, CHAT_URI, CHATS, CUSTOMIZATIONS, CURSOR, DRAFT, EXPANDED, FILTER, FIND, FINDING, FIND_AT, HAS_CHATS,
   HOST, HOST_ERROR, INPUT, MODEL, MODEL_CONFIG, OPEN_TERMINAL,

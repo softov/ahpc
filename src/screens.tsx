@@ -24,33 +24,27 @@ import { branchName, branchDrift, pullRequestLabel,
   CHANGE_AT, CHANGE_ROW, CHANGE_SCOPES, FILES_AT, FILES_ENTRIES, FILES_OPEN,
   MODEL, MODEL_CONFIG, OPEN, OPEN_FILE, CHAT_URI, PROVIDER, QUEUE, SELECTED, SESSIONS, SETTINGS, SIDEBAR,
   CHATS, CURSOR, FIND, FINDING, FIND_AT, OPEN_TERMINAL, PRESENT, SPLIT_AT, SPLIT_DEFAULT, TERMINAL, TERMINALS, TURNS, WORKSPACE,
-  hiddenSessions, openSession, visibleSessions, workspaceName,
+  ANSWERS, INPUT_STATUS, MARKDOWN, boodFloorFor,
+  hiddenSessions, openSession, sessionView, visibleSessions, workspaceName,
 } from './state.js';
-import type { HostState } from './state.js';
-import { findBlocks, toBlocks } from './blocks.js';
+import type { HostState, InputStatus } from './state.js';
+import { toBlocks } from './blocks.js';
 import type {
-  Agent, Automation, Changeset, ChangesetScope, Completion, ContentRef, Customization, FileContent, PendingInput, QueuedMessage, ResourceEntry,
+  Agent, Answer, Automation, Changeset, ChangesetScope, Completion, ContentRef, Customization, FileContent, PendingInput, QueuedMessage, ResourceEntry,
   TerminalRow, TerminalState,
   ModelRow, SessionConfig, SessionDetail, SessionSummary, SlashCommand, Turn,
 } from './ahp/types.js';
 import { decodeStatus } from './ahp/status.js';
-import { ChatTranscript } from './view/transcript.js';
-import { ChatComposer } from './view/composer.js';
-import { ChatSessionHead } from './view/sessionhead.js';
-import { settingIcon, valueIcon } from './view/icons.js';
-import { ChatHitl, ChatInputStatus } from './view/hitl.js';
+import {
+  ChatComposer, ChatHitl, ChatInputStatus, ChatSessionHead, ChatTranscript, ConnectionBadge, FileDiff, SessionDetails,
+  SessionList, diffLines, findBlocks, openPicker, settingIcon, valueIcon,
+} from '@textui/chat';
+import type { ComposerOption, DetailField } from '@textui/chat';
 import { ChangesList } from './view/changes.js';
 import { FileList } from './view/files.js';
 import { AutomationList } from './view/automations.js';
 import { CustomizationList } from './view/customizations.js';
 import { TerminalView } from './view/terminal.js';
-import { FileDiff } from './view/filediff.js';
-import { diffLines } from './diff.js';
-import { ConnectionBadge, SessionList } from './view/sessions.js';
-import { SessionDetails } from './view/details.js';
-import type { DetailField } from './view/details.js';
-import { openPicker } from './view/picker.js';
-import type { ComposerOption } from './view/controls.js';
 
 
 /**
@@ -63,8 +57,9 @@ import type { ComposerOption } from './view/controls.js';
  * command palette, a confirm - is a layer or an expansion inside one of these,
  * because none of them is a place you navigate *to*.
  *
- * Every screen is composition. The parts are in `view/`, the actions are in
- * `control.ts`, and what is left here is which part goes where.
+ * Every screen is composition. The chat parts are `@textui/chat`'s, the
+ * AHP-only ones are in `view/`, the actions are in `control.ts`, and what is
+ * left here is which part goes where.
  */
 
 /**
@@ -264,7 +259,7 @@ export const SessionsScreen: (props: Record<string, never>) => RenderOutput =
             onChange={(value: string) => app.store.set(FILTER, value)}
           />
           <SessionList
-            sessions={sessions}
+            sessions={sessions.map(sessionView)}
             selectedId={selected}
             focusId="chat.sessions"
             // The list, not the filter. Whatever registers first would
@@ -724,6 +719,14 @@ export const ChatScreen: (props: Record<string, never>) => RenderOutput =
     const present = useStoreValue<{ clientId: string; displayName?: string }[]>(PRESENT, []) ?? [];
     const chat = useStoreValue<string | null>(CHAT_URI, null) ?? null;
     const running = turns.some((turn) => turn.state === 'running');
+    // What the components used to read for themselves. The switch, the row
+    // under the composer and the draft answers are this client's state; the
+    // components take them as props and know nothing of the paths.
+    const markdown = useStoreValue<boolean>(MARKDOWN, true) ?? true;
+    const inputStatus = useStoreValue<InputStatus | null>(INPUT_STATUS, null) ?? null;
+    const [answers, setAnswers] = useStore<Record<string, Answer>>(
+      `${ANSWERS}/${input?.id ?? 'none'}` as BindingPath, {},
+    );
     /*
      * Memoised, and the three below it with it, because of what the
      * transcript does with them.
@@ -791,7 +794,7 @@ export const ChatScreen: (props: Record<string, never>) => RenderOutput =
       <Column padding={[0, 0, 1, 0]}>
         {session ? (
           <ChatSessionHead
-            session={session}
+            session={sessionView(session)}
             present={present}
             {...(model ? { model } : {})}
             {...(chat ? { chat } : {})}
@@ -899,6 +902,7 @@ export const ChatScreen: (props: Record<string, never>) => RenderOutput =
           cursor={cursor ?? 0}
           onCursor={onCursor}
           onToggle={onToggle}
+          markdown={markdown}
         />
 
         {/* The block that is waiting on a person sits between the conversation
@@ -907,6 +911,12 @@ export const ChatScreen: (props: Record<string, never>) => RenderOutput =
         {input ? (
           <ChatHitl
             input={input}
+            draft={answers ?? {}}
+            onDraft={setAnswers}
+            // Where it starts, so the creature has somewhere to stand that is
+            // not on it. The block sits above the composer, so this is the
+            // floor while a question is up.
+            onMeasure={(rect) => app.store.set(boodFloorFor('ask'), rect?.y ?? 0)}
             onApprove={(option?: string) => controller.approve(option)}
             onDeny={() => controller.deny()}
             onAnswer={(answers, accepted) => controller.answer(answers, accepted)}
@@ -929,10 +939,11 @@ export const ChatScreen: (props: Record<string, never>) => RenderOutput =
 
         {/* Under the block and over the composer, which is where the answer
             was given and where the next thing will be typed. */}
-        <ChatInputStatus />
+        <ChatInputStatus status={inputStatus} />
 
         <ChatComposer
           value={draft}
+          onMeasure={(rect) => app.store.set(boodFloorFor('composer'), rect?.y ?? 0)}
           running={running}
           queued={queued.length}
           options={options}
@@ -1029,6 +1040,7 @@ export const NewSessionScreen: (props: Record<string, never>) => RenderOutput =
 
         <ChatComposer
           value={draft}
+          onMeasure={(rect) => app.store.set(boodFloorFor('composer'), rect?.y ?? 0)}
           options={options}
           onOption={(option, anchorId) => {
             if (option.commandId) openPicker(app, { commandId: option.commandId, anchorId });

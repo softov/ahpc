@@ -23,17 +23,14 @@ import {
   AutomationsScreen, ChangesScreen, ChatScreen, FilesScreen, HostsScreen, McpScreen, NewAutomationScreen, NewSessionScreen, SessionsScreen, TerminalScreen,
   SettingsScreen, SkillsScreen,
 } from './screens.js';
-import { ChatBubble, ReasoningBlock, StreamingText } from './view/bubble.js';
-import { ChatComposer } from './view/composer.js';
-import { SEND_ID } from './view/controls.js';
-import { ChatHitl } from './view/hitl.js';
-import { ChatTranscript } from './view/transcript.js';
+import {
+  ChatBubble, ChatComposer, ChatHitl, ChatTranscript, ConnectionBadge, ReasoningBlock, SEND_ID, SessionList, StreamingText,
+  ToolCallRow,
+} from '@textui/chat';
 import { BoodSprite, Creature, moodOf, pickBood } from './view/creature.js';
 import { ChangesList } from './view/changes.js';
 import { FileList } from './view/files.js';
 import { AutomationList } from './view/automations.js';
-import { ConnectionBadge, SessionList } from './view/sessions.js';
-import { ToolCallRow } from './view/toolcall.js';
 
 /**
  * A chat client for an agent host.

@@ -1,4 +1,8 @@
-import type { QueuedMessage, ToolCall, Turn } from './ahp/types.js';
+import type { Block } from '@textui/chat';
+import type { QueuedMessage, Turn } from './ahp/types.js';
+
+export type { Block } from '@textui/chat';
+export { selectable } from '@textui/chat';
 
 /**
  * A conversation, flattened into the rows a viewport scrolls.
@@ -13,80 +17,6 @@ import type { QueuedMessage, ToolCall, Turn } from './ahp/types.js';
  * in one stream, and "let me search for those" means something before the
  * searches and nothing after them.
  */
-export type Block =
-  | { kind: 'said'; id: string; turnId: string; text: string }
-  | {
-    kind: 'header'; id: string; turnId: string; model?: string;
-    /**
-     * What the turn was asked for besides the model, in the host's words.
-     *
-     * The values rather than the keys: `thinkingLevel` is one host's name for
-     * a property whose *answers* are what a person reads, and a header that
-     * spelled out the key would be twice as long and no clearer.
-     */
-    settings?: string;
-    meta: string; state: Turn['state'];
-  }
-  | { kind: 'prose'; id: string; turnId: string; content: string; streaming: boolean }
-  | { kind: 'reasoning'; id: string; turnId: string; content: string; streaming: boolean }
-  | { kind: 'notice'; id: string; turnId: string; content: string }
-  | { kind: 'failure'; id: string; turnId: string; content: string; resumable: boolean }
-  | { kind: 'tool'; id: string; turnId: string; call: ToolCall }
-  | { kind: 'queued'; id: string; messageId: string; text: string };
-
-/**
- * Everything in a block that a person could be looking for.
- *
- * A tool call is its name, its command and what came back, because all three
- * are things somebody searches a transcript for - the file a command touched
- * is in the output and nowhere else. A header is the model and the settings,
- * which is how "where did I switch to opus" is answered.
- */
-export function blockText(block: Block): string {
-  switch (block.kind) {
-    case 'said':
-    case 'queued':
-      return block.text;
-    case 'prose':
-    case 'reasoning':
-    case 'notice':
-    case 'failure':
-      return block.content;
-    case 'header':
-      return [block.model, block.settings, block.meta].filter(Boolean).join(' ');
-    case 'tool':
-      return [
-        block.call.name, block.call.toolName, block.call.input,
-        block.call.intention, block.call.outcome, block.call.output,
-        ...(block.call.files ?? []),
-      ].filter(Boolean).join(' ');
-  }
-}
-
-/**
- * Where in the conversation a query appears, as block indices in order.
- *
- * Case-insensitive, and a blank query matches nothing rather than everything:
- * a find with no term is a find that has not been typed yet, and lighting up
- * every block for it is the opposite of what the box is for.
- */
-export function findBlocks(blocks: Block[], query: string): number[] {
-  const needle = query.trim().toLowerCase();
-  if (needle === '') return [];
-  const found: number[] = [];
-  blocks.forEach((block, index) => {
-    if (blockText(block).toLowerCase().includes(needle)) found.push(index);
-  });
-  return found;
-}
-
-/** Blocks the cursor stops on: the ones that do something when activated. */
-export function selectable(block: Block): boolean {
-  // A queued message among them, because taking one back is something you do
-  // to it - and the cursor is how anything in the transcript is reached.
-  return block.kind === 'tool' || block.kind === 'reasoning' || block.kind === 'queued';
-}
-
 export function toBlocks(turns: Turn[], queued: QueuedMessage[] = []): Block[] {
   const blocks: Block[] = [];
 

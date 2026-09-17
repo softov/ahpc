@@ -17,7 +17,7 @@ import {
 } from '../src/state.js';
 import type { InputStatus } from '../src/state.js';
 import type { SessionSummary, Turn } from '../src/ahp/types.js';
-import { PICKER, openPicker } from '../src/view/picker.js';
+import { PICKER, openPicker } from '@textui/chat';
 
 /**
  * The example, mounted.

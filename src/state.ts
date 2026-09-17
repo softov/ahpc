@@ -1,4 +1,5 @@
 import type { BindingPath, ReactiveStore } from '@textui/core';
+import type { ChatSession } from '@textui/chat';
 import type { HostEvent } from './ahp/connection.js';
 import type {
   Changeset, PendingInput, QueuedMessage, SessionSummary, SessionUri, Turn,
@@ -255,6 +256,14 @@ export const CURSOR = '$/screen.chat/cursor' as BindingPath;
  * link's target rather than its label.
  */
 export const MARKDOWN = '$/chat/ui/markdown' as BindingPath;
+/**
+ * Draft answers to the question the host is waiting on, one map per request.
+ *
+ * In the store, not in the block: AHP has an action for a draft answer
+ * precisely because another client may be looking at the same question, and
+ * a value only one box knows is one nobody else can see.
+ */
+export const ANSWERS = '$/chat/ui/answers' as BindingPath;
 /**
  * Whether the catalogue's detail pane is out, or `null` for "whatever the
  * terminal is wide enough for".
@@ -557,6 +566,34 @@ export function branchName(session: SessionSummary): string | undefined {
     if (typeof name === 'string' && name !== '') return name;
   }
   return undefined;
+}
+
+/**
+ * A session as the components take it: decoded, and with nothing in it that
+ * only this client knows how to read.
+ *
+ * The status bitfield, the git metadata, the project name and the pull
+ * request are all AHP's business, and `@textui/chat` has no opinion about
+ * any of them.
+ */
+export function sessionView(session: SessionSummary): ChatSession {
+  const branch = branchName(session);
+  const pull = pullRequestLabel(session);
+  return {
+    id: session.resource,
+    title: session.title,
+    provider: session.provider,
+    status: decodeStatus(session.status),
+    createdAt: session.createdAt,
+    modifiedAt: session.modifiedAt,
+    workingDirectories: session.workingDirectories,
+    project: projectName(session),
+    ...(branch ? { branch } : {}),
+    ...(pull ? { pullRequest: pull } : {}),
+    ...(session.activity ? { activity: session.activity } : {}),
+    ...(session.origin?.kind === 'automation' ? { origin: 'by an automation' } : {}),
+    ...(session.changes ? { changes: session.changes } : {}),
+  };
 }
 
 /** A pull request the session's branch is known by, and what became of it. */

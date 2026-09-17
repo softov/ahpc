@@ -28,8 +28,6 @@
 import { BOOD, boodHeight, livelyNames } from './bood/index.js';
 import type { Mood } from './bood/index.js';
 import type { Activity } from '../ahp/status.js';
-import { useApp, useEffect } from '@textui/core';
-import { boodFloorFor } from '../state.js';
 
 export {
   BoodSprite, Creature, MOODS, FORMS, creatureFrames, creatureMotion, creatureSize,
@@ -56,25 +54,6 @@ export function moodOf(activity: Activity): Mood {
     : activity === 'error' ? 'error'
       : activity === 'input' ? 'thinking'
         : 'happy';
-}
-
-/**
- * Say which row this component starts at, so nothing stands on top of it.
- *
- * Its top row rather than its height: the row is where the thing actually is,
- * and a height has to be added to a guess about everything below it to mean
- * anything. Published rather than assumed because it moves - the composer
- * grows a slash menu upward and grows again with a wrapped draft, and the
- * block that asks about a tool is only there while something is waiting.
- * Cleared on the way out, or a screen that had one would keep making room for
- * it after it had gone.
- */
-export function useFloorTop(key: string, row: number): void {
-  const app = useApp();
-  useEffect(() => {
-    app.store.set(boodFloorFor(key), row);
-    return () => app.store.set(boodFloorFor(key), 0);
-  }, [key, row]);
 }
 
 /**

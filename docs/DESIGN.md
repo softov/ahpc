@@ -10,10 +10,9 @@ It is kept because it is still the reason the code looks like this. For what the
 src/
   ahp/          the protocol: types, the status bitset, the connection, a scripted host
   blocks.ts     a conversation → the entries a feed scrolls. No rendering
-  diff.ts       two files → the rows a diff draws. No rendering either
   state.ts      the store paths, and the fold from host action to store write
   control.ts    the controller, the commands, the keybindings
-  view/         the components, and nothing else
+  view/         the AHP-only components: changes, files, automations, skills, terminals, the mascot
   screens.tsx   which component goes where
   app.tsx       registration: components, screens, surfaces
   cli/          the other front end: one command, an answer, and exit
@@ -22,14 +21,23 @@ src/
   main.tsx      the terminal, the quit key, and the clock
 ```
 
-The split that matters is `control.ts` against `view/`. They change for
+The split that matters is `control.ts` against the components. They change for
 different reasons: a new screen is a rendering change, and answering a new kind
 of request is a change in control. Written as one file, a small protocol change
 touches every component that draws a bubble.
 
-`blocks.ts` and `diff.ts` are pure for the same reason - they are where a bug is
-a wrong *value* rather than a wrong picture, and a test for either needs no
-terminal.
+The chat components themselves - the transcript, the bubbles, the tool call
+row, the composer, the block that waits on a person, the session list and
+head, the details pane, the file diff and the chip picker - are
+[`@textui/chat`](../../textui/packages/chat), and they take their own prop
+types. This client maps what AHP says onto them: `sessionView` in `state.ts`
+turns a `SessionSummary` into a `ChatSession` whose status is already a word,
+a tone and a glyph, and `toBlocks` turns turns into the package's `Block`.
+The markdown switch, the row under the composer and the draft answers are
+this client's store paths, passed down as props; the components read nothing.
+
+`blocks.ts` is pure for the same reason - it is where a bug is a wrong *value*
+rather than a wrong picture, and a test for it needs no terminal.
 
 ## The screens
 
@@ -229,14 +237,13 @@ Writing it turned up three things that were missing, and they are **now in
 mean "focus the filter": without one, a control's id comes from its instance
 and a command has nothing to name.
 
-**Still in this example, and probably application-shaped:** `ChatBubble`,
-`StreamingText`, `ReasoningBlock`, `ToolCallRow`, `ChatComposer`, `ChatHitl`
-and its `ConfirmRequest`/`QuestionForm`, `ChatTranscript`, `SessionList`,
-`ChangesList`, `ConnectionBadge`, `Gutter`. Every one is a composition of what
-the catalog ships - `ChatTranscript` is a `Feed` and a switch on the block
-kind, and the composer is a `TextArea` and a row of ghost buttons. The useful
-finding is that they *are* compositions, and that the vocabulary they share is
-a gutter, a status glyph and a tone.
+**Now `@textui/chat`:** `ChatBubble`, `StreamingText`, `ReasoningBlock`,
+`ToolCallRow`, `ChatComposer`, `ChatHitl` and its `ConfirmRequest`/`QuestionForm`,
+`ChatTranscript`, `SessionList`, `ConnectionBadge`, `Gutter`. Every one is a
+composition of what the catalog ships - `ChatTranscript` is a `Feed` and a
+switch on the block kind, and the composer is a `TextArea` and a row of ghost
+buttons. They started here, and moved out once they read nothing from this
+client's store. `ChangesList` stays: it is a changeset, which is AHP's.
 
 **Used unchanged, and enough:** `List` for the catalogue - rows are one line
 and the height does not depend on the content, which is exactly what a
@@ -245,15 +252,15 @@ transcript is not - plus `Panel`, `Row`/`Column`, `RadioGroup`, `Checkbox`,
 `KeyHints`, `CommandPalette`, `confirm()`, and `Button` - including
 `variant="ghost"`, which is what the composer's action row is made of.
 
-Two more, still here rather than in core:
-[`SessionDetails`](src/view/details.tsx) - a property list you can walk and
+Two more, in `@textui/chat` rather than in the catalog:
+`SessionDetails` - a property list you can walk and
 copy a value out of. `KeyValue` draws the same pairs and is static, so nothing
 selects a row: a URI cannot be read in full and cannot be pasted anywhere. The
 selected row is the one that gets the room - every other row truncates to one
 line, the selected one wraps - which costs nothing when the value is short and
 is the whole answer when it is a URI in a 40-column pane.
 
-And [`ComposerBar`](src/view/controls.tsx) with its chips, which is a row of
+And `ComposerBar` with its chips, which is a row of
 *current values* rather than a row of buttons: a button is a verb and these are
 nouns. What it needed from the catalog it got - `CommandPalette` already knew
 how to ask about one argument - so the only new part is a focusable label that
@@ -323,11 +330,11 @@ unanswered is not sendable.
 
 ## What to look at first
 
-[`src/view/hitl.tsx`](src/view/hitl.tsx), for the two kinds of waiting and why
-they are not one; then [`src/control.ts`](src/control.ts), which is every
-action the application has in one list; then
-[`src/view/transcript.tsx`](src/view/transcript.tsx), which is now short enough
-to read in a sitting because the viewport underneath it moved into the catalog.
+`hitl.tsx` in `@textui/chat`, for the two kinds of waiting and why they are
+not one; then [`src/control.ts`](src/control.ts), which is every action the
+application has in one list; then `transcript.tsx` in the same package, which
+is short enough to read in a sitting because the viewport underneath it moved
+into the catalog.
 
 The measure-report-scroll loop itself is in
 [`Feed`](../../packages/widgets/src/data/feed.ts) - that is where to look for "how
