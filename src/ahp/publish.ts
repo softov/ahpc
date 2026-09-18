@@ -205,6 +205,13 @@ export function publish(options: { root?: string; writable?: boolean; clientId?:
       let flags = (mode === 'truncate' && position === 0 ? constants.O_WRONLY : constants.O_RDWR) | constants.O_NOFOLLOW;
       if (ifMatch === undefined) flags |= constants.O_CREAT;
       if (createOnly && ifMatch === undefined) flags |= constants.O_EXCL;
+      // `O_NOFOLLOW` is what refuses a final link, and Windows has no such
+      // flag: `constants.O_NOFOLLOW` is undefined there and the `|` above is a
+      // no-op. That end is asked about the link first, which is the best it
+      // offers; where the flag exists the open itself is the check.
+      if (constants.O_NOFOLLOW === undefined && await lstat(at).then((found) => found.isSymbolicLink(), () => false)) {
+        throw new PublishRefusal(PERMISSION_DENIED, `${String(uri)} is a symbolic link.`);
+      }
       const file = await open(at, flags).catch((error: NodeJS.ErrnoException) => {
         if (createOnly && error.code === 'EEXIST') {
           throw new PublishRefusal(ALREADY_EXISTS, `${String(uri)} already exists.`);
@@ -226,6 +233,12 @@ export function publish(options: { root?: string; writable?: boolean; clientId?:
         throw new PublishRefusal(PERMISSION_DENIED, `Could not write ${String(uri)}: ${error.message}`);
       });
       try {
+        // Windows opens a directory for writing and fails at the first write
+        // instead, with an `EISDIR` the catch above never sees; asked here so
+        // both ends refuse before anything is touched.
+        if (process.platform === 'win32' && (await file.stat()).isDirectory()) {
+          throw new PublishRefusal(PERMISSION_DENIED, `${String(uri)} is a directory.`);
+        }
         if (createOnly && ifMatch !== undefined) {
           throw new PublishRefusal(ALREADY_EXISTS, `${String(uri)} already exists.`);
         }

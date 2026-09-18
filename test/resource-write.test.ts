@@ -54,7 +54,7 @@ const method = (name: string): ((params: unknown) => Promise<unknown>) => {
 };
 
 for (const one of fixture.cases) {
-  it(one.name, async () => {
+  it(one.name, async (ctx) => {
     const relative = one.path ?? 'file.txt';
     const at = join(root, relative);
     mkdirSync(dirname(at), { recursive: true });
@@ -63,7 +63,13 @@ for (const one of fixture.cases) {
     else if (typeof one.before === 'object' && 'file' in one.before) writeFileSync(at, one.before.file);
     else if (typeof one.before === 'object' && 'symlinkTo' in one.before) {
       writeFileSync(join(root, one.before.symlinkTo), 'not this');
-      symlinkSync(join(root, one.before.symlinkTo), at);
+      // Skipped, not failed, where this account may not make a link (Windows
+      // without Developer Mode answers EPERM): the code under test did not refuse.
+      try { symlinkSync(join(root, one.before.symlinkTo), at); }
+      catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'EPERM') throw error;
+        ctx.skip('this account cannot create symbolic links (Windows: turn on Developer Mode)');
+      }
     }
     // 'absent' leaves nothing, and the parent above is what a case with a
     // path of its own uses to say the *directory* is missing too.

@@ -8,10 +8,24 @@
  */
 
 import { describe, expect, it, beforeAll, afterAll } from 'vitest';
+import type { TestContext } from 'vitest';
 import { mkdtemp, rm, writeFile, readFile, mkdir, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { publish, publishedUnder } from '../src/ahp/publish.js';
+
+/**
+ * Makes the link, or skips the test where this account may not make one:
+ * Windows answers `EPERM` unless Developer Mode is on or the shell is elevated.
+ * Skipped rather than failed, because the code under test is not what refused.
+ */
+async function link(ctx: TestContext, target: string, at: string): Promise<void> {
+  try { await symlink(target, at); }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'EPERM') throw error;
+    ctx.skip('this account cannot create symbolic links (Windows: turn on Developer Mode)');
+  }
+}
 
 /** The authority a host routes on is the client's own id. */
 const PUBLISH_PREFIX = publishedUnder('ahpc');
@@ -205,7 +219,7 @@ describe('writing is a second decision, not part of publishing', () => {
       .toContain(await readFile(path.join(root, 'competing-etag.txt'), 'utf8'));
   });
 
-  it('says why a directory or a link is refused, rather than reporting an errno', async () => {
+  it('says why a directory or a link is refused, rather than reporting an errno', async (ctx) => {
     /*
      * Both refusals are the open flags' doing - `O_NOFOLLOW` answers `ELOOP`
      * and a directory opened for writing answers `EISDIR` - and both used to
@@ -235,14 +249,14 @@ describe('writing is a second decision, not part of publishing', () => {
      * at both ends.
      */
     await writeFile(path.join(root, 'link-target.txt'), 'target');
-    await symlink(path.join(root, 'link-target.txt'), path.join(root, 'inside-write-link.txt'));
+    await link(ctx, path.join(root, 'link-target.txt'), path.join(root, 'inside-write-link.txt'));
     const inside = await said('inside-write-link.txt');
     expect(inside).toContain('is a symbolic link');
     expect(inside).not.toContain('ELOOP');
     expect(await readFile(path.join(root, 'link-target.txt'), 'utf8')).toBe('target');
   });
 
-  it('refuses a copy or a move onto a link, and honours failIfExists', async () => {
+  it('refuses a copy or a move onto a link, and honours failIfExists', async (ctx) => {
     /*
      * The destination half, which the source does not share.
      *
@@ -254,7 +268,7 @@ describe('writing is a second decision, not part of publishing', () => {
     const handlers = publish({ root, writable: true }).handlers();
     await writeFile(path.join(root, 'pair-source.txt'), 'source');
     await writeFile(path.join(root, 'pair-target.txt'), 'target');
-    await symlink(path.join(root, 'pair-target.txt'), path.join(root, 'pair-link.txt'));
+    await link(ctx, path.join(root, 'pair-target.txt'), path.join(root, 'pair-link.txt'));
 
     for (const method of ['resourceCopy', 'resourceMove'] as const) {
       expect(await refused(() => handlers[method]?.({
@@ -450,14 +464,14 @@ describe('a refusal reaches the host as the code it was refused with', () => {
   });
 });
 
-it('keeps every publication operation inside the real directory', async () => {
+it('keeps every publication operation inside the real directory', async (ctx) => {
   const outside = await mkdtemp(path.join(tmpdir(), 'ahpc-outside-'));
   try {
     const target = path.join(outside, 'sentinel');
     await writeFile(target, 'outside');
-    await symlink(outside, path.join(root, 'outside-dir'));
-    await symlink(target, path.join(root, 'outside-file'));
-    await symlink(path.join(outside, 'absent'), path.join(root, 'outside-dangling'));
+    await link(ctx, outside, path.join(root, 'outside-dir'));
+    await link(ctx, target, path.join(root, 'outside-file'));
+    await link(ctx, path.join(outside, 'absent'), path.join(root, 'outside-dangling'));
     const uri = (name: string) => `${PUBLISH_PREFIX}${name}`;
     for (const writable of [false, true]) {
       const handlers = publish({ root, writable }).handlers();
@@ -480,8 +494,8 @@ it('keeps every publication operation inside the real directory', async () => {
   } finally { await rm(outside, { recursive: true, force: true }); }
 });
 
-it('can read a link whose destination is still published', async () => {
-  await symlink(path.join(root, 'note.txt'), path.join(root, 'inside-link'));
+it('can read a link whose destination is still published', async (ctx) => {
+  await link(ctx, path.join(root, 'note.txt'), path.join(root, 'inside-link'));
   const handlers = publish({ root }).handlers();
   expect(await handlers.resourceRead!({ uri: `${PUBLISH_PREFIX}inside-link` })).toMatchObject({ data: 'hello' });
 });
