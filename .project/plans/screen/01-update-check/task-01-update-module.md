@@ -1,6 +1,6 @@
 ---
 title: The update module compares, reads and refreshes, and is tested without a network
-status: todo
+status: done
 depends: []
 layer: shared
 refs:
@@ -40,4 +40,6 @@ refs:
 - `npm test` and `npm run typecheck` green.
 
 ## Resume
+
+Done 2026-09-18. `src/update.ts` with `newer`, `registry`, `readUpdate`, `stale`, `refreshUpdate`, `MAX_AGE_MS` and `updatePath`, plus `checkingUpdates` and `updateNotice` (task 03 had them moving here; they started here). `statePath(tool, file)` in `config.ts`; `manifest()` in `version.ts`, which `version()` wraps. `test/update.test.ts` is ahpd's file with the names changed: 37 cases, and the `newer` table is byte-identical to ahpd's.
 

@@ -15,7 +15,7 @@ import type { HostConnection } from './ahp/connection.js';
 import {
   BOOD, BOOD_FLOAT, BOOD_FLOOR, BOOD_INLINE, FOCUS, HOST, HOST_ERROR, INPUT, INPUT_STATUS, OPEN, RUNNING, SCREEN,
   SESSIONS,
-  SPLIT_AT, SPLIT_DEFAULT, STATUS, WORKSPACE, boodFloor, openSession, workspaceName,
+  SPLIT_AT, SPLIT_DEFAULT, STATUS, UPDATE_NOTICE, WORKSPACE, boodFloor, openSession, workspaceName,
 } from './state.js';
 import type { HostState, InputStatus } from './state.js';
 import { decodeStatus } from './ahp/status.js';
@@ -404,11 +404,17 @@ const Status = defineComponent<Record<string, never>>('ChatStatus', () => {
   const said = useStoreValue<InputStatus | null>(INPUT_STATUS, null) ?? null;
   const refusal = useStoreValue<string | null>(HOST_ERROR, null) ?? null;
   const error = said?.state === 'failed' && said.text === refusal ? null : refusal;
+  // A newer release on npm, after a refusal and before the hints: a refusal
+  // is about the key just pressed, and the hints are a chord away in the
+  // palette.
+  const notice = useStoreValue<string | null>(UPDATE_NOTICE, null) ?? null;
   return (
     <Row gap={2}>
       {error
         ? <text content={error} fg="danger" flex={1} truncate="end" />
-        : <Hints flex={1} />}
+        : notice
+          ? <text content={notice} fg="muted" flex={1} truncate="end" />
+          : <Hints flex={1} />}
       <text content={screen ?? '-'} fg="muted" />
     </Row>
   );

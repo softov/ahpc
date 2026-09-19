@@ -13,7 +13,7 @@ import { CLIPBOARD_PATH, layoutMarkdown, wrapRuns } from '@textui/core';
 import { toBlocks } from '../src/blocks.js';
 import {
   CHATS, CHAT_URI, DRAFT, HOST_ERROR, INPUT, INPUT_STATUS, OPEN, OPEN_TERMINAL, PROVIDER, QUEUE,
-  SELECTED, SETTINGS, SIDEBAR, TURNS, WORKSPACE, writeSessions,
+  SELECTED, SETTINGS, SIDEBAR, TURNS, UPDATE_NOTICE, WORKSPACE, writeSessions,
 } from '../src/state.js';
 import type { InputStatus } from '../src/state.js';
 import type { SessionSummary, Turn } from '../src/ahp/types.js';
@@ -1789,6 +1789,29 @@ describe('when the host says no', () => {
     for (let i = 0; i < 4; i++) await t.settle();
     expect(t.app.screens.current()?.id).toBe('sessions');
     await t.unmount();
+  });
+
+  it('says on the status row that a newer release is out, unless the host refused something', async () => {
+    const m = await open();
+    const notice = '@softov/ahpc 9.9.9 is on npm, this is 0.4.0';
+    expect(m.t.hasText(notice)).toBe(false);
+
+    // Set while the screen is up, the way a refresh that lands does.
+    m.t.app.store.set(UPDATE_NOTICE, notice);
+    for (let i = 0; i < 4; i++) await m.t.settle();
+    expect(m.t.hasText(notice)).toBe(true);
+
+    // A refusal is about the key just pressed, so it takes the row.
+    m.t.app.store.set(HOST_ERROR, 'the host refused that');
+    for (let i = 0; i < 4; i++) await m.t.settle();
+    expect(m.t.hasText('the host refused that')).toBe(true);
+    expect(m.t.hasText(notice)).toBe(false);
+
+    // And gives it back.
+    m.t.app.store.set(HOST_ERROR, null);
+    for (let i = 0; i < 4; i++) await m.t.settle();
+    expect(m.t.hasText(notice)).toBe(true);
+    await m.t.unmount();
   });
 
   it('takes an error the host sends mid-session', async () => {

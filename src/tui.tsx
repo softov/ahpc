@@ -9,7 +9,9 @@ import { parseSessionLink } from './links.js';
 import { CONTROLLER } from './control.js';
 import { connect, sink } from './connect.js';
 import { loadConfig } from './config.js';
-import { reportHostError } from './state.js';
+import { UPDATE_NOTICE, reportHostError } from './state.js';
+import { MAX_AGE_MS, checkingUpdates, readUpdate, refreshUpdate, registry, stale, updateNotice } from './update.js';
+import { manifest } from './version.js';
 
 /**
  * The entry point.
@@ -92,6 +94,8 @@ interface Options {
   publishWritable?: boolean;
   /** A file every frame is appended to, both directions, as JSON lines. */
   wire?: string;
+  /** Ask npm, in the background, whether a newer version exists. */
+  updateCheck: boolean;
   help: boolean;
 }
 
@@ -123,6 +127,12 @@ Seeing the wire
   --wire <file>         Append every frame, both directions, as JSON lines:
                         { at, from, peer, frame }. AHPC_RECORD=<file> is
                         the same thing from a shell.
+
+Knowing when it is old
+  --no-update-check     Never ask npm whether a newer version exists.
+                        NO_UPDATE_NOTIFIER or CI in the environment, or
+                        updateCheck: false in the file, say the same; a
+                        still or a piped run never asks.
 
 Appearance
   --theme <name>        workbench, paper-light, ...
@@ -167,6 +177,7 @@ export function parse(argv: string[]): Options {
     shell: 'workbench',
     boodInline: false,
     boodFloat: false,
+    updateCheck: true,
     approve: false,
     answer: false,
     help: false,
@@ -197,6 +208,7 @@ export function parse(argv: string[]): Options {
       case '--publish': options.publish = String(argv[++i]); break;
       case '--publish-writable': options.publishWritable = true; break;
       case '--wire': options.wire = String(argv[++i]); break;
+      case '--no-update-check': options.updateCheck = false; break;
       case '--help': case '-h': options.help = true; break;
       // A flag nobody reads is a flag nobody can rely on: an unknown one is
       // said so rather than silently doing what the defaults would have done.
@@ -251,6 +263,8 @@ async function still(options: Options): Promise<void> {
     // can do without being answered, which is how the confirmation is reached.
     before: async (app) => {
       const controller = app.services.require(CONTROLLER);
+      // What the file says, if anything; a still never asks the registry.
+      app.store.set(UPDATE_NOTICE, updateNotice(manifest()));
       // A URI, or the link the reference host's tools answer with.
       if (options.session) {
         if (parseSessionLink(options.session)) await controller.openLink(options.session);
@@ -331,6 +345,7 @@ export async function tui(argv: string[]): Promise<void> {
   if (file.boodInline !== undefined) options.boodInline = file.boodInline;
   if (file.boodFloat !== undefined && !argv.includes('--bood')) options.boodFloat = file.boodFloat;
   if (file.keys) options.keys = file.keys;
+  if (file.updateCheck === false && !argv.includes('--no-update-check')) options.updateCheck = false;
   if (options.help) {
     process.stdout.write(USAGE);
     return;
@@ -394,6 +409,23 @@ export async function tui(argv: string[]): Promise<void> {
   app.services.provide(WRITER_KEY, createWriter(terminal.capabilities()));
   sink.report = (message) => reportHostError(app.store, message);
   await app.start();
+
+  /*
+   * Whether a newer release is out, on the status row.
+   *
+   * Said from the file first, so the row is right before any request is
+   * made, and said again after each refresh so a release that lands while
+   * this is open reaches the row. Nothing here is awaited, and the timer is
+   * let go of so quitting does not wait six hours for it.
+   */
+  const self = manifest();
+  const say = (): void => { app.store.set(UPDATE_NOTICE, updateNotice(self)); };
+  say();
+  if (checkingUpdates(options.updateCheck)) {
+    const refresh = (): void => { void refreshUpdate({ name: self.name, registry: registry() }).then(say); };
+    if (stale(readUpdate())) refresh();
+    setInterval(refresh, MAX_AGE_MS).unref();
+  }
 
   // `--session`, on the screen as well as in a still: the conversation named,
   // by its URI or by an `agent-host-session://` link, opened on arrival.

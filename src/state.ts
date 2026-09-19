@@ -166,6 +166,16 @@ export const SETTINGS = '$/chat/compose/settings' as BindingPath;
 export const HOST_ERROR = '$/chat/host/error' as BindingPath;
 
 /**
+ * That a newer release of this client is on npm, as one sentence, or `null`.
+ *
+ * Set from `update.json` when the screen opens and again after each refresh
+ * it makes; nothing else touches it. Drawn on the status row when there is no
+ * refusal to show, because a refusal is about the key just pressed and this
+ * can wait.
+ */
+export const UPDATE_NOTICE = '$/chat/host/update' as BindingPath;
+
+/**
  * What became of the answer just given, on the row above the composer.
  *
  * Not `HOST_ERROR`, which is the application's last refusal and lives in the

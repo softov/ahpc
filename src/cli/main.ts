@@ -3,6 +3,8 @@
 import { readFile } from 'node:fs/promises';
 import { connect } from '../connect.js';
 import { configPath, loadConfig } from '../config.js';
+import { checkingUpdates, readUpdate, updateNotice } from '../update.js';
+import { manifest } from '../version.js';
 import type { Where } from '../connect.js';
 import { ago, archived, branch, json, line, mark, project, table } from './render.js';
 import type { HostConnection, HostEvent } from '../ahp/connection.js';
@@ -385,9 +387,27 @@ export async function cli(command: string, rest: string[]): Promise<number> {
     switch (command) {
       case 'status': {
         const rows = await host.listSessions().catch(() => []);
-        if (wants) { json({ id: host.id, url: host.url, state: host.state(), sessions: rows.length }); break; }
+        /*
+         * Whether a newer release is out, from the file the screen keeps and
+         * never from the network: this command prints and leaves. `tty` is
+         * true here whatever stdout is, because a command that was asked has
+         * decided to print already; the flag, the file and the environment
+         * still say no.
+         */
+        const file = loadConfig('ahpc', args.value('--config-file'));
+        const checking = checkingUpdates(!args.has('--no-update-check') && file.updateCheck !== false, process.env, true);
+        const notice = checking ? updateNotice(manifest()) : null;
+        if (wants) {
+          const latest = notice ? readUpdate()?.latest : undefined;
+          json({
+            id: host.id, url: host.url, state: host.state(), sessions: rows.length,
+            ...(latest !== undefined ? { update: { latest } } : {}),
+          });
+          break;
+        }
         line(`${host.state()}  ${host.url || '(scripted host)'}`);
         line(`${rows.length} session(s)`);
+        if (notice) line(notice);
         break;
       }
 

@@ -1,6 +1,6 @@
 ---
 title: The screen refreshes in the background and its status row says when a release is out
-status: todo
+status: done
 depends: [task-01-update-module.md]
 layer: screen
 refs:
@@ -45,4 +45,6 @@ A screen opened without any gate draws `@softov/ahpc <latest> is on npm, this is
 - `npm test` and `npm run typecheck` green.
 
 ## Resume
+
+Done 2026-09-18. `updateCheck` on `Config`, `--no-update-check` in `SWITCHES` and the screen's switch, the usage text under "Knowing when it is old", `UPDATE_NOTICE` in `state.ts`, `ChatStatus` with its third state, `still()` setting the store from the file, and `tui()` saying it on open and after every refresh. One smoke case covers the row: set while up, taken by a refusal, given back. By hand under a pty against a local registry answering `9.9.9`: the file appears on the first run, the row says so on the next, a still draws it and never asks, each gate leaves the file alone.
 

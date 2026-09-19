@@ -46,6 +46,13 @@ export interface Config {
    * but a screen whose content runs to the bottom will have a cat on it.
    */
   boodFloat?: boolean;
+  /**
+   * Ask npm whether a newer version exists, six hours apart.
+   *
+   * `false` never asks. The same as `--no-update-check`, for a person who
+   * would rather not type it every time.
+   */
+  updateCheck?: boolean;
 }
 
 /**
@@ -61,6 +68,16 @@ export const configHome = (): string =>
 /** This tool's own file. */
 export const configPath = (tool: string): string =>
   join(configHome(), tool, 'config.json');
+
+/**
+ * A file the tool writes, beside the one a person edits.
+ *
+ * `config.json` is hand-written and stays that way; anything a program
+ * rewrites on its own schedule gets a file of its own next to it, so a
+ * rewrite never loses the comments and the ordering somebody put there.
+ */
+export const statePath = (tool: string, file: string): string =>
+  join(configHome(), tool, file);
 
 /**
  * Read it, or answer that there was nothing to read.

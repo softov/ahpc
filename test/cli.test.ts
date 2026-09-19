@@ -9,7 +9,10 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { parse } from '../src/tui.js';
 import { SWITCHES, commandIn } from '../src/flags.js';
 
@@ -97,5 +100,53 @@ describe('one flag vocabulary, read by everything that parses one', () => {
     }
     expect(seen).toBeGreaterThan(15);
     expect(wrong).toEqual([]);
+  });
+});
+
+describe('ahpc status, and whether a newer release is out', () => {
+  /*
+   * Against the scripted host, with `update.json` under a throwaway
+   * `XDG_CONFIG_HOME`, and stdout caught rather than written. The command
+   * never asks the registry, so there is no server here to answer one.
+   */
+  const run = async (rest: string[], env: Record<string, string> = {}, config?: string): Promise<string> => {
+    const home = mkdtempSync(join(tmpdir(), 'ahpc-status-'));
+    const had = { XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME, CI: process.env.CI, NO_UPDATE_NOTIFIER: process.env.NO_UPDATE_NOTIFIER };
+    process.env.XDG_CONFIG_HOME = home;
+    delete process.env.CI;
+    delete process.env.NO_UPDATE_NOTIFIER;
+    Object.assign(process.env, env);
+    mkdirSync(join(home, 'ahpc'), { recursive: true });
+    writeFileSync(join(home, 'ahpc', 'update.json'), JSON.stringify({ name: '@softov/ahpc', latest: '9.9.9', checkedAt: '2026-09-18T12:00:00Z' }));
+    if (config !== undefined) writeFileSync(join(home, 'ahpc', 'config.json'), config);
+    let out = '';
+    const write = process.stdout.write.bind(process.stdout);
+    process.stdout.write = ((chunk: string | Uint8Array) => { out += String(chunk); return true; }) as typeof process.stdout.write;
+    try {
+      const { cli } = await import('../src/cli/main.js');
+      expect(await cli('status', rest)).toBe(0);
+    }
+    finally {
+      process.stdout.write = write;
+      for (const [key, value] of Object.entries(had)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+      rmSync(home, { recursive: true, force: true });
+    }
+    return out;
+  };
+
+  it('prints the sentence as a third line, from the file', async () => {
+    const out = await run([]);
+    expect(out.split('\n')[2]).toMatch(/^@softov\/ahpc 9\.9\.9 is on npm, this is \d+\.\d+\.\d+$/);
+  });
+  it('carries it under --json, as the version alone', async () => {
+    const said = JSON.parse(await run(['--json'])) as { update?: { latest: string } };
+    expect(said.update).toEqual({ latest: '9.9.9' });
+  });
+  it('says nothing under --no-update-check, CI, NO_UPDATE_NOTIFIER or updateCheck: false', async () => {
+    expect((await run(['--no-update-check'])).split('\n')).toHaveLength(3);
+    expect((await run([], { CI: '1' })).split('\n')).toHaveLength(3);
+    expect((await run([], { NO_UPDATE_NOTIFIER: '' })).split('\n')).toHaveLength(3);
+    expect((await run([], {}, '{"updateCheck": false}')).split('\n')).toHaveLength(3);
+    expect(JSON.parse(await run(['--json'], { CI: '1' })) as object).not.toHaveProperty('update');
   });
 });

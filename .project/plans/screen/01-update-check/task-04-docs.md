@@ -1,6 +1,6 @@
 ---
 title: README.md says how the check works
-status: todo
+status: done
 depends: [task-02-screen.md, task-03-status-verb.md]
 layer: docs
 refs:
@@ -32,4 +32,6 @@ A person reading README.md knows the flag, the key, the two environment variable
 - Relative links in `.project/` resolve.
 
 ## Resume
+
+Done 2026-09-18. README: the `status` row, a Configuration row, and a "Knowing when it is old" subsection. The deliberate-duplication idea names `update.ts` as the second copy.
 

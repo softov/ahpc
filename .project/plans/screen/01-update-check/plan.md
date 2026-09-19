@@ -1,7 +1,7 @@
 ---
 title: Telling somebody the version is old
 domain: screen
-status: planned
+status: built
 priority: medium
 created: 2026-09-18
 revalidated: 2026-09-18
@@ -109,10 +109,10 @@ ahpc --version -> untouched
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - The update module](task-01-update-module.md) | todo | - |
-| [02 - The screen checks and draws](task-02-screen.md) | todo | 01 |
-| [03 - `ahpc status` reads the file](task-03-status-verb.md) | todo | 01 |
-| [04 - Docs and the roadmap](task-04-docs.md) | todo | 02, 03 |
+| [01 - The update module](task-01-update-module.md) | done | - |
+| [02 - The screen checks and draws](task-02-screen.md) | done | 01 |
+| [03 - `ahpc status` reads the file](task-03-status-verb.md) | done | 01 |
+| [04 - Docs and the roadmap](task-04-docs.md) | done | 02, 03 |
 
 ## Risks and tradeoffs
 
@@ -123,15 +123,15 @@ ahpc --version -> untouched
 
 ## Resume state
 
-- **Done so far:** nothing.
-- **Next action:** [task-01-update-module.md](task-01-update-module.md), after ahpd's task 01 so the comparison tables are written once and copied.
+- **Done so far:** every task, 2026-09-18; see [implemented.md](implemented.md).
+- **Next action:** none.
 - **Open questions:** none.
 - **Watch out for:** `--static` and a piped stdout both go through `still()` and must not fetch. `SWITCHES` must list the flag or `ahpc --no-update-check session list` loses the word after it.
 
 ## Final verification checklist
 
-- [ ] `npm test` green, with `test/update.test.ts` in it and a status-row case in `test/smoke.test.tsx`.
-- [ ] `npm run typecheck` green.
-- [ ] By hand: `npm_config_registry` at a fake server answering `9.9.9`; the second `ahpc` shows the sentence on the status row; `ahpc status` prints it; `CI=1 ahpc` shows nothing and writes no file; `ahpc --static` fetches nothing.
-- [ ] README.md names the flag, the key and both environment variables.
-- [ ] `plans/index.md` updated.
+- [x] `npm test` green, with `test/update.test.ts` in it and a status-row case in `test/smoke.test.tsx` (28 files, 534 tests).
+- [x] `npm run typecheck` green.
+- [x] By hand: `npm_config_registry` at a fake server answering `9.9.9`; the second `ahpc` shows the sentence on the status row; `ahpc status` prints it; `CI=1 ahpc` shows nothing and writes no file; `ahpc --static` fetches nothing.
+- [x] README.md names the flag, the key and both environment variables.
+- [x] `plans/index.md` updated.

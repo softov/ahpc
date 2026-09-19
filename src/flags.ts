@@ -42,7 +42,7 @@ export const COMMANDS: ReadonlySet<string> = new Set([
  */
 export const SWITCHES: ReadonlySet<string> = new Set([
   // The screen's own.
-  '--static', '-s', '--settled', '--approve', '--answer', '--bood', '--help', '-h',
+  '--static', '-s', '--settled', '--approve', '--answer', '--bood', '--no-update-check', '--help', '-h',
   // Answered by the entry point before either front end is loaded, and here
   // so that neither swallows the word after it.
   '--version', '-v',

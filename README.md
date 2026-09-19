@@ -171,7 +171,7 @@ When a tool call is waiting: `a` approves, `d` denies, `1`-`9` pick an offered o
 | `logs` | Stream the host's log | `--level` `--follow` |
 | `auth` | List the resources this host protects | `--json` |
 | `auth <resource>` | Send a token for one | `--token` `--expires-in` |
-| `status` | Show the current connection | `--json` |
+| `status` | Show the current connection, and whether a newer `ahpc` is on npm | `--json` |
 
 ### Changes and files
 
@@ -317,8 +317,15 @@ Precedence: a flag overrides an environment variable, which overrides the file.
 | `--token`, `AHPC_TOKEN` | A bearer token for it |
 | `AHPC_TOKEN_<RESOURCE>` | A token for one protected resource |
 | `--config-file` | Read this file instead |
+| `--no-update-check`, `updateCheck: false` | Never ask npm whether a newer version exists. See below |
 
 `ahpc config` prints the file path and the values in force. It works without a host, which is what you need when the host is the problem.
+
+### Knowing when it is old
+
+The screen asks npm, six hours apart, whether a newer `@softov/ahpc` exists, and writes the answer to `update.json` beside the configuration. When there is one, the status row says `@softov/ahpc 0.5.0 is on npm, this is 0.4.0` in place of the key hints, and `ahpc status` prints the same sentence as a third line (`update: { latest }` under `--json`). Nothing waits on the network: the row is what the file said last time, the request goes out in the background after the screen is up and the row is read again when it lands, and a fresh install says nothing on its first run because there is no file yet. The request is `GET <registry>/-/package/@softov/ahpc/dist-tags`, eighteen bytes, against `npm_config_registry` when that is set and `registry.npmjs.org` otherwise, so a mirror is not reached past. Every failure is silence, offline or a registry that is down alike, because none of them is something to act on from here.
+
+Off with `--no-update-check`, with `NO_UPDATE_NOTIFIER` or `CI` set to anything, or with `"updateCheck": false` in the file. A still (`--static`) or a piped run draws or prints what the file says and never asks.
 
 ### Keys
 

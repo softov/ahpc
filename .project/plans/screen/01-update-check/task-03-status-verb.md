@@ -1,6 +1,6 @@
 ---
 title: ahpc status prints the notice from the file and never fetches
-status: todo
+status: done
 depends: [task-01-update-module.md]
 layer: cli
 refs:
@@ -29,4 +29,6 @@ refs:
 - `npm test` and `npm run typecheck` green.
 
 ## Resume
+
+Done 2026-09-18. `ahpc status` reads the config file for `updateCheck`, honours `--no-update-check` and the environment, prints the sentence as a third line, and under `--json` carries `update: { latest }` read from the file. Three cases in `test/cli.test.ts`, with stdout caught and a throwaway `XDG_CONFIG_HOME`.
 

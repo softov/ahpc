@@ -15,7 +15,7 @@ Reference: [00-screen.md](screen/00-screen.md)
 
 | Plan | Priority | Status | Requires | Blocks |
 | --- | --- | --- | --- | --- |
-| [01 - Telling somebody the version is old](screen/01-update-check/plan.md) | medium | planned; next: task 01 | ahpd daemon/01 for the shared comparison table | - |
+| [01 - Telling somebody the version is old](screen/01-update-check/plan.md) | medium | built 2026-09-18 ([implemented.md](screen/01-update-check/implemented.md)) | ahpd daemon/01 for the shared comparison table | - |
 
 Next free number in `screen`: `02`.
 
