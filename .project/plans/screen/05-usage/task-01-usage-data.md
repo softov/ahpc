@@ -1,6 +1,6 @@
 ---
 title: A turn's usage, its billed model and the model's context window are decoded and kept
-status: todo
+status: done
 depends: []
 layer: ahp
 refs:
@@ -55,3 +55,9 @@ A turn decoded from the wire carries a `TurnUsage` with its token counts, its co
 - `npm run typecheck` green.
 
 ## Resume
+
+Done 2026-09-20.
+`src/ahp/types.ts` gained `TurnUsage`, `Turn.usage` and `ModelRow.contextWindow`.
+`src/ahp/live.ts` gained `usage()` and `model()` now reads the declared window or the input-plus-output fallback.
+`test/meta.test.ts` covers the counts, the plain cost, the nano-AIU conversion, the empty report, the negative cost and the session-total-only report, and `test/reconnect.test.ts` covers the declared window, the fallback and a row with neither.
+Nothing is left, and task-02 is next.

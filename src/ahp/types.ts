@@ -201,6 +201,15 @@ export interface Turn {
    * onwards, so an id alone cannot say what any given answer cost.
    */
   model?: ModelSelection;
+  /**
+   * What the turn's usage report said, where the host sent one.
+   *
+   * Not the model the turn was asked for, which stays `model`: this is what
+   * the host measured, and a host may record the model here instead of on the
+   * request. Absent when the host reported no numbers at all, so a reader
+   * draws "nothing reported" rather than a row of zeroes.
+   */
+  usage?: TurnUsage;
   at: string;
   elapsedMs?: number;
 }
@@ -419,6 +428,31 @@ export interface ModelSelection {
   config?: Record<string, string>;
 }
 
+/**
+ * What a turn's usage report carried.
+ *
+ * The protocol's `UsageInfo`, with the `_meta` keys the reference host writes
+ * read here rather than at a screen. Every field is optional, because a host
+ * reports what it reports: a reader that filled the rest in with zeroes would
+ * say a turn cost nothing rather than that nobody said.
+ */
+export interface TurnUsage {
+  /** Input tokens the host counted for the turn. */
+  inputTokens?: number;
+  /** Output tokens the host counted for the turn. */
+  outputTokens?: number;
+  /** Input tokens read from cache rather than sent. */
+  cacheReadTokens?: number;
+  /** The model the host billed, which may differ from what the turn asked for. */
+  model?: string;
+  /** What automatic routing resolved to, when the request went through Auto. */
+  resolvedModel?: string;
+  /** The turn's cost in credits, from `_meta.cost` or `_meta.copilotUsage`. */
+  cost?: number;
+  /** The session's total cost in credits, from `_meta.copilotUsage.sessionTotalNanoAiu`. */
+  sessionCost?: number;
+}
+
 export interface ModelRow {
   /** What rides on a turn. */
   id: string;
@@ -432,6 +466,15 @@ export interface ModelRow {
    * own beside a model already listed under its harness.
    */
   provider: string;
+  /**
+   * How many tokens the model can hold.
+   *
+   * The protocol's `maxContextWindow` where the host declares it, otherwise
+   * the input and output limits added together, which is the fallback the
+   * reference makes for a host that publishes only those. Absent when the
+   * host declares neither number.
+   */
+  contextWindow?: number;
   /** The model's own settings, where it has any. */
   options?: ConfigProperty[];
 }

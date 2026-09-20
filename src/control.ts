@@ -1419,6 +1419,15 @@ function commands(
       run: () => app.screens.push('mcp'),
     },
     {
+      id: 'go.usage',
+      title: 'What this session has spent',
+      category: 'Screens',
+      description: 'Tokens, cost and the context window',
+      slots: ['palette'],
+      when: `${OPEN}`,
+      run: () => app.screens.push('usage'),
+    },
+    {
       /*
        * The next changeset this session offers.
        *
@@ -2557,6 +2566,7 @@ function shipped(): Binding[] {
     { keys: 't', commandId: 'chat.stop', scopeId: CHAT_SCOPE },
     { keys: 'k', commandId: 'go.skills', scopeId: CHAT_SCOPE },
     { keys: 'p', commandId: 'go.mcp', scopeId: CHAT_SCOPE },
+    { keys: 'u', commandId: 'go.usage', scopeId: CHAT_SCOPE },
 
     /**
      * An open file closes before the screen does.

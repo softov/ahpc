@@ -1,7 +1,7 @@
 ---
 title: A usage screen says what a session has spent
 domain: screen
-status: planned
+status: built
 priority: medium
 created: 2026-09-19
 revalidated: 2026-09-19
@@ -106,8 +106,8 @@ What this plan settled without one:
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - The usage data](task-01-usage-data.md) | todo | - |
-| [02 - The usage screen](task-02-usage-screen.md) | todo | 01 |
+| [01 - The usage data](task-01-usage-data.md) | done | - |
+| [02 - The usage screen](task-02-usage-screen.md) | done | 01 |
 
 ## Risks and tradeoffs
 
@@ -119,17 +119,16 @@ What this plan settled without one:
 
 ## Resume state
 
-- **Done so far:** nothing; the plan was written 2026-09-19 from decision `usage-gets-a-screen.md` and the upstream pass 4 review.
-- **Next action:** [task-01-usage-data.md](task-01-usage-data.md).
-- **Open questions:**
-  1. Does the screen list turns oldest first or newest first? Proposed: oldest first, matching the transcript, with the context line pinned above so the number a reader wants is not under a long list.
+- **Done so far:** tasks 01 and 02 done 2026-09-20; `Turn.usage` and `ModelRow.contextWindow` are decoded, the usage screen draws them, and the tests cover both.
+- **Next action:** none; [implemented.md](implemented.md) is written.
+- **Open questions:** none; turns are listed oldest first with the context line pinned above, as the decisions table settled.
 - **Watch out for:** `selection()` must keep reading `usage.model` for the turn's model id while the new `usage()` reads the counts, or a host that records its model only in usage loses the model row it has today.
 
 ## Final verification checklist
 
-- [ ] `test/meta.test.ts` asserts the decoded counts, cost, session total, billed model and resolved model from a turn's `usage`, and that an empty report yields none.
-- [ ] `test/reconnect.test.ts` asserts `ModelRow.contextWindow` from `maxContextWindow` and the input-plus-output fallback.
-- [ ] `test/usage.test.tsx` drives `go.usage` and the `u` key over `fakeHost`, with a row per turn, the session total and the context line.
-- [ ] `npm test` green.
-- [ ] `npm run typecheck` green.
-- [ ] `plans/index.md` updated.
+- [x] `test/meta.test.ts` asserts the decoded counts, cost, session total, billed model and resolved model from a turn's `usage`, and that an empty report yields none.
+- [x] `test/reconnect.test.ts` asserts `ModelRow.contextWindow` from `maxContextWindow` and the input-plus-output fallback.
+- [x] `test/usage.test.tsx` drives `go.usage` and the `u` key over `fakeHost`, with a row per turn, the session total and the context line.
+- [x] `npm test` green.
+- [x] `npm run typecheck` green.
+- [x] `plans/index.md` updated.

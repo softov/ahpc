@@ -1,6 +1,6 @@
 ---
 title: A usage screen shows what the open chat has spent
-status: todo
+status: done
 depends: [task-01-usage-data.md]
 layer: screen
 refs:
@@ -54,3 +54,9 @@ refs:
 - By hand: open a session, press `u`, and read the numbers against what the host reported.
 
 ## Resume
+
+Done 2026-09-20.
+`UsageScreen` in `src/screens.tsx` reads `TURNS` and the session's own catalogue row, one row per agent turn with its tokens and cost, the session total the host reports, and the context window against the most recent turn.
+It is registered in `src/app.tsx`, reached by `go.usage` in the palette and by `u` in the chat scope in `src/control.ts`.
+The fixture's claude models carry a width and `reply()` builds a turn with a usage report, and `test/usage.test.tsx` covers the command, the key, a row, the context line and the nothing-reported session.
+Nothing is left, and the plan's own verification against a live host is the one thing a person still has to do.

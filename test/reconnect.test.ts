@@ -810,6 +810,7 @@ describe('a model is read as the catalogue sends it', () => {
               id: 'opus[1m]',
               name: 'Opus',
               provider: 'claude',
+              maxContextWindow: 1_000_000,
               configSchema: thinking(
                 ['low', 'medium', 'high', 'xhigh', 'max'],
                 ['Low', 'Medium', 'High', 'Extra High', 'Max'],
@@ -817,9 +818,14 @@ describe('a model is read as the catalogue sends it', () => {
               ),
             },
             // One level, and not the one anything defaults to - so the host
-            // sends no `default` at all.
-            { id: 'haiku', name: 'Haiku', provider: 'claude', configSchema: thinking(['low'], ['Low']) },
-            // None: no schema, rather than an empty one.
+            // sends no `default` at all. It declares no window, only the two
+            // budgets the window falls back to.
+            {
+              id: 'haiku', name: 'Haiku', provider: 'claude',
+              maxPromptTokens: 180_000, maxOutputTokens: 20_000,
+              configSchema: thinking(['low'], ['Low']),
+            },
+            // None: no schema, rather than an empty one, and no window either.
             { id: 'sonnet', name: 'Sonnet', provider: 'claude' },
             // What a host that has not filled the required field in yet
             // sends. It was missing until recently, and every row of it is
@@ -870,6 +876,21 @@ describe('a model is read as the catalogue sends it', () => {
     // And a model whose harness reported no levels carries no schema, which
     // is not the same as carrying an empty one.
     expect(models[2]?.options).toBeUndefined();
+
+    await host.close();
+  });
+
+  it('reads the context window, and falls back to the two budgets when there is none', async () => {
+    const host = await catalogue();
+    const models = (await host.agents())[0]?.models ?? [];
+
+    // The declared window where the host gives one.
+    expect(models[0]?.contextWindow).toBe(1_000_000);
+    // The fallback the reference makes for a host that publishes only the
+    // input and output limits: their sum, not nothing.
+    expect(models[1]?.contextWindow).toBe(200_000);
+    // And a row with neither has no window rather than a guessed one.
+    expect(models[2]?.contextWindow).toBeUndefined();
 
     await host.close();
   });

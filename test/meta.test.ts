@@ -175,3 +175,86 @@ describe('a message the reference client keeps out of the transcript', () => {
     await host.close();
   });
 });
+
+describe("a turn's usage report", () => {
+  /** One agent turn, opened with whatever usage the host was told to send. */
+  const opened = async (usage?: unknown) => {
+    const { host, scripted, read } = await connect();
+    scripted.states.set(SESSION, { defaultChat: CHAT, chats: [{ resource: CHAT, title: 'Chat' }], status: 1 });
+    scripted.states.set(CHAT, {
+      turns: [{
+        id: 't1',
+        startedAt: new Date().toISOString(),
+        state: 'complete',
+        message: { text: 'what changed?', origin: { kind: 'user' } },
+        responseParts: [],
+        ...(usage === undefined ? {} : { usage }),
+      }],
+    });
+    const reader = read();
+    await settle();
+    const agent = (reader.view()?.turns ?? []).find((turn) => turn.role === 'agent');
+    return { host, reader, agent };
+  };
+
+  it('reads the counts, the cost, the session total and both models', async () => {
+    const { host, reader, agent } = await opened({
+      inputTokens: 1200,
+      outputTokens: 300,
+      cacheReadTokens: 400,
+      model: 'raptor-mini',
+      _meta: {
+        cost: 0.25,
+        copilotUsage: { totalNanoAiu: 750_000_000, sessionTotalNanoAiu: 2_500_000_000 },
+        autoModeResolved: { chosenModel: 'claude-opus-5' },
+      },
+    });
+    expect(agent?.usage).toEqual({
+      inputTokens: 1200,
+      outputTokens: 300,
+      cacheReadTokens: 400,
+      model: 'raptor-mini',
+      resolvedModel: 'claude-opus-5',
+      cost: 0.25,
+      sessionCost: 2.5,
+    });
+    reader.close();
+    await host.close();
+  });
+
+  it('converts a nano-AIU total when the host sent no plain cost', async () => {
+    const { host, reader, agent } = await opened({
+      inputTokens: 10,
+      _meta: { copilotUsage: { totalNanoAiu: 750_000_000 } },
+    });
+    expect(agent?.usage?.cost).toBe(0.75);
+    reader.close();
+    await host.close();
+  });
+
+  it('yields no usage at all for an empty report', async () => {
+    const { host, reader, agent } = await opened({});
+    expect(agent?.usage).toBeUndefined();
+    reader.close();
+    await host.close();
+  });
+
+  it('leaves a negative cost absent rather than drawing it', async () => {
+    const { host, reader, agent } = await opened({
+      inputTokens: 10,
+      _meta: { cost: -1, copilotUsage: { totalNanoAiu: -5 } },
+    });
+    expect(agent?.usage).toEqual({ inputTokens: 10 });
+    reader.close();
+    await host.close();
+  });
+
+  it('keeps a report that carries only a session total', async () => {
+    const { host, reader, agent } = await opened({
+      _meta: { copilotUsage: { sessionTotalNanoAiu: 1_500_000_000 } },
+    });
+    expect(agent?.usage).toEqual({ sessionCost: 1.5 });
+    reader.close();
+    await host.close();
+  });
+});

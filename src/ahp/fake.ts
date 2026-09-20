@@ -950,6 +950,7 @@ export function fakeHost(): FakeHost {
               id: 'claude-opus-5',
               displayName: 'Opus 5',
               provider: 'claude',
+              contextWindow: 1_000_000,
               options: [{
                 key: 'thinkingLevel',
                 title: 'Thinking Level',
@@ -963,6 +964,7 @@ export function fakeHost(): FakeHost {
               id: 'claude-sonnet-5',
               displayName: 'Sonnet 5',
               provider: 'claude',
+              contextWindow: 200_000,
               options: [{
                 key: 'thinkingLevel',
                 title: 'Thinking Level',
@@ -971,7 +973,7 @@ export function fakeHost(): FakeHost {
                 sessionMutable: true,
               }],
             },
-            { id: 'claude-haiku-5', displayName: 'Haiku 5', provider: 'claude' },
+            { id: 'claude-haiku-5', displayName: 'Haiku 5', provider: 'claude', contextWindow: 200_000 },
           ],
           // What this harness offers, before any session exists. The same list a
           // session reports, which is what the protocol says it is: entries here
@@ -1135,7 +1137,21 @@ export function fakeHost(): FakeHost {
   function reply(uri: SessionUri, said: string): void {
     const userTurn: Turn = { id: nextId('u'), role: 'user', message: said, parts: [], state: 'complete', at: AT };
     const model = { id: models.get(uri) ?? 'claude-opus-5' };
-    const agentTurn: Turn = { id: nextId('a'), role: 'agent', parts: [], state: 'running', model, at: AT };
+    const agentTurn: Turn = {
+      id: nextId('a'), role: 'agent', parts: [], state: 'running', model, at: AT,
+      // What a host that reports usage sends: the counts, the model it billed
+      // and the session total, so the usage screen has real numbers to draw
+      // and a fixture that reports nothing stays distinguishable from one that
+      // cannot.
+      usage: {
+        inputTokens: 12_400,
+        outputTokens: 830,
+        cacheReadTokens: 9_600,
+        model: model.id,
+        cost: 0.42,
+        sessionCost: 1.25,
+      },
+    };
 
     script.push(() => {
       turns.get(uri)?.push(userTurn);

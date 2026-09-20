@@ -1838,6 +1838,117 @@ export const McpScreen: (props: Record<string, never>) => RenderOutput =
     });
   });
 
+// ------------------------------------------------------------------- 9. usage
+
+/** The model a turn billed to, with what automatic routing resolved it to. */
+function billedModel(turn: Turn): string {
+  const billed = turn.usage?.model ?? turn.model?.id;
+  if (turn.usage?.resolvedModel !== undefined) {
+    return `${billed ?? 'the host did not say'} -> ${turn.usage.resolvedModel}`;
+  }
+  return billed ?? 'the host did not say';
+}
+
+/**
+ * What the open chat has spent.
+ *
+ * Every number here is already on the wire: a turn carries a usage report and
+ * the model the host advertises carries its context window. Nothing drew them,
+ * so a session that cost a fortune read exactly like one that cost nothing.
+ *
+ * A screen rather than a line in the header, because the amounts are only
+ * meaningful complete and a fixed-width transcript row is the one place they
+ * cannot be shown without abbreviating them into ambiguity.
+ */
+export const UsageScreen: (props: Record<string, never>) => RenderOutput =
+  defineComponent<Record<string, never>>('UsageScreen', () => {
+    const app = useApp();
+    const controller = useRequiredService(CONTROLLER);
+    const session = openSession(app.store);
+    const turns = useStoreValue<Turn[]>(TURNS, []) ?? [];
+    const [agents, setAgents] = useState<Agent[]>([]);
+
+    useEffect(() => {
+      void controller.agents().then(setAgents);
+    }, []);
+
+    // The harness the open session belongs to, which is the list its model
+    // rows come from. Asked for rather than kept, the way the hosts screen
+    // does it: no store key is added for what one screen reads.
+    const catalogue = agents.find((one) => one.provider === session?.provider);
+    const models = catalogue?.models ?? [];
+    const rowFor = (turn: Turn): ModelRow | undefined =>
+      models.find((one) => one.id === (turn.usage?.model ?? turn.model?.id));
+
+    /*
+     * Only the agent's own turns.
+     *
+     * A transcript row for what a person sent carries no usage - the host
+     * bills the answer, not the question - so listing every row would put
+     * "nothing reported" above each turn and bury the report under them.
+     */
+    const billed = turns.filter((turn) => turn.role === 'agent');
+
+    /*
+     * The session total is the host's own number, from the last turn that
+     * carries one, and never a sum of the rows: `sessionTotalNanoAiu` is the
+     * session's, and adding the per-turn totals to it would count the same
+     * spend twice.
+     */
+    let sessionCost: number | undefined;
+    for (const turn of billed) {
+      if (turn.usage?.sessionCost !== undefined) sessionCost = turn.usage.sessionCost;
+    }
+
+    // The window is per model and the usage is per turn, so the line pairs the
+    // most recent turn that used a model this session's catalogue lists.
+    const latest = [...billed].reverse().find((turn) =>
+      typeof turn.usage?.inputTokens === 'number' && rowFor(turn) !== undefined);
+    const window = latest === undefined ? undefined : rowFor(latest)?.contextWindow;
+
+    return (
+      <Panel title="Usage" flex={1}>
+        <Column gap={1} flex={1}>
+          {sessionCost !== undefined ? (
+            <text content={`This session has spent ${sessionCost} credits.`} bold />
+          ) : (
+            <text content="The host has reported no session total." fg="muted" />
+          )}
+          {latest === undefined ? null : window !== undefined ? (
+            <text
+              content={`The current model holds ${latest.usage?.inputTokens} / ${window} tokens.`}
+              fg="muted"
+            />
+          ) : (
+            <text content="The host does not say how large the current model's window is." fg="muted" />
+          )}
+          <Divider />
+          {billed.length === 0 ? (
+            <EmptyState title="Nothing to show" message="This session has no turns yet." flex={1} />
+          ) : (
+            billed.map((turn) => (
+              turn.usage === undefined ? (
+                <text key={turn.id} content="A turn reported nothing." fg="muted" />
+              ) : (
+                <Row key={turn.id} gap={2}>
+                  <text content={billedModel(turn)} />
+                  {turn.usage.inputTokens !== undefined
+                    ? <text content={`in ${turn.usage.inputTokens}`} fg="subtle" /> : null}
+                  {turn.usage.outputTokens !== undefined
+                    ? <text content={`out ${turn.usage.outputTokens}`} fg="subtle" /> : null}
+                  {turn.usage.cacheReadTokens !== undefined
+                    ? <text content={`cached ${turn.usage.cacheReadTokens}`} fg="subtle" /> : null}
+                  {turn.usage.cost !== undefined
+                    ? <text content={`${turn.usage.cost} credits`} fg="subtle" /> : null}
+                </Row>
+              )
+            ))
+          )}
+        </Column>
+      </Panel>
+    );
+  });
+
 // ---------------------------------------------------------------- 5. settings
 
 export const SettingsScreen: (props: Record<string, never>) => RenderOutput =

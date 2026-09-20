@@ -10,7 +10,7 @@ import type {
   TerminalRow, TerminalState,
   FileContent, FileEdit, McpState, PendingInput, QueuedMessage, Question, QuestionKind,
   ModelRow, ModelSelection, ResponsePart, SessionConfig, SessionDetail, SessionSummary, SessionUri, ToolCall,
-  ToolCallStatus, Turn,
+  ToolCallStatus, Turn, TurnUsage,
 } from './types.js';
 import { SessionFlag } from './types.js';
 
@@ -689,6 +689,7 @@ function turn(value: unknown, running: boolean): Turn {
   const found = bag(value);
   const message = bag(found.message);
   const state = str(found.state);
+  const report = usage(found.usage);
   return {
     id: str(found.id) ?? randomUUID(),
     role: 'agent',
@@ -698,6 +699,7 @@ function turn(value: unknown, running: boolean): Turn {
       : state === 'cancelled' ? 'cancelled'
         : state === 'error' ? 'failed' : 'complete',
     ...(selection(message.model, found.usage) ? { model: selection(message.model, found.usage) as ModelSelection } : {}),
+    ...(report ? { usage: report } : {}),
     at: str(found.startedAt) ?? new Date(0).toISOString(),
     ...(typeof found.duration === 'number' ? { elapsedMs: found.duration } : {}),
   };
@@ -1113,6 +1115,52 @@ function selection(value: unknown, usage?: unknown): ModelSelection | undefined 
   };
 }
 
+/**
+ * What a turn's usage report said, where it said anything.
+ *
+ * The counts are the protocol's own fields, and the rest are the well-known
+ * `_meta` keys the reference host writes and its own window reads. Every one
+ * of them is optional and none is defaulted: a report that carries nothing
+ * yields `undefined`, so a reader can say the host reported nothing rather
+ * than draw a row of zeroes it was never told.
+ *
+ * Cost has two spellings - a plain number in `_meta.cost`, and nano-AIU under
+ * `_meta.copilotUsage` - and they are converted to credits here so nothing
+ * above has to know the unit. A negative total is absent, as the reference
+ * reads it: the host that sent one is not saying the turn earned money.
+ */
+function usage(value: unknown): TurnUsage | undefined {
+  const found = bag(value);
+  const meta = bag(found._meta);
+  const copilot = bag(meta.copilotUsage);
+  const inputTokens = typeof found.inputTokens === 'number' ? found.inputTokens : undefined;
+  const outputTokens = typeof found.outputTokens === 'number' ? found.outputTokens : undefined;
+  const cacheReadTokens = typeof found.cacheReadTokens === 'number' ? found.cacheReadTokens : undefined;
+  const model = str(found.model);
+  const resolvedModel = str(bag(meta.autoModeResolved).chosenModel);
+  const total = typeof meta.cost === 'number' && meta.cost >= 0 ? meta.cost
+    : typeof copilot.totalNanoAiu === 'number' && copilot.totalNanoAiu >= 0
+      ? copilot.totalNanoAiu / 1_000_000_000
+      : undefined;
+  const sessionCost = typeof copilot.sessionTotalNanoAiu === 'number' && copilot.sessionTotalNanoAiu >= 0
+    ? copilot.sessionTotalNanoAiu / 1_000_000_000
+    : undefined;
+  // A cost or a session total with no tokens is still consumption worth
+  // showing, which is why the test is for numbers rather than for tokens.
+  if (inputTokens === undefined && outputTokens === undefined && total === undefined && sessionCost === undefined) {
+    return undefined;
+  }
+  return {
+    ...(inputTokens !== undefined ? { inputTokens } : {}),
+    ...(outputTokens !== undefined ? { outputTokens } : {}),
+    ...(cacheReadTokens !== undefined ? { cacheReadTokens } : {}),
+    ...(model !== undefined ? { model } : {}),
+    ...(resolvedModel !== undefined ? { resolvedModel } : {}),
+    ...(total !== undefined ? { cost: total } : {}),
+    ...(sessionCost !== undefined ? { sessionCost } : {}),
+  };
+}
+
 /** A selection as it goes out: the id, and the answers it was given. */
 function selectionOf(model: ModelSelection): Record<string, unknown> {
   return {
@@ -1132,6 +1180,15 @@ function selectionOf(model: ModelSelection): Record<string, unknown> {
 function model(value: unknown): ModelRow {
   const found = bag(value);
   const options = config({ schema: found.configSchema }).properties;
+  // The declared window where the host gives one, otherwise the input and
+  // output budgets added, which is the fallback the reference makes for a
+  // host that publishes only those. Nothing at all when it declares neither.
+  const prompt = found.maxPromptTokens;
+  const output = found.maxOutputTokens;
+  const contextWindow = typeof found.maxContextWindow === 'number' ? found.maxContextWindow
+    : typeof prompt === 'number' || typeof output === 'number'
+      ? (typeof prompt === 'number' ? prompt : 0) + (typeof output === 'number' ? output : 0)
+      : undefined;
   return {
     id: str(found.id) ?? '',
     // `name`, which is what `SessionModelInfo` calls the readable one -
@@ -1140,6 +1197,7 @@ function model(value: unknown): ModelRow {
     // `claude-sonnet-4-5-20250929`.
     displayName: str(found.name) ?? str(found.displayName) ?? str(found.id) ?? '',
     provider: str(found.provider) ?? '',
+    ...(contextWindow !== undefined ? { contextWindow } : {}),
     ...(options.length > 0 ? { options } : {}),
   };
 }
