@@ -1,6 +1,6 @@
 ---
 title: A queued message carries the model it will run on, and its row says so
-status: todo
+status: blocked
 depends: []
 layer: src/blocks.ts
 refs:
@@ -49,3 +49,5 @@ A message waiting in the host's queue keeps the model the host recorded for it, 
 - `npm test` green and `npm run typecheck` green in this repository.
 
 ## Resume
+
+Blocked 2026-09-20: waits on a `@textui/chat` release carrying a model slot on the queued block, which is the `/github/textui` change and the version bump.

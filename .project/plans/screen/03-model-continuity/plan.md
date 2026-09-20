@@ -1,7 +1,7 @@
 ---
 title: The model a queued or reopened turn runs on
 domain: screen
-status: planned
+status: active
 priority: medium
 created: 2026-09-19
 revalidated: 2026-09-19
@@ -102,8 +102,8 @@ No decision file is created by this plan; every choice it settles is recorded in
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - A queued message keeps its model](task-01-queued-message-model.md) | todo | - |
-| [02 - Opening a session restores the model's answers](task-02-seed-model-config-on-open.md) | todo | - |
+| [01 - A queued message keeps its model](task-01-queued-message-model.md) | blocked | - |
+| [02 - Opening a session restores the model's answers](task-02-seed-model-config-on-open.md) | done | - |
 
 ## Risks and tradeoffs
 
@@ -115,8 +115,8 @@ No decision file is created by this plan; every choice it settles is recorded in
 
 ## Resume state
 
-- **Done so far:** nothing; the plan is written and no code is touched.
-- **Next action:** [task-01-queued-message-model.md](task-01-queued-message-model.md).
+- **Done so far:** task-02 is done as of 2026-09-20 and no other task is started.
+- **Next action:** [task-01-queued-message-model.md](task-01-queued-message-model.md), which is blocked until a `@textui/chat` release carries a model slot on the queued block.
 - **Open questions:** none.
 - **Watch out for:** `MODEL_CONFIG` is the composer's answers for the next message and not a record of the last one, which is why seeding it on open is right and why clearing it on a model change must stay.
 

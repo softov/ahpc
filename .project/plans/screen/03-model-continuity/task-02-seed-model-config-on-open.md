@@ -1,6 +1,6 @@
 ---
 title: Opening a session seeds the composer's model configuration from the last turn
-status: todo
+status: done
 depends: []
 layer: src/control.ts
 refs:
@@ -44,3 +44,8 @@ Opening a session sets `MODEL_CONFIG` from the last turn's recorded answers and 
 - `npm run typecheck` green.
 
 ## Resume
+
+Done 2026-09-20.
+`SessionDetail` gained `modelConfig`, `detail()` returns it from the same selection as the model id, and `open()` seeds `MODEL_CONFIG` and registers the model's commands through `offerModel()`.
+`test/live.test.tsx` decodes a last turn's answers and their absence, and `test/smoke.test.tsx` opens the fixture session and reads `MODEL_CONFIG` and the registered command's default.
+Found that the fake host's `detail()` resolves the model and carries no `modelConfig`, so the mounted case covers the empty branch while the decoder case covers the answers.

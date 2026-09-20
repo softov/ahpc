@@ -3107,6 +3107,10 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
         ...(channels.refusal(uri) !== undefined ? { refusal: channels.refusal(uri) as string } : {}),
         config: config(state.config),
         ...(last !== undefined ? { model: known(last) } : {}),
+        // The same selection the id came from, so a turn's id and its answers
+        // are never two turns' worth. `ran` is undefined when the id fell back
+        // to the session's own private field, which records no answers.
+        ...(ran?.config ? { modelConfig: ran.config } : {}),
         ...(str(state.activity) ? { activity: str(state.activity) as string } : {}),
       };
     },

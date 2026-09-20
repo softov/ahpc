@@ -277,6 +277,42 @@ describe('the config a live session reports', () => {
   });
 });
 
+/*
+ * What the last turn was asked for, which reopening a session has to give back.
+ *
+ * The id alone says which model answered and nothing about the settings it was
+ * given, so a session reopened on the id alone sends the next message on the
+ * model's defaults rather than on the answers the last turn actually ran with.
+ */
+describe('the detail a live session reports', () => {
+  it('keeps the last turn\'s answers beside the model it ran on', async () => {
+    const { host, scripted } = await connect();
+    scripted.states.set(SESSION, { defaultChat: CHAT, chats: [{ resource: CHAT, title: 'Chat' }], status: 1 });
+    scripted.states.set(CHAT, {
+      turns: [{
+        id: 't1',
+        state: 'complete',
+        message: { model: { id: 'claude-opus-5', config: { thinking: 'high' } } },
+      }],
+    });
+    const detail = await host.detail(SESSION as never);
+    expect(detail.modelConfig).toEqual({ thinking: 'high' });
+    await host.close();
+  });
+
+  it('leaves the answers off a turn that recorded none', async () => {
+    const { host, scripted } = await connect();
+    scripted.states.set(SESSION, { defaultChat: CHAT, chats: [{ resource: CHAT, title: 'Chat' }], status: 1 });
+    scripted.states.set(CHAT, {
+      turns: [{ id: 't1', state: 'complete', message: { model: { id: 'claude-opus-5' } } }],
+    });
+    const detail = await host.detail(SESSION as never);
+    expect(detail.model?.id).toBe('claude-opus-5');
+    expect(detail.modelConfig).toBeUndefined();
+    await host.close();
+  });
+});
+
 /**
  * One finished turn, seeded on the chat a reader subscribes to.
  *

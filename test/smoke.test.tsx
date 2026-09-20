@@ -4,7 +4,7 @@ import type { Harness } from '@textui/testing';
 import { registerChat } from '../src/app.js';
 import { CREATURES, MOODS, creatureMotion, drawCreature } from '../src/view/creature.js';
 import { BOOD, BOOD_FLOAT, BOOD_FLOOR, FILTER, SESSIONS, visibleSessions } from '../src/state.js';
-import { CONTROLLER } from '../src/control.js';
+import { CONTROLLER, modelCommand } from '../src/control.js';
 import { fakeHost } from '../src/ahp/fake.js';
 import type { FakeHost } from '../src/ahp/fake.js';
 import { decodeStatus } from '../src/ahp/status.js';
@@ -12,7 +12,7 @@ import { SessionFlag } from '../src/ahp/types.js';
 import { CLIPBOARD_PATH, layoutMarkdown, wrapRuns } from '@textui/core';
 import { toBlocks } from '../src/blocks.js';
 import {
-  CHATS, CHAT_URI, DRAFT, HOST_ERROR, INPUT, INPUT_STATUS, OPEN, OPEN_TERMINAL, PROVIDER, QUEUE,
+  CHATS, CHAT_URI, DRAFT, HOST_ERROR, INPUT, INPUT_STATUS, MODEL_CONFIG, OPEN, OPEN_TERMINAL, PROVIDER, QUEUE,
   SELECTED, SETTINGS, SIDEBAR, TURNS, UPDATE_NOTICE, WORKSPACE, openSession, writeSessions,
 } from '../src/state.js';
 import type { InputStatus } from '../src/state.js';
@@ -1025,9 +1025,21 @@ describe('leaving', () => {
     expect(quits).toEqual(['quit']);
 
     const controller = t.app.services.require(CONTROLLER);
+    // An answer chosen on the last session belongs to that session, so this is
+    // what "a session opens with an empty configuration" has to clear.
+    t.store.set(MODEL_CONFIG, { thinkingLevel: 'low' });
     controller.open(SEEDED);
     t.app.screens.push('chat');
     for (let i = 0; i < 4; i++) await t.settle();
+
+    // Opening registers the model's own commands, which is what puts the
+    // host's default in front of a person before anything has been answered.
+    await until({ t, host }, () => t.app.commands.get(modelCommand('thinkingLevel')) !== undefined);
+    // The fixture's detail records no answers, so the row is empty and the
+    // host's own default stands rather than the previous session's choice.
+    expect(t.store.get<Record<string, string>>(MODEL_CONFIG)).toEqual({});
+    expect(t.app.commands.get(modelCommand('thinkingLevel'))?.args?.[0]?.default).toBe('high');
+
     controller.send('go');
     for (let i = 0; i < 20; i++) host.pump();
     for (let i = 0; i < 4; i++) await t.settle();

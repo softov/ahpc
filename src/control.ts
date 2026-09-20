@@ -687,6 +687,11 @@ export function createController(
         // against. The name beside it is the catalogue's, and resolving it is
         // the chip's job rather than something to store a second copy of.
         if (detail.model) app.store.set(MODEL, detail.model.id);
+        // The answers the last turn was given, so the next message on the same
+        // model carries the same settings - empty when it recorded none, so a
+        // session never opens on the previous one's answers.
+        app.store.set(MODEL_CONFIG, detail.modelConfig ?? {});
+        offerModel(detail.model?.options ?? []);
         offer(detail.config, uri);
       }).catch(failed);
     },

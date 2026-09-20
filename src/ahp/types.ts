@@ -101,6 +101,15 @@ export interface SessionDetail {
    * and stands in for itself.
    */
   model?: ModelRow;
+  /**
+   * The answers the last turn was given, by the model's own property key.
+   *
+   * Beside `model` rather than on the session: a session has no settings of
+   * its own, and these belong to the one turn that recorded them. Absent when
+   * that turn answered nothing, so a session opened with no answers opens on
+   * the model's own defaults rather than on a previous session's.
+   */
+  modelConfig?: Record<string, string>;
   activity?: string;
   /**
    * Why the host would not talk about this session, in its own words.
