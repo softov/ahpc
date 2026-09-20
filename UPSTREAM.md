@@ -1,6 +1,6 @@
 # Keeping up with the reference host
 
-What VS Code's agent host changed since this client was last read against it, and what each change asks of this repository. One pass per review; a box is ticked by the commit that lands the work. The host side of the same pass is `UPSTREAM.md` in `ahpd`, and the method - which clone, which directories, in what order - is in that repository's `REFERENCE.md`.
+What VS Code's agent host changed since this client was last read against it, and what each change asks of this repository. One pass per review; a box is ticked by the commit that lands the work. The host side of the same pass is `UPSTREAM.md` in `ahpd`, and the method - which clone, which directories, in what order - is in [REFERENCE.md](REFERENCE.md).
 
 ## Pass 3 - 2026-09-13, seeing the wire
 
