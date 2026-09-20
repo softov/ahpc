@@ -1214,7 +1214,17 @@ function commands(
         // The composer is the root, so there is nothing under it to pop to -
         // and escape on the one screen that has no way back would do nothing
         // at all. From there it means "show me what already exists".
-        if (app.screens.current()?.id === 'new') { toSessions(); return; }
+        const here = app.screens.current()?.id;
+        if (here === 'new') { toSessions(); return; }
+        /*
+         * Leaving the catalogue for a fresh session gives the session up.
+         *
+         * On the catalogue the conversation is one keypress away (`f`), so
+         * the header can keep naming it; past the catalogue it cannot, and a
+         * title that outlived the conversation would sit over a composer
+         * about to start a different one.
+         */
+        if (here === 'sessions') controller.close();
         app.screens.pop();
       },
     },
@@ -2025,6 +2035,26 @@ function commands(
       args: [{ name: 'uri', type: 'string' as const }],
     },
     {
+      /*
+       * Back into the conversation the catalogue is still holding.
+       *
+       * Escape from a conversation leaves it open - the subscription is live
+       * and the chat screen is kept alive - so coming back is pushing the
+       * screen rather than opening the session a second time. That also keeps
+       * where the reader had scrolled, which re-opening would throw away.
+       */
+      id: 'session.reopen',
+      title: 'Reopen the session',
+      category: 'Session',
+      description: 'Return to the conversation that was open',
+      slots: ['palette'],
+      when: `${OPEN}`,
+      run: () => {
+        if (!app.store.get<SessionUri>(OPEN)) return;
+        app.screens.push('chat');
+      },
+    },
+    {
       id: 'session.new',
       title: 'New session',
       category: 'Session',
@@ -2444,6 +2474,9 @@ function shipped(): Binding[] {
 
     // The catalogue.
     { keys: 'n', commandId: 'session.new', scopeId: SESSIONS_SCOPE },
+    // Back into the conversation it was just showing. Available only while
+    // one is still open, which is until escape gives it up.
+    { keys: 'f', commandId: 'session.reopen', scopeId: SESSIONS_SCOPE, when: `${OPEN}` },
     { keys: 'r', commandId: 'session.refresh', scopeId: SESSIONS_SCOPE },
     { keys: 'a', commandId: 'session.archive', scopeId: SESSIONS_SCOPE },
     { keys: 'u', commandId: 'session.read', scopeId: SESSIONS_SCOPE },

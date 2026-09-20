@@ -13,7 +13,7 @@ import { CLIPBOARD_PATH, layoutMarkdown, wrapRuns } from '@textui/core';
 import { toBlocks } from '../src/blocks.js';
 import {
   CHATS, CHAT_URI, DRAFT, HOST_ERROR, INPUT, INPUT_STATUS, OPEN, OPEN_TERMINAL, PROVIDER, QUEUE,
-  SELECTED, SETTINGS, SIDEBAR, TURNS, UPDATE_NOTICE, WORKSPACE, writeSessions,
+  SELECTED, SETTINGS, SIDEBAR, TURNS, UPDATE_NOTICE, WORKSPACE, openSession, writeSessions,
 } from '../src/state.js';
 import type { InputStatus } from '../src/state.js';
 import type { SessionSummary, Turn } from '../src/ahp/types.js';
@@ -1918,6 +1918,51 @@ describe('leaving, after a session has been open', () => {
     await t.settle();
     expect(quits).toEqual(['quit']);
     await t.unmount();
+  });
+});
+
+/**
+ * Coming back to a conversation the catalogue is still holding.
+ *
+ * Escape from a conversation leaves it open, so the catalogue can offer it
+ * again with `f`; escape from the catalogue gives it up, so the composer past
+ * it does not inherit the title of a session nobody is in.
+ */
+describe('leaving a conversation and coming back', () => {
+  it('reopens it with f, and gives it up on escape', async () => {
+    const m = await catalogue({ width: 160, height: 30 });
+    m.t.app.services.require(CONTROLLER).open(IDLE);
+    m.t.app.screens.push('chat');
+    for (let i = 0; i < 6; i++) await m.t.settle();
+    expect(m.t.app.screens.current()?.id).toBe('chat');
+    const title = openSession(m.t.store)?.title ?? '';
+    expect(title).toBe('Why does the composer eat q');
+
+    // The keyboard on the transcript, which is where a reader who is walking
+    // the history has it. From the composer escape leaves the field instead.
+    m.t.app.focus.focus('chat.transcript');
+    m.t.press('escape');
+    for (let i = 0; i < 6; i++) await m.t.settle();
+    expect(m.t.app.screens.current()?.id).toBe('sessions');
+    // Still held, and the footer offers it back.
+    expect(openSession(m.t.store)?.resource).toBe(IDLE);
+    expect(m.t.lines().join('\n')).toContain('reopen');
+
+    m.t.press('f');
+    for (let i = 0; i < 6; i++) await m.t.settle();
+    expect(m.t.app.screens.current()?.id).toBe('chat');
+
+    m.t.app.focus.focus('chat.transcript');
+    m.t.press('escape');
+    for (let i = 0; i < 6; i++) await m.t.settle();
+    expect(m.t.app.screens.current()?.id).toBe('sessions');
+    expect(openSession(m.t.store)).not.toBeNull();
+    m.t.press('escape');
+    for (let i = 0; i < 6; i++) await m.t.settle();
+    expect(m.t.app.screens.current()?.id).toBe('new');
+    expect(openSession(m.t.store)).toBeNull();
+    expect(m.t.hasText(title)).toBe(false);
+    await m.t.unmount();
   });
 });
 

@@ -187,6 +187,9 @@ const Hints = defineComponent<BoxProps>('ChatHints', (props) => {
   // session stays open while its changes are on screen, and `i write` there
   // is an offer nothing honours.
   const screen = useStoreValue<string | null>(SCREEN, 'sessions') ?? 'sessions';
+  // A session the catalogue is still holding: escape left it open, and `f`
+  // puts the conversation back on screen.
+  const reopenable = useStoreValue<string | null>(OPEN, null) !== null;
   // Not `status > 1`: the bitset carries "a client has read this" in the same
   // number, so an idle session somebody looked at is 33 and every hint would
   // read "stop".
@@ -379,6 +382,9 @@ const Hints = defineComponent<BoxProps>('ChatHints', (props) => {
         // right there on the screen saying so. Naming both is what fits.
         { keys: leftRight, label: 'detail' },
         { keys: 'enter', label: 'open' },
+        // Named only while there is one to go back to. Escape on the
+        // catalogue gives the session up, and the hint goes with it.
+        ...(reopenable ? [{ keys: 'f', label: 'reopen' }] : []),
         { keys: 'n', label: 'new' },
         // `a` archives and `delete` disposes, and neither is here: the row is
         // one line and naming `ctrl+f` cost it the room. Both are a letter
