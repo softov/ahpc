@@ -345,6 +345,8 @@ Naming a chord replaces every default on it, so a chord is either yours or the c
 
 ## Development
 
+The layout, the checks and how a release is published are in [DEVELOPER.md](DEVELOPER.md).
+
 ```sh
 git clone https://github.com/softov/ahpc
 cd ahpc
