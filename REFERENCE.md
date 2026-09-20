@@ -36,23 +36,35 @@ Code is not the point:
 git clone --filter=blob:none --sparse --depth 1 \
   https://github.com/microsoft/vscode.git /github/externals/vscode
 cd /github/externals/vscode
-git sparse-checkout set src/vs/platform/agentHost \
-  src/vs/workbench/contrib/chat/browser/agentSessions \
-  src/vs/workbench/contrib/chat/browser/actions \
-  src/vs/workbench/contrib/chat/browser/chatSessions \
-  src/vs/workbench/contrib/chat/common
+git sparse-checkout set src/vs/platform/agentHost src/vs/sessions \
+  src/vs/workbench/contrib/chat src/vs/workbench/services/agentHost
 ```
+
+The first path is the host; the rest are the client, and they are here because
+a pass has to read what the window **sends** as well as what the host answers.
+`src/vs/sessions/` is the Sessions window, which is the reference client now,
+and the workbench tree beside it is the older one.
+
+A path left out of the sparse set is not in the working tree at all: it lists
+nothing, `git sparse-checkout list` does not mention it, and a search over the
+checkout finds nothing in it without saying so. `src/vs/sessions` was missing
+until a pass noticed that a whole client was absent from its own read, and
+`src/vs/workbench/contrib/chat/browser/widget` was missing the same way one
+pass later, which is why the client tree is set whole here rather than path by
+path. Before trusting "this is not used anywhere", check that the tree that
+symbol would live in is checked out.
 
 It is **MIT-licensed**: read it for the design, and keep the prose here ours.
 Nothing has been copied and nothing should be.
 
-**Last read against:** VS Code `8e35945b` (2026-09-12) and the protocol
-repository at `a21274d` (2026-09-12), on 2026-09-13. What each pass found and
+**Last read against:** VS Code `832cf23c5` (2026-09-19) and the protocol
+repository at `8549827` (2026-09-19; a `CODEOWNERS` commit, so the wire itself
+is unchanged since `fd0471d4`), on 2026-09-19. What each pass found and
 what it asked of this repository is [UPSTREAM.md](UPSTREAM.md); the next pass
 starts from these two revisions rather than from wherever the clone was left.
-`git log <that>..HEAD -- src/vs/workbench/contrib/chat` is the client half of
-the list, and `src/vs/platform/agentHost/common/state/protocol/` is the
-directory to read first, because it is the wire. The `.md` files there were
+`git log <that>..HEAD -- src/vs/workbench/contrib/chat src/vs/sessions` is the
+client half of the list, and `src/vs/platform/agentHost/common/state/protocol/`
+is the directory to read first, because it is the wire. The `.md` files there were
 reflowed to one-line paragraphs in September 2026, so read them with
 `git diff --word-diff`; a plain diff of one is the whole file.
 
@@ -60,6 +72,7 @@ What is in it, and why each part earned its keep here:
 
 | path | what it settled |
 | --- | --- |
+| `src/vs/sessions/contrib/providers/agentHost/` | the Sessions window, which is the reference client now: `baseAgentHostSessionsProvider.ts` is the provider, `agentHostSessionConfigPicker.ts` builds its pickers out of the host's session config schema, and `agentHostSessionArtifacts.ts` and `agentHostSessionBranchActions.ts` are drawn from what a host reports |
 | `src/vs/workbench/contrib/chat/browser/agentSessions/agentHost/` | the window that talks to a host: what VS Code **sends** to one and what it reads back. `agentHostSessionHandler.ts` is the session lifecycle, `stateToProgressAdapter.ts` turns host state into the line a turn shows, `agentSessionApprovalModel.ts` is how an approval a host asks for is answered, and `openSessionLinkOpener.contribution.ts` is the click on an `agent-host-session://` link |
 | `src/vs/workbench/contrib/chat/browser/widget/` | how that window draws a turn - `chatListRenderer.ts`, the progress, subagent and thinking parts, the tool confirmation parts. It is the second opinion on what a client must be able to draw from state alone, which is the whole of what this client does |
 | `src/vs/platform/agentHost/common/state/protocol/` | the wire. Read it first, because everything here is an implementation of it, and it is unchanged more often than not |

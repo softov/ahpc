@@ -2,6 +2,24 @@
 
 What VS Code's agent host changed since this client was last read against it, and what each change asks of this repository. One pass per review; a box is ticked by the commit that lands the work. The host side of the same pass is `UPSTREAM.md` in `ahpd`, and the method - which clone, which directories, in what order - is in [REFERENCE.md](REFERENCE.md).
 
+## Pass 4 - 2026-09-19, the first pass with the sessions window in the clone
+
+VS Code `8e35945b` (2026-09-12) to `832cf23c5` (2026-09-19): 68 commits in the workbench chat tree and 230 files under `src/vs/sessions`. **The wire did not move** - `common/state/protocol/` is unchanged and `.ahp-version` is still `fd0471d4` - and the protocol repository moved one commit, `a21274d` to `8549827`, which adds a `CODEOWNERS` file. The full record, with the reference for every item and the local file it would change, is [`.project/review/2026-09-19-upstream-pass-4.md`](.project/review/2026-09-19-upstream-pass-4.md).
+
+`src/vs/sessions` - the Sessions window, the reference client now - had been missing from the clone's sparse set, so a whole client was invisible to a pass. It is in the set now, here and in `ahpd`.
+
+- [ ] **`responseRoundEnded` closes the open reasoning section and draws no row.** One `_meta` read and one branch: `src/ahp/live.ts:604-605`, `src/blocks.ts:49`.
+- [ ] **A queued message keeps the model it will run on.** `src/ahp/live.ts:1255` (`queued()`).
+- [ ] **Reopening a session restores the last turn's model configuration.** `src/control.ts:28,300,739-758`.
+- [ ] **A completed response says what it changed.** `src/blocks.ts`.
+- [ ] **Authentication a tool needs is a blocking state of its own.** `src/blocks.ts`.
+- [ ] **A session's own pull requests are told from the ones it inherited.** `src/state.ts:634,654` - worth doing only once the Left open in the review is answered in its favour.
+
+### Read and not taken
+
+- Subagent identity on a tool call (a read that predates this range), turn token counts and credits, the config picker's curation, the Dev Container handoff, the artifact surface, `markRead`'s extra option, the menus and context keys, the window's own rendering, and the transport diagnostics stream. Each with its reference, in the review.
+- No new client-to-host request and no new `_meta` on an outbound request appeared in this range, and no `authenticate` payload changed.
+
 ## Pass 3 - 2026-09-13, seeing the wire
 
 Same revisions as Pass 2. Not a change upstream made but a gap the review left: there is no way to see what this client and a host say to each other while it runs, so every question about the wire has been answered by reading source. The host side is the same pass in `ahpd`, and the format is shared.
