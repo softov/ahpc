@@ -2325,6 +2325,67 @@ describe('blocks', () => {
     expect(toBlocks([turn]).map((block: { kind: string }) => block.kind))
       .toEqual(['header', 'prose', 'tool', 'prose']);
   });
+
+  it('draws no row for a round the host ended, and stops the reasoning above it', () => {
+    // Running, so the reasoning part would be streaming were it still last.
+    const turn: Turn = {
+      id: 't', role: 'agent', state: 'running', at: '', parts: [
+        { kind: 'reasoning', id: 'r1', content: 'weighing it' },
+        { kind: 'roundEnded', id: 'n1' },
+      ],
+    };
+    const blocks = toBlocks([turn]);
+    expect(blocks.map((block) => block.kind)).toEqual(['header', 'reasoning']);
+    expect(blocks[1]).toMatchObject({ kind: 'reasoning', streaming: false });
+  });
+
+  it('writes the turn edit counts on the header, after the elapsed time', () => {
+    const turn: Turn = {
+      id: 't', role: 'agent', state: 'complete', at: '', elapsedMs: 2100, parts: [
+        { kind: 'toolCall', id: 'c1', call: {
+          id: 'c1', name: 'Edit', toolName: 'Edit', status: 'completed', edits: { added: 12, removed: 3 },
+        } },
+      ],
+    };
+    const header = toBlocks([turn])[0];
+    expect(header?.kind === 'header' ? header.meta : '').toContain('+12 -3');
+    expect(header?.kind === 'header' ? header.meta : '').toContain('2.1s');
+  });
+
+  it('leaves the header without a count when nothing edited', () => {
+    const turn: Turn = {
+      id: 't', role: 'agent', state: 'complete', at: '', elapsedMs: 2100, parts: [
+        { kind: 'toolCall', id: 'c1', call: { id: 'c1', name: 'Read', toolName: 'Read', status: 'completed' } },
+      ],
+    };
+    const header = toBlocks([turn])[0];
+    expect(header?.kind === 'header' ? header.meta : '').not.toContain('+');
+  });
+
+  it('draws a call waiting on a sign-in as one notice naming it and the server', () => {
+    const turn: Turn = {
+      id: 't', role: 'agent', state: 'running', at: '', parts: [
+        { kind: 'toolCall', id: 'c1', call: {
+          id: 'c1', name: 'read_file', toolName: 'read_file', status: 'auth-required',
+          auth: { resource: 'https://api.github.com', name: 'GitHub API', description: 'the token expired' },
+        } },
+      ],
+    };
+    const blocks = toBlocks([turn]);
+    expect(blocks.map((block) => block.kind)).toEqual(['header', 'notice']);
+    const content = blocks[1]?.kind === 'notice' ? blocks[1].content : '';
+    expect(content).toContain('read_file');
+    expect(content).toContain('https://api.github.com');
+  });
+
+  it('still draws a running call as a tool row', () => {
+    const turn: Turn = {
+      id: 't', role: 'agent', state: 'running', at: '', parts: [
+        { kind: 'toolCall', id: 'c1', call: { id: 'c1', name: 'Read', toolName: 'Read', status: 'running' } },
+      ],
+    };
+    expect(toBlocks([turn]).map((block) => block.kind)).toEqual(['header', 'tool']);
+  });
 });
 
 /**

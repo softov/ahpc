@@ -1,6 +1,6 @@
 ---
 title: A responseRoundEnded notification closes the reasoning section and draws no row
-status: todo
+status: done
 depends: []
 layer: src/blocks.ts
 refs:
@@ -42,3 +42,9 @@ A `systemNotification` whose `_meta.kind` is `responseRoundEnded` leaves no row 
 - `npm run typecheck` green.
 
 ## Resume
+
+Done 2026-09-20.
+`ResponsePart` gained the `roundEnded` variant, and `parts()` reads `_meta.kind` through the existing `bag()` helper and emits it for `responseRoundEnded`.
+`toBlocks` adds no row for it and clears `streaming` on the `reasoning` or `prose` block above it.
+`test/live.test.tsx` covers the ended round and an ordinary notification in the new `a round the host ended` suite, and `test/smoke.test.tsx` covers the block case in `describe('blocks')`.
+Nothing is left, and task-02 is next.

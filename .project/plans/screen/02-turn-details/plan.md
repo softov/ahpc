@@ -1,7 +1,7 @@
 ---
 title: Three corrections to what a chat turn draws
 domain: screen
-status: planned
+status: built
 priority: high
 created: 2026-09-19
 revalidated: 2026-09-19
@@ -104,9 +104,9 @@ No decision file is created by this plan; every choice it settles is recorded in
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - A round-ended notification draws nothing](task-01-response-round-ended.md) | todo | - |
-| [02 - The turn header carries its edit counts](task-02-edit-stats.md) | todo | - |
-| [03 - A tool waiting on a sign-in is its own row](task-03-auth-required-state.md) | todo | 02 |
+| [01 - A round-ended notification draws nothing](task-01-response-round-ended.md) | done | - |
+| [02 - The turn header carries its edit counts](task-02-edit-stats.md) | done | - |
+| [03 - A tool waiting on a sign-in is its own row](task-03-auth-required-state.md) | done | 02 |
 
 ## Risks and tradeoffs
 
@@ -118,15 +118,15 @@ No decision file is created by this plan; every choice it settles is recorded in
 
 ## Resume state
 
-- **Done so far:** nothing; the plan is written and no code is touched.
-- **Next action:** [task-01-response-round-ended.md](task-01-response-round-ended.md).
+- **Done so far:** tasks 01, 02 and 03 done 2026-09-20; the plan is built.
+- **Next action:** none; [implemented.md](implemented.md) is written.
 - **Open questions:** none.
-- **Watch out for:** `parts()` is also where a failed turn's `error` part is decoded, so the new case belongs inside the `systemNotification` case rather than beside it. `ToolCallStatus` is cast from a string today, so adding the member also means removing the blind cast.
+- **Watch out for:** `parts()` is also where a failed turn's `error` part is decoded, so the round-ended case lives inside the `systemNotification` case rather than beside it. `ToolCallStatus` is now mapped through an explicit table, so a host status this client does not know reads as `running`.
 
 ## Final verification checklist
 
-- [ ] `test/live.test.tsx` holds a scripted turn whose parts end with a `responseRoundEnded` notification, and the reader's turn has no notice part.
-- [ ] `test/smoke.test.tsx` holds the round-ended, edit-count and sign-in block cases.
-- [ ] `npm test` green.
-- [ ] `npm run typecheck` green.
-- [ ] `plans/index.md` updated.
+- [x] `test/live.test.tsx` holds a scripted turn whose parts end with a `responseRoundEnded` notification, and the reader's turn has no notice part.
+- [x] `test/smoke.test.tsx` holds the round-ended, edit-count and sign-in block cases.
+- [x] `npm test` green.
+- [x] `npm run typecheck` green.
+- [x] `plans/index.md` updated.

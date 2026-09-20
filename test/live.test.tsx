@@ -5,7 +5,7 @@ import { fakeHost } from '../src/ahp/fake.js';
 import { CONTROLLER } from '../src/control.js';
 import { sessions } from '../src/state.js';
 import { activityOf } from '../src/ahp/live.js';
-import { CHAT, SESSION, connect } from './scenario.js';
+import { CHAT, SESSION, connect, settle } from './scenario.js';
 
 /*
  * A catalogue is only as fresh as what it was last told.
@@ -273,6 +273,126 @@ describe('the config a live session reports', () => {
     const config = await host.config(SESSION as never);
     expect(config.values).toEqual({ permissionMode: 'default' });
     expect(config.properties.map((property) => property.key)).toEqual(['permissionMode', 'permissions', 'shellInitScripts']);
+    await host.close();
+  });
+});
+
+/**
+ * One finished turn, seeded on the chat a reader subscribes to.
+ *
+ * The state goes in directly rather than through the host's actions, because
+ * what these check is the decoder and not the reducer: the reader is handed
+ * the same `responseParts` the host would have reduced.
+ */
+async function reading(responseParts: Record<string, unknown>[]) {
+  const { host, scripted, read } = await connect();
+  scripted.states.set(SESSION, { defaultChat: CHAT, chats: [{ resource: CHAT, title: 'Chat' }], status: 1 });
+  scripted.states.set(CHAT, {
+    turns: [{ id: 't1', startedAt: new Date().toISOString(), state: 'complete', responseParts }],
+  });
+  const reader = read();
+  await settle();
+  return { host, reader };
+}
+
+/*
+ * A round the host ends with neither text nor a tool call.
+ *
+ * `responseRoundEnded` arrives as a `systemNotification` with the kind on the
+ * open `_meta` map, and the reference host uses it to settle the reasoning
+ * section that was streaming above it. Drawn as a notice it leaves an empty
+ * row under every answer the agent only thought about.
+ */
+describe('a round the host ended', () => {
+  it('keeps the reasoning part and drops the round-ended notification', async () => {
+    const { host, reader } = await reading([
+      { kind: 'reasoning', id: 'r1', content: 'weighing it' },
+      { kind: 'systemNotification', id: 'n1', content: '', _meta: { kind: 'responseRoundEnded' } },
+    ]);
+    const parts = reader.view()?.turns[0]?.parts ?? [];
+    expect(parts.map((part) => part.kind)).toEqual(['reasoning', 'roundEnded']);
+    expect(parts.some((part) => part.kind === 'systemNotification')).toBe(false);
+    expect(parts[0]).toMatchObject({ kind: 'reasoning', content: 'weighing it' });
+    reader.close();
+    await host.close();
+  });
+
+  it('still draws a notification of another kind, with its content', async () => {
+    const { host, reader } = await reading([
+      { kind: 'systemNotification', id: 'n1', content: 'the server restarted' },
+    ]);
+    const parts = reader.view()?.turns[0]?.parts ?? [];
+    expect(parts.map((part) => part.kind)).toEqual(['systemNotification']);
+    expect(parts[0]).toMatchObject({ kind: 'systemNotification', content: 'the server restarted' });
+    reader.close();
+    await host.close();
+  });
+});
+
+/*
+ * What a turn's file edits added and removed.
+ *
+ * A `fileEdit` tool result carries the counts, and the turn header totals them
+ * over the turn's own calls. A host that sends no diff says nothing rather
+ * than saying zero, which is why the count is absent and not `+0 -0`.
+ */
+describe('the edits a turn made', () => {
+  it('counts a fileEdit result onto the call', async () => {
+    const { host, reader } = await reading([
+      { kind: 'toolCall', id: 'c1', toolCall: {
+        toolCallId: 'c1', toolName: 'Edit', displayName: 'Edit', status: 'completed',
+        content: [{ type: 'fileEdit', diff: { added: 4, removed: 1 } }],
+      } },
+    ]);
+    const call = reader.view()?.turns[0]?.parts[0];
+    expect(call?.kind === 'toolCall' ? call.call.edits : undefined).toEqual({ added: 4, removed: 1 });
+    reader.close();
+    await host.close();
+  });
+
+  it('leaves the count off a result that is only text', async () => {
+    const { host, reader } = await reading([
+      { kind: 'toolCall', id: 'c1', toolCall: {
+        toolCallId: 'c1', toolName: 'Read', displayName: 'Read', status: 'completed',
+        content: [{ type: 'text', text: 'the file says this' }],
+      } },
+    ]);
+    const call = reader.view()?.turns[0]?.parts[0];
+    expect(call?.kind === 'toolCall' ? call.call.edits : undefined).toBeUndefined();
+    reader.close();
+    await host.close();
+  });
+});
+
+/*
+ * A tool call the MCP server paused for a token.
+ *
+ * The protocol has a status and a challenge for it, and this client had
+ * neither: the string was cast into a union that did not contain it and the
+ * challenge was dropped, so the row read as an ordinary call that never
+ * finished.
+ */
+describe('a call waiting on a sign-in', () => {
+  it('keeps the status and the challenge the host sent', async () => {
+    const { host, reader } = await reading([
+      { kind: 'toolCall', id: 'c1', toolCall: {
+        toolCallId: 'c1', toolName: 'read_file', displayName: 'read_file', status: 'auth-required',
+        auth: {
+          reason: 'insufficientScope',
+          description: 'the token expired',
+          resource: { resource: 'https://api.github.com', resource_name: 'GitHub API' },
+        },
+      } },
+    ]);
+    const call = reader.view()?.turns[0]?.parts[0];
+    expect(call?.kind === 'toolCall' ? call.call.status : undefined).toBe('auth-required');
+    expect(call?.kind === 'toolCall' ? call.call.auth : undefined).toEqual({
+      resource: 'https://api.github.com',
+      name: 'GitHub API',
+      reason: 'insufficientScope',
+      description: 'the token expired',
+    });
+    reader.close();
     await host.close();
   });
 });

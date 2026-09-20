@@ -537,6 +537,24 @@ function plain(value: unknown): string | undefined {
 }
 
 /**
+ * The tool-call statuses this client draws, under the host's own spelling.
+ *
+ * The protocol's union is larger - `streaming` and `pending-result-confirmation`
+ * are two this client has no row for - so an unrecognised status is a
+ * deliberate `running` rather than a string cast into a union that never
+ * contained it.
+ */
+const TOOL_STATUSES: Record<string, ToolCallStatus> = {
+  pending: 'pending',
+  'pending-confirmation': 'pending-confirmation',
+  running: 'running',
+  'auth-required': 'auth-required',
+  completed: 'completed',
+  failed: 'failed',
+  cancelled: 'cancelled',
+};
+
+/**
  * One tool call, flattened out of an eight-state union.
  *
  * Which fields exist depends on the state - `toolInput` arrives when the
@@ -555,15 +573,43 @@ function toolCall(value: unknown): ToolCall {
   const files = content
     .map((entry) => str(bag(bag(entry).file).uri) ?? str(bag(entry).uri))
     .filter((entry): entry is string => entry !== undefined);
+  // A `fileEdit` result carries the counts the turn header totals. Absent or
+  // non-numeric is left out rather than read as zero: a host that sent no diff
+  // has not said the edit was empty.
+  let added = 0;
+  let removed = 0;
+  for (const entry of content) {
+    if (str(bag(entry).type) !== 'fileEdit') continue;
+    const diff = bag(bag(entry).diff);
+    if (typeof diff.added === 'number') added += diff.added;
+    if (typeof diff.removed === 'number') removed += diff.removed;
+  }
 
-  const status = (str(call.status) ?? 'running') as ToolCallStatus;
+  const status = TOOL_STATUSES[str(call.status) ?? ''] ?? 'running';
   const progress = status === 'running' ? plain(bag(call._meta).progressMessage) : undefined;
+  // A call paused on a sign-in carries the challenge the host sent. The
+  // resource URL is what `authenticate` names, and the rest is what the host
+  // said about why it is needed.
+  const auth = bag(call.auth);
+  const resource = bag(auth.resource);
+  const resourceUri = status === 'auth-required' ? str(resource.resource) : undefined;
+  const challenge = resourceUri === undefined
+    ? {}
+    : {
+      auth: {
+        resource: resourceUri,
+        ...(str(resource.resource_name) ? { name: str(resource.resource_name) as string } : {}),
+        ...(str(auth.reason) ? { reason: str(auth.reason) as string } : {}),
+        ...(str(auth.description) ? { description: str(auth.description) as string } : {}),
+      },
+    };
 
   return {
     id: str(call.toolCallId) ?? randomUUID(),
     name: str(call.displayName) ?? str(call.toolName) ?? 'tool',
     toolName: str(call.toolName) ?? 'tool',
     status,
+    ...challenge,
     // A `ContentRef` is a promise of content rather than content: reporting
     // nothing is better than reporting the reference as if it were the command.
     ...(typeof input === 'string' ? { input } : {}),
@@ -574,6 +620,7 @@ function toolCall(value: unknown): ToolCall {
     ...(plain(call.pastTenseMessage) ? { outcome: plain(call.pastTenseMessage) as string } : {}),
     ...(text ? { output: text } : {}),
     ...(files.length > 0 ? { files } : {}),
+    ...(added > 0 || removed > 0 ? { edits: { added, removed } } : {}),
     ...(plain(call.confirmationTitle) ? { confirmationTitle: plain(call.confirmationTitle) as string } : {}),
     ...(list(call.options).length > 0
       ? {
@@ -602,6 +649,14 @@ function parts(value: unknown): ResponsePart[] {
         out.push({ kind: 'reasoning', id, content: str(part.content) ?? '' });
         break;
       case 'systemNotification':
+        // `_meta.kind` is an open map, and the reference host puts
+        // `responseRoundEnded` there when a round ends with neither text nor a
+        // tool call. It is a marker rather than a notice: the part stays so
+        // the reasoning above it stops streaming, and it draws no row.
+        if (str(bag(part._meta).kind) === 'responseRoundEnded') {
+          out.push({ kind: 'roundEnded', id });
+          break;
+        }
         out.push({ kind: 'systemNotification', id, content: plain(part.content) ?? '' });
         break;
       case 'toolCall': {

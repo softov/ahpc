@@ -1,6 +1,6 @@
 ---
 title: A completed turn's header says how many lines it added and removed
-status: todo
+status: done
 depends: []
 layer: src/blocks.ts
 refs:
@@ -42,3 +42,9 @@ A completed turn whose tool results edited files draws `+A -R` on its header row
 - `npm run typecheck` green.
 
 ## Resume
+
+Done 2026-09-20.
+`ToolCall` gained `edits`, and `toolCall()` sums `diff.added` and `diff.removed` over the `fileEdit` entries, leaving the count off when the host sent no numeric diff.
+`toBlocks` totals the turn's own calls before the header is pushed and appends `+A -R` after the elapsed time, and leaves `meta` alone when both totals are zero.
+`test/live.test.tsx` covers the counted call and the text-only one in the new `the edits a turn made` suite, and `test/smoke.test.tsx` covers the header cases in `describe('blocks')`.
+Nothing is left, and task-03 is next.

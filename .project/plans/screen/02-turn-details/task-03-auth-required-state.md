@@ -1,6 +1,6 @@
 ---
 title: A tool call waiting on a sign-in draws as a blocking row of its own
-status: todo
+status: done
 depends: [task-02-edit-stats.md]
 layer: src/blocks.ts
 refs:
@@ -46,3 +46,10 @@ A tool call whose host status is `auth-required` draws as one sign-in notice nam
 - `npm run typecheck` green.
 
 ## Resume
+
+Done 2026-09-20.
+`ToolCallStatus` gained `auth-required`, `ToolCall` gained `auth`, and `toolCall()` maps the host's status through an explicit table and reads the challenge from `call.auth`.
+`toBlocks` draws an `auth-required` call as one `notice` naming the call and the server, and a tool row keeps the narrowing so `@textui/chat` never sees the new status.
+`screens.tsx` narrows the pending input in a small `hitlInput` helper for the same reason, which the plan did not name; see implemented.md.
+`test/live.test.tsx` covers the decoded call in `a call waiting on a sign-in`, `test/smoke.test.tsx` covers the notice and the running row, and `test/customizations.test.tsx` is green.
+Nothing is left.

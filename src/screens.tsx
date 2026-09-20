@@ -39,7 +39,7 @@ import {
   ChatComposer, ChatHitl, ChatInputStatus, ChatSessionHead, ChatTranscript, ConnectionBadge, FileDiff, SessionDetails,
   SessionList, diffLines, findBlocks, openPicker, settingIcon, valueIcon,
 } from '@textui/chat';
-import type { ComposerOption, DetailField } from '@textui/chat';
+import type { ComposerOption, DetailField, ChatPendingInput } from '@textui/chat';
 import { ChangesList } from './view/changes.js';
 import { FileList } from './view/files.js';
 import { AutomationList } from './view/automations.js';
@@ -686,6 +686,25 @@ const NO_TURNS: Turn[] = [];
 const NO_QUEUE: QueuedMessage[] = [];
 const NONE_EXPANDED: Record<string, boolean> = {};
 
+/**
+ * A pending input as `ChatHitl` draws it.
+ *
+ * `@textui/chat`'s tool call has no `auth-required` status, and a
+ * confirmation never is one: a call waiting on a sign-in is drawn as a notice
+ * in the transcript rather than as a yes or a no here. The narrowing is
+ * written out rather than cast, so an impossible shape still gets a row.
+ */
+function hitlInput(input: PendingInput): ChatPendingInput {
+  if (input.kind !== 'toolConfirmation') return input;
+  return {
+    ...input,
+    call: {
+      ...input.call,
+      status: input.call.status === 'auth-required' ? 'pending-confirmation' : input.call.status,
+    },
+  };
+}
+
 export const ChatScreen: (props: Record<string, never>) => RenderOutput =
   defineComponent<Record<string, never>>('ChatScreen', () => {
     const app = useApp();
@@ -910,7 +929,7 @@ export const ChatScreen: (props: Record<string, never>) => RenderOutput =
             past. */}
         {input ? (
           <ChatHitl
-            input={input}
+            input={hitlInput(input)}
             draft={answers ?? {}}
             onDraft={setAnswers}
             // Where it starts, so the creature has somewhere to stand that is

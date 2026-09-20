@@ -114,7 +114,7 @@ export interface SessionDetail {
 }
 
 export type ToolCallStatus =
-  | 'pending' | 'pending-confirmation' | 'running' | 'completed' | 'failed' | 'cancelled';
+  | 'pending' | 'pending-confirmation' | 'running' | 'auth-required' | 'completed' | 'failed' | 'cancelled';
 
 /**
  * One tool call, flattened.
@@ -150,6 +150,16 @@ export interface ToolCall {
   output?: string;
   exitCode?: number;
   files?: string[];
+  /** What this call's results changed, in lines. Absent when the host sent no diff. */
+  edits?: { added: number; removed: number };
+  /**
+   * The sign-in this call is waiting on.
+   *
+   * `resource` is the protected resource's own URL, which is what the
+   * `authenticate` command names; the rest is what the host said about it.
+   * Only ever set while `status` is `auth-required`.
+   */
+  auth?: { resource: string; name?: string; reason?: string; description?: string };
   /** Set while `pending-confirmation`. */
   confirmationTitle?: string;
   options?: { id: string; label: string }[];
@@ -159,6 +169,8 @@ export type ResponsePart =
   | { kind: 'markdown'; id: string; content: string }
   | { kind: 'reasoning'; id: string; content: string }
   | { kind: 'systemNotification'; id: string; content: string }
+  /** A marker between parts rather than content: the host ended the round, so nothing is drawn. */
+  | { kind: 'roundEnded'; id: string }
   | { kind: 'toolCall'; id: string; call: ToolCall }
   /** How a turn failed, in the host's words. `resumable`: the host can carry on from it. */
   | { kind: 'error'; id: string; message: string; resumable: boolean };
