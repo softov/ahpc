@@ -1,7 +1,7 @@
 ---
 title: A session's own pull requests are told from the ones it inherited
 domain: screen
-status: planned
+status: built
 priority: medium
 created: 2026-09-19
 revalidated: 2026-09-19
@@ -92,7 +92,7 @@ What this plan settled without one:
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - The ownership filter](task-01-ownership-filter.md) | todo | - |
+| [01 - The ownership filter](task-01-ownership-filter.md) | done | - |
 
 ## Risks and tradeoffs
 
@@ -103,16 +103,15 @@ What this plan settled without one:
 
 ## Resume state
 
-- **Done so far:** nothing; the plan was written 2026-09-19 from the upstream pass 4 review.
-- **Next action:** [task-01-ownership-filter.md](task-01-ownership-filter.md).
-- **Open questions:**
-  1. Does ahpd host/03 send `initialPullRequestUrls` as a captured empty array or omit the key? Proposed: either is read the same way, because an absent list and an empty list both leave every `pullRequestUrls` entry owned, which is what the reference's `?? []` does.
-- **Watch out for:** the singular `pullRequestUrl` spelling must go through the same filter, or a host that sends one URL bypasses ownership; and the host half, ahpd `.project/plans/host/03-pull-request-baseline/plan.md`, is prose here and in the index row and never a frontmatter `requires`, because a path into another repository cannot resolve.
+- **Done so far:** task 01 done 2026-09-20; the plan is built.
+- **Next action:** none; [implemented.md](implemented.md) is written.
+- **Open questions:** none, because an omitted key and a captured empty array both leave every URL owned, so the host's choice does not change the code.
+- **Watch out for:** the singular `pullRequestUrl` spelling goes through the same filter, because a host that sends one URL would otherwise bypass ownership; and the host half, ahpd `.project/plans/host/03-pull-request-baseline/plan.md`, is prose here and in the index row and never a frontmatter `requires`, because a path into another repository cannot resolve.
 
 ## Final verification checklist
 
-- [ ] `test/pullrequest.test.ts` covers both keys absent, an inherited URL, an associated URL that is also in the baseline, the first owned URL winning, and the case and trailing-slash spellings.
-- [ ] The case at `test/smoke.test.tsx:869` still draws `cleanup/compile-script #412 merged`.
-- [ ] `npm test` green.
-- [ ] `npm run typecheck` green.
-- [ ] `plans/index.md` updated.
+- [x] `test/pullrequest.test.ts` covers both keys absent, an inherited URL, an associated URL that is also in the baseline, the first owned URL winning, and the case and trailing-slash spellings.
+- [x] The case at `test/smoke.test.tsx:869` still draws `cleanup/compile-script #412 merged`.
+- [x] `npm test` green.
+- [x] `npm run typecheck` green.
+- [x] `plans/index.md` updated.

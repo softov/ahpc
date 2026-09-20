@@ -1,6 +1,6 @@
 ---
 title: A pull request is drawn only when the host says this session owns it
-status: todo
+status: done
 depends: []
 layer: screen
 refs:
@@ -39,3 +39,9 @@ refs:
 - `npm run typecheck` green.
 
 ## Resume
+
+Done 2026-09-20.
+`src/state.ts` gained `urlsIn()` beside `urlKey`, and `pullRequest()` now filters the URL list through the baseline and associated sets before it chooses.
+`test/pullrequest.test.ts` gained the cases for the rule: an inherited URL, the same URL associated, the first owned URL winning, neither key present, a case or trailing-slash spelling, the singular spelling and a non-list baseline.
+The catalogue case at `test/smoke.test.tsx:869` still draws `cleanup/compile-script #412 merged`.
+Everything named in the task is done, and the plan is built.

@@ -617,14 +617,24 @@ export interface PullRequest {
 /** The key two spellings of one pull request URL share: case and a trailing slash. */
 const urlKey = (url: string): string => url.trim().replace(/\/+$/, '').toLowerCase();
 
+/** The strings of an array, and none of anything else: a host that sends an object or a number there is not a crash. */
+function urlsIn(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((one): one is string => typeof one === 'string') : [];
+}
+
 /**
  * The pull request the reference host found for this session, if it applies.
  *
  * `_meta.github` is the reference host's, the way `_meta.git` is: a
  * convention read by its own window, not a declaration. `pullRequestUrls` is
- * the history, most recent first, and only the most recent counts. Two
- * checks are the host's own, and are kept here so a row never says more than
- * the host would: a request found for another branch is not this branch's
+ * the history, most recent first, and only the most recent one this session
+ * owns counts. `initialPullRequestUrls` is the baseline that came with the
+ * checkout, and `associatedPullRequestUrls` is what a person explicitly
+ * attached: a URL is owned when it is not in the first or is in the second,
+ * and neither list present means nothing is filtered, so a host that knows no
+ * provenance keeps the row it has today. Two further checks are the host's
+ * own, and are kept here so a row never says more than the host would: a
+ * request found for another branch is not this branch's
  * (`pullRequestBranchName`, when the host has recorded one), and a state is
  * only the state of the URL it was observed on (`pullRequestStateUrl`) - the
  * host keeps reporting the last request it knew while it looks for one on the
@@ -636,7 +646,9 @@ export function pullRequest(session: SessionSummary): PullRequest | undefined {
   const urls = Array.isArray(found.pullRequestUrls)
     ? found.pullRequestUrls.filter((url): url is string => typeof url === 'string')
     : typeof found.pullRequestUrl === 'string' ? [found.pullRequestUrl] : [];
-  const url = urls[0];
+  const initial = new Set(urlsIn(found.initialPullRequestUrls).map(urlKey));
+  const associated = new Set(urlsIn(found.associatedPullRequestUrls).map(urlKey));
+  const url = urls.filter((one) => !initial.has(urlKey(one)) || associated.has(urlKey(one)))[0];
   if (url === undefined) return undefined;
   const branch = found.pullRequestBranchName;
   if (typeof branch === 'string' && branch !== branchName(session)) return undefined;

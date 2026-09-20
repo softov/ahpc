@@ -61,3 +61,68 @@ describe('the pull request the host found', () => {
     expect(pullRequest(session({ pullRequestUrl: PR }))?.number).toBe('412');
   });
 });
+
+/*
+ * The baseline a checkout came with.
+ *
+ * A folder-isolated session starts on a checkout that may already have a pull
+ * request open; the host records it in `initialPullRequestUrls` so a row does
+ * not present it as something this session opened or merged. A person who
+ * attaches one by hand puts it in `associatedPullRequestUrls`, which overrides
+ * the baseline, and a host that sends neither key filters nothing.
+ */
+describe('the pull request this session owns', () => {
+  const OWNED = 'https://github.com/brbyte/brb_backend/pull/500';
+
+  it('is nothing when the only request came with the checkout', () => {
+    expect(pullRequest(session({
+      pullRequestUrls: [PR], initialPullRequestUrls: [PR],
+    }))).toBeUndefined();
+  });
+
+  it('is this session\'s again when a person attached it', () => {
+    expect(pullRequestLabel(session({
+      pullRequestUrls: [PR], initialPullRequestUrls: [PR], associatedPullRequestUrls: [PR],
+    }))).toBe('#412');
+  });
+
+  it('is the first owned request when the head is inherited', () => {
+    expect(pullRequest(session({
+      pullRequestUrls: [PR, OWNED], initialPullRequestUrls: [PR],
+    }))?.number).toBe('500');
+    // And its state applies on its own URL, not the inherited head's.
+    expect(pullRequest(session({
+      pullRequestUrls: [PR, OWNED], initialPullRequestUrls: [PR],
+      pullRequestState: 'merged', pullRequestStateUrl: OWNED,
+    }))).toEqual({ number: '500', state: 'merged' });
+  });
+
+  it('leaves the head owned when the host sends no baseline', () => {
+    expect(pullRequest(session({ pullRequestUrls: [PR] }))?.number).toBe('412');
+    expect(pullRequestLabel(session({ pullRequestUrls: [PR] }))).toBe('#412');
+  });
+
+  it('matches a baseline spelling that differs in case or a trailing slash', () => {
+    expect(pullRequest(session({
+      pullRequestUrls: [PR], initialPullRequestUrls: [`${PR.toUpperCase()}/`],
+    }))).toBeUndefined();
+    expect(pullRequest(session({
+      pullRequestUrls: [`${PR.toUpperCase()}/`], initialPullRequestUrls: [PR],
+    }))).toBeUndefined();
+  });
+
+  it('filters the single-URL spelling too', () => {
+    expect(pullRequest(session({
+      pullRequestUrl: PR, initialPullRequestUrls: [PR],
+    }))).toBeUndefined();
+    expect(pullRequestLabel(session({
+      pullRequestUrl: PR, initialPullRequestUrls: [PR], associatedPullRequestUrls: [PR],
+    }))).toBe('#412');
+  });
+
+  it('filters nothing for a baseline that is not a list of URLs', () => {
+    expect(pullRequest(session({ pullRequestUrls: [PR], initialPullRequestUrls: 'nope' }))?.number).toBe('412');
+    expect(pullRequest(session({ pullRequestUrls: [PR], initialPullRequestUrls: [412] }))?.number).toBe('412');
+    expect(pullRequest(session({ pullRequestUrls: [PR], associatedPullRequestUrls: { [PR]: true } }))?.number).toBe('412');
+  });
+});
