@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  AUTH_REQUIRED, attempt, authRequiredOf, authRequiredReason, askFor, failureWords, hostWords, retryAllowed,
+  AUTH_REQUIRED, attempt, authRequiredOf, askFor, failureWords, hostWords,
 } from '../src/ahp/auth.js';
 import { needsToken } from '../src/cli/main.js';
 
@@ -69,14 +69,6 @@ describe('reading a refusal', () => {
     expect(failureWords(new Error('the host is busy'))).toBe('the host is busy');
   });
 
-  it('reads a dispatch rejection whose words carry the code, and names no resource', () => {
-    const refusal = authRequiredReason('RPC error -32007: Authentication required');
-    expect(refusal?.resources).toEqual([]);
-    expect(refusal?.words).toBe('Authentication required');
-    // A code is the only door: a reason that does not carry one is not a refusal.
-    expect(authRequiredReason('the host is busy')).toBeNull();
-    expect(authRequiredReason('-320071 is not the code')).toBeNull();
-  });
 
   it('asks for the first resource the host named, carrying the name and the words', () => {
     const refusal = authRequiredOf(refused([
@@ -92,11 +84,6 @@ describe('reading a refusal', () => {
     expect(askFor({ resources: [], words: 'no door' })).toBeNull();
   });
 
-  it('allows exactly one more attempt, and not two', () => {
-    expect(retryAllowed(0)).toBe(true);
-    expect(retryAllowed(1)).toBe(false);
-    expect(retryAllowed(2)).toBe(false);
-  });
 });
 
 describe('the one retry', () => {

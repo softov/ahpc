@@ -182,7 +182,7 @@ What this plan settled without one:
 
 ## Final verification checklist
 
-- [x] `test/auth.test.ts` reads a `-32007` with and without resources, takes the ask's name from `resource_name`, reads a dispatch rejection whose words carry the code, and applies the one-retry rule, and asks nothing for a refusal that names no door.
+- [x] `test/auth.test.ts` reads a `-32007` with and without resources, takes the ask's name from `resource_name`, applies the one-retry rule through `attempt` itself, and asks nothing for a refusal that names no door. The dispatch reader and the `retryAllowed` predicate were written, called from nowhere, and dropped.
 - [x] `test/auth.test.tsx` drives the modal over the fake host: refused, prompted, accepted, and the act served exactly once more; a refused credential leaves the prompt open and runs nothing; a second refusal after the retry stops; two refused acts at once are both answered by one credential, the matching one retried and the other told no.
 - [x] `test/reconnect.test.ts` still passes, and the scripted host can refuse a request and clear the refusal after `authenticate`.
 - [x] A shell run against a host that refuses prints one sentence and exits 1, with no stack trace and no prompt.

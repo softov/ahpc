@@ -1,6 +1,6 @@
 import type { RenderOutput } from '@textui/core';
 import { defineComponent, useEffect, useRequiredService, useStoreValue } from '@textui/core';
-import { Column, Field, Form, FormActions, Panel, TextInput, useForm } from '@textui/widgets';
+import { Column, Dialog, Field, Form, FormActions, TextInput, useForm } from '@textui/widgets';
 import { CONTROLLER } from '../control.js';
 import { AUTH_ASK } from '../state.js';
 import type { AuthAsk } from '../ahp/auth.js';
@@ -48,7 +48,7 @@ export const SignInPrompt: (props: Record<string, never>) => RenderOutput =
     if (ask === null) return null;
 
     return (
-      <Panel title="Sign in" width={64}>
+      <Dialog title="Sign in" width={62}>
         <Column gap={1}>
           <Column gap={0}>
             {/* The host's own name for it when it gave one, and the identifier
@@ -86,6 +86,6 @@ export const SignInPrompt: (props: Record<string, never>) => RenderOutput =
             />
           </Form>
         </Column>
-      </Panel>
+      </Dialog>
     );
   });

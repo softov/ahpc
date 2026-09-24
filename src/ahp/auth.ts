@@ -1,10 +1,11 @@
 /**
  * A refusal, read once, and the one retry a credential buys.
  *
- * A `-32007` reaches this client from two places and in two shapes: a request
- * that rejects with a JSON-RPC code in its `code`, and a dispatch whose
- * `rejectionReason` is a string with the code somewhere in the words. Both are
- * read here so nothing above this file has to know what a protocol code is.
+ * A `-32007` is read here, off a request that rejects with the JSON-RPC code in
+ * its `code`, so nothing above this file has to know what a protocol code is. A
+ * dispatch carries its refusal as a `rejectionReason` string instead, with no
+ * code to read; that shape is not retried and so is not read here. See
+ * `deferred.md` beside the plan.
  *
  * The discipline is the reference client's, stated as three rules. One attempt
  * is one attempt, so a refusal is read rather than retried in place. One
@@ -18,9 +19,6 @@
 
 /** AHP's `AuthRequired`, the JSON-RPC code for "authenticate for this first". */
 export const AUTH_REQUIRED = -32007;
-
-/** The protocol's `-32007` wherever a host put it, so a wrapper and a bare code read the same. */
-const AUTH_CODE = /-32007(?!\d)/;
 
 /** The SDK puts `RPC error -32007: ` in front of the host's own message. */
 const WRAPPER = /^RPC error -?\d+:\s*/;
@@ -107,32 +105,11 @@ export function authRequiredOf(error: unknown): AuthRefusal | null {
   return { resources, words: hostWords(said) };
 }
 
-/**
- * A refused *dispatch*, read as an auth refusal, or `null`.
- *
- * A dispatch is a notification and the host has no response id to put an error
- * in: the same action comes back with a `rejectionReason` string instead, and
- * the SDK does not turn one into a code. So the code has to be in the host's
- * words, and the reader only opens a door when the protocol's own `-32007`
- * appears there. A refusal read this way names no resource, which is what makes
- * the caller stop rather than guess.
- */
-export function authRequiredReason(reason: unknown): AuthRefusal | null {
-  if (typeof reason !== 'string') return authRequiredOf(reason);
-  if (!AUTH_CODE.test(reason)) return null;
-  return { resources: [], words: hostWords(reason) };
-}
-
 /** The sentence to draw for a failed act: a refusal's own words, or the error's. */
 export function failureWords(error: unknown): string {
   const refusal = authRequiredOf(error);
   if (refusal !== null) return refusal.words;
   return error instanceof Error ? error.message : String(error);
-}
-
-/** Whether another attempt is allowed after this many credentials have been accepted. */
-export function retryAllowed(retries: number): boolean {
-  return retries < 1;
 }
 
 /**

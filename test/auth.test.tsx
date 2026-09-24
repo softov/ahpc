@@ -173,6 +173,7 @@ describe('the credential prompt', () => {
     // A credential is taken for either resource, so whichever refusal the
     // prompt ends up showing can be answered.
     host.authenticate = async () => undefined;
+    const pushed = watchSignIn(host);
     host.changesets = async () => { scopes += 1; throw refused(RESOURCE, 'no scopes'); };
     host.changes = async () => { changes += 1; throw refused(OTHER, 'no changes'); };
 
@@ -188,8 +189,13 @@ describe('the credential prompt', () => {
 
     await submit(t, 'tok');
 
-    // Both asks were held, and exactly one of them was tried again.
-    expect(scopes + changes).toBe(3);
+    // The newest refusal is what the prompt draws, so the credential is pushed
+    // for the resource `changesAt` was refused for and not the other one.
+    expect(pushed).toEqual([{ resource: OTHER, token: 'tok' }]);
+    // Exactly the matching act ran again. Counting the two apart is the whole
+    // point: a sum would read the same if the wrong waiter had been answered.
+    expect(changes).toBe(2);
+    expect(scopes).toBe(1);
     expect(await first).toMatchObject({ code: -32007 });
     expect(await second).toMatchObject({ code: -32007 });
 

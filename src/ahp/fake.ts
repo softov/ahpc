@@ -72,7 +72,7 @@ export interface FakeHost extends HostConnection {
    * opt-in, so a case that does not ask for it never refuses.
    */
   protect(resource: string, name?: string): void;
-  /** How many requests of one method this host has served, so a retry can be counted. */
+  /** How many times one method was *called*, refusals included, so a retry can be counted. */
   asked(method: string): number;
 }
 
@@ -269,8 +269,8 @@ export function fakeHost(): FakeHost {
    * the resource, which is what a refusal may carry and what the prompt draws.
    */
   const protectedBy = new Map<string, string | undefined>();
-  /** Requests answered, by method, so a test can count a retry. */
-  const served = new Map<string, number>();
+  /** Calls made, by method. Counted before the refusal, because a retry is a call and not an answer. */
+  const attempts = new Map<string, number>();
   const configs = new Map<SessionUri, Record<string, string>>();
   const observers = new Map<SessionUri, Set<(event: HostEvent) => void>>();
   const chats = new Map<SessionUri, string>();
@@ -1370,9 +1370,9 @@ export function fakeHost(): FakeHost {
     }
   }
 
-  /** One request answered, by method, so a retry is countable. */
+  /** One call, by method, counted whether it goes on to be refused or answered. */
   function count(method: string): void {
-    served.set(method, (served.get(method) ?? 0) + 1);
+    attempts.set(method, (attempts.get(method) ?? 0) + 1);
   }
 
   /** Everything this host advertises as protected: what the agents declare, plus anything protected by hand. */
@@ -2267,6 +2267,6 @@ export function fakeHost(): FakeHost {
       tokens.delete(resource);
     },
 
-    asked: (method) => served.get(method) ?? 0,
+    asked: (method) => attempts.get(method) ?? 0,
   };
 }
