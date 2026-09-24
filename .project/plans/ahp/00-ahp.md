@@ -50,6 +50,7 @@ ahpc [flags] -> connect(Where) -> liveHost(...) -> ahp.Client over a WebSocket
   Built by [01 - Sign in when a host refuses](01-sign-in-when-a-host-refuses/plan.md) on 2026-09-24; what it left is in its [deferred.md](01-sign-in-when-a-host-refuses/deferred.md).
 - The live auth states the reference client uses as a fallback - an MCP server that is `authRequired`, a tool call carrying `auth` - are drawn inertly here and do not become a resource to ask for.
 - The tool server in `src/mcp/` answers a refusal to a model rather than to a person, and has no prompt of its own.
-- Nothing is authenticated until the host has refused, and the prompt asks the person every run: it reads neither `AHPC_TOKEN_<RESOURCE>`, which this client's own shell half documents, nor anything on disk.
+- Nothing is authenticated until the host has refused, and the prompt asks the person every time: it does not read `AHPC_TOKEN_<RESOURCE>`, which this client's own shell half documents, and it keeps nothing between refusals.
   An agent declaring a required resource therefore fails per turn inside a session that was created without complaint, which is not a refusal this client can read.
+  A reconnect makes it worse: the host keeps credentials per connection and the reconnect loop never returns to `connect`, so a resumed connection is an unauthenticated one.
   Planned by [02 - Push a token before the host refuses](02-a-token-before-the-host-refuses/plan.md).

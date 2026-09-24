@@ -1,8 +1,9 @@
 ---
 title: A token is kept in a file of its own, and looked for before anybody is asked
-status: accepted
+status: superseded
 date: 2026-09-24
 supersedes: decisions/the-prompt-does-not-keep-the-secret.md
+superseded-by: decisions/a-token-is-kept-for-the-process-and-never-written-down.md
 refs:
   - "[code://src/config.ts#L72-L80](../../src/config.ts#L72-L80) - `statePath`, the helper for a file a program rewrites on its own schedule"
   - "[code://src/cli/main.ts#L1302-L1305](../../src/cli/main.ts#L1302-L1305) - the chain the shell already resolves: `--token`, then the resource's variable, then a pipe"
