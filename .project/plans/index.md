@@ -23,7 +23,17 @@ Reference: [00-screen.md](screen/00-screen.md)
 
 Next free number in `screen`: `06`.
 
+## ahp
+
+Reference: [00-ahp.md](ahp/00-ahp.md)
+
+| Plan | Priority | Status | Requires | Blocks |
+| --- | --- | --- | --- | --- |
+| [01 - Sign in when a host refuses, and run the refused act once more](ahp/01-sign-in-when-a-host-refuses/plan.md) | high | planned 2026-09-23 | - | - |
+
+Next free number in `ahp`: `02`.
+
 ## Later domains (no plans yet)
 
-`cli` (`src/cli`) · `mcp` (`src/mcp`) · `ahp` (`src/ahp`) · `documentation`.
+`cli` (`src/cli`) · `mcp` (`src/mcp`) · `documentation`.
 Ideas: [the tool server](../ideas/the-tool-server.md), [deliberate duplication](../ideas/deliberate-duplication.md), [artifacts and references on screen](../ideas/artifacts-and-references.md), [subagent rows](../ideas/subagent-rows.md).
