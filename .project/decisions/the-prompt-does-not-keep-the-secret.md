@@ -1,7 +1,8 @@
 ---
 title: The prompt does not keep the secret it was given
-status: accepted
+status: superseded
 date: 2026-09-23
+superseded-by: decisions/a-token-is-kept-in-a-file-of-its-own.md
 refs:
   - code://src/ahp/live.ts#L1956-L1980 - `authenticate`, which hands the token to the host for this connection
   - code://src/state.ts#L165-L194 - `HOST_ERROR` and `INPUT_STATUS`, the only free-text the store holds today

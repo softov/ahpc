@@ -30,8 +30,9 @@ Reference: [00-ahp.md](ahp/00-ahp.md)
 | Plan | Priority | Status | Requires | Blocks |
 | --- | --- | --- | --- | --- |
 | [01 - Sign in when a host refuses, and run the refused act once more](ahp/01-sign-in-when-a-host-refuses/plan.md) | high | built 2026-09-24 ([implemented.md](ahp/01-sign-in-when-a-host-refuses/implemented.md)) | - | - |
+| [02 - Push a token before the host refuses, and look for one before asking](ahp/02-a-token-before-the-host-refuses/plan.md) | high | planned 2026-09-24 | ahp/01 for the prompt and the retry it hangs off | - |
 
-Next free number in `ahp`: `02`.
+Next free number in `ahp`: `03`.
 
 ## Later domains (no plans yet)
 
