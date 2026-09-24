@@ -23,6 +23,8 @@ A non-interactive run never prompts and never retries an act.
 A `-32007` becomes a sentence that names the resource and the environment variable that would satisfy it, and the exit code is 1.
 `ahpc auth <resource>` remains the way to push a credential, and the connection's own printed sentence remains the first thing a person sees.
 
+Source: (defaulted: there is nobody to ask, `src/main.tsx:53-64` is where a `Fault` becomes one sentence and anything else a stack, and `ahpc auth` already has the credential sources at `src/cli/main.ts:1263-1287`.)
+
 ## Consequences
 
 A script that is refused fails with a sentence rather than a stack trace, which is the difference between a client that is broken and a host that wants a credential.

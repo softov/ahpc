@@ -23,11 +23,14 @@ A `-32007` whose `data` names no resource opens nothing and is drawn as the host
 Only the first resource a refusal names is asked for, because the host named it and a second one is a different act's problem.
 The `auth/required` notification always names one, because the connection drops a notification that does not, so a prompt opened from a notification always has a resource to show.
 
+Source: (defaulted: `authentication.md` requires the resource to match one the host advertised and `authenticate` refuses a guessed one before sending, `src/ahp/live.ts:1966-1968`; the reference states the rule at `/github/ahpapp/src/auth-gate.tsx:22-24`.)
+
 ## Consequences
 
 There is never an empty prompt, and no screen or helper has to invent an identifier.
 A person refused by a host that names nothing sees the sentence and can still run `ahpc auth <resource>` if they know which resource they want.
 The live-state fallback the reference uses for exactly this case is not ported, so an MCP server whose state is `authRequired` does not become the resource for a refusal that named none.
+The reference's `resourceToAsk` also prefers a resource the client already declared, so its sheet can draw the host's friendly name; that ordering is not ported either, because the host's `resource_name` travels on the refusal itself and is carried as the ask's name.
 
 ## Options
 

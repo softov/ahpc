@@ -253,3 +253,36 @@ it('delivers the opening snapshot inside subscribe, which is what a waiting call
   expect(arrived).toBe(true);
   held.close();
 });
+
+/*
+ * A request refused until somebody signs in.
+ *
+ * The one state the fixture could not express, and without it neither the
+ * reader nor the retry has a host to be wrong against. Opt-in, so every case
+ * above answers exactly as it did before.
+ */
+it('refuses a request for a resource it protects, and serves it once a token arrives', async () => {
+  const host = fakeHost();
+  const RESOURCE = 'https://api.anthropic.com';
+  host.protect(RESOURCE, 'Anthropic API');
+
+  const refused = await host.listSessions().catch((error: unknown) => error);
+  // The shape a real `-32007` has: the code on the error, and the resource the
+  // host named in `data`, with the host's own name for it.
+  expect(refused).toMatchObject({ code: -32007 });
+  expect((refused as { data?: unknown }).data).toEqual({
+    resources: [{ resource: RESOURCE, resource_name: 'Anthropic API' }],
+  });
+  expect(host.asked('listSessions')).toBe(1);
+
+  await host.authenticate?.(RESOURCE, 'tok');
+  await expect(host.listSessions()).resolves.toBeInstanceOf(Array);
+  expect(host.asked('listSessions')).toBe(2);
+});
+
+it('answers a request for a resource it was never asked to protect', async () => {
+  const host = fakeHost();
+  // Nobody called `protect`, so nothing is refused and no token is needed.
+  await expect(host.listSessions()).resolves.toBeInstanceOf(Array);
+  expect(host.asked('listSessions')).toBe(1);
+});

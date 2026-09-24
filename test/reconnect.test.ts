@@ -1525,6 +1525,27 @@ describe('signing in to what a host protects', () => {
 
     await host.close();
   });
+
+  it('refuses a request until a token is pushed, then answers it', async () => {
+    const { host, scripted } = await protecting();
+    scripted.refuseRequests.set('listSessions', {
+      code: -32007,
+      message: 'Authentication required',
+      data: { resources: [{ resource: 'https://api.anthropic.com', resource_name: 'Anthropic API' }] },
+    });
+
+    // The request case, which is the one a `-32007` reaches a caller on: the
+    // error is thrown rather than reported, and it carries its own resource.
+    await expect(host.listSessions()).rejects.toMatchObject({
+      code: -32007,
+      data: { resources: [{ resource: 'https://api.anthropic.com', resource_name: 'Anthropic API' }] },
+    });
+
+    await host.authenticate?.('https://api.anthropic.com', 'tok');
+    await expect(host.listSessions()).resolves.toEqual([]);
+
+    await host.close();
+  });
 });
 
 describe('the host\'s own log, which the protocol client also drops', () => {

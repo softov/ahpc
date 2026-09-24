@@ -1,6 +1,6 @@
 ---
 title: A refusal in a non-interactive run is a sentence, not a stack
-status: todo
+status: done
 depends: [task-01-the-refusal-is-read-once.md]
 layer: cli
 refs:
@@ -22,8 +22,7 @@ A command run with no screen that is refused with `-32007` prints one sentence n
 
 - `UPDATE: src/cli/main.ts:762-768` - a `catch` before the `finally` that converts an auth refusal into a `Fault`.
 - `UPDATE: src/cli/main.ts:1255-1300` - one helper that builds the sentence from an `AuthAsk` and `tokenVariable`, used by `signIn`'s own missing-token message and by the new catch.
-- `CREATE: test/auth.test.ts` - the sentence as a pure function, in the file task 01 creates.
-- `UPDATE: test/auth.test.ts` - the cases below.
+- `UPDATE: test/auth.test.ts` - the sentence as a pure function, added to the file task 01 creates, plus the cases below.
 
 ## Steps
 
@@ -31,7 +30,7 @@ A command run with no screen that is refused with `-32007` prints one sentence n
 2. The sentence for a refusal that named no resource is the host's own words, which is what `failureWords` already answers.
 3. The `finally` still flushes and closes, so the connection is hung up on both paths.
 4. Reuse the same sentence builder from `signIn`'s "No token" message so the two cannot drift.
-5. No prompt and no retry: nothing here calls `attempt`, and the asker installed by a screen is not installed in a shell run.
+5. No prompt and no retry: nothing here calls `attempt`, and the asker is installed by `createController` (`src/control.ts:227-232`), which a shell run never calls, so `src/connect.ts`'s box keeps its stderr default for the whole command.
 
 ## Validation
 
@@ -42,6 +41,6 @@ A command run with no screen that is refused with `-32007` prints one sentence n
 
 ## Resume
 
-Not started.
-One thing to confirm: whether the connection's own printed sentence and the `Fault` are one line or two when both fire.
-Proposed: keep both only if they read as one thought, otherwise have the catch be the single sentence.
+Done 2026-09-24.
+The `catch` before the `finally` in `src/cli/main.ts` reads a refusal with `authRequiredOf`, names the resource it found with `needsToken`, falls back to `failureWords` for a doorless one, and throws a `Fault`. `needsToken(resource, name?)` is the one sentence, used by that catch and by `signIn`'s missing-token message, and it is exported so `test/auth.test.ts` can read it as a pure function.
+Verified by the two sentence cases in `test/auth.test.ts`, `test/cli.test.ts` unchanged and green, and `npm run typecheck`. Nothing is prompted or retried by construction: the asker is installed by `createController`, which a shell run never calls.

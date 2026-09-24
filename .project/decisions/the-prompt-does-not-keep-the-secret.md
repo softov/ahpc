@@ -22,6 +22,8 @@ The prompt holds what was typed only until it is submitted.
 On an accepted credential the field is cleared and the secret is not written anywhere else.
 Nothing is persisted, so a reconnect the host has forgotten prompts again.
 
+Source: (defaulted: the host holds the token for the connection once `authenticate` is accepted, the store is a plain object every screen binds to, and the reference's own closing discipline drops the draft at `/github/ahpapp/src/components/ResourceAuth.tsx:64-74`.)
+
 ## Consequences
 
 There is exactly one copy of the secret after a successful sign-in, and it is the host's.

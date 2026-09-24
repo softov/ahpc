@@ -77,6 +77,17 @@ export class Scripted {
   /** An error to refuse a subscribe with, in place of the plain `-32001`. */
   refuseWith: Record<string, unknown> | null = null;
   /**
+   * Requests to refuse with a chosen error, by method, until `authenticate`
+   * names the resource the error carries.
+   *
+   * `refuseWith` is the subscribe case; this is the request case, which is the
+   * one a `-32007` reaches a caller on. Opt-in, so a scenario that does not set
+   * it answers exactly as before.
+   */
+  readonly refuseRequests = new Map<string, Record<string, unknown>>();
+  /** Resources a token has been pushed for, by resource. */
+  readonly tokens = new Map<string, string>();
+  /**
    * Hold the opening exchange instead of answering it.
    *
    * `initialize` on a first connection and `reconnect` on a later one, because
@@ -137,6 +148,21 @@ export class Scripted {
   timesAsked(method: string, channel?: string): number {
     return this.asked.filter((frame) => frame.method === method
       && (channel === undefined || frame.params?.channel === channel)).length;
+  }
+
+  /**
+   * The error to answer one request with, or `null` to answer normally.
+   *
+   * A refusal clears once a token has been pushed for the resource the error
+   * named, which is what makes "refused until signed in" expressible in a line.
+   */
+  private refusalFor(method: string): Record<string, unknown> | null {
+    const error = this.refuseRequests.get(method);
+    if (error === undefined) return null;
+    const resources = (error.data as { resources?: { resource?: string }[] } | undefined)?.resources;
+    const resource = resources?.[0]?.resource;
+    if (resource !== undefined && this.tokens.has(resource)) return null;
+    return error;
   }
 
   /** Emit one OTLP log batch, in the shape the specification's example has. */
@@ -413,6 +439,13 @@ export class Scripted {
       await reply({});
       return;
     }
+    if (method !== undefined && method !== 'authenticate') {
+      const refusal = this.refusalFor(method);
+      if (refusal !== null) {
+        if (id !== undefined) await this.send({ jsonrpc: '2.0', id, error: refusal });
+        return;
+      }
+    }
     if (method === 'listSessions') {
       const cursor = message.params?.cursor as string | undefined;
       const page = cursor === undefined ? 0 : Number(cursor);
@@ -422,7 +455,15 @@ export class Scripted {
       return;
     }
     if (method === 'createSession') { await reply(null); return; }
-    if (method === 'authenticate') { await reply({}); return; }
+    if (method === 'authenticate') {
+      const resource = String(message.params?.resource ?? '');
+      const token = String(message.params?.token ?? '');
+      // An empty token revokes, as the protocol says, and revoking one puts the
+      // refusal back: that is what makes a second sign-in a real question.
+      if (token === '') this.tokens.delete(resource); else this.tokens.set(resource, token);
+      await reply({});
+      return;
+    }
     if (method === 'createResourceWatch') { await reply({ channel: this.watchChannel }); return; }
     if (method === 'resourceResolve') { await reply(this.resolveWith); return; }
     if (method !== undefined && method.startsWith('resource')) { await reply({}); return; }

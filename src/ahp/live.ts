@@ -111,7 +111,7 @@ export interface LiveHostOptions {
    * as the `data` on any `-32007`, which the specification says may come back
    * from **any** command rather than only from `authenticate`.
    */
-  onAuthRequired?(resources: { resource: string; description?: string }[], reason?: string): void;
+  onAuthRequired?(resources: { resource: string; name?: string }[], reason?: string): void;
   /**
    * One log record the host emitted, flattened out of OTLP.
    *
@@ -1426,8 +1426,12 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
       const one = bag(params.resource);
       const resource = str(one.resource);
       if (resource === undefined) return;
+      // `ProtectedResourceMetadata` names the friendly string `resource_name`.
+      // Reading `description` here dropped it, so the prompt had an identifier
+      // and no name to draw beside it.
+      const name = str(one.resource_name) || str(one.description);
       options.onAuthRequired?.(
-        [{ resource, ...(str(one.description) ? { description: str(one.description) as string } : {}) }],
+        [{ resource, ...(name !== undefined ? { name } : {}) }],
         str(params.reason),
       );
       return;
@@ -1524,9 +1528,10 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
     if (rpc?.code === -32007) {
       const resources = list(bag(rpc.data).resources).map((raw) => {
         const one = bag(raw);
+        const name = str(one.resource_name) || str(one.description);
         return {
           resource: str(one.resource) ?? '',
-          ...(str(one.description) ? { description: str(one.description) as string } : {}),
+          ...(name !== undefined ? { name } : {}),
         };
       }).filter((one) => one.resource !== '');
       if (resources.length > 0) options.onAuthRequired?.(resources);

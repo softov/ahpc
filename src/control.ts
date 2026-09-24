@@ -15,6 +15,9 @@ import { findBlocks, valueIcon } from '@textui/chat';
 import { toBlocks } from './blocks.js';
 import { chatMatches, linksIn, parseSessionLink, sessionOfLink } from './links.js';
 import { operate } from './ahp/operate.js';
+import { attempt, failureWords } from './ahp/auth.js';
+import type { AuthAsk } from './ahp/auth.js';
+import { auth } from './connect.js';
 import type { HostConnection } from './ahp/connection.js';
 import type { Terminals } from './terminal.js';
 import { createTerminals } from './terminal.js';
@@ -26,7 +29,7 @@ import { SessionFlag } from './ahp/types.js';
 import {
   ARCHIVED, BOOD_FLOAT, CAN_ADD_CHAT, CAN_FORK, CAN_SIDE_CHAT, CHAT_URI, CHATS, CUSTOMIZATIONS, CURSOR, DRAFT, EXPANDED, FILTER, FIND, FINDING, FIND_AT, HAS_CHATS,
   HOST, HOST_ERROR, INPUT, MODEL, MODEL_CONFIG, OPEN_TERMINAL,
-  AUTOMATIONS, AUTOMATION_ROW,
+  AUTOMATIONS, AUTOMATION_ROW, AUTH_ASK,
   CHANGES as CHANGES_AT_PATH, CHANGE_AT, CHANGE_ROW, CHANGE_SCOPES, FILES_AT, FILES_OPEN,
   OPEN, OPEN_FILE, PROVIDER, MARKDOWN, QUEUE, RUNNING, SCREEN, SELECTED, SETTINGS, SIDEBAR,
   SPLIT_AT, SPLIT_DEFAULT, TURNS, WORKSPACE,
@@ -70,6 +73,19 @@ export interface Controller {
   setRead(uri: SessionUri, read: boolean): void;
   /** Say that the host refused something, wherever it was noticed. */
   report(error: unknown): void;
+  /**
+   * Ask for a token for one resource, and answer whether the host took it.
+   *
+   * The prompt opens over whatever screen the person is on, and the answer is
+   * what a refused act waits on: true runs it once more, false is a credential
+   * the host turned down or a prompt that was dismissed. A notification opens
+   * the same prompt with nothing waiting on the answer.
+   */
+  askSignIn(one: AuthAsk): Promise<boolean>;
+  /** Push a token the prompt collected. False when the host turned it down. */
+  signIn(resource: string, token: string): Promise<boolean>;
+  /** Put the prompt away without a credential. An act waiting on it is told no. */
+  dismissSignIn(): void;
   /**
    * End the session on the host.
    *
@@ -445,6 +461,87 @@ export function createController(
     reportHostError(app.store, typeof rpc?.code === 'number' ? `${message} (${rpc.code})` : message);
   };
 
+  /** The one layer the credential prompt is drawn on. A second ask takes it over. */
+  const AUTH_LAYER = 'auth';
+
+  /**
+   * Everyone waiting on the credential prompt, by the resource they were refused for.
+   *
+   * A list rather than one, because more than one act can be refused before
+   * anybody answers: the waiter whose resource the host accepted runs again,
+   * and the others are answered no rather than left hanging. One layer id, so a
+   * second refusal takes over what is drawn instead of stacking a second modal.
+   */
+  const waiters: { resource: string; settle(accepted: boolean): void }[] = [];
+
+  /**
+   * The prompt has been answered.
+   *
+   * Emptied before anything else, and guarded against its own `onClose`:
+   * closing the layer calls this again, and a second pass must not resolve a
+   * waiter twice or clear an ask that has already been replaced. A dismissed
+   * prompt is `settle(null)`, which is a declined credential and never a retry.
+   */
+  let settling = false;
+  const settle = (accepted: string | null): void => {
+    if (settling) return;
+    settling = true;
+    try {
+      const held = waiters.splice(0, waiters.length);
+      if (app.layers.entries().some((entry) => entry.id === AUTH_LAYER)) app.layers.close(AUTH_LAYER);
+      app.store.set(AUTH_ASK, null);
+      for (const one of held) one.settle(accepted !== null && one.resource === accepted);
+    }
+    finally { settling = false; }
+  };
+
+  const askSignIn = (one: AuthAsk): Promise<boolean> => new Promise<boolean>((resolve) => {
+    waiters.push({ resource: one.resource, settle: resolve });
+    app.store.set(AUTH_ASK, one);
+    // Already open: the newest ask is what the store draws, and the waiters
+    // above are what the answer reaches.
+    if (app.layers.entries().some((entry) => entry.id === AUTH_LAYER)) return;
+    app.layers.open({
+      id: AUTH_LAYER,
+      layer: 'modal',
+      scrim: true,
+      trapFocus: true,
+      dismissOnEscape: true,
+      node: { component: 'SignInPrompt' },
+      onClose: () => { settle(null); },
+    });
+  });
+
+  /**
+   * Push a token the prompt collected.
+   *
+   * A credential the host turns down keeps the prompt open over the field it
+   * was typed in, with the host's own words, so the answer is to retype rather
+   * than to run the act again. Nothing is kept: the host holds the token for
+   * the connection, and a copy here would be a second secret with the same
+   * lifetime and one more place to read it from.
+   */
+  const signIn = async (resource: string, token: string): Promise<boolean> => {
+    if (!host.authenticate) {
+      const current = app.store.get<AuthAsk | null>(AUTH_ASK);
+      if (current) app.store.set(AUTH_ASK, { ...current, words: 'This host takes no token.' });
+      return false;
+    }
+    try {
+      await host.authenticate(resource, token);
+    }
+    catch (error) {
+      const current = app.store.get<AuthAsk | null>(AUTH_ASK);
+      if (current) app.store.set(AUTH_ASK, { ...current, words: failureWords(error) });
+      return false;
+    }
+    settle(resource);
+    return true;
+  };
+
+  /** One call to the host, run once more after a credential the host accepted. */
+  const guard = <T>(once: () => Promise<T>): Promise<T> => attempt(once, (one) => askSignIn(one));
+
   /**
    * Read the catalogue again, at most once per turn of the loop.
    *
@@ -474,7 +571,7 @@ export function createController(
    */
   const reread = async (): Promise<void> => {
     try {
-      writeSessions(app.store, await host.listSessions());
+      writeSessions(app.store, await guard(() => host.listSessions()));
     } catch (error) { failed(error); }
   };
 
@@ -540,12 +637,18 @@ export function createController(
 
     async refresh() {
       try {
-        writeSessions(app.store, await host.listSessions());
+        writeSessions(app.store, await guard(() => host.listSessions()));
         app.store.set(HOST_ERROR, null);
       } catch (error) { failed(error); }
     },
 
     report: failed,
+
+    askSignIn,
+
+    signIn,
+
+    dismissSignIn: () => { settle(null); },
 
     /**
      * Read a different chat in the session already open.
@@ -580,14 +683,14 @@ export function createController(
       const uri = app.store.get<SessionUri>(OPEN);
       if (!uri) return;
       try {
-        const chat = await host.createChat(uri, first, source);
+        const chat = await guard(() => host.createChat(uri, first, source));
         controller.openChat(chat);
       } catch (error) { failed(error); }
     },
 
     async disposeChat(chat) {
       try {
-        await host.disposeChat(chat);
+        await guard(() => host.disposeChat(chat));
       } catch (error) { failed(error); return; }
       // Whatever is left. The host moves its own default; this client only
       // has to stop reading a chat that is gone.
@@ -839,7 +942,7 @@ export function createController(
 
     async disposeSession(uri) {
       try {
-        await host.disposeSession(uri);
+        await guard(() => host.disposeSession(uri));
       } catch (error) { failed(error); }
       if (app.store.get<SessionUri>(OPEN) === uri) controller.close();
       await controller.refresh();
@@ -853,11 +956,14 @@ export function createController(
       // schema offers is not `sessionMutable`, so a session created without it
       // is one that can never be told.
       const config = app.store.get<Record<string, string>>(SETTINGS) ?? {};
-      const uri = await host.createSession({
+      // Only the creation is guarded: what follows it - the re-read, the open,
+      // the first message - must not run a second time because a credential
+      // arrived after a refusal.
+      const uri = await guard(() => host.createSession({
         provider,
         ...(workingDirectory ? { workingDirectory } : {}),
         ...(Object.keys(config).length > 0 ? { config } : {}),
-      });
+      }));
       await controller.refresh();
       controller.open(uri);
       // The provider is lazy: a session sits in `creating` and emits nothing
@@ -867,15 +973,19 @@ export function createController(
       return uri;
     },
 
-    agents: () => host.agents(),
-    detail: (uri) => host.detail(uri),
-    config: (uri) => host.config(uri),
-    customizations: (uri) => host.customizations(uri),
-    harnessCommands: () => host.harnessCommands(),
+    agents: () => guard(() => host.agents()),
+    detail: (uri) => guard(() => host.detail(uri)),
+    config: (uri) => guard(() => host.config(uri)),
+    customizations: (uri) => guard(() => host.customizations(uri)),
+    harnessCommands: () => guard(() => host.harnessCommands()),
     setCustomizationEnabled: (uri, id, enabled) => host.setCustomizationEnabled(uri, id, enabled),
-    content: (ref) => host.content(ref),
-    loadOlderTurns: (uri) => host.loadOlderTurns(uri),
-    files: async (uri) => (await host.resourceList?.(uri)) ?? [],
+    content: (ref) => guard(() => host.content(ref)),
+    loadOlderTurns: (uri) => guard(() => host.loadOlderTurns(uri)),
+    files: async (uri) => {
+      const list = host.resourceList;
+      if (!list) return [];
+      return await guard(() => list(uri));
+    },
 
     /*
      * Be told when a directory changes, instead of asking again.
@@ -892,23 +1002,39 @@ export function createController(
       catch { return { close: () => undefined }; }
     },
     file: async (uri) => {
-      if (!host.resourceRead) throw new Error('This host serves no files.');
-      return await host.resourceRead(uri);
+      const read = host.resourceRead;
+      if (!read) throw new Error('This host serves no files.');
+      return await guard(() => read(uri));
     },
     automations: async () => {
-      if (!host.automations) throw new Error('This host serves no automations.');
-      return await host.automations();
+      const all = host.automations;
+      if (!all) throw new Error('This host serves no automations.');
+      return await guard(() => all());
     },
     onAutomations: (observer) => host.onAutomations?.(observer) ?? { close: () => {} },
     createAutomation: async (definition) => {
-      if (!host.createAutomation) throw new Error('This host serves no automations.');
-      return await host.createAutomation(definition);
+      const write = host.createAutomation;
+      if (!write) throw new Error('This host serves no automations.');
+      return await guard(() => write(definition));
     },
-    runAutomation: async (uri) => { await host.runAutomation?.(uri); },
-    setAutomationEnabled: async (uri, enabled) => { await host.setAutomationEnabled?.(uri, enabled); },
-    removeAutomation: async (uri) => { await host.removeAutomation?.(uri); },
-    changesets: async (uri) => (await host.changesets?.(uri)) ?? [],
-    changesAt: (uri, changeset) => host.changes(uri, changeset),
+    runAutomation: async (uri) => {
+      const run = host.runAutomation;
+      if (run) await guard(() => run(uri));
+    },
+    setAutomationEnabled: async (uri, enabled) => {
+      const set = host.setAutomationEnabled;
+      if (set) await guard(() => set(uri, enabled));
+    },
+    removeAutomation: async (uri) => {
+      const remove = host.removeAutomation;
+      if (remove) await guard(() => remove(uri));
+    },
+    changesets: async (uri) => {
+      const all = host.changesets;
+      if (!all) return [];
+      return await guard(() => all(uri));
+    },
+    changesAt: (uri, changeset) => guard(() => host.changes(uri, changeset)),
     review: (changeset, files, isReviewed) => { host.review?.(changeset, files, isReviewed); },
 
     async settings() {
@@ -944,6 +1070,18 @@ export function createController(
   bag.add({ dispose: () => watching.close() });
   for (const command of commands(app, controller, host)) bag.add(app.commands.register(command));
   for (const binding of keys(bindings)) bag.add(app.keybindings.register(binding));
+
+  /*
+   * Fill the connection's asker box, the way `sink.report` is filled.
+   *
+   * The host is built before the controller is, so a refusal that arrives
+   * before this prints its sentence; from here on it opens the prompt. The box
+   * is module-level, so what was there before is put back on dispose - a second
+   * run would otherwise leave this run's prompt behind.
+   */
+  const openedAsk = auth.ask;
+  auth.ask = (one) => { void controller.askSignIn(one); };
+  bag.add({ dispose: () => { auth.ask = openedAsk; } });
 
   return Object.assign(controller, { dispose: () => bag.dispose() });
 }

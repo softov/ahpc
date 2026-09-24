@@ -28,6 +28,7 @@ import {
   ToolCallRow,
 } from '@textui/chat';
 import { BoodSprite, Creature, moodOf, pickBood } from './view/creature.js';
+import { SignInPrompt } from './view/auth.js';
 import { ChangesList } from './view/changes.js';
 import { FileList } from './view/files.js';
 import { AutomationList } from './view/automations.js';
@@ -521,6 +522,7 @@ export function registerChat(app: TextUIApp, options: ChatOptions = {}): Disposa
     ['McpScreen', McpScreen],
     ['UsageScreen', UsageScreen],
     ['BoodOverlay', BoodOverlay],
+    ['SignInPrompt', SignInPrompt],
     ['ChatHeader', Header],
     ['ChatStatus', Status],
     ['ChatHints', Hints],

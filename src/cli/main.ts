@@ -2,6 +2,7 @@
 
 import { readFile } from 'node:fs/promises';
 import { connect } from '../connect.js';
+import { askFor, authRequiredOf, failureWords } from '../ahp/auth.js';
 import { configPath, loadConfig } from '../config.js';
 import { checkingUpdates, readUpdate, updateNotice } from '../update.js';
 import { manifest } from '../version.js';
@@ -760,6 +761,20 @@ export async function cli(command: string, rest: string[]): Promise<number> {
     }
     return 0;
   }
+  catch (error) {
+    /*
+     * A refusal, said as a sentence rather than a stack.
+     *
+     * A command run with no screen has nobody to ask, so a `-32007` is the
+     * host saying which resource it wants and this is the answer: name it, name
+     * the variable that satisfies it, and exit 1. Nothing is retried, because
+     * the act may already have done something before it was refused.
+     */
+    const refusal = authRequiredOf(error);
+    if (refusal === null) throw error;
+    const one = askFor(refusal);
+    throw new Fault(one === null ? failureWords(error) : needsToken(one.resource, one.name));
+  }
   finally {
     // Sent, then hung up. A command that dispatches one action and exits is
     // the only caller that can close a connection faster than its own
@@ -767,6 +782,18 @@ export async function cli(command: string, rest: string[]): Promise<number> {
     await host.flush?.();
     await host.close?.();
   }
+}
+
+/**
+ * What to do about a resource that wants a token.
+ *
+ * One sentence for the two places this command says it: a `-32007` from the
+ * host, and `ahpc auth` finding nothing to send. They are the same problem, and
+ * a second wording is a second thing to keep true.
+ */
+export function needsToken(resource: string, name?: string): string {
+  const what = name !== undefined && name !== resource ? `${name} (${resource})` : resource;
+  return `${what} needs a token. Pass --token, set ${tokenVariable(resource)}, or pipe one in: ahpc auth ${resource}`;
 }
 
 /** Everything under `session`. */
@@ -1276,7 +1303,7 @@ async function signIn(host: HostConnection, args: Args, wants: boolean): Promise
     ?? process.env[tokenVariable(resource)]
     ?? (process.stdin.isTTY ? undefined : (await readAll(process.stdin)).trim());
   if (token === undefined) {
-    throw new Fault(`No token. Pass --token, set ${tokenVariable(resource)}, or pipe one in.`);
+    throw new Fault(needsToken(resource));
   }
   // An expiry is only sent when it is known and is a positive integer, which
   // is what the specification requires of it.

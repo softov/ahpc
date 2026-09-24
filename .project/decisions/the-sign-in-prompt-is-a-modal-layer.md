@@ -27,11 +27,13 @@ The prompt is a `modal` layer with a scrim, a focus trap and escape-to-dismiss, 
 Its component is registered in `app.tsx` beside the others and is not a screen.
 It is drawn over the act that was refused rather than replacing it, so declining leaves the person exactly where they were.
 
+Source: (defaulted: the modal plane, the scrim, the focus trap, `dismissOnEscape` and the masked `TextInput` all already exist, and the reference draws its sheet above every screen at `/github/ahpapp/src/auth-gate.tsx:356-371`.)
+
 ## Consequences
 
 A credential can be supplied from any screen without navigating, and dismissing it is one key rather than walking a stack back.
 The refused act's promise is held while the layer is open, which is what lets the same act run again when the layer says the host accepted the token.
-One prompt is open at a time, so a second refusal while one is up is reported rather than stacked, and the layer id is what makes that true.
+One prompt is open at a time, and the single layer id is what makes that true; a second refusal while one is up takes over what the prompt shows, and every act waiting on a credential is answered by whichever resource the host accepts.
 Nothing in `src/screens.tsx` changes, and no screen learns what `-32007` is.
 
 ## Options

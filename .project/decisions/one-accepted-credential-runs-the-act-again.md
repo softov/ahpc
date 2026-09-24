@@ -26,10 +26,13 @@ A second `-32007` for the same act is reported and nothing else is sent.
 Only an act this client can run as one awaited call is covered.
 A fire-and-forget dispatch is not, because ahpc sends one without keeping a handle to match its echo, and re-sending a chat message or a keystroke on its own is worse than asking the person to do it again.
 
+Source: (defaulted: the reference's three rules at `/github/ahpapp/src/auth-gate.tsx:15-24` and `refusalStep` at `/github/ahpapp/src/auth-required.ts:133-145`, and the plan's own words "retry the refused act exactly once".)
+
 ## Consequences
 
 The person answers one question and the thing they asked for happens, which is the whole point of the prompt.
 A controller method that forwards one call to the host gains the same five lines whether it is a catalogue read, a file listing or a session creation, so the discipline lives in one place rather than at each call site.
+The wrapper goes around the single `await host.<call>()` at its call site and never around the method, because `refresh`, `createChat`, `disposeChat` and `disposeSession` catch their own rejection (`src/control.ts:545`, `:585`, `:591`, `:843`) and `create` acts again after its await (`:861-866`).
 An act that has side effects before the refusal is re-run from its own start, which is why the wrapper is applied to single calls and not to a command with several.
 A host that keeps refusing is a wall the client stops at, in the host's own words.
 

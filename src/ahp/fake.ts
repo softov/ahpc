@@ -64,6 +64,16 @@ export interface FakeHost extends HostConnection {
   invoked(): { changeset: string; operationId: string; target?: unknown }[];
   /** Paths a watch is open on, so releasing one can be asserted. */
   watching(): string[];
+  /**
+   * Make one resource need a token before this host answers a request.
+   *
+   * Not on `HostConnection`: a client never tells a host what it protects.
+   * Here so "refused until signed in" is a state a test can set, and it is
+   * opt-in, so a case that does not ask for it never refuses.
+   */
+  protect(resource: string, name?: string): void;
+  /** How many requests of one method this host has served, so a retry can be counted. */
+  asked(method: string): number;
 }
 
 type Step = () => void;
@@ -252,6 +262,15 @@ export function fakeHost(): FakeHost {
   const watched = new Set<string>();
   /** Tokens pushed, by resource. An empty token revokes, as the protocol says. */
   const tokens = new Map<string, string>();
+  /**
+   * Resources this run refuses a request for until a token arrives.
+   *
+   * Empty unless a test calls `protect`. The value is the host's own name for
+   * the resource, which is what a refusal may carry and what the prompt draws.
+   */
+  const protectedBy = new Map<string, string | undefined>();
+  /** Requests answered, by method, so a test can count a retry. */
+  const served = new Map<string, number>();
   const configs = new Map<SessionUri, Record<string, string>>();
   const observers = new Map<SessionUri, Set<(event: HostEvent) => void>>();
   const chats = new Map<SessionUri, string>();
@@ -1334,12 +1353,42 @@ export function fakeHost(): FakeHost {
 
   // --------------------------------------------------------------- connection
 
+  /**
+   * Refuse while a resource this host protects has no token.
+   *
+   * The same shape a real host sends: the protocol's code, and the resource it
+   * named in `data.resources` with the host's own name for it. Thrown rather
+   * than returned, because to the caller a `-32007` is a rejection.
+   */
+  function requireToken(): void {
+    for (const [resource, name] of protectedBy) {
+      if (tokens.has(resource)) continue;
+      throw Object.assign(new Error(`Authentication required for ${resource}`), {
+        code: -32007,
+        data: { resources: [{ resource, ...(name !== undefined ? { resource_name: name } : {}) }] },
+      });
+    }
+  }
+
+  /** One request answered, by method, so a retry is countable. */
+  function count(method: string): void {
+    served.set(method, (served.get(method) ?? 0) + 1);
+  }
+
+  /** Everything this host advertises as protected: what the agents declare, plus anything protected by hand. */
+  function advertised(): { resource: string; name?: string }[] {
+    return [
+      ...AGENTS.flatMap((agent) => agent.protectedResources ?? []),
+      ...[...protectedBy].map(([resource, name]) => ({ resource, ...(name !== undefined ? { name } : {}) })),
+    ];
+  }
+
   return {
     id: 'fake',
     url: 'fake://scripted',
     state: () => 'connected',
 
-    listSessions: async () => [...summaries.values()],
+    listSessions: async () => { count('listSessions'); requireToken(); return [...summaries.values()]; },
 
     agents: async (): Promise<Agent[]> => AGENTS,
 
@@ -1976,7 +2025,7 @@ export function fakeHost(): FakeHost {
      * string would let a client ship a name no host will take.
      */
     authenticate: async (resource, token) => {
-      const known = AGENTS.flatMap((agent) => agent.protectedResources ?? []);
+      const known = advertised();
       if (known.length > 0 && !known.some((one) => one.resource === resource)) {
         throw new Error(`This host protects ${known.map((one) => one.resource).join(', ')}, not ${resource}.`);
       }
@@ -1984,7 +2033,7 @@ export function fakeHost(): FakeHost {
       return undefined;
     },
 
-    protectedResources: async () => AGENTS.flatMap((agent) => agent.protectedResources ?? []),
+    protectedResources: async () => advertised(),
 
     /*
      * Values a schema would not carry.
@@ -2163,6 +2212,8 @@ export function fakeHost(): FakeHost {
     },
 
     detail: async (uri): Promise<SessionDetail> => {
+      count('detail');
+      requireToken();
       const chat = chats.get(uri) ?? null;
       const history = turns.get(uri) ?? [];
       const last = [...history, ...(active.get(uri) ? [active.get(uri) as Turn] : [])]
@@ -2203,5 +2254,19 @@ export function fakeHost(): FakeHost {
 
     /** What is being watched, so a screen closing can be seen to release it. */
     watching: () => [...watched],
+
+    /*
+     * A resource this host will not answer for until a token arrives.
+     *
+     * Opt-in, so every case that does not call it behaves exactly as before.
+     * A token pushed before this is dropped, because the point of the hook is
+     * the refusal that follows it.
+     */
+    protect: (resource, name) => {
+      protectedBy.set(resource, name);
+      tokens.delete(resource);
+    },
+
+    asked: (method) => served.get(method) ?? 0,
   };
 }

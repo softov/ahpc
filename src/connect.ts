@@ -4,6 +4,7 @@ import { MissingProtocolPackage, liveHost } from './ahp/live.js';
 import { fakeHost } from './ahp/fake.js';
 import { publish } from './ahp/publish.js';
 import type { HostConnection } from './ahp/connection.js';
+import type { AuthAsk } from './ahp/auth.js';
 
 /**
  * Enough of the options to choose a host, and nothing about drawing one.
@@ -51,6 +52,27 @@ export const sink: { report(message: string): void } = {
   report: (message) => process.stderr.write(`${message}\n`),
 };
 
+/** The sentence that names a resource and the command that would satisfy it. */
+export function signInSentence(one: AuthAsk): string {
+  const what = one.name ?? one.resource;
+  return one.reason === 'expired'
+    ? `The token for ${what} has expired. Sign in again: ahpc auth ${one.resource}`
+    : `${what} needs signing in to: ahpc auth ${one.resource}`;
+}
+
+/**
+ * Where a refusal goes when there is a screen to put it in.
+ *
+ * The connection is built before the application is, so its callback is given a
+ * box to write into and the box is filled once there is a controller, exactly
+ * as `sink` is. Until then an ask goes to `sink`, which is where a connection
+ * that fails before there is an interface belongs, and in a shell run nothing
+ * ever fills it, so the sentence is the whole of what happens.
+ */
+export const auth: { ask(one: AuthAsk): void } = {
+  ask: (one) => sink.report(signInSentence(one)),
+};
+
 /**
  * The host this run talks to.
  *
@@ -73,16 +95,21 @@ export async function connect(options: Where): Promise<HostConnection & { pump?(
       /*
        * The host wants signing into something.
        *
-       * Said in the words a person can act on, which means naming the
-       * resource and the variable that would satisfy it. `expired` is called
-       * out because the answer is different: a new credential, not the one
+       * Handed to the `auth` box rather than said here: a screen fills the box
+       * and opens the prompt where the person is, and a shell leaves it alone,
+       * so the box's own sentence is the whole of what happens. `expired` is
+       * carried because the answer is different: a new credential, not the one
        * that was just refused.
        */
       onAuthRequired: (resources, why) => {
-        const names = resources.map((one) => one.resource).join(', ');
-        sink.report(why === 'expired'
-          ? `The token for ${names} has expired. Sign in again: ahpc auth ${resources[0]?.resource ?? ''}`
-          : `${names} needs signing in to: ahpc auth ${resources[0]?.resource ?? ''}`);
+        const first = resources[0];
+        if (first === undefined) return;
+        auth.ask({
+          resource: first.resource,
+          ...(first.name !== undefined ? { name: first.name } : {}),
+          ...(why !== undefined ? { reason: why } : {}),
+          words: '',
+        });
       },
       // What this client serves back. Nothing unless a directory was named:
       // the protocol is symmetrical, and a client that published by default

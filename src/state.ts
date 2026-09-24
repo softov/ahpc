@@ -1,6 +1,7 @@
 import type { BindingPath, ReactiveStore } from '@textui/core';
 import type { ChatSession } from '@textui/chat';
 import type { HostEvent } from './ahp/connection.js';
+import type { AuthAsk } from './ahp/auth.js';
 import type {
   Changeset, PendingInput, QueuedMessage, SessionSummary, SessionUri, Turn,
 } from './ahp/types.js';
@@ -192,6 +193,16 @@ export interface InputStatus {
   state: 'sending' | 'failed';
   text: string;
 }
+
+/**
+ * A credential the host is asking for, or `null`.
+ *
+ * One at a time, and it is what the modal draws: the resource, the host's name
+ * for it when it gave one, why it wants it, and the words it refused in. The
+ * prompt clears it when it settles, and it holds no secret - what was typed
+ * lives in the field only until `authenticate` takes it.
+ */
+export const AUTH_ASK = '$/chat/host/authAsk' as BindingPath;
 
 export const OPEN = '$/chat/ui/open' as BindingPath;
 /** Which of the bood this run got. One animal, wherever one is drawn. */
@@ -506,6 +517,11 @@ export function turns(store: ReactiveStore): Turn[] {
 
 export function pendingInput(store: ReactiveStore): PendingInput | null {
   return store.get<PendingInput>(INPUT) ?? null;
+}
+
+/** The credential the host is asking for, or `null` when it is not. */
+export function authAsk(store: ReactiveStore): AuthAsk | null {
+  return store.get<AuthAsk | null>(AUTH_ASK) ?? null;
 }
 
 export function changes(store: ReactiveStore): Changeset {
