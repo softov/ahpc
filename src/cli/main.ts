@@ -3,7 +3,7 @@
 import { readFile } from 'node:fs/promises';
 import { connect } from '../connect.js';
 import { askFor, authRequiredOf, failureWords } from '../ahp/auth.js';
-import { configPath, loadConfig } from '../config.js';
+import { configPath, connectionToken, loadConfig } from '../config.js';
 import { checkingUpdates, readUpdate, updateNotice } from '../update.js';
 import { manifest } from '../version.js';
 import type { Where } from '../connect.js';
@@ -145,6 +145,9 @@ Anything else
 The host
   --host <url>    ws://host:port, or AHPC_HOST, or the config file
   --token <tkn>   a bearer token for it, or AHPC_TOKEN, or the config file
+  --connection-token-file <p>
+                  read the token from this file, which is what the host
+                  writes when it is given the same flag
   --config-file   read this instead of the one below
   (none)          the scripted host, which needs nothing installed
 
@@ -226,7 +229,16 @@ export class Fault extends Error {}
 const where = (args: Args): Where => {
   const file = loadConfig('ahpc', args.value('--config-file'));
   const host = args.value('--host') ?? process.env.AHPC_HOST ?? file.host;
-  const token = args.value('--token') ?? process.env.AHPC_TOKEN ?? file.token;
+  let token: string | undefined;
+  try {
+    token = connectionToken({
+      ...(args.value('--token') !== undefined ? { token: args.value('--token') as string } : {}),
+      ...(args.value('--connection-token-file') !== undefined
+        ? { tokenFile: args.value('--connection-token-file') as string }
+        : {}),
+    }, file);
+  }
+  catch (error) { throw new Fault(error instanceof Error ? error.message : String(error)); }
   return {
     ...(host ? { host } : {}),
     ...(token ? { token } : {}),

@@ -8,7 +8,7 @@ import { registerChat } from './app.js';
 import { parseSessionLink } from './links.js';
 import { CONTROLLER } from './control.js';
 import { connect, sink } from './connect.js';
-import { loadConfig } from './config.js';
+import { connectionToken, loadConfig } from './config.js';
 import { UPDATE_NOTICE, reportHostError } from './state.js';
 import { MAX_AGE_MS, checkingUpdates, readUpdate, refreshUpdate, registry, stale, updateNotice } from './update.js';
 import { manifest } from './version.js';
@@ -68,6 +68,8 @@ interface Options {
    */
   host?: string;
   token?: string;
+  /** A file holding that token, named by `--connection-token-file`. */
+  tokenFile?: string;
   /** Read this config instead of the one XDG names. */
   configFile?: string;
   /** Keys from the config file, over the ones this client ships with. */
@@ -106,6 +108,9 @@ export const USAGE = `ahpc - a terminal client for the Agent Host Protocol
 The host
   --host <url>          A live agent host, ws://host:port
   --token <tkn>         A bearer token for it
+  --connection-token-file <f>
+                        Read that token from a file, which is what the host
+                        writes when it is given the same flag
   --config-file <f>     Read this instead of ~/.config/ahpc/config.json
   (none of these)       The scripted host, which needs nothing installed
 
@@ -203,6 +208,7 @@ export function parse(argv: string[]): Options {
       case '--session': options.session = String(argv[++i]); break;
       case '--host': options.host = String(argv[++i]); break;
       case '--token': options.token = String(argv[++i]); break;
+      case '--connection-token-file': options.tokenFile = String(argv[++i]); break;
       case '--config-file': options.configFile = String(argv[++i]); break;
       case '--path': options.path = String(argv[++i]); break;
       case '--publish': options.publish = String(argv[++i]); break;
@@ -339,7 +345,13 @@ export async function tui(argv: string[]): Promise<void> {
    */
   const file = loadConfig('ahpc', options.configFile);
   options.host = options.host ?? process.env.AHPC_HOST ?? file.host;
-  options.token = options.token ?? process.env.AHPC_TOKEN ?? file.token;
+  options.token = connectionToken(
+    {
+      ...(options.token !== undefined ? { token: options.token } : {}),
+      ...(options.tokenFile !== undefined ? { tokenFile: options.tokenFile } : {}),
+    },
+    file,
+  );
   if (file.theme && !argv.includes('--theme')) options.theme = file.theme;
   if (file.shell && !argv.includes('--shell')) options.shell = file.shell;
   if (file.boodInline !== undefined) options.boodInline = file.boodInline;

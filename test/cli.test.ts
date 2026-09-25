@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -148,5 +148,95 @@ describe('ahpc status, and whether a newer release is out', () => {
     expect((await run([], { NO_UPDATE_NOTIFIER: '' })).split('\n')).toHaveLength(3);
     expect((await run([], {}, '{"updateCheck": false}')).split('\n')).toHaveLength(3);
     expect(JSON.parse(await run(['--json'], { CI: '1' })) as object).not.toHaveProperty('update');
+  });
+});
+
+/*
+ * The secret this client presents to open a connection.
+ *
+ * One resolution for both front ends, because a screen and a shell that
+ * disagreed about which credential to send would disagree silently. The file
+ * half is the other end of the host's own `--connection-token-file`, so what
+ * is asserted here is that this reads what that writes.
+ */
+describe('the connection token, and the file the host keeps it in', () => {
+  const held = process.env.AHPC_TOKEN;
+  const clean = (): void => { delete process.env.AHPC_TOKEN; };
+  const restore = (): void => {
+    if (held === undefined) delete process.env.AHPC_TOKEN;
+    else process.env.AHPC_TOKEN = held;
+  };
+
+  it('reads a token file the way the host writes one', async () => {
+    const { connectionToken } = await import('../src/config.js');
+    clean();
+    const dir = mkdtempSync(join(tmpdir(), 'ahpc-token-'));
+    try {
+      // The host writes the secret with a trailing newline, and reads its own
+      // file back trimmed. Anything else here would present a token with a
+      // newline on the end of it.
+      const at = join(dir, 'host.token');
+      writeFileSync(at, 'e6c1f0a94b6d4e2f8a3c5d7e9f0b1c2d\n');
+      expect(connectionToken({ tokenFile: at }, {})).toBe('e6c1f0a94b6d4e2f8a3c5d7e9f0b1c2d');
+    } finally { rmSync(dir, { recursive: true, force: true }); restore(); }
+  });
+
+  it('refuses the two flags together, as the host does', async () => {
+    const { connectionToken } = await import('../src/config.js');
+    expect(() => connectionToken({ token: 'a', tokenFile: '/nowhere' }, {}))
+      .toThrow('not both');
+  });
+
+  it('refuses a file that is missing or empty, and never writes one', async () => {
+    const { connectionToken } = await import('../src/config.js');
+    clean();
+    const dir = mkdtempSync(join(tmpdir(), 'ahpc-token-'));
+    try {
+      const missing = join(dir, 'absent.token');
+      // The host owns this secret: a client that made one up would be
+      // presenting a credential nobody agreed to.
+      expect(() => connectionToken({ tokenFile: missing }, {})).toThrow('No connection token at');
+      expect(existsSync(missing)).toBe(false);
+
+      const empty = join(dir, 'empty.token');
+      writeFileSync(empty, '\n');
+      expect(() => connectionToken({ tokenFile: empty }, {})).toThrow('is empty');
+    } finally { rmSync(dir, { recursive: true, force: true }); restore(); }
+  });
+
+  it('takes the most deliberate source that has one', async () => {
+    const { connectionToken } = await import('../src/config.js');
+    const dir = mkdtempSync(join(tmpdir(), 'ahpc-token-'));
+    try {
+      const said = join(dir, 'said.token');
+      const configured = join(dir, 'configured.token');
+      writeFileSync(said, 'from-the-flag\n');
+      writeFileSync(configured, 'from-the-config-file\n');
+
+      clean();
+      // This invocation beats this shell beats the file.
+      expect(connectionToken({ token: 'typed' }, { token: 'filed' })).toBe('typed');
+      expect(connectionToken({ tokenFile: said }, { token: 'filed' })).toBe('from-the-flag');
+      process.env.AHPC_TOKEN = 'from-the-shell';
+      expect(connectionToken({}, { token: 'filed' })).toBe('from-the-shell');
+      expect(connectionToken({ tokenFile: said }, {})).toBe('from-the-flag');
+
+      clean();
+      // Within the config file, the path beats the written-down secret.
+      expect(connectionToken({}, { connectionTokenFile: configured, token: 'filed' }))
+        .toBe('from-the-config-file');
+      expect(connectionToken({}, { token: 'filed' })).toBe('filed');
+      expect(connectionToken({}, {})).toBeUndefined();
+    } finally { rmSync(dir, { recursive: true, force: true }); restore(); }
+  });
+
+  it('is a flag both front ends parse and document', async () => {
+    expect(parse(['--connection-token-file', '/etc/ahpc.token']).tokenFile).toBe('/etc/ahpc.token');
+    // It takes a value, so it must never join the valueless set or the word
+    // after it is read as a command.
+    expect(SWITCHES.has('--connection-token-file')).toBe(false);
+    expect(commandIn(['--connection-token-file', 'status'])).toBeUndefined();
+    const usage = (await import('../src/tui.js')).USAGE;
+    expect(usage).toContain('--connection-token-file');
   });
 });

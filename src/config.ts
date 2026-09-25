@@ -10,6 +10,14 @@ export interface Config {
   host?: string;
   /** A bearer token for it. */
   token?: string;
+  /**
+   * A file holding that token, read instead of writing the secret down here.
+   *
+   * The same file `ahpd --connection-token-file` keeps, and the same key name
+   * that host's own configuration uses. A path is not a credential, so this
+   * key is safe in a file people share and back up, which `token` is not.
+   */
+  connectionTokenFile?: string;
   /** The theme to open on. */
   theme?: string;
   /** The shell layout. */
@@ -108,4 +116,55 @@ export function loadConfig(tool: string, named?: string): Config {
   catch (error) {
     throw new Error(`${path} could not be read: ${error instanceof Error ? error.message : String(error)}`);
   }
+}
+
+/**
+ * The secret this client presents to open a connection, or nothing.
+ *
+ * Both front ends resolve it through here, because the screen and the shell
+ * disagreeing about which credential to send is the one difference nobody
+ * would think to look for.
+ *
+ * Most deliberate source first: this invocation, then this shell, then the
+ * file that answers for every invocation. Within a pair, the path beats the
+ * written-down secret, because somebody who set both has said where they are
+ * moving to.
+ *
+ * `--token` and `--connection-token-file` are refused together rather than
+ * ranked, which is what the host does with the same two flags.
+ */
+export function connectionToken(
+  said: { token?: string; tokenFile?: string },
+  file: Config,
+): string | undefined {
+  if (said.token !== undefined && said.tokenFile !== undefined) {
+    throw new Error('Pass --token or --connection-token-file, not both.');
+  }
+  if (said.token !== undefined) return said.token;
+  if (said.tokenFile !== undefined) return readTokenFile(said.tokenFile);
+  if (process.env.AHPC_TOKEN) return process.env.AHPC_TOKEN;
+  if (file.connectionTokenFile !== undefined) return readTokenFile(file.connectionTokenFile);
+  return file.token;
+}
+
+/**
+ * The token inside a file the host keeps.
+ *
+ * Trimmed, because the host writes a trailing newline and reads its own file
+ * back the same way. A missing file is refused rather than written: the host
+ * owns this secret and a client that invented one would be presenting a
+ * credential nobody agreed to. Nothing here checks the token's shape, so
+ * whatever the host accepts is whatever this sends.
+ */
+function readTokenFile(path: string): string {
+  let text: string;
+  try {
+    text = readFileSync(path, 'utf8');
+  }
+  catch {
+    throw new Error(`No connection token at ${path}. The host writes one there when it is given --connection-token-file.`);
+  }
+  const held = text.trim();
+  if (held === '') throw new Error(`${path} is empty.`);
+  return held;
 }
