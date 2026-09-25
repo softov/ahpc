@@ -99,6 +99,8 @@ export class Scripted {
   holdHandshake = false;
   /** What `resourceResolve` answers. */
   resolveWith: Record<string, unknown> = { uri: 'file:///x', type: 'file' };
+  /** The rows `sessionConfigCompletions` answers with. */
+  completionsWith: Record<string, unknown>[] = [];
   /** What the next `reconnect` answers. */
   reconnectWith: Record<string, unknown> = { type: 'replay', actions: [], missing: [] };
   /** An error to answer `reconnect` with instead, as a restarted host does. */
@@ -466,6 +468,7 @@ export class Scripted {
     }
     if (method === 'createResourceWatch') { await reply({ channel: this.watchChannel }); return; }
     if (method === 'resourceResolve') { await reply(this.resolveWith); return; }
+    if (method === 'sessionConfigCompletions') { await reply({ items: this.completionsWith }); return; }
     if (method !== undefined && method.startsWith('resource')) { await reply({}); return; }
     if (method === 'ping') { await reply(null); return; }
     // `unsubscribe` and `dispatchAction` are notifications: recorded above,

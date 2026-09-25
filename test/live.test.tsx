@@ -278,6 +278,33 @@ describe('the config a live session reports', () => {
 });
 
 /*
+ * What a dynamic picker is allowed to offer.
+ *
+ * A row with no `value` is not a row and is dropped. A row whose value is the
+ * empty string is a real answer and is kept: `computer` means this host when
+ * it is empty, and dropping it both hid that option and left somebody who had
+ * picked a machine with no way back out of the choice.
+ */
+describe('the values a host answers a picker with', () => {
+  it('keeps an empty value and drops a missing one', async () => {
+    const { host, scripted } = await connect();
+    scripted.completionsWith = [
+      { value: '', label: 'This host', description: 'Run the session here.' },
+      { value: 'computer://box', label: 'box', description: 'debian - Up' },
+      // No `value` at all, which is not something to choose.
+      { label: 'broken' },
+    ];
+
+    const found = await host.configCompletions?.({ property: 'computer', provider: 'claude' });
+    expect(found).toEqual([
+      { value: '', label: 'This host', description: 'Run the session here.' },
+      { value: 'computer://box', label: 'box', description: 'debian - Up' },
+    ]);
+    await host.close();
+  });
+});
+
+/*
  * What the last turn was asked for, which reopening a session has to give back.
  *
  * The id alone says which model answered and nothing about the settings it was

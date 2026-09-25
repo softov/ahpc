@@ -2003,14 +2003,26 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
         ...(values && Object.keys(values).length > 0 ? { config: values } : {}),
         ...(query ? { query } : {}),
       }));
-      return list(result.items).map((raw) => {
+      return list(result.items).flatMap((raw) => {
         const item = bag(raw);
-        return {
-          value: str(item.value) ?? '',
-          label: str(item.label) ?? str(item.value) ?? '',
+        const value = str(item.value);
+        /*
+         * A row with no `value` is not a row. A row whose value is empty is.
+         *
+         * The two were one case while `branch` was the only dynamic key, and
+         * an empty branch name means nothing. It stopped being one when a key
+         * arrived whose empty value is a real answer: `computer`, where empty
+         * means this host rather than a machine. Dropping it hid that option
+         * and left somebody who had picked a machine with no way back out of
+         * the choice.
+         */
+        if (value === undefined) return [];
+        return [{
+          value,
+          label: str(item.label) ?? value,
           ...(str(item.description) ? { description: str(item.description) as string } : {}),
-        };
-      }).filter((item) => item.value !== '');
+        }];
+      });
     },
 
     resourceResolve: async (uri) => {

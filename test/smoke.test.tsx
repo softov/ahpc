@@ -1599,6 +1599,30 @@ describe('the composer is the front door', () => {
     await t.unmount();
   });
 
+
+  /**
+   * An answer with no text of its own.
+   *
+   * `computer` is why this exists: its empty value means "this host, in no
+   * machine", a row `sessionConfigCompletions` carries and the schema does
+   * not, so the chip had nothing to read the answer as and drew a mark and an
+   * arrow with a gap between them. The question is what it says instead.
+   */
+  it('names the question where the answer is empty', async () => {
+    const { t } = await open({ width: 100, height: 30 });
+    const bar = () => t.lines().slice(-5, -3);
+    await t.app.execute('compose.set.isolation', { value: 'worktree' });
+    for (let i = 0; i < 10; i++) await t.settle();
+    expect(bar()[1]).toContain('main');
+    // `branch` is `enumDynamic`, so the host listed no values and an answer
+    // that is the empty string has no label anywhere to be looked up in.
+    await t.app.execute('compose.set.branch', { value: '' });
+    for (let i = 0; i < 10; i++) await t.settle();
+    expect(bar()[1]).not.toContain('main');
+    expect(bar()[1]).toContain('Branch');
+    await t.unmount();
+  });
+
   /**
    * A different directory is a different set of answers.
    *

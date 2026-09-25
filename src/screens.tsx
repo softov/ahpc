@@ -32,7 +32,7 @@ import { toBlocks } from './blocks.js';
 import type {
   Agent, Answer, Automation, Changeset, ChangesetScope, Completion, ContentRef, Customization, FileContent, PendingInput, QueuedMessage, ResourceEntry,
   TerminalRow, TerminalState,
-  ModelRow, SessionConfig, SessionDetail, SessionSummary, SlashCommand, Turn,
+  ConfigProperty, ModelRow, SessionConfig, SessionDetail, SessionSummary, SlashCommand, Turn,
 } from './ahp/types.js';
 import { decodeStatus } from './ahp/status.js';
 import {
@@ -71,6 +71,23 @@ import { TerminalView } from './view/terminal.js';
  * options" looked like.
  */
 const SEEDED = new Set(['worktreeBranchPrefix', 'worktreeBranchTrack', 'worktreeCreateNewBranch', 'worktreeIncludeFiles', 'shellInitScripts']);
+
+/**
+ * What an answer reads as on a chip.
+ *
+ * The row's label where the schema listed the value, the value itself where it
+ * did not - a branch name is its own label - and the question's title where
+ * there is no answer to show.
+ *
+ * An empty value is an answer with no text of its own, which is the third
+ * case: the computer key's empty value is "this host, in no machine", and its
+ * label lives in `sessionConfigCompletions` rather than in the schema, so a
+ * chip that printed the value printed nothing at all.
+ */
+function chipLabel(property: ConfigProperty, value: string | undefined): string {
+  return property.values.find((found) => found.value === value)?.label
+    ?? (value === undefined || value === '' ? property.title : value);
+}
 
 /**
  * Everything the catalogue knows about one session, as rows.
@@ -566,7 +583,7 @@ function useComposerOptions(): ComposerOption[] {
             ? valueIcon(unicode, value, chosen?.label)
             : undefined)
             ?? settingIcon(unicode, property.key, property.title),
-          label: chosen?.label ?? value ?? property.title,
+          label: chipLabel(property, value),
           title: property.title,
           commandId: modelCommand(property.key),
         };
@@ -616,7 +633,7 @@ function fromConfigOf(unicode: UnicodeLevel, config: SessionConfig | null, model
           ? valueIcon(unicode, value, chosen?.label)
           : undefined)
           ?? settingIcon(unicode, property.key, property.title),
-        label: chosen?.label ?? value ?? property.title,
+        label: chipLabel(property, value),
         // The question, for anything showing these with room for the pair.
         title: property.title,
         ...(WHERE.includes(property.key) ? { where: true } : {}),
