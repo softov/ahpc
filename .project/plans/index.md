@@ -20,8 +20,9 @@ Reference: [00-screen.md](screen/00-screen.md)
 | [03 - The model a queued or reopened turn runs on](screen/03-model-continuity/plan.md) | medium | active 2026-09-20 | a `@textui/chat` release with a model slot on the queued block, if task-01 keeps that shape | - |
 | [04 - A session's own pull requests are told from the ones it inherited](screen/04-pull-request-ownership/plan.md) | medium | built 2026-09-20 ([implemented.md](screen/04-pull-request-ownership/implemented.md)) | ahpd `.project/plans/host/03-pull-request-baseline/plan.md` for the `initialPullRequestUrls` and `associatedPullRequestUrls` keys | - |
 | [05 - A usage screen says what a session has spent](screen/05-usage/plan.md) | medium | built 2026-09-20 ([implemented.md](screen/05-usage/implemented.md)) | - | - |
+| [06 - An automation is read before it is run, and the changes screen follows the session](screen/06-automations-read-before-run/plan.md) | high | built 2026-09-26 ([implemented.md](screen/06-automations-read-before-run/implemented.md)) | - | - |
 
-Next free number in `screen`: `06`.
+Next free number in `screen`: `07`.
 
 ## ahp
 
