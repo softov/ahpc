@@ -2,9 +2,9 @@
 title: <What is true when this task is done, as a name>
 status: todo
 depends: []
-layer: <package or part: agents | papo | papo screen | tools | docs>
+layer: "<package or part: agents | papo | papo screen | tools | docs>"
 refs:
-  - code://packages/<package>/src/<file>.ts - <why this task touches it>
+  - "[code://packages/<package>/src/<file>.ts](../../../../packages/<package>/src/<file>.ts) - <why this task touches it>"
 ---
 
 ## Objective

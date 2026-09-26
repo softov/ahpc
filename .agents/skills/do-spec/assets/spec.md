@@ -5,7 +5,7 @@ covers:
 decisions:
   - decisions/<decision>.md
 refs:
-  - code://<path> - <the implementing code>
+  - "[code://<path>](../../<path>) - <the implementing code>"
 ---
 
 <What the capability does, as it is now. One paragraph.>

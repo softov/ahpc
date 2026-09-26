@@ -1,11 +1,11 @@
 ---
-title: <Constraint as an imperative: Never ..., Always ..., Store ... as ...>
+title: "<Constraint as an imperative: Never ..., Always ..., Store ... as ...>"
 applies:
   - <glob relative to the repository root, e.g. packages/agents/**>
 because:
   - decisions/<decision>.md
 refs:
-  - code://<path> - <what it points at>
+  - "[code://<path>](../../<path>) - <what it points at>"
 ---
 
 <The constraint in full. What is forbidden or required, and where.>

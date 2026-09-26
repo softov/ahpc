@@ -8,11 +8,11 @@ revalidated: <YYYY-MM-DD>
 
 ## Packages
 
-- `code://packages/<package>` - <what it is; its entry point; its contracts file>.
+- [`code://packages/<package>`](../../../packages/<package>) - <what it is; its entry point; its contracts file>.
 
 ## Contracts
 
-- `code://packages/<package>/src/types/<file>.ts` - <the shapes every other package imports>.
+- [`code://packages/<package>/src/types/<file>.ts`](../../../packages/<package>/src/types/<file>.ts) - <the shapes every other package imports>.
 
 ## Runtime path
 
@@ -22,7 +22,7 @@ revalidated: <YYYY-MM-DD>
 
 ## Tests
 
-- `code://packages/<package>/src/<file>.test.ts` - <what is covered>.
+- [`code://packages/<package>/src/<file>.test.ts`](../../../packages/<package>/src/<file>.test.ts) - <what is covered>.
 
 ## Known gaps
 

@@ -1,11 +1,11 @@
 ---
 name: do-spec
-description: Write or update the project's documentation under .project/ (plans with their task files, implemented and deferred records, specs, rules, decisions, research) in the specai 0.1 format. Use when asked to write or amend a plan or a task, move a task's status, close a plan, record a decision, add or retire a rule, or write or correct a spec.
+description: Create and maintain the `.project/ artifacts` that let an agent understand what a project is building, why each decision was made, which rules hold, which problems are open, what has been implemented, and what work remains, so the record survives across agents and sessions. Use when writing, amending or closing a plan, task, decision, problem, spec, rule, research note or implementation record, when moving a task's status, and when templates, paths, references, statuses and cross-links must stay consistent.
 metadata:
-  specai: "0.1"
+  artifacts: "0.2"
 ---
 
-# Writing specai files
+# Writing `.project/ artifacts` files
 
 `.project/` holds what the project is building and why. `.agents/` holds only skills.
 Start every file from its template in `assets/`; the template says what goes in each field and section. Replace every `<placeholder>`, delete what you do not fill.
@@ -20,6 +20,7 @@ Start every file from its template in `assets/`; the template says what goes in 
 | spec | [spec.md](assets/spec.md) | `.project/specs/<slug>.md` |
 | rule | [rule.md](assets/rule.md) | `.project/rules/<slug>.md` |
 | decision | [decision.md](assets/decision.md) | `.project/decisions/<slug>.md` |
+| problem | [problem.md](assets/problem.md) | `.project/problems/<slug>.md` |
 | research | Markdown with a `title` | `.project/research/<slug>.md` |
 
 `.project/plans/index.md` is the entry: one row per plan, kept by hand.
@@ -30,6 +31,10 @@ Start every file from its template in `assets/`; the template says what goes in 
 - A path is an identity: nothing is moved or deleted; what no longer applies gets a `status`.
 - Paths in frontmatter are relative to `.project/`, except a task's `depends`, which names sibling task files.
 - `refs` say where something is, never its state, one per line as `<uri> - <one line on why it is here>`. A ref is a URI: `code://<path>#L<n>-L<m>`, `npm://<package>@<range>`, `git://<sha|branch|tag>`, `tasker://<instance>:<project>#<id>`, `https://...`, `file://...`. A plan's files read and patterns to reuse are its refs; nothing lists them twice.
+- A `code://` ref is local code, so write it as a Markdown link: keep the URI as the link text and make the target the same path relative to the file you are writing. In a decision at `.project/decisions/`, that is `[code://packages/papo/src/chat.ts#L51](../../packages/papo/src/chat.ts#L51)`. The text keeps the URI searchable and the target makes it clickable in a Markdown view. In a body, the same link reads better with the URI in a code span: ``[`code://<path>`](../../<path>)``.
+- Quote the whole ref in frontmatter, because a list item that starts with `[` is YAML flow sequence syntax: `- "[code://packages/papo/src/chat.ts#L51](../../packages/papo/src/chat.ts#L51) - the configured default"`. Escape a `"` in the note as `\"`.
+- The target carries one `../` per level between the file's folder and the repository root: four from `.project/plans/<domain>/<NN>-<slug>/`, three from `.project/plans/<domain>/00-<domain>.md`, two from `.project/specs/`, `.project/rules/`, `.project/decisions/`, `.project/problems/`, `.project/research/`.
+- Only `code://` is linked; `npm://`, `git://`, `tasker://`, `https://` and `file://` stay bare, because they are not files in this repository. Never link a path the repository does not have yet, such as a `CREATE:` entry or a spec named in `creates`.
 - Globs (`applies`, `covers`) are relative to the repository root.
 - One full sentence per line in prose. Never an em dash.
 
@@ -38,6 +43,7 @@ Start every file from its template in `assets/`; the template says what goes in 
 - plan: `draft` `planned` `active` `built` `dropped`
 - task: `todo` `doing` `done` `blocked` `dropped`
 - decision: `proposed` `accepted` `deprecated` `superseded`
+- problem: `open` `mitigated` `fixed` `wontfix`
 - rule: `active` `retired` · spec: `current` `retired`
 
 ## Plans
@@ -57,8 +63,10 @@ To close a plan: every task `done` or `dropped`, `implemented.md` written, `defe
 ## Decisions, rules, specs
 
 - A decision that replaces another is a new file with `supersedes`; the old one gets `status: superseded` and `superseded-by`, body untouched; rules and specs that pointed at the old one move to the new one unless the old rationale still holds.
-- Every decision is a file in `.project/decisions/` from the moment it is made; no file, no decision. A plan's *Decisions locked in* table only links them (`[<title>](../../decisions/<slug>.md)`) and a row without a file is not a decision. The file names its source: the user's answer with the question quoted, a `code://` line, or `(defaulted: ...)` when the writer chose and the user may erase it.
+- Every decision is a file in `.project/decisions/` from the moment it is made; no file, no decision. A plan's *Decisions locked in* table only links them (`[<title>](../../../decisions/<slug>.md)`) and a row without a file is not a decision. The file names its source: the user's answer with the question quoted, a `code://` line, or `(defaulted: ...)` when the writer chose and the user may erase it.
 - A decision needs a fork: two options that both work and a nameable rejected alternative (the `Options` section). A gap against the reference (Claude's runtime, decision 112) is a finding in cli/03's table, fixed in a task and cited as `cli/03 F<n>`; a spec requirement is a task step; scope is the plan's intro. None of these gets a decision file. What a plan settled without a decision goes in a second table under *Decisions locked in* (`What | Source | Task`).
+- A problem is something wrong that nobody chose: a defect, a limitation, an obstacle met while working. It is a file in `.project/problems/` from the moment it is found, and it binds nothing, because a later session fixes it or routes around it. The `Options` section is the test: two options that both work make a decision, something that does not work is a problem. Filed as a decision it comes back as `status: accepted` and the next session builds on the damage.
+- A workaround belongs to the problem, in its *Workaround* section, and stops applying when the status is `fixed`; it is a decision only if there was a fork. To close one: `status: fixed` and `fixed-by` naming what closed it, or `wontfix` with the decision that accepted it.
 - A rule restating another is removed, not added. To retire one: `status: retired` and one line at the top saying why.
 - A spec is corrected in place when behaviour changes; if the change contradicts a listed decision, a new decision comes first.
 
@@ -70,11 +78,12 @@ To close a plan: every task `done` or `dropped`, `implemented.md` written, `defe
 
 ## Finding what `.project/` already says about a file
 
-The `refs` are the index: every plan, task, decision, rule and spec names the code it is about as `code://<path>`, so the way to find what has been decided or planned for a file is to search `.project/` for its path.
+The `refs` are the index: every plan, task, decision, rule and spec names the code it is about as `code://<path>`, so the way to find what has been decided or planned for a file is to search `.project/` for its path. The link text keeps `code://<path>`, so these searches match a ref whether it was written as a link or left bare.
 
 - Everything about one file: `rg -n "code://packages/agents/src/run/tools.ts" .project/` (drop the `#L...` so a ref with line numbers still matches).
 - Everything about a package or folder: `rg -n "code://packages/agents/src/run/" .project/`.
 - The decisions only: `rg -ln "code://packages/agents/src/run/tools.ts" .project/decisions/`.
+- What is open against it: `rg -ln "code://packages/agents/src/run/" .project/problems/`.
 - Which plan a decision belongs to: `rg -n "decisions/<slug>.md" .project/plans/`.
 - A decision by number or subject when the slug is unknown: `rg -n "^title: 116 " .project/decisions/` or `rg -ln -i "deny" .project/decisions/`.
 

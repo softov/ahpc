@@ -13,9 +13,11 @@ creates:
   - specs/<new-spec>.md
 decisions:
   - decisions/<decision>.md
+problems:
+  - problems/<slug>.md
 refs:
-  - code://packages/<package>/src/<file>.ts#L<n>-L<m> - <what it does today and why it matters here>
-  - code://packages/<package>/src/<other>.ts - <the pattern this plan mirrors>
+  - "[code://packages/<package>/src/<file>.ts#L<n>-L<m>](../../../../packages/<package>/src/<file>.ts#L<n>-L<m>) - <what it does today and why it matters here>"
+  - "[code://packages/<package>/src/<other>.ts](../../../../packages/<package>/src/<other>.ts) - <the pattern this plan mirrors>"
   - npm://<package>@<range> - <what is taken from it>
   - https://<document> - <what it says>
 ---
@@ -47,7 +49,7 @@ The files read and the patterns to reuse are the `refs` above, each with its not
 
 | # | Decision | Rationale / source |
 | --- | --- | --- |
-| 1 | <decision> | <user's words with the date / `code://<path>#L<n>` / `(defaulted: ...)`> |
+| 1 | <decision> | <user's words with the date / [code://<path>#L<n>](../../../../<path>#L<n>) / `(defaulted: ...)`> |
 
 ## Proposed architecture
 
@@ -55,7 +57,7 @@ The files read and the patterns to reuse are the `refs` above, each with its not
 - **Event flow** - <...>
 - **State flow** - <...>
 - **Layer responsibilities** - <package>: <...> · <package>: <...>
-- **Source-of-truth files** - `code://<path>`
+- **Source-of-truth files** - [`code://<path>`](../../../../<path>)
 
 ## Tasks
 

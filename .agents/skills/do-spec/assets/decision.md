@@ -4,7 +4,7 @@ status: accepted
 date: <YYYY-MM-DD>
 supersedes: decisions/<older-decision>.md
 refs:
-  - code://<path>#L<n> - <the code the decision is about>
+  - "[code://<path>#L<n>](../../<path>#L<n>) - <the code the decision is about>"
   - git://<sha> - <the change that made it>
   - https://<document> - <what it says>
 ---

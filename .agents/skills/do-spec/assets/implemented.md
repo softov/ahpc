@@ -3,14 +3,14 @@ title: <Plan title> - implemented
 date: <YYYY-MM-DD>
 refs:
   - git://<sha of the last commit>
-  - code://packages/<package>/src/<file>.ts
+  - "[code://packages/<package>/src/<file>.ts](../../../../packages/<package>/src/<file>.ts)"
 ---
 
 <One paragraph: what exists now that did not before, in product terms.>
 
 ## What was built
 
-- `code://<path>` - <what it holds>.
+- [`code://<path>`](../../../../<path>) - <what it holds>.
 
 ## Verified
 
