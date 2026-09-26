@@ -14,13 +14,13 @@ import {
   useStoreValue,
   useTheme,
 } from '@textui/core';
-import { Badge, Column, Divider, EmptyState, Field, Form, FormActions, Marquee, Panel, RadioGroup, Row, SearchBox, Select, TextInput, argumentOf, useForm } from '@textui/widgets';
+import { Badge, Column, Divider, EmptyState, Field, Form, FormActions, Marquee, Panel, RadioGroup, Row, SearchBox, Select, TextArea, TextInput, argumentOf, useForm } from '@textui/widgets';
 import { PRESETS, presetFor, scheduleProblem, zoneIsKnownHere } from './schedule.js';
 import {
   AUTOMATIONS_SCOPE, CHANGES_SCOPE, CHAT_SCOPE, CONTROLLER, MCP_SCOPE, SESSIONS_SCOPE, SKILLS_SCOPE, modelCommand, settingCommand,
 } from './control.js';
 import { branchName, branchDrift, pullRequestLabel,
-  ARCHIVED, AUTOMATIONS, AUTOMATION_ROW, CHANGES, CUSTOMIZATIONS, DRAFT, EXPANDED, FILTER, FOCUS, HISTORY, HOST, INPUT,
+  ARCHIVED, AUTOMATIONS, AUTOMATION_EDIT, AUTOMATION_ROW, AUTOMATION_SIDEBAR, CHANGES, CUSTOMIZATIONS, DRAFT, EXPANDED, FILTER, FOCUS, HISTORY, HOST, INPUT,
   CHANGE_AT, CHANGE_ROW, CHANGE_SCOPES, FILES_AT, FILES_ENTRIES, FILES_OPEN,
   MODEL, MODEL_CONFIG, OPEN, OPEN_FILE, CHAT_URI, PROVIDER, QUEUE, SELECTED, SESSIONS, SETTINGS, SIDEBAR,
   CHATS, CURSOR, FIND, FINDING, FIND_AT, OPEN_TERMINAL, PRESENT, SPLIT_AT, SPLIT_DEFAULT, TERMINAL, TERMINALS, TURNS, WORKSPACE,
@@ -42,7 +42,7 @@ import {
 import type { ComposerOption, DetailField, ChatPendingInput } from '@textui/chat';
 import { ChangesList } from './view/changes.js';
 import { FileList } from './view/files.js';
-import { AutomationList } from './view/automations.js';
+import { AutomationList, AutomationRuns, automationFields } from './view/automations.js';
 import { CustomizationList } from './view/customizations.js';
 import { TerminalView } from './view/terminal.js';
 
@@ -230,6 +230,9 @@ export const SessionsScreen: (props: Record<string, never>) => RenderOutput =
     // width could not do.
     const asked = useStoreValue<boolean | null>(SIDEBAR, null);
     const open = asked ?? width > splitAt;
+    // Below the split, a pane that is out is the whole screen: the list goes
+    // until left puts the pane away.
+    const alone = open && width <= splitAt;
 
     const focused = useStoreValue<string | null>(FOCUS, null);
     const reading = open && focused === 'chat.details';
@@ -262,6 +265,7 @@ export const SessionsScreen: (props: Record<string, never>) => RenderOutput =
 
     return (
       <Row flex={1} gap={1}>
+        {alone ? null : (
         <Panel
           title="Sessions"
           {...(reading ? { width: aside } : { flex: 1 })}
@@ -306,11 +310,12 @@ export const SessionsScreen: (props: Record<string, never>) => RenderOutput =
               ? <text content={`x  show archived (${hidden})`} fg="subtle" />
               : null}
         </Panel>
+        )}
 
         {open ? (
         <Panel
           title="Session"
-          {...(reading ? { flex: 1 } : { width: aside })}
+          {...(reading || alone ? { flex: 1 } : { width: aside })}
           meta={current ? 'enter copies' : ''}
         >
           {current && status ? (
@@ -1188,8 +1193,10 @@ export const ChangesScreen: (props: Record<string, never>) => RenderOutput =
 
     useEffect(() => {
       if (!uri) return;
+      let live = true;
       void controller.changesets(uri)
         .then((found) => {
+          if (!live) return;
           app.store.set(CHANGE_SCOPES, found);
           /*
            * Settle on one, rather than leaving "whichever the host would pick".
@@ -1206,15 +1213,19 @@ export const ChangesScreen: (props: Record<string, never>) => RenderOutput =
           if (first) app.store.set(CHANGE_AT, first.uriTemplate);
         })
         .catch((error: unknown) => controller.report(error));
+      return () => { live = false; };
     }, [uri]);
 
     // The chosen one, re-read when the choice moves. The default arrives on
-    // the session channel already, so only a named scope is fetched here.
+    // the session channel already, so only a named scope is fetched here. An
+    // answer for a session or scope that is no longer on screen is dropped.
     useEffect(() => {
       if (!uri || !at) return;
+      let live = true;
       void controller.changesAt(uri, at)
-        .then((found) => app.store.set(CHANGES, found))
+        .then((found) => { if (live) app.store.set(CHANGES, found); })
         .catch((error: unknown) => controller.report(error));
+      return () => { live = false; };
     }, [uri, at]);
 
     const chosen = scopes.find((scope) => scope.uriTemplate === at)
@@ -1361,12 +1372,72 @@ export const ChangesScreen: (props: Record<string, never>) => RenderOutput =
  * automation with no triggers is one nothing fires, so leaving the schedule
  * blank writes a definition with an empty trigger list rather than a broken one.
  */
+/** A JSON object, or an empty one for anything else. */
+function object(value: unknown): Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+/** An array of JSON objects, or an empty one. */
+function list(value: unknown): Record<string, unknown>[] {
+  return Array.isArray(value) ? value.map(object) : [];
+}
+
+/** The string-valued entries, which is what a picker can show. */
+function strings(value: unknown): Record<string, string> {
+  return Object.fromEntries(Object.entries(object(value)).filter((entry): entry is [string, string] => typeof entry[1] === 'string'));
+}
+
 export const NewAutomationScreen: (props: Record<string, never>) => RenderOutput =
   defineComponent<Record<string, never>>('NewAutomationScreen', () => {
     const app = useApp();
+    const theme = useTheme();
+    const width = useSize().width;
     const controller = useRequiredService(CONTROLLER);
     const session = openSession(app.store);
     const [failure, setFailure] = useState<string | null>(null);
+
+    // The one being edited, or none for a new one. Read once: the form is a
+    // draft of it, and the host answering `automation/set` for another client's
+    // change must not rewrite what is being typed.
+    const [editing] = useState<Automation | null>(() => {
+      const uri = app.store.get<string>(AUTOMATION_EDIT) ?? '';
+      return (app.store.get<Automation[]>(AUTOMATIONS) ?? []).find((one) => one.resource === uri) ?? null;
+    });
+    const scheduleTrigger = editing
+      ? list(editing.definition?.triggers).find((one) => one.kind === 'schedule')
+      : undefined;
+
+    /*
+     * What each run's session is created with, which is the composer's
+     * question asked for a session that does not exist yet: a harness, a
+     * model and the model's own settings, and the host's session schema for
+     * that harness in that directory. Kept here rather than in the composer's
+     * store keys, because the composer describes the next message and this
+     * describes somebody else's.
+     */
+    const [agents, setAgents] = useState<Agent[]>([]);
+    const [provider, setProvider] = useState<string>(
+      editing ? (editing.provider ?? '') : (session?.provider ?? ''),
+    );
+    const [model, setModel] = useState<string>(editing?.model ?? '');
+    const [modelConfig, setModelConfig] = useState<Record<string, string>>(() => {
+      const found = object(object(editing?.definition?.session).model).config;
+      return strings(found);
+    });
+    const [settings, setSettings] = useState<Record<string, string>>(() => strings(editing?.config));
+    const [config, setConfig] = useState<SessionConfig | null>(null);
+
+    useEffect(() => {
+      void controller.agents()
+        .then((found) => {
+          setAgents(found);
+          // A new one runs on the first harness the host offers, which is
+          // what "the host's default" means to the host too - and naming it
+          // is what lets the model and settings below be asked about.
+          if (!editing && provider === '' && found[0]) setProvider(found[0].provider);
+        })
+        .catch((error: unknown) => controller.report(error));
+    }, []);
 
     const form = useForm<{
       title: string;
@@ -1374,24 +1445,27 @@ export const NewAutomationScreen: (props: Record<string, never>) => RenderOutput
       directory: string;
       expression: string;
       timeZone: string;
+      misfire: string;
     }>({
       initialValues: {
-        title: '',
-        message: '',
+        title: editing?.title ?? '',
+        message: editing?.prompt ?? '',
         // Where the open session is working, when there is one. It is the only
         // directory this client can name without having listed something.
-        directory: (session?.workingDirectories[0] ?? '').replace(/^file:\/\//, ''),
-        expression: '',
+        directory: (editing ? (editing.workingDirectories[0] ?? '') : (session?.workingDirectories[0] ?? ''))
+          .replace(/^file:\/\//, ''),
+        expression: editing?.schedule?.expression ?? '',
         // The machine's own, because a schedule written without thinking about
         // the zone means the one the person writing it is in.
-        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+        timeZone: editing?.schedule?.timeZone ?? (Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'),
+        misfire: editing?.misfire ?? 'runOnce',
       },
       validate: (values) => {
         const errors: { title?: string; message?: string; expression?: string; timeZone?: string } = {};
         if (values.title.trim() === '') errors.title = 'An automation needs a name to be found by';
         // The first message is what the automation is *for*: a session created
         // and never spoken to does nothing at all.
-        if (values.message.trim() === '') errors.message = 'This is what it will say, so it cannot be empty';
+        if (values.message.trim() === '') errors.message = 'Every run starts with this, so it cannot be empty';
         // Blank is manual-only, which is a choice. Anything else has to parse.
         if (values.expression.trim() !== '') {
           const problem = scheduleProblem(values.expression);
@@ -1403,29 +1477,46 @@ export const NewAutomationScreen: (props: Record<string, never>) => RenderOutput
         return errors;
       },
       onSubmit: async (values) => {
-        const scheduled = values.expression.trim() !== '';
-        try {
-          await controller.createAutomation({
-            title: values.title.trim(),
-            enabled: true,
-            message: { text: values.message.trim() },
-            session: {
-              ...(session?.provider ? { provider: session.provider } : {}),
-              ...(values.directory.trim() !== ''
-                ? { workingDirectories: [`file://${values.directory.trim()}`] }
-                : {}),
-            },
-            // An empty list, not an absent key: the protocol says an empty
-            // trigger list is what manual-only means, and a definition with no
-            // `triggers` at all is one a host has to guess about.
-            triggers: scheduled
+        const base = editing?.definition ?? {};
+        const directory = values.directory.trim();
+        const chosenOptions = Object.fromEntries(Object.entries(modelConfig).filter(([, value]) => value !== ''));
+        // Every field this form does not draw is carried over from what the
+        // host holds: the protocol says unknown entries are preserved on an
+        // edit, and a custom agent or an attachment is not this form's to drop.
+        const { provider: _p, model: _m, workingDirectories: _w, config: _c, ...keptSession } = object(base.session);
+        const definition = {
+          title: values.title.trim(),
+          // The protocol requires the `automation` origin on this message.
+          message: { ...object(base.message), text: values.message.trim(), origin: { kind: 'automation' } },
+          session: {
+            ...keptSession,
+            ...(provider !== '' ? { provider } : {}),
+            ...(model !== ''
+              ? { model: { id: model, ...(Object.keys(chosenOptions).length > 0 ? { config: chosenOptions } : {}) } }
+              : {}),
+            ...(directory !== '' ? { workingDirectories: [`file://${directory}`] } : {}),
+            ...(Object.keys(settings).length > 0 ? { config: settings } : {}),
+          },
+          // An empty list, not an absent key: the protocol says an empty
+          // trigger list is what manual-only means. Event triggers are kept as
+          // the host holds them, and the schedule keeps its id, since a run
+          // records which trigger fired it.
+          triggers: [
+            ...list(base.triggers).filter((one) => one.kind !== 'schedule'),
+            ...(values.expression.trim() !== ''
               ? [{
-                id: 't1',
+                ...(scheduleTrigger ?? {}),
+                id: typeof scheduleTrigger?.id === 'string' ? scheduleTrigger.id : 't1',
                 kind: 'schedule',
                 schedule: { expression: values.expression.trim(), timeZone: values.timeZone.trim() },
+                misfirePolicy: values.misfire,
               }]
-              : [],
-          });
+              : []),
+          ],
+        };
+        try {
+          if (editing) await controller.updateAutomation(editing.resource, definition);
+          else await controller.createAutomation({ ...definition, enabled: true });
           app.screens.pop();
         }
         catch (error) {
@@ -1434,8 +1525,67 @@ export const NewAutomationScreen: (props: Record<string, never>) => RenderOutput
       },
     });
 
+    // The host's questions for this harness in this directory, asked again as
+    // the answers change - an answer can bring new questions, the way a git
+    // directory brings a worktree. After a pause, so a directory being typed
+    // is one question rather than one per key.
+    const directory = form.values.directory.trim();
+    const answered = JSON.stringify(settings);
+    const [asking] = useState<{ directory: string | null }>({ directory: null });
+    useEffect(() => {
+      if (provider === '') { setConfig(null); return; }
+      let live = true;
+      const typing = asking.directory !== null && asking.directory !== directory;
+      asking.directory = directory;
+      const timer = setTimeout(() => {
+        void controller.resolveSettings({
+          provider,
+          ...(directory !== '' ? { workingDirectory: directory } : {}),
+          values: settings,
+        })
+          .then((found) => {
+            if (!live) return;
+            setConfig(found);
+            // The host's echo, defaults filled in, is what the protocol says a
+            // session template carries. Compared by value, so the echo of the
+            // same answers does not ask again.
+            if (JSON.stringify(found.values) !== answered) setSettings(found.values);
+          })
+          .catch(() => { if (live) setConfig(null); });
+      }, typing ? 250 : 0);
+      return () => { live = false; clearTimeout(timer); };
+    }, [provider, directory, answered]);
+
+    const agent = agents.find((one) => one.provider === provider);
+    const modelRow = agent?.models.find((one) => one.id === model);
+    // What a person answers here: questions with answers, that the host lets
+    // be asked, that are not the ones a client seeds, and not the ones the
+    // model answers for itself.
+    const questions = (config?.properties ?? [])
+      .filter((property) => property.readOnly !== true && !SEEDED.has(property.key))
+      .filter((property) => property.values.length > 0 || property.enumDynamic === true)
+      .filter((property) => !(modelRow?.options ?? []).some((one) => one.key === property.key));
+    const modelQuestions = (modelRow?.options ?? []).filter((property) => property.values.length > 0);
+    // As many to a row as fit at about thirty cells each, so a host that asks
+    // six questions costs two rows rather than six.
+    const perRow = Math.max(1, Math.min(3, Math.floor((width - 4) / 30)));
+    const asked = [
+      ...modelQuestions.map((property) => ({ property, value: modelConfig[property.key] ?? property.default ?? '', model: true })),
+      ...questions.map((property) => ({ property, value: settings[property.key] ?? property.default ?? '', model: false })),
+    ];
+    // One label column for the whole form, wide enough for the host's first
+    // question in each settings row, so every field's text starts in the same
+    // column and no question is cut to an ellipsis.
+    const labels = Math.min(16, Math.max(10, ...asked
+      .filter((_, index) => index % perRow === 0)
+      .map(({ property }) => property.title.length + 1)));
+    const answer = (key: string, value: string, isModel: boolean): void => {
+      if (isModel) setModelConfig((was) => ({ ...was, [key]: value }));
+      else setSettings((was) => ({ ...was, [key]: value }));
+    };
+
     return (
-      <Panel title="A new automation" flex={1}>
+      <Panel title={editing ? `Edit ${editing.title}` : 'A new automation'} flex={1}>
         <Form form={form as never} flex={1}>
           <Column gap={0} flex={1}>
             {/* Paired, so the whole form fits a 24-row terminal. That is not
@@ -1444,7 +1594,7 @@ export const NewAutomationScreen: (props: Record<string, never>) => RenderOutput
                 somebody who cannot scroll to it - this library's scroll view
                 does not follow focus, so there is nowhere to put the overflow. */}
             <Row gap={1}>
-              <Field name="title" label="Name" labelWidth={10} required flex={2}>
+              <Field name="title" label="Name" labelWidth={labels} required flex={2}>
                 <TextInput
                   value={form.values.title}
                   autoFocus
@@ -1460,10 +1610,92 @@ export const NewAutomationScreen: (props: Record<string, never>) => RenderOutput
                 />
               </Field>
             </Row>
-            <Field name="message" label="Says" labelWidth={10} required>
-              <TextInput
+            <Row gap={1}>
+              <Field name="harness" label="Harness" labelWidth={labels} flex={2}>
+                <Select
+                  options={[
+                    ...(provider === '' ? [{ value: '', label: "The host's default" }] : []),
+                    ...agents.map((one) => ({ value: one.provider, label: one.displayName })),
+                  ]}
+                  value={provider}
+                  mode="floating"
+                  onChange={(value: string) => {
+                    if (value === provider) return;
+                    setProvider(value);
+                    // A model and its settings belong to a harness, and the
+                    // host's questions are asked again for the new one.
+                    setModel('');
+                    setModelConfig({});
+                    setSettings({});
+                  }}
+                />
+              </Field>
+              <Field name="model" label="Model" labelWidth={6} flex={2}>
+                <Select
+                  options={[
+                    { value: '', label: agent && agent.models.length === 0 ? 'No models' : 'Default' },
+                    ...(agent?.models ?? []).map((one) => ({ value: one.id, label: one.displayName })),
+                    // One the harness no longer lists is still what the
+                    // automation says, so it is shown rather than dropped.
+                    ...(model !== '' && !agent?.models.some((one) => one.id === model) ? [{ value: model, label: model }] : []),
+                  ]}
+                  value={model}
+                  mode="floating"
+                  onChange={(value: string) => {
+                    if (value === model) return;
+                    setModel(value);
+                    setModelConfig({});
+                  }}
+                />
+              </Field>
+            </Row>
+            {/* The host's own questions and the model's, in the host's words. */}
+            {Array.from({ length: Math.ceil(asked.length / perRow) }, (_, index) => (
+              <Row gap={1} key={`settings.${index}`}>
+                {asked.slice(index * perRow, index * perRow + perRow).map(({ property, value, model: isModel }, at) => (
+                  <Field
+                    key={`${isModel ? 'model' : 'session'}.${property.key}`}
+                    name={`${isModel ? 'model' : 'session'}.${property.key}`}
+                    label={property.title}
+                    labelWidth={at === 0 ? labels : Math.min(16, property.title.length + 1)}
+                    flex={1}
+                  >
+                    {property.values.length > 0 ? (
+                      <Select
+                        options={[
+                          ...(value === '' ? [{ value: '', label: 'Default' }] : []),
+                          ...property.values.map((one) => ({ value: one.value, label: one.label })),
+                          ...(value !== '' && !property.values.some((one) => one.value === value) ? [{ value, label: value }] : []),
+                        ]}
+                        value={value}
+                        mode="floating"
+                        onChange={(next: string) => answer(property.key, next, isModel)}
+                      />
+                    ) : (
+                      // A question whose answers the host lists only on
+                      // asking, such as a branch: typed, since there is no
+                      // list to open.
+                      <TextInput
+                        value={value}
+                        placeholder={property.title.toLowerCase()}
+                        onChange={(next: string) => answer(property.key, next, isModel)}
+                      />
+                    )}
+                  </Field>
+                ))}
+              </Row>
+            ))}
+            {/* The prompt every run's session opens with, so a paragraph
+                rather than a line. Enter is a newline here; tab leaves. */}
+            <Field name="message" label="Prompt" labelWidth={labels} required>
+              <TextArea
                 value={form.values.message}
-                placeholder="review what changed today"
+                placeholder="Review what changed today and list anything that needs a person"
+                maxRows={4}
+                // `TextInput`'s inset: a padding cell, and a border cell in a
+                // theme that draws input borders. Without it this text starts
+                // left of the fields above and below it.
+                padding={[0, theme.border === 'none' ? 1 : 2]}
                 onChange={(value: string) => { form.setValue('message', value); form.touch('message'); }}
               />
             </Field>
@@ -1471,26 +1703,43 @@ export const NewAutomationScreen: (props: Record<string, never>) => RenderOutput
             {/* The easy path first. Choosing one writes the expression below,
                 which stays the authoritative value - so a preset is a way of
                 filling the field in, never a second place the answer lives. */}
-            <Field name="preset" label="Runs" labelWidth={10}>
-              <Select
-                options={[
-                  ...PRESETS.map((one) => ({ value: one.id, label: one.label })),
-                  // Only reachable by typing. Offering it as a choice would be
-                  // offering to clear the field somebody just filled in.
-                  ...(presetFor(form.values.expression) === undefined
-                    ? [{ value: 'custom', label: 'Something else, written below' }]
-                    : []),
-                ]}
-                value={presetFor(form.values.expression)?.id ?? 'custom'}
-                mode="floating"
-                onChange={(value: string) => {
-                  const chosen = PRESETS.find((one) => one.id === value);
-                  if (!chosen) return;
-                  form.setValue('expression', chosen.expression);
-                  form.touch('expression');
-                }}
-              />
-            </Field>
+            <Row gap={1}>
+              <Field name="preset" label="Runs" labelWidth={labels} flex={2}>
+                <Select
+                  options={[
+                    ...PRESETS.map((one) => ({ value: one.id, label: one.label })),
+                    // Only reachable by typing. Offering it as a choice would be
+                    // offering to clear the field somebody just filled in.
+                    ...(presetFor(form.values.expression) === undefined
+                      ? [{ value: 'custom', label: 'Something else, written below' }]
+                      : []),
+                  ]}
+                  value={presetFor(form.values.expression)?.id ?? 'custom'}
+                  mode="floating"
+                  onChange={(value: string) => {
+                    const chosen = PRESETS.find((one) => one.id === value);
+                    if (!chosen) return;
+                    form.setValue('expression', chosen.expression);
+                    form.touch('expression');
+                  }}
+                />
+              </Field>
+              {/* What the host does about occurrences it missed while it was
+                  down. Only a question when there is a schedule to miss. */}
+              {form.values.expression.trim() !== '' ? (
+                <Field name="misfire" label="Missed" labelWidth={6} flex={1}>
+                  <Select
+                    options={[
+                      { value: 'runOnce', label: 'Run once' },
+                      { value: 'skip', label: 'Skip' },
+                    ]}
+                    value={form.values.misfire}
+                    mode="floating"
+                    onChange={(value: string) => { form.setValue('misfire', value); form.touch('misfire'); }}
+                  />
+                </Field>
+              ) : null}
+            </Row>
             {/* One row, because they are one fact: an expression without the
                 zone it is read in does not name a time. It also buys back the
                 rows the picker above costs, so the whole form still fits a
@@ -1500,7 +1749,7 @@ export const NewAutomationScreen: (props: Record<string, never>) => RenderOutput
               <Field
                 name="expression"
                 label="Schedule"
-                labelWidth={10}
+                labelWidth={labels}
                 hint="minute hour day month weekday"
                 flex={2}
               >
@@ -1533,7 +1782,7 @@ export const NewAutomationScreen: (props: Record<string, never>) => RenderOutput
               fg="subtle"
             />
             {failure !== null ? <text content={failure} fg="danger" wrap="word" /> : null}
-            <FormActions submitLabel="Create" cancelLabel="Cancel" onCancel={() => app.screens.pop()} />
+            <FormActions submitLabel={editing ? 'Save' : 'Create'} cancelLabel="Cancel" onCancel={() => app.screens.pop()} />
           </Column>
         </Form>
       </Panel>
@@ -1561,9 +1810,30 @@ export const AutomationsScreen: (props: Record<string, never>) => RenderOutput =
     const app = useApp();
     const controller = useRequiredService(CONTROLLER);
     useFocusScope({ id: AUTOMATIONS_SCOPE });
+    const theme = useTheme();
     const automations = useStoreValue<Automation[]>(AUTOMATIONS, []) ?? [];
     const [failure, setFailure] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
+    const row = useStoreValue<string>(AUTOMATION_ROW, '') ?? '';
+
+    // A detail pane with nothing selected is empty until a key is pressed, so
+    // the first row is the selection until somebody moves.
+    useEffect(() => {
+      if (automations.length === 0) return;
+      if (automations.some((one) => one.resource === row)) return;
+      app.store.set(AUTOMATION_ROW, automations[0]?.resource ?? '');
+    }, [automations.map((one) => one.resource).join(',')]);
+
+    // The same split as the catalogue's: out above `splitAt` unless put away,
+    // a drawer below it, and the pane with the keyboard is the wide one.
+    const width = useSize().width;
+    const splitAt = useStoreValue<number>(SPLIT_AT, SPLIT_DEFAULT) ?? SPLIT_DEFAULT;
+    const asked = useStoreValue<boolean | null>(AUTOMATION_SIDEBAR, null);
+    const open = asked ?? width > splitAt;
+    const alone = open && width <= splitAt;
+    const focused = useStoreValue<string | null>(FOCUS, null);
+    const reading = open && (focused === 'automation.details' || focused === 'automation.runs');
+    const aside = Math.max(34, Math.min(56, Math.round(width * 0.4)));
 
     useEffect(() => {
       let live = true;
@@ -1605,20 +1875,70 @@ export const AutomationsScreen: (props: Record<string, never>) => RenderOutput =
       );
     }
 
-    return (
-      <Panel title="Automations" flex={1}>
+    const current = automations.find((one) => one.resource === row) ?? null;
+    const list = (
+      <Panel
+        title="Automations"
+        {...(reading ? { width: aside } : { flex: 1 })}
+        meta={`${automations.length} held`}
+      >
         <AutomationList
           automations={automations}
+          selectedId={row || null}
           focusId="chat.automations"
           autoFocus
           flex={1}
           onSelect={(uri) => app.store.set(AUTOMATION_ROW, uri)}
-          // Enter runs it, which is the verb this screen is for. The others
-          // are keys, and all three are named in the hints.
-          onOpen={(uri) => { app.store.set(AUTOMATION_ROW, uri); void app.execute('automation.run'); }}
+          // Enter reads it. Running is `r`, so a stray enter never starts an
+          // agent nobody asked for.
+          onOpen={(uri) => { app.store.set(AUTOMATION_ROW, uri); void app.execute('automation.openDetails'); }}
         />
       </Panel>
     );
+
+    if (!open) return <Row flex={1}>{list}</Row>;
+
+    const pane = (
+      <Panel
+        title="Automation"
+        {...(reading || alone ? { flex: 1 } : { width: aside })}
+        meta={current ? 'e edits  r runs' : ''}
+      >
+        {current ? (
+          <Column gap={1} flex={1}>
+            <Row gap={1}>
+              <text
+                content={current.enabled ? theme.glyphs.bulletFilled : theme.glyphs.bulletHollow}
+                fg={current.enabled ? 'accent' : 'muted'}
+                shrink={0}
+              />
+              <text content={current.title} bold wrap="word" flex={1} />
+            </Row>
+            <SessionDetails
+              fields={automationFields(current)}
+              focusId="automation.details"
+              claim={asked === true}
+              values="all"
+            />
+            <text content={`Runs${current.runs.length > 0 ? ` (${current.runs.length})` : ''}`} fg="muted" bold />
+            <AutomationRuns
+              runs={current.runs}
+              {...(current.moreRuns ? { more: true } : {})}
+              focusId="automation.runs"
+              flex={1}
+              onOpen={(session) => { controller.open(session); app.screens.push('chat'); }}
+            />
+          </Column>
+        ) : (
+          <EmptyState title="Nothing selected" message="Choose an automation on the left." />
+        )}
+      </Panel>
+    );
+
+    // Below the split the pane is the whole screen while it is out: two
+    // halves too narrow to read are worse than one whole one.
+    if (alone) return <Row flex={1}>{pane}</Row>;
+    return <Row flex={1} gap={1}>{list}{pane}</Row>;
   });
 
 // ------------------------------------------------------------- 6b. the files

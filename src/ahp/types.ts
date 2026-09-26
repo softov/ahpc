@@ -765,6 +765,16 @@ export interface AutomationRun {
   session?: string;
   /** Whether a trigger started it, rather than somebody pressing Run. */
   triggered: boolean;
+  /** ISO 8601. When the host made the run. */
+  createdAt?: string;
+  /** ISO 8601. When it ended, whichever way it ended. */
+  completedAt?: string;
+  /** ISO 8601. The occurrence a schedule trigger fired for. */
+  scheduledFor?: string;
+  /** A catch-up run for occurrences missed while the host was away. */
+  catchUp?: boolean;
+  /** The host's message for a failed run. */
+  error?: string;
 }
 
 /**
@@ -789,4 +799,30 @@ export interface Automation {
   runs: AutomationRun[];
   /** Which of `update`, `remove` and `run` the host will accept for it now. */
   operations: string[];
+  /** The first message every run's session is sent. */
+  prompt?: string;
+  /** Provider id for the sessions it starts. Absent is the host's default. */
+  provider?: string;
+  /** Model id for the sessions it starts. Absent is the provider's default. */
+  model?: string;
+  /** `file://` URIs on the host. Empty is a session with no workspace. */
+  workingDirectories: string[];
+  /** Session config values the runs are created with. */
+  config?: Record<string, unknown>;
+  /** `skip` or `runOnce`, for the schedule trigger. Absent is `runOnce`. */
+  misfire?: string;
+  /** Titles of the host-defined event triggers. */
+  events: string[];
+  /** ISO 8601. */
+  createdAt?: string;
+  /** ISO 8601. Last change to the definition. */
+  modifiedAt?: string;
+  /** The host holds older runs than `runs` carries. */
+  moreRuns?: boolean;
+  /**
+   * The definition as the host sent it. An edit starts from this, so the
+   * fields this client does not draw - `_meta`, event triggers, attachments,
+   * a custom agent - go back unchanged.
+   */
+  definition?: Record<string, unknown>;
 }

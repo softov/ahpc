@@ -995,11 +995,19 @@ function summary(value: unknown): SessionSummary {
 /** One run, flattened out of its lifecycle and its origin. */
 function automationRun(value: unknown): AutomationRun {
   const found = bag(value);
+  const lifecycle = bag(found.lifecycle);
+  const origin = bag(found.origin);
+  const error = str(bag(lifecycle.error).message);
   return {
     resource: str(found.resource) ?? '',
-    status: str(bag(found.lifecycle).status) ?? 'pending',
+    status: str(lifecycle.status) ?? 'pending',
     ...(str(found.primarySession) ? { session: str(found.primarySession) as string } : {}),
-    triggered: str(bag(found.origin).kind) === 'trigger',
+    triggered: str(origin.kind) === 'trigger',
+    ...(str(lifecycle.createdAt) ? { createdAt: str(lifecycle.createdAt) as string } : {}),
+    ...(str(lifecycle.completedAt) ? { completedAt: str(lifecycle.completedAt) as string } : {}),
+    ...(str(origin.scheduledFor) ? { scheduledFor: str(origin.scheduledFor) as string } : {}),
+    ...(origin.catchUp === true ? { catchUp: true } : {}),
+    ...(error ? { error } : {}),
   };
 }
 
@@ -1019,6 +1027,12 @@ function automation(value: unknown): Automation {
     .map(bag)
     .find((trigger) => trigger.kind === 'schedule');
   const timing = bag(schedule?.schedule);
+  const session = bag(definition.session);
+  const config = bag(session.config);
+  const events = list(definition.triggers)
+    .map(bag)
+    .filter((trigger) => trigger.kind === 'event')
+    .map((trigger) => str(trigger.title) ?? str(trigger.type) ?? 'event');
   return {
     resource: str(found.resource) ?? '',
     title: str(definition.title) ?? 'Untitled automation',
@@ -1036,6 +1050,17 @@ function automation(value: unknown): Automation {
     ...(str(found.nextRunAt) ? { nextRunAt: str(found.nextRunAt) as string } : {}),
     runs: list(found.runs).map(automationRun),
     operations: list(found.operations).filter((one): one is string => typeof one === 'string'),
+    ...(str(bag(definition.message).text) ? { prompt: str(bag(definition.message).text) as string } : {}),
+    ...(str(session.provider) ? { provider: str(session.provider) as string } : {}),
+    ...(str(bag(session.model).id) ? { model: str(bag(session.model).id) as string } : {}),
+    workingDirectories: list(session.workingDirectories).filter((one): one is string => typeof one === 'string'),
+    ...(Object.keys(config).length > 0 ? { config } : {}),
+    ...(str(schedule?.misfirePolicy) ? { misfire: str(schedule?.misfirePolicy) as string } : {}),
+    events,
+    ...(str(found.createdAt) ? { createdAt: str(found.createdAt) as string } : {}),
+    ...(str(found.modifiedAt) ? { modifiedAt: str(found.modifiedAt) as string } : {}),
+    ...(str(found.runsNextCursor) ? { moreRuns: true } : {}),
+    definition,
   };
 }
 
@@ -2318,6 +2343,12 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
         // one because the field is required.
         requestId: randomUUID(),
       });
+    },
+
+    updateAutomation: async (uri, changes) => {
+      // A request, like `setAutomationEnabled`: the host answers with
+      // `automation/set`, and the screen reads the answer from there.
+      client.dispatch(AUTOMATIONS, { type: 'automation/updateRequested', resource: uri, changes });
     },
 
     setAutomationEnabled: async (uri, enabled) => {

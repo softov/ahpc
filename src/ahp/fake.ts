@@ -493,11 +493,54 @@ export function fakeHost(): FakeHost {
       // the one thing a next run cannot be.
       nextRunAt: new Date(Date.now() + 4 * 3_600_000 + 12 * 60_000).toISOString(),
       runs: [
-        { resource: 'ahp-automation-run:/r3', status: 'completed', session: 'ahp-session:/1f0a', triggered: true },
-        { resource: 'ahp-automation-run:/r2', status: 'completed', session: 'ahp-session:/6b21', triggered: true },
-        { resource: 'ahp-automation-run:/r1', status: 'failed', triggered: true },
+        {
+          resource: 'ahp-automation-run:/r3', status: 'completed', session: 'ahp-session:/1f0a', triggered: true,
+          createdAt: new Date(Date.now() - 20 * 3_600_000).toISOString(),
+          completedAt: new Date(Date.now() - 19 * 3_600_000).toISOString(),
+        },
+        {
+          resource: 'ahp-automation-run:/r2', status: 'completed', session: 'ahp-session:/6b21', triggered: true,
+          createdAt: new Date(Date.now() - 44 * 3_600_000).toISOString(),
+          completedAt: new Date(Date.now() - 43 * 3_600_000).toISOString(),
+        },
+        {
+          resource: 'ahp-automation-run:/r1', status: 'failed', triggered: true,
+          createdAt: new Date(Date.now() - 68 * 3_600_000).toISOString(),
+          completedAt: new Date(Date.now() - 68 * 3_600_000).toISOString(),
+          error: 'The working directory is not a git repository',
+        },
       ],
       operations: ['update', 'remove', 'run'],
+      prompt: 'Build every libbrb_* library with compileLinux.sh and report the first one that fails, with the compiler output.',
+      provider: 'claude',
+      model: 'claude-sonnet-5',
+      workingDirectories: ['file:///brb_main/src/brb_framework'],
+      events: [],
+      createdAt: '2026-09-01T12:00:00.000Z',
+      modifiedAt: '2026-09-10T08:30:00.000Z',
+      misfire: 'skip',
+      // Whole, with the parts no screen draws: an edit has to send them back.
+      definition: {
+        title: 'Nightly framework build',
+        enabled: true,
+        message: {
+          text: 'Build every libbrb_* library with compileLinux.sh and report the first one that fails, with the compiler output.',
+          origin: { kind: 'automation' },
+        },
+        session: {
+          provider: 'claude',
+          model: { id: 'claude-sonnet-5' },
+          workingDirectories: ['file:///brb_main/src/brb_framework'],
+          agent: { uri: 'agent://reviewer' },
+        },
+        triggers: [{
+          id: 'nightly',
+          kind: 'schedule',
+          schedule: { expression: '0 9 * * 1-5', timeZone: 'America/Sao_Paulo' },
+          misfirePolicy: 'skip',
+        }],
+        _meta: { 'example.com/owner': 'softov' },
+      },
     }],
     ['ahp-automation:/2e71', {
       resource: 'ahp-automation:/2e71',
@@ -510,8 +553,51 @@ export function fakeHost(): FakeHost {
       // No `run` while it is off: offering the button anyway would be a
       // control that argues with the switch beside it.
       operations: ['update', 'remove'],
+      prompt: 'Read the Desk cases opened since the last run and label each one.',
+      workingDirectories: [],
+      events: [],
     }],
   ]);
+  /**
+   * What a host holds for a definition: the fields a row draws, read back out
+   * of it the way `live.ts` reads them, and the definition itself.
+   */
+  const held = (uri: string, definition: Record<string, unknown>): Omit<Automation, 'runs' | 'operations'> => {
+    const object = (value: unknown): Record<string, unknown> =>
+      (typeof value === 'object' && value !== null ? value as Record<string, unknown> : {});
+    const triggers = Array.isArray(definition.triggers) ? definition.triggers.map(object) : [];
+    const schedule = triggers.find((one) => one.kind === 'schedule');
+    const timing = object(schedule?.schedule) as { expression?: string; timeZone?: string };
+    const message = object(definition.message);
+    const session = object(definition.session);
+    const model = object(session.model);
+    const config = object(session.config);
+    return {
+      resource: uri,
+      title: typeof definition.title === 'string' ? definition.title : 'Untitled automation',
+      enabled: definition.enabled !== false,
+      ...(timing.expression
+        ? { schedule: { expression: timing.expression, timeZone: timing.timeZone ?? 'UTC' } }
+        : {}),
+      // A host with a clock answers with when it will fire, and that answer
+      // is the confirmation the form is waiting for. An hour from now, so
+      // the fixture is a *next* run whenever this is read.
+      ...(timing.expression && definition.enabled !== false
+        ? { nextRunAt: new Date(Date.now() + 3_600_000).toISOString() }
+        : {}),
+      ...(typeof message.text === 'string' ? { prompt: message.text } : {}),
+      ...(typeof session.provider === 'string' ? { provider: session.provider } : {}),
+      ...(typeof model.id === 'string' ? { model: model.id } : {}),
+      workingDirectories: Array.isArray(session.workingDirectories)
+        ? session.workingDirectories.filter((one): one is string => typeof one === 'string')
+        : [],
+      ...(Object.keys(config).length > 0 ? { config } : {}),
+      ...(typeof schedule?.misfirePolicy === 'string' ? { misfire: schedule.misfirePolicy } : {}),
+      events: triggers.filter((one) => one.kind === 'event').map((one) => String(one.title ?? one.type ?? 'event')),
+      modifiedAt: new Date().toISOString(),
+      definition,
+    };
+  };
   const automationWatchers = new Set<() => void>();
   const automationsMoved = (): void => { for (const listener of automationWatchers) listener(); };
 
@@ -1412,31 +1498,23 @@ export function fakeHost(): FakeHost {
 
     createAutomation: async (definition) => {
       const uri = `ahp-automation:/${(0x8000 + automations.size).toString(16)}`;
-      const triggers = Array.isArray(definition.triggers) ? definition.triggers : [];
-      const schedule = triggers
-        .map((one) => (typeof one === 'object' && one !== null ? one as Record<string, unknown> : {}))
-        .find((one) => one.kind === 'schedule');
-      const timing = (typeof schedule?.schedule === 'object' && schedule.schedule !== null
-        ? schedule.schedule
-        : {}) as { expression?: string; timeZone?: string };
       automations.set(uri, {
-        resource: uri,
-        title: typeof definition.title === 'string' ? definition.title : 'Untitled automation',
-        enabled: definition.enabled !== false,
-        ...(timing.expression
-          ? { schedule: { expression: timing.expression, timeZone: timing.timeZone ?? 'UTC' } }
-          : {}),
-        // A host with a clock answers with when it will fire, and that answer
-        // is the confirmation the form is waiting for. An hour from now, so
-        // the fixture is a *next* run whenever this is read.
-        ...(timing.expression
-          ? { nextRunAt: new Date(Date.now() + 3_600_000).toISOString() }
-          : {}),
+        ...held(uri, definition),
         runs: [],
         operations: ['update', 'remove', 'run'],
+        createdAt: new Date().toISOString(),
       });
       automationsMoved();
       return uri;
+    },
+
+    /** Each field in `changes` replaces the definition's whole, as the protocol's patch does. */
+    updateAutomation: async (uri, changes) => {
+      const found = automations.get(uri);
+      if (!found || !found.operations.includes('update')) return;
+      const definition = { ...(found.definition ?? {}), ...changes };
+      automations.set(uri, { ...found, ...held(uri, definition) });
+      automationsMoved();
     },
 
     /**
@@ -1461,7 +1539,7 @@ export function fakeHost(): FakeHost {
       });
       automations.set(uri, {
         ...found,
-        runs: [{ resource: run, status: 'running', session, triggered: false }, ...found.runs],
+        runs: [{ resource: run, status: 'running', session, triggered: false, createdAt: new Date().toISOString() }, ...found.runs],
       });
       moved();
       automationsMoved();

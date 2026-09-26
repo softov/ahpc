@@ -13,7 +13,7 @@ import { CLIPBOARD_PATH, layoutMarkdown, wrapRuns } from '@textui/core';
 import { toBlocks } from '../src/blocks.js';
 import {
   CHATS, CHAT_URI, DRAFT, HOST_ERROR, INPUT, INPUT_STATUS, MODEL_CONFIG, OPEN, OPEN_TERMINAL, PROVIDER, QUEUE,
-  SELECTED, SETTINGS, SIDEBAR, TURNS, UPDATE_NOTICE, WORKSPACE, openSession, writeSessions,
+  QUIT_WINDOW_MS, SELECTED, SETTINGS, SIDEBAR, TURNS, UPDATE_NOTICE, WORKSPACE, openSession, writeSessions,
 } from '../src/state.js';
 import type { InputStatus } from '../src/state.js';
 import type { SessionSummary, Turn } from '../src/ahp/types.js';
@@ -1013,13 +1013,17 @@ describe('leaving', () => {
       onBoot: (app) => {
         registerChat(app, { host });
         app.commands.register({ id: 'app.quit', title: 'Quit', run: () => quits.push('quit') });
-        app.keybindings.register({ keys: 'ctrl+c', commandId: 'app.quit' });
       },
     });
     for (let i = 0; i < 6; i++) await t.settle();
 
     // Nothing is running: the stop binding does not apply and the key falls
-    // through. A `when` on the command alone would swallow it here.
+    // through. A `when` on the command alone would swallow it here. One
+    // press arms, and the second quits.
+    t.press('ctrl+c');
+    await t.settle();
+    expect(quits).toEqual([]);
+    expect(t.hasText('ctrl+c again to quit')).toBe(true);
     t.press('ctrl+c');
     await t.settle();
     expect(quits).toEqual(['quit']);
@@ -1251,30 +1255,70 @@ describe('what a session actually is', () => {
    * the space instead truncates the URIs the detail pane exists to let you
    * copy. Neither matters while you are looking at the other one.
    */
-  it('gives the width to whichever pane has the keyboard', async () => {
+  for (const width of [100, 60]) {
+    it(`names the palette key at the header's right end, not in the footer, at ${width} columns`, async () => {
+      const { t } = await catalogue({ width, height: 30 });
+      const rows = t.text().split('\n');
+      const header = rows.findIndex((row) => row.includes('Assistant'));
+      expect(rows[header]).toContain('ctrl+p commands');
+      expect(rows[header]).toContain('f1 help');
+      expect(rows.filter((row) => row.includes('ctrl+p'))).toHaveLength(1);
+
+      // A session with a workspace has something there already, so it keeps it.
+      t.app.services.require(CONTROLLER).open(SEEDED);
+      t.app.screens.push('chat');
+      for (let i = 0; i < 6; i++) await t.settle();
+      expect(t.text()).not.toContain('ctrl+p');
+      await t.unmount();
+    });
+  }
+
+  it('draws the pane alone while it is out on a narrow terminal', async () => {
     const { t } = await catalogue();
     t.app.store.set(SELECTED, SEEDED);
-    // The drawer out, and the keyboard put back on the list: this is about
-    // which pane is the wide one, which only means anything once both of them
-    // are drawn. Wider than the split there is room for the workspace either
-    // way, and the test would pass without proving anything.
-    t.app.store.set(SIDEBAR, true);
+    await t.app.execute('session.openDetails');
     for (let i = 0; i < 6; i++) await t.settle();
+
+    // The list is gone and the pane has the whole width, so the workspace
+    // fits where it would not beside the list.
+    expect(t.hasText('Sessions')).toBe(false);
+    expect(t.hasText('/brb_main/src/brb_framework')).toBe(true);
+
+    await t.app.execute('session.closeDetails');
+    for (let i = 0; i < 6; i++) await t.settle();
+    expect(t.app.focus.focused()).toBe('chat.sessions');
+    expect(t.hasText('Kqueue events on Li')).toBe(true);
+    await t.unmount();
+  });
+
+  it('gives the width to whichever pane has the keyboard', async () => {
+    const host = fakeHost();
+    // Above a lowered split, so both panes are drawn and only the keyboard
+    // decides which one is wide. Narrow enough that the pane's share cannot
+    // hold the workspace unless it is the one being read.
+    const t = await renderApp({
+      width: 86,
+      height: 30,
+      shell: 'workbench',
+      theme: 'workbench',
+      onBoot: (app) => { registerChat(app, { host, splitAt: 60 }); },
+    });
+    for (let i = 0; i < 8; i++) await t.settle();
+    await t.app.execute('go.sessions');
+    for (let i = 0; i < 6; i++) await t.settle();
+    t.app.store.set(SELECTED, SEEDED);
     t.focus('chat.sessions');
     for (let i = 0; i < 4; i++) await t.settle();
-
-    // The list has the keyboard, so the workspace does not fit.
     expect(t.hasText('/brb_main/src/brb_framework')).toBe(false);
 
     t.focus('chat.details');
     for (let i = 0; i < 4; i++) await t.settle();
+    expect(t.hasText('Sessions')).toBe(true);
     expect(t.hasText('/brb_main/src/brb_framework')).toBe(true);
 
-    // And walking back out gives the list its width back on the way past.
     t.focus('chat.sessions');
     for (let i = 0; i < 4; i++) await t.settle();
     expect(t.hasText('/brb_main/src/brb_framework')).toBe(false);
-    expect(t.hasText('Kqueue events on Li')).toBe(true);
     await t.unmount();
   });
 
@@ -1930,7 +1974,6 @@ describe('leaving, after a session has been open', () => {
       onBoot: (app) => {
         registerChat(app, { host });
         app.commands.register({ id: 'app.quit', title: 'Quit', run: () => quits.push('quit') });
-        app.keybindings.register({ keys: 'ctrl+c', commandId: 'app.quit' });
       },
     });
     for (let i = 0; i < 8; i++) await t.settle();
@@ -1951,8 +1994,39 @@ describe('leaving, after a session has been open', () => {
     expect(t.app.screens.current()?.id).toBe('sessions');
 
     t.press('ctrl+c');
+    t.press('ctrl+c');
     await t.settle();
     expect(quits).toEqual(['quit']);
+    await t.unmount();
+  });
+
+  it('does not quit on one ctrl+c, or on two further apart than the window', async () => {
+    const quits: string[] = [];
+    const t = await renderApp({
+      width: 100,
+      height: 30,
+      shell: 'workbench',
+      theme: 'workbench',
+      onBoot: (app) => {
+        registerChat(app, { host: fakeHost() });
+        app.commands.register({ id: 'app.quit', title: 'Quit', run: () => quits.push('quit') });
+      },
+    });
+    for (let i = 0; i < 6; i++) await t.settle();
+
+    t.press('ctrl+c');
+    await t.settle();
+    expect(t.hasText('ctrl+c again to quit')).toBe(true);
+
+    // The window closes, the status row goes back, and the next press arms
+    // again rather than quitting.
+    await new Promise((resolve) => setTimeout(resolve, QUIT_WINDOW_MS + 100));
+    await t.settle();
+    expect(t.hasText('ctrl+c again to quit')).toBe(false);
+    t.press('ctrl+c');
+    await t.settle();
+    expect(quits).toEqual([]);
+    expect(t.hasText('ctrl+c again to quit')).toBe(true);
     await t.unmount();
   });
 });

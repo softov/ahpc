@@ -487,6 +487,8 @@ export interface HostConnection {
   runAutomation?(uri: string): Promise<void>;
   /** Switch one on or off, which is a patch of its definition. */
   setAutomationEnabled?(uri: string, enabled: boolean): Promise<void>;
+  /** Replace the definition fields in `changes`, each one whole. */
+  updateAutomation?(uri: string, changes: Record<string, unknown>): Promise<void>;
   /** Forget one, and everything it has done. */
   removeAutomation?(uri: string): Promise<void>;
   /**

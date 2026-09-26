@@ -392,12 +392,8 @@ export async function tui(argv: string[]): Promise<void> {
       // but a quit key that exists only where it happens to be unread is a
       // quit key nobody can rely on - so it is ctrl+c and the palette.
       //
-      // `ctrl+c` is registered for the turn *and* for this, in that order:
-      // while something is running it stops it, and when nothing is, the
-      // first binding does not apply and this one does. Cancel what is
-      // happening, or leave if nothing is - which is what the key means
-      // everywhere else.
-      booted.keybindings.register({ keys: 'ctrl+c', commandId: 'app.quit' });
+      // `ctrl+c` is the controller's: it stops a running turn, and otherwise
+      // quits on a second press (`app.interrupt`). `ctrl+q` quits at once.
       booted.keybindings.register({ keys: 'ctrl+q', commandId: 'app.quit' });
 
       /*

@@ -3,7 +3,7 @@ import { renderApp } from '@textui/testing';
 import { registerChat } from '../src/app.js';
 import { fakeHost } from '../src/ahp/fake.js';
 import { CONTROLLER } from '../src/control.js';
-import { AUTOMATION_ROW } from '../src/state.js';
+import { AUTOMATION_ROW, OPEN } from '../src/state.js';
 
 /*
  * What the host does without being asked.
@@ -16,10 +16,10 @@ import { AUTOMATION_ROW } from '../src/state.js';
  * would say a switched-off automation runs every weekday.
  */
 
-async function open(width = 90, height = 30) {
+async function open(width = 90, height = 30, theme = 'dark') {
   const host = fakeHost();
   const t = await renderApp({
-    width, height, shell: 'workbench', theme: 'dark',
+    width, height, shell: 'workbench', theme,
     onBoot: (app) => { registerChat(app, { host }); },
   });
   for (let i = 0; i < 8; i++) await t.settle();
@@ -55,7 +55,7 @@ describe('the automations screen', () => {
     // The hour, not the minute: the fixture is relative to now and the row is
     // drawn a moment later, so pinning the minute would be pinning the clock.
     expect(t.hasText('in 4h')).toBe(true);
-    expect(t.hasText('nothing scheduled')).toBe(true);
+    expect(t.hasText('paused')).toBe(true);
     await t.unmount();
   });
 
@@ -100,7 +100,7 @@ describe('the automations screen', () => {
     expect(found?.enabled).toBe(false);
     expect(found?.operations).not.toContain('run');
     // And the screen followed, without being told to re-read.
-    expect(t.hasText('nothing scheduled')).toBe(true);
+    expect(t.hasText('in 4h')).toBe(false);
     await t.unmount();
   });
 
@@ -124,6 +124,73 @@ describe('the automations screen', () => {
 });
 
 /*
+ * Reading one.
+ *
+ * Enter opens the detail and `r` runs, so a stray enter never starts an agent.
+ * The pane works the way the catalogue's does: right or enter to read it, left
+ * back, and below the split it is the whole screen while it is out.
+ */
+describe('the automation detail', () => {
+  const runsOf = async (host: ReturnType<typeof fakeHost>, uri: string) =>
+    ((await host.automations?.()) ?? []).find((one) => one.resource === uri)?.runs.length ?? 0;
+
+  it('opens on enter and does not run anything', async () => {
+    const { t, host } = await open();
+    const before = await runsOf(host, 'ahp-automation:/9c4a');
+    t.press('enter');
+    for (let i = 0; i < 8; i++) await t.settle();
+
+    expect(await runsOf(host, 'ahp-automation:/9c4a')).toBe(before);
+    expect(t.app.focus.focused()).toBe('automation.details');
+    await t.unmount();
+  });
+
+  it('runs on r', async () => {
+    const { t, host } = await open();
+    const before = await runsOf(host, 'ahp-automation:/9c4a');
+    t.press('r');
+    for (let i = 0; i < 10; i++) await t.settle();
+    expect(await runsOf(host, 'ahp-automation:/9c4a')).toBe(before + 1);
+    await t.unmount();
+  });
+
+  for (const [width, height] of [[70, 40], [160, 40]] as const) {
+    it(`shows what the automation says, where and on what, at ${width} columns`, async () => {
+      const { t } = await open(width, height);
+      t.press('right');
+      for (let i = 0; i < 8; i++) await t.settle();
+
+      expect(t.hasText('Build every libbrb_* library')).toBe(true);
+      expect(t.hasText('/brb_main/src/brb_framework')).toBe(true);
+      expect(t.hasText('claude-sonnet-5')).toBe(true);
+      // The failed run says why, which is what somebody opens this to find.
+      expect(t.hasText('The working directory')).toBe(true);
+      // Below the split the pane is the screen; above it the list stays.
+      expect(t.hasText('Triage new Desk cases')).toBe(width > 140);
+
+      t.press('left');
+      for (let i = 0; i < 8; i++) await t.settle();
+      expect(t.app.focus.focused()).toBe('chat.automations');
+      expect(t.hasText('Triage new Desk cases')).toBe(true);
+      await t.unmount();
+    });
+  }
+
+  it('opens the session a run started', async () => {
+    const { t } = await open(160, 40);
+    t.press('right');
+    for (let i = 0; i < 6; i++) await t.settle();
+    t.focus('automation.runs');
+    await t.settle();
+    t.press('enter');
+    for (let i = 0; i < 10; i++) await t.settle();
+
+    expect(t.app.store.get<string>(OPEN)).toBe('ahp-session:/1f0a');
+    await t.unmount();
+  });
+});
+
+/*
  * Writing one down.
  *
  * The half that was missing until now: this client could list, run and switch
@@ -138,9 +205,11 @@ describe('writing a new automation', () => {
     for (let i = 0; i < 4; i++) await t.settle();
   };
 
-  for (const width of [90, 60]) {
-    it(`offers the form, at ${width} columns`, async () => {
-      const { t } = await open(width, 24);
+  // Twenty-four rows in the default theme, which draws no input borders; a
+  // theme that boxes every input needs a taller terminal for the same form.
+  for (const [width, height, theme] of [[90, 24, 'paper'], [60, 24, 'paper'], [90, 36, 'dark'], [60, 36, 'dark']] as const) {
+    it(`offers the form, at ${width}x${height} in ${theme}`, async () => {
+      const { t } = await open(width, height, theme);
       await t.app.execute('automation.new');
       for (let i = 0; i < 8; i++) await t.settle();
       expect(t.hasText('A new automation')).toBe(true);
@@ -148,6 +217,7 @@ describe('writing a new automation', () => {
       // run it by hand. The second is the line that changes as you type, so it
       // is the one that has to survive a narrow shell.
       expect(t.hasText('Schedule')).toBe(true);
+      expect(t.hasText('Prompt')).toBe(true);
       expect(t.hasText('presses Run')).toBe(true);
       // The common ones, offered rather than left to be known.
       expect(t.hasText('By hand only')).toBe(true);
@@ -213,4 +283,91 @@ describe('writing a new automation', () => {
     expect(t.hasText('Weekly audit')).toBe(true);
     await t.unmount();
   });
+});
+
+/*
+ * Changing one.
+ *
+ * The form opens on what the host holds and sends back each field whole, so
+ * what it does not draw - `_meta`, a custom agent, the schedule trigger's id
+ * and misfire policy - has to reach the host unchanged.
+ */
+describe('editing an automation', () => {
+  const held = async (host: ReturnType<typeof fakeHost>) =>
+    ((await host.automations?.()) ?? []).find((one) => one.resource === 'ahp-automation:/9c4a');
+
+  it('opens on e with what the host holds', async () => {
+    const { t } = await open(110, 30, 'paper');
+    t.press('e');
+    for (let i = 0; i < 12; i++) await t.settle();
+    expect(t.hasText('Edit Nightly framework build')).toBe(true);
+    expect(t.hasText('Build every libbrb_* library')).toBe(true);
+    expect(t.hasText('Sonnet 5')).toBe(true);
+    expect(t.hasText('Save')).toBe(true);
+    await t.unmount();
+  });
+
+  it('offers the harness, the model and the host\'s settings', async () => {
+    const { t } = await open(110, 30, 'paper');
+    t.press('n');
+    for (let i = 0; i < 12; i++) await t.settle();
+    expect(t.hasText('Harness')).toBe(true);
+    expect(t.hasText('Model')).toBe(true);
+    // The host's own questions, in its words.
+    expect(t.hasText('Isolation')).toBe(true);
+    expect(t.hasText('Permissions')).toBe(true);
+    await t.unmount();
+  });
+
+  it('saves a change and keeps what the form does not draw', async () => {
+    const { t, host } = await open(110, 30, 'paper');
+    t.press('e');
+    for (let i = 0; i < 12; i++) await t.settle();
+    t.type(' v2');
+    for (let i = 0; i < 4; i++) await t.settle();
+    // Save is the last stop, so one step back from the first field.
+    t.press('shift+tab');
+    await t.settle();
+    t.press('enter');
+    for (let i = 0; i < 12; i++) await t.settle();
+
+    const after = await held(host);
+    expect(after?.title).toBe('Nightly framework build v2');
+    const definition = after?.definition as Record<string, any>;
+    expect(definition._meta).toEqual({ 'example.com/owner': 'softov' });
+    expect(definition.session.agent).toEqual({ uri: 'agent://reviewer' });
+    expect(definition.session.provider).toBe('claude');
+    expect(definition.session.model.id).toBe('claude-sonnet-5');
+    expect(definition.message.origin).toEqual({ kind: 'automation' });
+    expect(definition.triggers[0].id).toBe('nightly');
+    expect(definition.triggers[0].misfirePolicy).toBe('skip');
+    await t.unmount();
+  });
+
+  it('will not open for one the host does not offer update on', async () => {
+    const { t, host } = await open(110, 30, 'paper');
+    t.app.store.set(AUTOMATION_ROW, 'ahp-automation:/2e71');
+    // The fixture's switched-off one offers update, so take it away.
+    const found = ((await host.automations?.()) ?? []).find((one) => one.resource === 'ahp-automation:/2e71');
+    if (found) found.operations = [];
+    await t.app.execute('automation.edit');
+    for (let i = 0; i < 8; i++) await t.settle();
+    expect(t.hasText('Edit Triage')).toBe(false);
+    await t.unmount();
+  });
+
+  // It has drifted twice: the prompt is a TextArea, which has no border of its
+  // own, so its text has to be inset by hand to line up with a TextInput's.
+  for (const theme of ['paper', 'dark'] as const) {
+    it(`lines the prompt up with the name, in ${theme}`, async () => {
+      const { t } = await open(110, 36, theme);
+      t.press('e');
+      for (let i = 0; i < 12; i++) await t.settle();
+      const rows = t.text().split('\n');
+      const column = (label: RegExp, word: string) => (rows.find((row) => label.test(row)) ?? '').indexOf(word);
+      expect(column(/Prompt\*/, 'Build')).toBeGreaterThan(0);
+      expect(column(/Prompt\*/, 'Build')).toBe(column(/Name\*/, 'Nightly'));
+      await t.unmount();
+    });
+  }
 });

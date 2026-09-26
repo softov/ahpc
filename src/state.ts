@@ -75,6 +75,10 @@ export const FILES_OPEN = '$/chat/files/open' as BindingPath;
  */
 export const AUTOMATIONS = '$/chat/automations/all' as BindingPath;
 export const AUTOMATION_ROW = '$/chat/automations/row' as BindingPath;
+/** The automation the form edits, or `''` for a new one. */
+export const AUTOMATION_EDIT = '$/chat/automations/edit' as BindingPath;
+/** The automation detail pane: out, away, or `null` to follow the width, as `SIDEBAR` does. */
+export const AUTOMATION_SIDEBAR = '$/chat/automations/sidebar' as BindingPath;
 export const STATUS = '$/chat/conv/status' as BindingPath;
 /**
  * Is there a turn to stop, as a `when` clause can ask it.
@@ -86,6 +90,11 @@ export const STATUS = '$/chat/conv/status' as BindingPath;
  * written beside the number.
  */
 export const RUNNING = '$/chat/conv/running' as BindingPath;
+
+/** A first ctrl+c was pressed and a second one inside `QUIT_WINDOW_MS` quits. */
+export const QUIT_ARMED = '$/chat/ui/quitArmed' as BindingPath;
+/** How long the first ctrl+c waits for the second. */
+export const QUIT_WINDOW_MS = 800;
 
 /**
  * What the next message will be sent as.

@@ -29,9 +29,9 @@ import { SessionFlag } from './ahp/types.js';
 import {
   ARCHIVED, BOOD_FLOAT, CAN_ADD_CHAT, CAN_FORK, CAN_SIDE_CHAT, CHAT_URI, CHATS, CUSTOMIZATIONS, CURSOR, DRAFT, EXPANDED, FILTER, FIND, FINDING, FIND_AT, HAS_CHATS,
   HOST, HOST_ERROR, INPUT, MODEL, MODEL_CONFIG, OPEN_TERMINAL,
-  AUTOMATIONS, AUTOMATION_ROW, AUTH_ASK,
+  AUTOMATIONS, AUTOMATION_EDIT, AUTOMATION_ROW, AUTOMATION_SIDEBAR, AUTH_ASK,
   CHANGES as CHANGES_AT_PATH, CHANGE_AT, CHANGE_ROW, CHANGE_SCOPES, FILES_AT, FILES_OPEN,
-  OPEN, OPEN_FILE, PROVIDER, MARKDOWN, QUEUE, RUNNING, SCREEN, SELECTED, SETTINGS, SIDEBAR,
+  OPEN, OPEN_FILE, PROVIDER, MARKDOWN, QUEUE, QUIT_ARMED, QUIT_WINDOW_MS, RUNNING, SCREEN, SELECTED, SETTINGS, SIDEBAR,
   SPLIT_AT, SPLIT_DEFAULT, TURNS, WORKSPACE,
   applyEvent, inputRefused, pendingInput, queue, reportHostError, sendingInput, sessions, turns,
   writeSessions, writeStatus,
@@ -160,6 +160,13 @@ export interface Controller {
   runAutomation(uri: string): Promise<void>;
   /** Switch one on or off. */
   setAutomationEnabled(uri: string, enabled: boolean): Promise<void>;
+  /** Replace the definition fields in `changes`. */
+  updateAutomation(uri: string, changes: Record<string, unknown>): Promise<void>;
+  /**
+   * The session schema for a harness and directory, with the host's defaults
+   * filled in. Unlike `settings()`, it leaves the composer's store alone.
+   */
+  resolveSettings(options: { provider: string; workingDirectory?: string; values?: Record<string, string> }): Promise<SessionConfig>;
   /** Forget one. */
   removeAutomation(uri: string): Promise<void>;
   /** One file's bytes, by URI on the host. */
@@ -539,8 +546,22 @@ export function createController(
     return true;
   };
 
+  /**
+   * Drop everything the changes screen holds about the session it last showed.
+   *
+   * A changeset URI names one session, so a scope chosen on the last one read
+   * that session's files on this one.
+   */
+  const forgetChanges = (): void => {
+    app.store.set(OPEN_FILE, null);
+    app.store.set(CHANGES_AT_PATH, { status: 'complete', files: [] } satisfies Changeset);
+    app.store.set(CHANGE_SCOPES, []);
+    app.store.set(CHANGE_AT, '');
+    app.store.set(CHANGE_ROW, '');
+  };
+
   /** One call to the host, run once more after a credential the host accepted. */
-  const guard = <T>(once: () => Promise<T>): Promise<T> => attempt(once, (one) => askSignIn(one));
+  const guard =<T>(once: () => Promise<T>): Promise<T> => attempt(once, (one) => askSignIn(one));
 
   /**
    * Read the catalogue again, at most once per turn of the loop.
@@ -762,7 +783,7 @@ export function createController(
       app.store.set(CAN_ADD_CHAT, canAddChat(uri));
       app.store.set(CAN_FORK, canSource(uri, 'fork'));
       app.store.set(CAN_SIDE_CHAT, canSource(uri, 'sideChat'));
-      app.store.set(OPEN_FILE, null);
+      forgetChanges();
       subscription = host.subscribe(uri, (event) => {
         model = applyEvent(app.store, event, model);
         // The open session's own status still refreshes the list here: the
@@ -811,7 +832,7 @@ export function createController(
       app.store.set(CAN_ADD_CHAT, false);
       app.store.set(CAN_FORK, false);
       app.store.set(CAN_SIDE_CHAT, false);
-      app.store.set(OPEN_FILE, null);
+      forgetChanges();
       // Idle, because nothing is open. A status that outlived the conversation
       // it described is a header saying "running" over an empty screen.
       writeStatus(app.store, 1);
@@ -1025,6 +1046,12 @@ export function createController(
       const set = host.setAutomationEnabled;
       if (set) await guard(() => set(uri, enabled));
     },
+    updateAutomation: async (uri, changes) => {
+      const update = host.updateAutomation;
+      if (!update) throw new Error('This host cannot change an automation.');
+      await guard(() => update(uri, changes));
+    },
+    resolveSettings: (options) => guard(() => host.resolveConfig(options)),
     removeAutomation: async (uri) => {
       const remove = host.removeAutomation;
       if (remove) await guard(() => remove(uri));
@@ -1138,6 +1165,8 @@ function commands(
   const target = (): SessionUri | null =>
     (app.screens.current()?.id === 'chat' ? openUri() : null) ?? selected() ?? openUri();
   const running = (): boolean => turns(app.store).some((turn) => turn.state === 'running');
+  /** The first ctrl+c's window, while it is open. Unref'd, so it never holds the process. */
+  let quitting: ReturnType<typeof setTimeout> | null = null;
 
   /**
    * Move the transcript cursor to the match `by` away from the one it is on.
@@ -1393,7 +1422,26 @@ function commands(
       category: 'Automations',
       description: 'A session the host starts without being asked',
       slots: ['palette'],
-      run: () => { app.screens.push('automation.new'); },
+      run: () => {
+        app.store.set(AUTOMATION_EDIT, '');
+        app.screens.push('automation.new');
+      },
+    },
+    {
+      id: 'automation.edit',
+      title: 'Edit this automation',
+      category: 'Automations',
+      description: 'Change what it says, where and on what it runs, and when',
+      slots: ['palette'],
+      when: `${AUTOMATION_ROW}`,
+      run: () => {
+        const uri = app.store.get<string>(AUTOMATION_ROW) ?? '';
+        const found = (app.store.get<Automation[]>(AUTOMATIONS) ?? []).find((one) => one.resource === uri);
+        // The host says whether it will take a change to this one now.
+        if (!found?.operations.includes('update')) return;
+        app.store.set(AUTOMATION_EDIT, uri);
+        app.screens.push('automation.new');
+      },
     },
     {
       id: 'automation.run',
@@ -1460,6 +1508,36 @@ function commands(
           app.store.set(AUTOMATION_ROW, '');
         }
         catch (error) { controller.report(error); }
+      },
+    },
+    /*
+     * The automation detail pane, opened and put away the way the session one
+     * is: right or enter to read it, left back to the list, and below the
+     * split the pane is the whole screen while it is out.
+     */
+    {
+      id: 'automation.openDetails',
+      title: 'Open the automation detail',
+      category: 'Automations',
+      description: 'Show what it says, where it runs and what it has done',
+      slots: ['palette'],
+      when: `${SCREEN} == 'automations' && ${AUTOMATION_ROW}`,
+      run: () => {
+        app.store.set(AUTOMATION_SIDEBAR, true);
+        app.focus.focus('automation.details');
+      },
+    },
+    {
+      id: 'automation.closeDetails',
+      title: 'Put the automation detail away',
+      category: 'Automations',
+      description: 'Hide the detail pane, and give the list the width',
+      slots: ['palette'],
+      when: `${SCREEN} == 'automations'`,
+      run: () => {
+        app.focus.focus('chat.automations');
+        const width = app.store.get<number>(SPLIT_AT) ?? SPLIT_DEFAULT;
+        if (app.size.width <= width) app.store.set(AUTOMATION_SIDEBAR, false);
       },
     },
     {
@@ -2300,6 +2378,29 @@ function commands(
       run: () => app.store.set(ARCHIVED, !(app.store.get<boolean>(ARCHIVED) ?? false)),
     },
 
+    /*
+     * ctrl+c when there is nothing to stop: the first press says what a
+     * second one would do, and only a second inside the window quits. One
+     * press meant to stop a turn that ended a moment before closed the whole
+     * application.
+     */
+    {
+      id: 'app.interrupt',
+      title: 'Quit on a second ctrl+c',
+      category: 'Application',
+      run: () => {
+        if (quitting) {
+          clearTimeout(quitting);
+          quitting = null;
+          app.store.set(QUIT_ARMED, false);
+          void app.execute('app.quit');
+          return;
+        }
+        app.store.set(QUIT_ARMED, true);
+        quitting = setTimeout(() => { quitting = null; app.store.set(QUIT_ARMED, false); }, QUIT_WINDOW_MS);
+        (quitting as unknown as { unref?(): void }).unref?.();
+      },
+    },
     {
       id: 'chat.stop',
       title: 'Stop the turn',
@@ -2590,6 +2691,8 @@ function shipped(): Binding[] {
      * command swallows it without passing it on.
      */
     { keys: 'ctrl+c', commandId: 'terminal.interrupt', when: `${SCREEN} == 'terminal' && ${OPEN_TERMINAL}` },
+    // Everywhere else, after the two above: arm, and quit on the second.
+    { keys: 'ctrl+c', commandId: 'app.interrupt' },
     { keys: 'ctrl+n', commandId: 'session.new' },
     { keys: 'ctrl+r', commandId: 'session.refresh' },
     /*
@@ -2700,10 +2803,14 @@ function shipped(): Binding[] {
     // which is right, because the verbs differ per changeset and per host.
     { keys: 'x', commandId: 'changes.run', scopeId: CHANGES_SCOPE },
     // Scoped to the screen, so a letter is a letter everywhere else. `enter`
-    // runs one and is the list's own, which leaves the switch and the
-    // one that does not come back.
+    // is the list's own and opens the detail, so running one is a key of its
+    // own and never the thing a stray enter does.
+    { keys: 'r', commandId: 'automation.run', scopeId: AUTOMATIONS_SCOPE },
+    { keys: 'right', commandId: 'automation.openDetails', scopeId: AUTOMATIONS_SCOPE },
+    { keys: 'left', commandId: 'automation.closeDetails', scopeId: AUTOMATIONS_SCOPE },
     { keys: 'n', commandId: 'automation.new', scopeId: AUTOMATIONS_SCOPE },
-    { keys: 'e', commandId: 'automation.toggle', scopeId: AUTOMATIONS_SCOPE },
+    { keys: 'e', commandId: 'automation.edit', scopeId: AUTOMATIONS_SCOPE },
+    { keys: 'o', commandId: 'automation.toggle', scopeId: AUTOMATIONS_SCOPE },
     { keys: 'd', commandId: 'automation.remove', scopeId: AUTOMATIONS_SCOPE },
     { keys: 's', commandId: 'go.settings', scopeId: CHAT_SCOPE },
     { keys: 't', commandId: 'chat.stop', scopeId: CHAT_SCOPE },

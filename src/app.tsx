@@ -15,7 +15,7 @@ import type { HostConnection } from './ahp/connection.js';
 import {
   BOOD, BOOD_FLOAT, BOOD_FLOOR, BOOD_INLINE, FOCUS, HOST, HOST_ERROR, INPUT, INPUT_STATUS, OPEN, RUNNING, SCREEN,
   SESSIONS,
-  SPLIT_AT, SPLIT_DEFAULT, STATUS, UPDATE_NOTICE, WORKSPACE, boodFloor, openSession, workspaceName,
+  SPLIT_AT, SPLIT_DEFAULT, QUIT_ARMED, STATUS, UPDATE_NOTICE, WORKSPACE, boodFloor, openSession, workspaceName,
 } from './state.js';
 import type { HostState, InputStatus } from './state.js';
 import { decodeStatus } from './ahp/status.js';
@@ -149,10 +149,25 @@ const Header = defineComponent<Record<string, never>>('ChatHeader', () => {
         <>
           <text content={theme.glyphs[decoded.glyph]} fg={decoded.tone} shrink={0} />
           <text content={session.title} flex={1} truncate="end" />
-          <text content={workspaceName(session.workingDirectories[0])} fg="muted" shrink={4} truncate="end" />
+          {session.workingDirectories[0]
+            ? <text content={workspaceName(session.workingDirectories[0])} fg="muted" shrink={4} truncate="end" />
+            : null}
         </>
       ) : (
         <text content={host?.url ?? 'no host'} fg="muted" flex={1} truncate="end" />
+      )}
+      {/* The palette's key, where the row's right end is free. It left the
+          footer, which is the row every screen runs out of room on, and it is
+          the same key on every screen, so it does not belong with the ones
+          that change. */}
+      {session?.workingDirectories[0] ? null : (
+        <Row gap={1} shrink={0}>
+          <text content="f1" fg="accent" bold />
+          <text content="help" fg="muted" />
+          <text content={theme.glyphs.separator} fg="subtle" />
+          <text content="ctrl+p" fg="accent" bold />
+          <text content="commands" fg="muted" />
+        </Row>
       )}
     </Row>
   );
@@ -326,7 +341,6 @@ const Hints = defineComponent<BoxProps>('ChatHints', (props) => {
           { keys: 'enter', label: 'run' },
           { keys: 'ctrl+c', label: 'interrupt' },
           { keys: 'esc', label: 'back' },
-          { keys: 'ctrl+p', label: 'commands' },
         ]}
       />
     );
@@ -341,19 +355,24 @@ const Hints = defineComponent<BoxProps>('ChatHints', (props) => {
         {...props}
         hints={[
           { keys: upDown, label: 'move' },
-          { keys: 'enter', label: screen === 'changes' || screen === 'files' ? 'open' : screen === 'automations' ? 'run' : 'on / off' },
+          { keys: 'enter', label: screen === 'changes' || screen === 'files' || screen === 'automations' ? 'open' : 'on / off' },
           // Only where they do something. A hint for a key that is inert on
           // this screen is worse than no hint.
           ...(screen === 'changes'
             ? [{ keys: ']', label: 'changeset' }, { keys: 'r', label: 'read' }, { keys: 'x', label: 'do' }]
             : []),
-          // Named only where they do something. `enter` already runs one, so
-          // what is left is the switch and the one that does not come back.
+          // Named only where they do something. `enter` opens the detail, so
+          // running one has a key of its own.
           ...(screen === 'automations'
-            ? [{ keys: 'n', label: 'new' }, { keys: 'e', label: 'on / off' }, { keys: 'd', label: 'forget' }]
+            ? [
+              { keys: 'r', label: 'run' },
+              { keys: 'n', label: 'new' },
+              { keys: 'e', label: 'edit' },
+              { keys: 'o', label: 'on / off' },
+              { keys: 'd', label: 'forget' },
+            ]
             : []),
           { keys: 'esc', label: 'back' },
-          { keys: 'ctrl+p', label: 'commands' },
           { keys: 'ctrl+c', label: 'quit' },
         ]}
       />
@@ -367,7 +386,6 @@ const Hints = defineComponent<BoxProps>('ChatHints', (props) => {
         hints={[
           { keys: 'tab', label: 'move' },
           { keys: 'esc', label: 'back' },
-          { keys: 'ctrl+p', label: 'commands' },
           { keys: 'ctrl+c', label: 'quit' },
         ]}
       />
@@ -391,7 +409,6 @@ const Hints = defineComponent<BoxProps>('ChatHints', (props) => {
         // one line and naming `ctrl+f` cost it the room. Both are a letter
         // away in the palette, and the filter is the one nothing else offers.
         { keys: 'ctrl+f', label: 'filter' },
-        { keys: 'ctrl+p', label: 'commands' },
         { keys: 'ctrl+c', label: 'quit' },
       ]}
     />
@@ -415,9 +432,14 @@ const Status = defineComponent<Record<string, never>>('ChatStatus', () => {
   // is about the key just pressed, and the hints are a chord away in the
   // palette.
   const notice = useStoreValue<string | null>(UPDATE_NOTICE, null) ?? null;
+  // Ahead of everything: it is about the key just pressed, and it is gone
+  // again in under a second.
+  const armed = useStoreValue<boolean>(QUIT_ARMED, false) ?? false;
   return (
     <Row gap={2}>
-      {error
+      {armed
+        ? <text content="ctrl+c again to quit" fg="warning" bold flex={1} truncate="end" />
+        : error
         ? <text content={error} fg="danger" flex={1} truncate="end" />
         : notice
           ? <text content={notice} fg="muted" flex={1} truncate="end" />

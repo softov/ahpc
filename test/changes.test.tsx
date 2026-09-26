@@ -4,7 +4,7 @@ import type { Harness } from '@textui/testing';
 import { registerChat } from '../src/app.js';
 import { CONTROLLER } from '../src/control.js';
 import { fakeHost } from '../src/ahp/fake.js';
-import { OPEN_FILE } from '../src/state.js';
+import { CHANGE_AT, OPEN_FILE } from '../src/state.js';
 
 /**
  * The changeset, and one file out of it.
@@ -99,6 +99,24 @@ describe('the changeset', () => {
     for (let i = 0; i < 8; i++) await t.settle();
 
     expect(t.app.store.get<string>(OPEN_FILE) ?? null).toBe(null);
+    await t.unmount();
+  });
+
+  it('shows the next session its own changes, not the last one\'s', async () => {
+    const t = await changes();
+    expect(t.hasText('compileLinux.sh')).toBe(true);
+
+    t.app.screens.pop();
+    for (let i = 0; i < 6; i++) await t.settle();
+    t.app.services.require(CONTROLLER).open('ahp-session:/1f0a');
+    for (let i = 0; i < 8; i++) await t.settle();
+    await t.app.execute('go.changes');
+    for (let i = 0; i < 10; i++) await t.settle();
+
+    // The scope chosen on the first session is a URI under that session, and
+    // kept, it read the first session's files on this one.
+    expect(t.app.store.get<string>(CHANGE_AT) ?? '').not.toContain(CHANGED);
+    expect(t.hasText('compileLinux.sh')).toBe(false);
     await t.unmount();
   });
 
