@@ -147,7 +147,7 @@ beforeAll(async () => {
     await host.resourceMkdir?.('file:///x/sub');
     await host.resourceMove?.('file:///x/a.txt', 'file:///x/b.txt');
     await host.resourceCopy?.('file:///x/b.txt', 'file:///x/c.txt');
-    await host.authenticate?.('https://api.anthropic.com', 'tok', { expiresIn: 60 });
+    await host.authenticate?.('https://api.anthropic.com', 'tok-never-on-disk', { expiresIn: 60 });
     await host.configCompletions?.({ property: 'branch', provider: 'claude' });
     await host.automationTriggers?.();
     await host.automationRuns?.('ahp-automation:/a1');
@@ -205,6 +205,15 @@ describe('every frame this client sends is one the protocol declares', () => {
     const real = report.found.filter((one) => one.what !== known);
     expect(real.map((one) => one.what)).toEqual([]);
     expect(report.found.some((one) => one.what === known)).toBe(true);
+  });
+});
+
+describe('the recording', () => {
+  it('keeps the authenticate frame and drops its token', () => {
+    const sent = outbound(capture).split('\n').map((line) => JSON.parse(line) as { frame?: { method?: string; params?: { token?: string } } });
+    const asked = sent.find((one) => one.frame?.method === 'authenticate');
+    expect(asked?.frame?.params?.token).toBe('[redacted]');
+    expect(capture).not.toContain('tok-never-on-disk');
   });
 });
 

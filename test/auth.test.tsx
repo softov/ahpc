@@ -152,6 +152,33 @@ describe('the credential prompt', () => {
     await t.unmount();
   });
 
+  it('stays dismissed when the catalogue ticks, and comes back for ctrl+r', async () => {
+    const { t, host } = await open();
+
+    t.press('escape');
+    for (let i = 0; i < 10; i++) await t.settle();
+    expect(t.getAllByComponent('SignInPrompt')).toHaveLength(0);
+
+    // A tick rereads the catalogue behind the person's back; a refusal there
+    // is said on the status bar, never asked about.
+    const before = host.asked('listSessions');
+    host.rename(SEEDED as SessionUri, 'moved');
+    await new Promise((resolve) => { setTimeout(resolve, 200); });
+    for (let i = 0; i < 10; i++) await t.settle();
+    expect(host.asked('listSessions')).toBeGreaterThan(before);
+    expect(t.getAllByComponent('SignInPrompt')).toHaveLength(0);
+
+    await controllerOf(t).refresh();
+    for (let i = 0; i < 10; i++) await t.settle();
+    expect(t.getAllByComponent('SignInPrompt')).toHaveLength(0);
+
+    t.press('ctrl+r');
+    for (let i = 0; i < 10; i++) await t.settle();
+    expect(t.getAllByComponent('SignInPrompt')).toHaveLength(1);
+
+    await t.unmount();
+  });
+
   it('opens nothing for a refusal that names no resource', async () => {
     const { t } = await open((host) => {
       host.listSessions = async () => { throw refused(); };

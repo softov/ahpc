@@ -600,7 +600,8 @@ export function registerChat(app: TextUIApp, options: ChatOptions = {}): Disposa
     bag.add(app.screens.register(screen));
   }
 
-  void controller.refresh();
+  // Asked on the way in, so a host that wants a token says so once, now.
+  void controller.refresh(true);
   // The composer, with nothing open. A client whose first screen is a
   // catalogue makes "talk to an agent" a two-step errand; the first message is
   // what creates the session, so the field is what the application opens on.

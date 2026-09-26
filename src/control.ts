@@ -51,7 +51,12 @@ import {
  */
 
 export interface Controller {
-  refresh(): Promise<void>;
+  /**
+   * Read the catalogue again. `ask` lets a refusal open the sign-in prompt,
+   * which only a read a person asked for should do: one that runs because
+   * something moved would reopen the prompt after every dismissal.
+   */
+  refresh(ask?: boolean): Promise<void>;
   open(uri: SessionUri): void;
   /**
    * Open what an `agent-host-session://` link names: the session, and the
@@ -592,7 +597,9 @@ export function createController(
    */
   const reread = async (): Promise<void> => {
     try {
-      writeSessions(app.store, await guard(() => host.listSessions()));
+      // Not through `guard`: this runs on every status tick, and a prompt it
+      // opened would come back each time somebody dismissed it.
+      writeSessions(app.store, await host.listSessions());
     } catch (error) { failed(error); }
   };
 
@@ -656,9 +663,9 @@ export function createController(
       draftTimer = setTimeout(() => { host.setDraft(uri, text); }, DRAFT_DEBOUNCE_MS);
     },
 
-    async refresh() {
+    async refresh(ask = false) {
       try {
-        writeSessions(app.store, await guard(() => host.listSessions()));
+        writeSessions(app.store, await (ask ? guard(() => host.listSessions()) : host.listSessions()));
         app.store.set(HOST_ERROR, null);
       } catch (error) { failed(error); }
     },
@@ -732,7 +739,7 @@ export function createController(
       // agent made a moment ago may not have reached the list yet.
       let row = sessionOfLink(parsed, sessions(app.store));
       if (row === undefined) {
-        await controller.refresh();
+        await controller.refresh(true);
         row = sessionOfLink(parsed, sessions(app.store));
       }
       if (row === undefined) {
@@ -2370,7 +2377,7 @@ function commands(
       description: 'Reload list from the host',
       slots: ['palette'],
       keepOpen: true,
-      run: () => void controller.refresh(),
+      run: () => void controller.refresh(true),
     },
     {
       id: 'session.archive',

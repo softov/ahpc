@@ -324,6 +324,16 @@ interface Framed {
   close(): Promise<void> | void;
 }
 
+/**
+ * A frame as it may be written down: an `authenticate` request's token
+ * replaced, because a token is kept for the process and never written to disk.
+ */
+function redacted(frame: unknown): unknown {
+  const found = bag(frame);
+  if (found.method !== 'authenticate' || typeof bag(found.params).token !== 'string') return frame;
+  return { ...found, params: { ...bag(found.params), token: '[redacted]' } };
+}
+
 function tee(inner: Framed, heard: (method: string, params: Bag) => void, wire: { file?: string; peer: string }): Framed {
   /*
    * Every frame, to a file, when `--wire` or `AHPC_RECORD` names one.
@@ -344,6 +354,7 @@ function tee(inner: Framed, heard: (method: string, params: Bag) => void, wire: 
     // a frame that is not is exactly what a capture is for.
     let frame: unknown = text;
     try { frame = JSON.parse(text); } catch { /* kept as text */ }
+    frame = redacted(frame);
     try {
       appendFileSync(recording, `${JSON.stringify({ at: new Date().toISOString(), from, peer: wire.peer, frame })}\n`);
     }
