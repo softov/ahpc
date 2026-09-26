@@ -145,6 +145,8 @@ export const CHATS = '$/chat/conv/chats' as BindingPath;
 export const TERMINALS = '$/chat/term/all' as BindingPath;
 /** Which of them is being read. */
 export const OPEN_TERMINAL = '$/chat/term/open' as BindingPath;
+/** The terminal screen shows the list of terminals instead of one of them. */
+export const TERMINAL_LIST = '$/chat/term/list' as BindingPath;
 /** Its state. Null while nothing has been read yet, which is not the same as empty. */
 export const TERMINAL = '$/chat/term/state' as BindingPath;
 export const CAN_ADD_CHAT = '$/chat/conv/canAddChat' as BindingPath;

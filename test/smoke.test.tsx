@@ -13,7 +13,7 @@ import { CLIPBOARD_PATH, layoutMarkdown, wrapRuns } from '@textui/core';
 import { toBlocks } from '../src/blocks.js';
 import {
   CHATS, CHAT_URI, DRAFT, HOST_ERROR, INPUT, INPUT_STATUS, MODEL_CONFIG, OPEN, OPEN_TERMINAL, PROVIDER, QUEUE,
-  QUIT_WINDOW_MS, SELECTED, SETTINGS, SIDEBAR, TURNS, UPDATE_NOTICE, WORKSPACE, openSession, writeSessions,
+  QUIT_WINDOW_MS, SELECTED, SETTINGS, TERMINALS, SIDEBAR, TURNS, UPDATE_NOTICE, WORKSPACE, openSession, writeSessions,
 } from '../src/state.js';
 import type { InputStatus } from '../src/state.js';
 import type { SessionSummary, Turn } from '../src/ahp/types.js';
@@ -2818,6 +2818,87 @@ describe('a terminal', () => {
     for (let i = 0; i < 12; i++) await m.t.settle();
     return m;
   };
+
+  /** Three shells, the first one being read, and the command field with the keyboard. */
+  const three = async (size?: { width: number; height: number }) => {
+    const m = await open(size);
+    const controller = m.t.app.services.require(CONTROLLER);
+    await controller.terminals.open();
+    await controller.terminals.open();
+    await controller.terminals.open();
+    m.t.app.screens.push('terminal');
+    for (let i = 0; i < 12; i++) await m.t.settle();
+    const rows = m.t.store.get<{ resource: string }[]>(TERMINALS) ?? [];
+    controller.terminals.read(rows[0]?.resource ?? '');
+    m.t.focus('terminal.input');
+    for (let i = 0; i < 6; i++) await m.t.settle();
+    return { m, rows: rows.map((row) => row.resource) };
+  };
+  const reading = (m: Mounted): string | null => m.t.store.get<string>(OPEN_TERMINAL) ?? null;
+
+  it('jumps to a terminal by its place with alt and a number, from the command field', async () => {
+    const { m, rows } = await three();
+    expect(rows).toHaveLength(3);
+    m.t.press('alt+3');
+    for (let i = 0; i < 4; i++) await m.t.settle();
+    expect(reading(m)).toBe(rows[2]);
+    // Not typed into the field on the way.
+    expect(m.t.app.focus.focused()).toBe('terminal.input');
+    m.t.press('alt+1');
+    for (let i = 0; i < 4; i++) await m.t.settle();
+    expect(reading(m)).toBe(rows[0]);
+    await m.t.unmount();
+  });
+
+  it('tabs between the command field and the tabs, and walks the tabs with the arrows', async () => {
+    const { m, rows } = await three();
+    m.t.press('tab');
+    await m.t.settle();
+    expect(m.t.app.focus.focused()).toBe('terminal.tabs');
+    m.t.press('right');
+    for (let i = 0; i < 4; i++) await m.t.settle();
+    expect(reading(m)).toBe(rows[1]);
+    m.t.press('left');
+    m.t.press('left');
+    for (let i = 0; i < 4; i++) await m.t.settle();
+    // Wraps at the front.
+    expect(reading(m)).toBe(rows[2]);
+    m.t.press('alt+right');
+    for (let i = 0; i < 4; i++) await m.t.settle();
+    expect(reading(m)).toBe(rows[0]);
+    m.t.press('tab');
+    await m.t.settle();
+    expect(m.t.app.focus.focused()).toBe('terminal.input');
+    await m.t.unmount();
+  });
+
+  for (const width of [100, 60]) {
+    it(`lists the terminals on ctrl+l and opens one on enter, at ${width} columns`, async () => {
+      const { m, rows } = await three({ width, height: 30 });
+      m.t.press('ctrl+l');
+      for (let i = 0; i < 6; i++) await m.t.settle();
+      expect(m.t.hasText('Terminals (3)')).toBe(true);
+      expect(m.t.hasText('A command, and enter')).toBe(false);
+      expect(m.t.app.focus.focused()).toBe('terminal.list');
+
+      m.t.press('down');
+      await m.t.settle();
+      m.t.press('enter');
+      for (let i = 0; i < 6; i++) await m.t.settle();
+      expect(reading(m)).toBe(rows[1]);
+      expect(m.t.hasText('Terminals (3)')).toBe(false);
+      expect(m.t.app.focus.focused()).toBe('terminal.input');
+
+      // And ctrl+l twice is there and back, to the same one.
+      m.t.press('ctrl+l');
+      for (let i = 0; i < 4; i++) await m.t.settle();
+      m.t.press('ctrl+l');
+      for (let i = 0; i < 4; i++) await m.t.settle();
+      expect(m.t.hasText('Terminals (3)')).toBe(false);
+      expect(reading(m)).toBe(rows[1]);
+      await m.t.unmount();
+    });
+  }
 
   it('says what the shell said, and keeps what it said before', async () => {
     const m = await opened();

@@ -23,12 +23,12 @@ import type { Terminals } from './terminal.js';
 import { createTerminals } from './terminal.js';
 import type {
   Agent, Answer, Automation, Changeset, ChangesetScope, ChatSource, Completion, ConfigProperty, ContentRef, Customization, FileContent, QueuedMessage, ResourceEntry, SessionConfig, SessionDetail,
-  SessionUri, Turn,
+  SessionUri, TerminalRow, Turn,
 } from './ahp/types.js';
 import { SessionFlag } from './ahp/types.js';
 import {
   ARCHIVED, BOOD_FLOAT, CAN_ADD_CHAT, CAN_FORK, CAN_SIDE_CHAT, CHAT_URI, CHATS, CUSTOMIZATIONS, CURSOR, DRAFT, EXPANDED, FILTER, FIND, FINDING, FIND_AT, HAS_CHATS,
-  HOST, HOST_ERROR, INPUT, MODEL, MODEL_CONFIG, OPEN_TERMINAL,
+  HOST, HOST_ERROR, INPUT, MODEL, MODEL_CONFIG, OPEN_TERMINAL, TERMINALS, TERMINAL_LIST,
   AUTOMATIONS, AUTOMATION_EDIT, AUTOMATION_ROW, AUTOMATION_SIDEBAR, AUTH_ASK,
   CHANGES as CHANGES_AT_PATH, CHANGE_AT, CHANGE_ROW, CHANGE_SCOPES, FILES_AT, FILES_OPEN,
   OPEN, OPEN_FILE, PROVIDER, MARKDOWN, QUEUE, QUIT_ARMED, QUIT_WINDOW_MS, RUNNING, SCREEN, SELECTED, SETTINGS, SIDEBAR,
@@ -1165,6 +1165,15 @@ function commands(
   const target = (): SessionUri | null =>
     (app.screens.current()?.id === 'chat' ? openUri() : null) ?? selected() ?? openUri();
   const running = (): boolean => turns(app.store).some((turn) => turn.state === 'running');
+  /** Read the terminal `by` places from the open one, wrapping at either end. */
+  const stepTerminal = (by: number): void => {
+    const rows = app.store.get<TerminalRow[]>(TERMINALS) ?? [];
+    if (rows.length === 0) return;
+    const open = app.store.get<string>(OPEN_TERMINAL) ?? '';
+    const at = Math.max(0, rows.findIndex((row) => row.resource === open));
+    const next = rows[(at + by + rows.length) % rows.length];
+    if (next) controller.terminals.read(next.resource);
+  };
   /** The first ctrl+c's window, while it is open. Unref'd, so it never holds the process. */
   let quitting: ReturnType<typeof setTimeout> | null = null;
 
@@ -2172,6 +2181,62 @@ function commands(
       when: OPEN_TERMINAL,
       run: () => void controller.terminals.close(),
     },
+    /*
+     * Moving between terminals. By place for alt+1 to alt+9, by one either
+     * way for alt+left and alt+right, and the list on ctrl+l.
+     */
+    {
+      id: 'terminal.jump',
+      title: 'Go to terminal',
+      category: 'Terminal',
+      description: 'Read the terminal at this place in the tabs',
+      when: `${SCREEN} == 'terminal'`,
+      args: [{ name: 'index', type: 'number' as const, required: true, description: 'Its place, from 1' }],
+      run: (args: Record<string, unknown>) => {
+        const rows = app.store.get<TerminalRow[]>(TERMINALS) ?? [];
+        const found = rows[Number(args.index) - 1];
+        if (found) controller.terminals.read(found.resource);
+      },
+    },
+    {
+      id: 'terminal.next',
+      title: 'Next terminal',
+      category: 'Terminal',
+      slots: ['palette'],
+      when: `${SCREEN} == 'terminal'`,
+      run: () => stepTerminal(1),
+    },
+    {
+      id: 'terminal.previous',
+      title: 'Previous terminal',
+      category: 'Terminal',
+      slots: ['palette'],
+      when: `${SCREEN} == 'terminal'`,
+      run: () => stepTerminal(-1),
+    },
+    {
+      id: 'terminal.list',
+      title: 'List the terminals',
+      category: 'Terminal',
+      description: 'Every terminal on the host, and back to the one being read',
+      slots: ['palette'],
+      when: `${SCREEN} == 'terminal'`,
+      run: () => {
+        const listing = !(app.store.get<boolean>(TERMINAL_LIST) ?? false);
+        app.store.set(TERMINAL_LIST, listing);
+        // The list takes the keyboard as it mounts; the way back is to the field.
+        if (!listing) app.focus.focus('terminal.input');
+      },
+    },
+    {
+      id: 'terminal.focusSwitch',
+      title: 'Between the tabs and the command field',
+      category: 'Terminal',
+      when: `${SCREEN} == 'terminal'`,
+      run: () => {
+        app.focus.focus(app.focus.focused() === 'terminal.tabs' ? 'terminal.input' : 'terminal.tabs');
+      },
+    },
     {
       id: 'go.terminal',
       title: 'Terminals',
@@ -2691,6 +2756,22 @@ function shipped(): Binding[] {
      * command swallows it without passing it on.
      */
     { keys: 'ctrl+c', commandId: 'terminal.interrupt', when: `${SCREEN} == 'terminal' && ${OPEN_TERMINAL}` },
+    // Between terminals. The command field keeps alt+left and alt+right for
+    // its words, so those two reach here from the tabs and the output only;
+    // alt+1 to alt+9 and ctrl+l work from anywhere on the screen.
+    ...Array.from({ length: 9 }, (_, index) => ({
+      keys: `alt+${String(index + 1)}`,
+      commandId: 'terminal.jump',
+      args: { index: index + 1 },
+      title: `Go to terminal ${String(index + 1)}`,
+      when: `${SCREEN} == 'terminal'`,
+    })),
+    { keys: 'alt+right', commandId: 'terminal.next', when: `${SCREEN} == 'terminal'` },
+    { keys: 'alt+left', commandId: 'terminal.previous', when: `${SCREEN} == 'terminal'` },
+    { keys: 'ctrl+l', commandId: 'terminal.list', when: `${SCREEN} == 'terminal'` },
+    // Tab goes between the command field and the tabs, and nowhere else.
+    { keys: 'tab', commandId: 'terminal.focusSwitch', when: `${SCREEN} == 'terminal' && !${TERMINAL_LIST}` },
+    { keys: 'shift+tab', commandId: 'terminal.focusSwitch', when: `${SCREEN} == 'terminal' && !${TERMINAL_LIST}` },
     // Everywhere else, after the two above: arm, and quit on the second.
     { keys: 'ctrl+c', commandId: 'app.interrupt' },
     { keys: 'ctrl+n', commandId: 'session.new' },

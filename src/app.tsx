@@ -15,7 +15,7 @@ import type { HostConnection } from './ahp/connection.js';
 import {
   BOOD, BOOD_FLOAT, BOOD_FLOOR, BOOD_INLINE, FOCUS, HOST, HOST_ERROR, INPUT, INPUT_STATUS, OPEN, RUNNING, SCREEN,
   SESSIONS,
-  SPLIT_AT, SPLIT_DEFAULT, QUIT_ARMED, STATUS, UPDATE_NOTICE, WORKSPACE, boodFloor, openSession, workspaceName,
+  SPLIT_AT, SPLIT_DEFAULT, QUIT_ARMED, STATUS, TERMINAL_LIST, UPDATE_NOTICE, WORKSPACE, boodFloor, openSession, workspaceName,
 } from './state.js';
 import type { HostState, InputStatus } from './state.js';
 import { decodeStatus } from './ahp/status.js';
@@ -210,6 +210,7 @@ const Hints = defineComponent<BoxProps>('ChatHints', (props) => {
   // number, so an idle session somebody looked at is 33 and every hint would
   // read "stop".
   const running = useStoreValue<boolean>(RUNNING, false) ?? false;
+  const listing = useStoreValue<boolean>(TERMINAL_LIST, false) ?? false;
   // Where the keyboard is decides what the keys mean. While the composer has
   // it, escape leaves the field; from the transcript, escape leaves the
   // screen - and a hint row that said one of those in both places is wrong
@@ -337,11 +338,21 @@ const Hints = defineComponent<BoxProps>('ChatHints', (props) => {
     return (
       <KeyHints
         {...props}
-        hints={[
-          { keys: 'enter', label: 'run' },
-          { keys: 'ctrl+c', label: 'interrupt' },
-          { keys: 'esc', label: 'back' },
-        ]}
+        hints={listing
+          ? [
+            { keys: upDown, label: 'move' },
+            { keys: 'enter', label: 'open' },
+            { keys: 'ctrl+l', label: 'back to it' },
+            { keys: 'esc', label: 'back' },
+          ]
+          : [
+            { keys: 'enter', label: 'run' },
+            { keys: 'ctrl+c', label: 'interrupt' },
+            { keys: 'tab', label: 'tabs' },
+            { keys: 'alt+1-9', label: 'go to' },
+            { keys: 'ctrl+l', label: 'list' },
+            { keys: 'esc', label: 'back' },
+          ]}
       />
     );
   }

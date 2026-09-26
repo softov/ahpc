@@ -23,7 +23,7 @@ import { branchName, branchDrift, pullRequestLabel,
   ARCHIVED, AUTOMATIONS, AUTOMATION_EDIT, AUTOMATION_ROW, AUTOMATION_SIDEBAR, CHANGES, CUSTOMIZATIONS, DRAFT, EXPANDED, FILTER, FOCUS, HISTORY, HOST, INPUT,
   CHANGE_AT, CHANGE_ROW, CHANGE_SCOPES, FILES_AT, FILES_ENTRIES, FILES_OPEN,
   MODEL, MODEL_CONFIG, OPEN, OPEN_FILE, CHAT_URI, PROVIDER, QUEUE, SELECTED, SESSIONS, SETTINGS, SIDEBAR,
-  CHATS, CURSOR, FIND, FINDING, FIND_AT, OPEN_TERMINAL, PRESENT, SPLIT_AT, SPLIT_DEFAULT, TERMINAL, TERMINALS, TURNS, WORKSPACE,
+  CHATS, CURSOR, FIND, FINDING, FIND_AT, OPEN_TERMINAL, PRESENT, SPLIT_AT, SPLIT_DEFAULT, TERMINAL, TERMINALS, TERMINAL_LIST, TURNS, WORKSPACE,
   ANSWERS, INPUT_STATUS, MARKDOWN, boodFloorFor,
   hiddenSessions, openSession, sessionView, visibleSessions, workspaceName,
 } from './state.js';
@@ -436,6 +436,7 @@ export const TerminalScreen: (props: Record<string, never>) => RenderOutput =
     const rows = useStoreValue<TerminalRow[]>(TERMINALS, []) ?? [];
     const open = useStoreValue<string | null>(OPEN_TERMINAL, null) ?? null;
     const state = useStoreValue<TerminalState | null>(TERMINAL, null);
+    const listing = useStoreValue<boolean>(TERMINAL_LIST, false) ?? false;
     const [draft, setDraft] = useState('');
     const size = useSize();
 
@@ -485,6 +486,12 @@ export const TerminalScreen: (props: Record<string, never>) => RenderOutput =
         onDraft={setDraft}
         onSend={(line) => { controller.terminals.write(line); setDraft(''); }}
         onSelect={(uri) => { controller.terminals.read(uri); }}
+        listing={listing}
+        onOpen={(uri) => {
+          controller.terminals.read(uri);
+          app.store.set(TERMINAL_LIST, false);
+          app.focus.focus('terminal.input');
+        }}
       />
     );
   });
