@@ -27,6 +27,12 @@ It is the other end of `ahpd --connection-token-file`, which writes a fresh secr
 
 ## Left for later
 
-- A refusal in the screen prints a stack rather than a sentence: the screen has no `Fault` handling, and `loadConfig` has always behaved that way there. Giving the screen its own error surface is its own change.
-- A rejected connection token is reported as `Could not reach ws://...: TransportError: websocket failed to open`, the same sentence an unreachable port gets. Recorded in [finding a host without being told](../../../ideas/finding-a-host-without-being-told.md).
-- Nothing discovers a host or its credential on its own; both are still typed. That is the idea above, and it needs the host's half too.
+- Nothing discovers a host or its credential on its own; both are still typed. That needs the host's half too, and is the idea [finding a host without being told](../../../ideas/finding-a-host-without-being-told.md).
+
+## Problems this left open
+
+Three, none of them chosen, all filed rather than absorbed here.
+
+- [A bad token file prints a stack in the screen](../../../problems/a-bad-token-file-prints-a-stack-in-the-screen.md), and a configured path is read even when no host is named, so a missing one stops the scripted host.
+- [Every token file read failure is called a missing file](../../../problems/every-token-file-read-failure-is-called-a-missing-file.md), and a `~` in a configured path is not expanded.
+- [A refused connection token reads like an unreachable host](../../../problems/a-refused-connection-token-reads-like-an-unreachable-host.md), which is what the by-hand verification above ran into.
