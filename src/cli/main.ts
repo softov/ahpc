@@ -3,6 +3,7 @@
 import { readFile } from 'node:fs/promises';
 import { connect } from '../connect.js';
 import { askFor, authRequiredOf, failureWords } from '../ahp/auth.js';
+import { tokenVariable } from '../ahp/tokens.js';
 import { configPath, connectionToken, loadConfig } from '../config.js';
 import { checkingUpdates, readUpdate, updateNotice } from '../update.js';
 import { manifest } from '../version.js';
@@ -1324,18 +1325,6 @@ async function signIn(host: HostConnection, args: Args, wants: boolean): Promise
     ...(Number.isInteger(expires) && expires > 0 ? { expiresIn: expires } : {}),
   });
   return 0;
-}
-
-/**
- * The environment variable a resource's token is read from.
- *
- * Derived from the resource rather than fixed, because a host may protect
- * several and one variable for all of them is one credential for all of them:
- * `https://api.anthropic.com` becomes `AHPC_TOKEN_API_ANTHROPIC_COM`.
- */
-function tokenVariable(resource: string): string {
-  const name = resource.replace(/^[a-z]+:\/\//, '').replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '');
-  return `AHPC_TOKEN_${name.toUpperCase()}`;
 }
 
 /** Everything on a stream, for the write that takes its content from a pipe. */

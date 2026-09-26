@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { renderApp } from '@textui/testing';
 import type { Harness } from '@textui/testing';
 import { registerChat } from '../src/app.js';
@@ -6,6 +6,7 @@ import { CONTROLLER } from '../src/control.js';
 import { fakeHost } from '../src/ahp/fake.js';
 import type { FakeHost } from '../src/ahp/fake.js';
 import { HOST_ERROR } from '../src/state.js';
+import { forgetAll, remember, resolveToken, tokenVariable } from '../src/ahp/tokens.js';
 import type { SessionUri } from '../src/ahp/types.js';
 
 /*
@@ -76,6 +77,22 @@ async function submit(t: Harness, token: string): Promise<void> {
 }
 
 const controllerOf = (t: Harness) => t.app.services.require(CONTROLLER);
+
+/*
+ * The token cache lasts the process, and every test here shares one, so a
+ * token one test signed in with would answer the next test's prompt. The
+ * variables are cleared for the same reason: an exported one skips the prompt
+ * and a case that expects it would pass or fail for the wrong reason.
+ */
+const VARIABLES = [tokenVariable(RESOURCE), tokenVariable(OTHER)];
+const exported = new Map<string, string | undefined>();
+beforeEach(() => {
+  for (const name of VARIABLES) { exported.set(name, process.env[name]); delete process.env[name]; }
+});
+afterEach(() => {
+  forgetAll();
+  for (const [name, value] of exported) { if (value === undefined) delete process.env[name]; else process.env[name] = value; }
+});
 
 describe('the credential prompt', () => {
   it('draws the resource and the host words, then runs the refused act once more', async () => {
@@ -174,6 +191,87 @@ describe('the credential prompt', () => {
 
     t.press('ctrl+r');
     for (let i = 0; i < 10; i++) await t.settle();
+    expect(t.getAllByComponent('SignInPrompt')).toHaveLength(1);
+
+    await t.unmount();
+  });
+
+  it('keeps a typed token the host accepts, and not one it refuses', async () => {
+    const { t, host } = await open();
+    const real = host.authenticate;
+    host.authenticate = async () => { throw refused(RESOURCE, 'not that one'); };
+    await submit(t, 'wrong');
+    expect(resolveToken(RESOURCE)).toBeUndefined();
+
+    host.authenticate = real;
+    t.focus('field.token');
+    await t.settle();
+    for (let i = 0; i < 'wrong'.length; i++) t.press('backspace');
+    await submit(t, 'tok-typed');
+    expect(t.getAllByComponent('SignInPrompt')).toHaveLength(0);
+    expect(resolveToken(RESOURCE)).toBe('tok-typed');
+
+    await t.unmount();
+  });
+
+  it('answers a refusal from the environment, drawing nothing', async () => {
+    process.env[tokenVariable(RESOURCE)] = 'tok-exported';
+    let pushed: { resource: string; token: string }[] = [];
+    let before = 0;
+    const { t, host } = await open((one) => {
+      one.protect(RESOURCE, 'Anthropic API');
+      pushed = watchSignIn(one);
+      before = one.asked('listSessions');
+    });
+
+    expect(t.getAllByComponent('SignInPrompt')).toHaveLength(0);
+    expect(pushed).toEqual([{ resource: RESOURCE, token: 'tok-exported' }]);
+    // Refused once at boot, then served on the one more attempt.
+    expect(host.asked('listSessions')).toBe(before + 2);
+
+    await t.unmount();
+  });
+
+  it('answers a later refusal with the token signed in with earlier', async () => {
+    const { t, host } = await open();
+    await submit(t, 'tok-once');
+    expect(t.getAllByComponent('SignInPrompt')).toHaveLength(0);
+
+    // The host lets go of it, as it does when a socket closes.
+    await host.authenticate?.(RESOURCE, '');
+    const pushed = watchSignIn(host);
+    t.press('ctrl+r');
+    for (let i = 0; i < 12; i++) await t.settle();
+
+    expect(t.getAllByComponent('SignInPrompt')).toHaveLength(0);
+    expect(pushed).toEqual([{ resource: RESOURCE, token: 'tok-once' }]);
+
+    await t.unmount();
+  });
+
+  it('asks when the host no longer knows the cached token, and drops it', async () => {
+    remember(RESOURCE, 'tok-stale');
+    const { t } = await open((one) => {
+      one.protect(RESOURCE, 'Anthropic API');
+      one.authenticate = async () => { throw refused(RESOURCE, 'unknown credential'); };
+    });
+
+    expect(t.getAllByComponent('SignInPrompt')).toHaveLength(1);
+    expect(resolveToken(RESOURCE)).toBeUndefined();
+
+    await t.unmount();
+  });
+
+  it('never replays a cached token the host said has expired', async () => {
+    const { t, host } = await open((one) => { one.protect(RESOURCE, 'Anthropic API'); });
+    await submit(t, 'tok-old');
+    const pushed = watchSignIn(host);
+
+    void controllerOf(t).askSignIn({ resource: RESOURCE, reason: 'expired', words: '' });
+    for (let i = 0; i < 10; i++) await t.settle();
+
+    // `authentication.md`: MUST NOT blindly replay the challenged credential.
+    expect(pushed).toEqual([]);
     expect(t.getAllByComponent('SignInPrompt')).toHaveLength(1);
 
     await t.unmount();

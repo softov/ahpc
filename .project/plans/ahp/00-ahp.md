@@ -1,7 +1,7 @@
 ---
 title: Ahp - what exists today
 domain: ahp
-revalidated: 2026-09-24
+revalidated: 2026-09-26
 ---
 
 The ahp domain is this client's half of the wire: the shapes the protocol declares, the live connection that speaks it, the channels it holds open, and the scripted host the tests and a bare `ahpc` run against.
@@ -17,8 +17,9 @@ Everything above it - `src/control.ts`, `src/screens.tsx`, `src/cli/` - reaches 
 
 - `code://src/ahp/connection.ts` - `HostConnection`, the seam `src/control.ts`, `src/cli/main.ts` and `src/mcp/` are written against.
 - `code://src/ahp/types.ts` - the flattened shapes the screens read, and `SessionFlag`.
-- `code://src/ahp/live.ts` - `liveHost(options)`, the reconnecting connection, and `reason(error)`, where every refusal becomes words.
+- `code://src/ahp/live.ts` - `liveHost(options)`, the reconnecting connection, and `reason(error)`, where every refusal becomes words. `onConnected` fires on the first connection and on every reconnect, and `connect` answers it with `pushTokens`.
 - `code://src/ahp/auth.ts` - `authRequiredOf`, `askFor` and `attempt`: the one reading of a `-32007` and the one retry a credential buys.
+- `code://src/ahp/tokens.ts` - `tokenVariable`, `resolveToken`, `remember`, `forget` and `pushTokens`: where a resource token comes from and how long it is kept, in memory for the process and never on disk.
 - `code://src/ahp/channels.ts` - `openChannels`, who is holding which channel and what the host said on it.
 - `code://src/ahp/fake.ts` - `fakeHost()`, the scripted host.
 - `code://src/ahp/publish.ts`, `code://src/ahp/operate.ts`, `code://src/ahp/status.ts` - what this client serves back, the changeset operation negotiation, and the status bits.
@@ -29,9 +30,10 @@ Everything above it - `src/control.ts`, `src/screens.tsx`, `src/cli/` - reaches 
 ahpc [flags] -> connect(Where) -> liveHost(...) -> ahp.Client over a WebSocket
   -> initialize(initialSubscriptions: [ahp-root://]) -> Mirror + openChannels
   -> the root channel's snapshots fill mirror.root.agents, whose protectedResources name what needs a token
+  -> onConnected -> pushTokens: a token from AHPC_TOKEN_<RESOURCE> or this run's cache, for each declared resource, silently; again after every reconnect
   -> a question: client.request -> the host's result, or an RpcError with a code
   -> a refusal: reason(error) -> onRefusal for the words, and onAuthRequired when a -32007 names resources
-  -> a directly awaited request rejects with its code -> attempt() -> the sign-in prompt -> the same call once more
+  -> a directly awaited request rejects with its code -> attempt() -> a token this run has, or the sign-in prompt -> the same call once more
   -> HostConnection -> controller (screen) or cli (shell)
 ```
 
@@ -42,6 +44,7 @@ ahpc [flags] -> connect(Where) -> liveHost(...) -> ahp.Client over a WebSocket
 - `code://test/resilience.test.ts` - a word the reducer cannot read.
 - `code://test/live.test.tsx`, `code://test/fake.test.ts` - the screen over the scripted host, and the fixture itself.
 - `code://test/auth.test.ts`, `code://test/auth.test.tsx` - the refusal read, the one retry, and the sign-in prompt over the refusing fixture.
+- `code://test/tokens.test.ts` - the token chain, the cache and when an entry is dropped.
 - `code://test/conformance.test.ts` - the frames the suite produced, against the strict schema.
 
 ## Known gaps
@@ -50,7 +53,5 @@ ahpc [flags] -> connect(Where) -> liveHost(...) -> ahp.Client over a WebSocket
   Built by [01 - Sign in when a host refuses](01-sign-in-when-a-host-refuses/plan.md) on 2026-09-24; what it left is in its [deferred.md](01-sign-in-when-a-host-refuses/deferred.md).
 - The live auth states the reference client uses as a fallback - an MCP server that is `authRequired`, a tool call carrying `auth` - are drawn inertly here and do not become a resource to ask for.
 - The tool server in `src/mcp/` answers a refusal to a model rather than to a person, and has no prompt of its own.
-- Nothing is authenticated until the host has refused, and the prompt asks the person every time: it does not read `AHPC_TOKEN_<RESOURCE>`, which this client's own shell half documents, and it keeps nothing between refusals.
-  An agent declaring a required resource therefore fails per turn inside a session that was created without complaint, which is not a refusal this client can read.
-  A reconnect makes it worse: the host keeps credentials per connection and the reconnect loop never returns to `connect`, so a resumed connection is an unauthenticated one.
-  Planned by [02 - Push a token before the host refuses](02-a-token-before-the-host-refuses/plan.md).
+- A resource token is pushed on every connection and looked for before the prompt is drawn.
+  Built by [02 - Push a token before the host refuses](02-a-token-before-the-host-refuses/plan.md) on 2026-09-26. A one-shot shell command benefits too, because the push happens in `connect`, but the shell's refusal sentence still names `--token` and `ahpc auth`, which do not carry a token into another command.

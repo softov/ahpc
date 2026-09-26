@@ -1,6 +1,6 @@
 ---
 title: Every declared resource is authenticated on every connection, including a remade one
-status: todo
+status: done
 depends: [task-01-the-chain-and-the-cache.md]
 layer: "src/ahp/live.ts, src/connect.ts"
 refs:
@@ -37,3 +37,5 @@ Nothing is asked of the person and no failure reaches them.
 - `npm test` and `npm run typecheck` green.
 
 ## Resume
+
+Done on 2026-09-26. The hook is `onConnected`, awaited before `liveHost` returns and before a reconnect rereads the catalogue, so the first request never races the push.

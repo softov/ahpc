@@ -1,10 +1,10 @@
 ---
 title: Push a token before the host refuses, and look for one before asking
 domain: ahp
-status: planned
+status: built
 priority: high
 created: 2026-09-24
-revalidated: 2026-09-24
+revalidated: 2026-09-26
 requires:
   - plans/ahp/01-sign-in-when-a-host-refuses/plan.md
 changes: []
@@ -114,9 +114,9 @@ What this plan settled without one:
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - The chain and the cache](task-01-the-chain-and-the-cache.md) | todo | - |
-| [02 - Pushed on every connection](task-02-pushed-on-every-connection.md) | todo | 01 |
-| [03 - The prompt looks first](task-03-the-prompt-looks-first.md) | todo | 01 |
+| [01 - The chain and the cache](task-01-the-chain-and-the-cache.md) | done | - |
+| [02 - Pushed on every connection](task-02-pushed-on-every-connection.md) | done | 01 |
+| [03 - The prompt looks first](task-03-the-prompt-looks-first.md) | done | 01 |
 
 ## Risks and tradeoffs
 
@@ -139,22 +139,20 @@ What this plan settled without one:
 
 ## Resume state
 
-- **Done so far:** nothing. The plan was written on 2026-09-24 out of a comparison against ahpapp and ahpx, after plan 01 shipped, and amended the same day: the token file was dropped for a process-lifetime cache, and the reconnect question below was answered by reading the code rather than left open.
-- **Next action:** [task-01-the-chain-and-the-cache.md](task-01-the-chain-and-the-cache.md).
-- **Open questions:**
-  1. Whether a resource's token should carry an expiry the way `ahpc auth --expires-in` allows - proposed: no, the cache holds what was typed and the host owns the lifetime, and an expiry this client invented would be a second clock.
-- **Watch out for:** `--token` is the *connection* token for every command (`src/cli/main.ts:229`) and the *resource* token only for `ahpc auth` (`src/cli/main.ts:1302`). They are close enough that merging them is the obvious mistake, and this plan is about the second only: the first is already baked into `endpoint` at `src/ahp/live.ts:1386` and already lasts the process.
-  A push placed in `connect`'s tail looks right and is wrong, because the reconnect loop at `src/ahp/live.ts:1748` never returns there. Task 02 step 1 exists for the session that tries it anyway.
-  The prompt's existing six cases pass only when no `AHPC_TOKEN_*` is set, so a failure there after task 03 is most likely leaked environment rather than broken behaviour.
+- **Done so far:** all three tasks, on 2026-09-26.
+- **Next action:** none. The plan is built.
+- **Open questions:** none. A resource's token carries no expiry of this client's making: the cache holds what was typed and the host owns the lifetime.
+- **Watch out for:** the cache is process-wide, so a test file that signs in must empty it with `forgetAll` between cases, and must clear `AHPC_TOKEN_*` so an exported one does not answer a prompt the case expects.
+  `--token` is still the *connection* token for every command but `ahpc auth`; this plan did not touch that.
 
 ## Final verification checklist
 
-- [ ] A token in `AHPC_TOKEN_<RESOURCE>` answers a refusal with no prompt drawn, and the refused act runs once more.
-- [ ] A token cached by an earlier accepted sign-in does the same, within the same run.
-- [ ] A cached token the host answers `-32007` to opens the prompt and leaves no entry behind; one it answers `-32602` to is still cached.
-- [ ] A host declaring a resource this process has a token for is authenticated on the first connection **and again after a forced reconnect**, with nothing drawn and no prompt.
-- [ ] A host that serves no `protectedResources`, or whose `authenticate` throws, still yields a usable connection.
-- [ ] Nothing is written to disk and no environment variable is set: no file appears across a resolve, a remember and a forget.
-- [ ] `test/auth.test.tsx`'s six existing cases pass untouched.
-- [ ] `npm test` and `npm run typecheck` green.
-- [ ] `plans/index.md` carries the row, and `00-ahp.md` names `src/ahp/tokens.ts` and the connection hook.
+- [x] A token in `AHPC_TOKEN_<RESOURCE>` answers a refusal with no prompt drawn, and the refused act runs once more.
+- [x] A token cached by an earlier accepted sign-in does the same, within the same run.
+- [x] A cached token the host answers `-32007` to opens the prompt and leaves no entry behind; one it answers `-32602` to is still cached.
+- [x] A host declaring a resource this process has a token for is authenticated on the first connection **and again after a forced reconnect**, with nothing drawn and no prompt. Verified over the scripted transport; not against a running `ahpd`.
+- [x] A host that serves no `protectedResources`, or whose `authenticate` throws, still yields a usable connection.
+- [x] Nothing is written to disk and no environment variable is set: no file appears across a resolve, a remember and a forget.
+- [x] `test/auth.test.tsx`'s six existing cases pass with no edit to their bodies; the file gained a reset of the cache and the variables around each case.
+- [x] `npm test` green, 32 files and 636 tests. `npx tsc` green.
+- [x] `plans/index.md` carries the row, and `00-ahp.md` names `src/ahp/tokens.ts` and the connection hook.

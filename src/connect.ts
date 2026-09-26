@@ -3,6 +3,7 @@
 import { MissingProtocolPackage, liveHost } from './ahp/live.js';
 import { fakeHost } from './ahp/fake.js';
 import { publish } from './ahp/publish.js';
+import { pushTokens } from './ahp/tokens.js';
 import type { HostConnection } from './ahp/connection.js';
 import type { AuthAsk } from './ahp/auth.js';
 
@@ -118,6 +119,9 @@ export async function connect(options: Where): Promise<HostConnection & { pump?(
         ? { publish: publish({ root: options.publish, ...(options.publishWritable ? { writable: true } : {}) }) }
         : {}),
       onState: (state) => { if (state === 'offline') sink.report('The host stopped answering'); },
+      // Every declared resource this run has a token for, pushed on every
+      // connection: the host drops what it holds when a socket closes.
+      onConnected: (host) => pushTokens(host),
     });
   }
   catch (error) {

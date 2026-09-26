@@ -1,6 +1,6 @@
 ---
 title: A resource token is resolved from the environment and a process-lifetime cache
-status: todo
+status: done
 depends: []
 layer: "src/ahp"
 refs:
@@ -39,3 +39,5 @@ Nothing is written to disk, nothing draws, nothing connects.
 - `npm test` and `npm run typecheck` green.
 
 ## Resume
+
+Done on 2026-09-26. `pushTokens` also lives here, beside the chain, so `connect` stays one line and the forgetting rule is applied in one place.

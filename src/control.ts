@@ -16,6 +16,7 @@ import { toBlocks } from './blocks.js';
 import { chatMatches, linksIn, parseSessionLink, sessionOfLink } from './links.js';
 import { operate } from './ahp/operate.js';
 import { attempt, failureWords } from './ahp/auth.js';
+import { forget, remember, resolveToken } from './ahp/tokens.js';
 import type { AuthAsk } from './ahp/auth.js';
 import { auth } from './connect.js';
 import type { HostConnection } from './ahp/connection.js';
@@ -507,7 +508,31 @@ export function createController(
     finally { settling = false; }
   };
 
-  const askSignIn = (one: AuthAsk): Promise<boolean> => new Promise<boolean>((resolve) => {
+  /**
+   * Answer an ask with a token this run already has, drawing nothing.
+   *
+   * Tried once per ask, so a stale entry cannot loop between a refusal and its
+   * retry. A token the host turns down falls through to the prompt, and is
+   * dropped when the host says it does not know it. An `expired` challenge is
+   * never answered this way: `authentication.md` says the challenged
+   * credential MUST NOT be replayed.
+   */
+  const silently = async (one: AuthAsk): Promise<boolean> => {
+    if (one.reason === 'expired' || !host.authenticate) return false;
+    const token = resolveToken(one.resource);
+    if (token === undefined) return false;
+    try {
+      await host.authenticate(one.resource, token);
+      return true;
+    }
+    catch (error) {
+      forget(one.resource, error);
+      return false;
+    }
+  };
+
+  /** Draw the prompt, and wait for it to be answered. */
+  const prompt = (one: AuthAsk): Promise<boolean> => new Promise<boolean>((resolve) => {
     waiters.push({ resource: one.resource, settle: resolve });
     app.store.set(AUTH_ASK, one);
     // Already open: the newest ask is what the store draws, and the waiters
@@ -524,14 +549,16 @@ export function createController(
     });
   });
 
+  /** A token from this run if there is one, and the prompt if not. */
+  const askSignIn = async (one: AuthAsk): Promise<boolean> => (await silently(one)) || await prompt(one);
+
   /**
    * Push a token the prompt collected.
    *
    * A credential the host turns down keeps the prompt open over the field it
    * was typed in, with the host's own words, so the answer is to retype rather
-   * than to run the act again. Nothing is kept: the host holds the token for
-   * the connection, and a copy here would be a second secret with the same
-   * lifetime and one more place to read it from.
+   * than to run the act again. One the host accepts is kept for the rest of
+   * the run, so a reconnect and the next refusal can push it without asking.
    */
   const signIn = async (resource: string, token: string): Promise<boolean> => {
     if (!host.authenticate) {
@@ -541,6 +568,7 @@ export function createController(
     }
     try {
       await host.authenticate(resource, token);
+      remember(resource, token);
     }
     catch (error) {
       const current = app.store.get<AuthAsk | null>(AUTH_ASK);

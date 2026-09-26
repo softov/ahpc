@@ -58,6 +58,15 @@ export interface LiveHostOptions {
   /** Told when the socket drops, so the badge can stop claiming otherwise. */
   onState?(state: 'connecting' | 'connected' | 'offline'): void;
   /**
+   * A connection is usable: the first one, and each one a reconnect remade.
+   *
+   * Awaited before `liveHost` returns and before a reconnect rereads the
+   * catalogue, so what it does is done before anything else asks. The host
+   * keeps credentials per connection, which is why this fires on every one.
+   * A throw is swallowed: it never fails a connection.
+   */
+  onConnected?(host: HostConnection): Promise<void> | void;
+  /**
    * Told when the host refuses one channel, in the host's own words.
    *
    * Separate from `onState` because they mean opposite things: a refusal is
@@ -1538,6 +1547,13 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
   for (const snapshot of list(hello.snapshots)) mirror.applySnapshot(snapshot);
   moveTo('connected');
 
+  /** What `liveHost` returns, once it is built, for `onConnected`. */
+  let self: HostConnection | undefined;
+  const usable = async (): Promise<void> => {
+    if (self === undefined || !options.onConnected) return;
+    try { await options.onConnected(self); } catch { /* never fails a connection */ }
+  };
+
   /** True once `close` has been called, so a deliberate hang-up is not retried. */
   let finished = false;
 
@@ -1822,6 +1838,7 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
               : { resumed: list(answer.snapshots) as { resource: string; state?: unknown }[] });
           }
           moveTo('connected');
+          await usable();
           // Notifications are not replayed, so what the catalogue missed is
           // not in the answer above and has to be asked for again.
           for (const listener of catalogue) listener();
@@ -1943,7 +1960,7 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
     void sending.finally(() => inFlight.delete(sending));
   };
 
-  return {
+  const made: HostConnection & { close(): Promise<void> } = {
     // The name the host knows this connection by, not a word meaning "real".
     // A daemon logs the `clientId` it accepted and the one that went away, so
     // reporting it here is what lets a run on this side be tied to a run on
@@ -3201,4 +3218,7 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
       await client.shutdown();
     },
   };
+  self = made;
+  await usable();
+  return made;
 }

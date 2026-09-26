@@ -8,9 +8,10 @@
  * assert on the frames rather than on the screen.
  */
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { InMemoryTransport, type AhpTransport } from '@microsoft/agent-host-protocol/client';
 import { liveHost } from '../src/ahp/live.js';
+import { forgetAll, pushTokens, remember } from '../src/ahp/tokens.js';
 import type { HostEvent } from '../src/ahp/connection.js';
 import { AUTOMATIONS, CHAT, ROOT, SESSION, Scripted, connect, settle } from './scenario.js';
 
@@ -1543,6 +1544,67 @@ describe('signing in to what a host protects', () => {
 
     await host.authenticate?.('https://api.anthropic.com', 'tok');
     await expect(host.listSessions()).resolves.toEqual([]);
+
+    await host.close();
+  });
+});
+
+describe('a token this run has is pushed on every connection', () => {
+  const RESOURCE = 'https://api.anthropic.com';
+
+  async function remembering(root: Record<string, unknown>): Promise<{ host: Awaited<ReturnType<typeof liveHost>>; all: Scripted[] }> {
+    const all: Scripted[] = [];
+    const open = async (): Promise<AhpTransport> => {
+      const [mine, theirs] = InMemoryTransport.pair();
+      const scripted = new Scripted(theirs);
+      scripted.states.set(ROOT, root);
+      all.push(scripted);
+      return mine;
+    };
+    const host = await liveHost({
+      url: 'ws://scripted', clientId: 'ahpc-test', connect: open, backoff: [0], keepaliveMs: 0,
+      onConnected: (made) => pushTokens(made),
+    });
+    return { host, all };
+  }
+
+  afterEach(() => { forgetAll(); });
+
+  it('authenticates on the first connection and again after a reconnect', async () => {
+    remember(RESOURCE, 'tok-kept');
+    const { host, all } = await remembering({
+      agents: [{ provider: 'claude', protectedResources: [{ resource: RESOURCE, resource_name: 'Anthropic API' }], models: [] }],
+      terminals: [],
+    });
+    // Before `liveHost` returned, so nothing the caller asks can beat it.
+    expect(all[0]?.tokens.get(RESOURCE)).toBe('tok-kept');
+
+    await all[0]?.drop();
+    await settle(40);
+    expect(all).toHaveLength(2);
+    expect(host.state()).toBe('connected');
+    // The host keeps credentials per connection, so a resumed one is pushed again.
+    expect(all[1]?.tokens.get(RESOURCE)).toBe('tok-kept');
+
+    await host.close();
+  });
+
+  it('pushes nothing for a host that declares nothing', async () => {
+    remember(RESOURCE, 'tok-kept');
+    const { host, all } = await remembering({ agents: [{ provider: 'claude', models: [] }], terminals: [] });
+
+    expect(all[0]?.asked.some((frame) => frame.method === 'authenticate')).toBe(false);
+
+    await host.close();
+  });
+
+  it('pushes nothing for a resource this run has no token for', async () => {
+    const { host, all } = await remembering({
+      agents: [{ provider: 'claude', protectedResources: [{ resource: RESOURCE }], models: [] }],
+      terminals: [],
+    });
+
+    expect(all[0]?.asked.some((frame) => frame.method === 'authenticate')).toBe(false);
 
     await host.close();
   });

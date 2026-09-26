@@ -1,6 +1,6 @@
 ---
 title: The prompt looks for a token before it asks, and keeps the one the host takes
-status: todo
+status: done
 depends: [task-01-the-chain-and-the-cache.md]
 layer: "src/control.ts"
 refs:
@@ -31,3 +31,5 @@ A token the person types and the host accepts is kept for the rest of the run, s
 - `npm test` and `npm run typecheck` green.
 
 ## Resume
+
+Done on 2026-09-26. The silent path returns `true` to `attempt` directly and adds no waiter, so `settle` is still the only way a waiter is answered; settling through it would have answered another resource's open prompt with no. An `expired` challenge skips the look.
