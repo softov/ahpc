@@ -1,9 +1,10 @@
-import type { BindingPath, BoxProps, Disposable, RenderOutput, SemanticVariant, TextUIApp } from '@textui/core';
-import { createBag, defineComponent, useApp, useEffect, useFocusScope, useSize, useStoreValue, useTheme } from '@textui/core';
+import type { BindingPath, BoxProps, Disposable, I18n, RenderOutput, SemanticVariant, TextUIApp } from '@textui/core';
+import { createBag, defineComponent, useApp, useEffect, useFocusScope, useI18n, useSize, useStoreValue, useTheme } from '@textui/core';
 import type { ListItem, ListItemState } from '@textui/widgets';
 import { Column, KeyHints, List, Panel, Row, ScrollView, SearchBox, registerBuiltins } from '@textui/widgets';
 import { follow, matches } from '../wire.js';
 import type { WireRow } from '../wire.js';
+import { registerMessages } from '../i18n/index.js';
 
 /*
  * The wire, as a screen.
@@ -44,10 +45,10 @@ const TONE: Record<WireRow['kind'], SemanticVariant> = {
 export const visibleRows = (rows: WireRow[], filter: string): WireRow[] => (filter.trim() === '' ? rows : rows.filter((row) => matches(row, filter)));
 
 /** The frame, as lines. Capped: a snapshot can run to thousands, and the top of it is what says what it is. */
-const linesOf = (frame: unknown): string[] => {
+const linesOf = (frame: unknown, i18n: I18n): string[] => {
   const text = typeof frame === 'string' ? frame : JSON.stringify(frame, null, 2) ?? '';
   const lines = text.split('\n');
-  return lines.length > 3000 ? [...lines.slice(0, 3000), `… ${lines.length - 3000} more lines`] : lines;
+  return lines.length > 3000 ? [...lines.slice(0, 3000), i18n.t('views.wire.moreLines', { count: lines.length - 3000 })] : lines;
 };
 
 export interface WireListProps extends BoxProps {
@@ -64,6 +65,7 @@ export const WireList: (props: WireListProps) => RenderOutput =
   defineComponent<WireListProps>('WireList', (props) => {
     const { rows, selectedId, onSelect, onOpen, emptyMessage, focusId, autoFocus, ...rest } = props;
     const theme = useTheme();
+    const i18n = useI18n();
     const byId = new Map(rows.map((row) => [String(row.seq), row]));
     const items: ListItem[] = rows.map((row) => ({ id: String(row.seq), label: row.method || row.kind, tone: TONE[row.kind] }));
     return (
@@ -74,7 +76,7 @@ export const WireList: (props: WireListProps) => RenderOutput =
         {...(autoFocus ? { autoFocus } : {})}
         {...(onSelect ? { onSelect: (id: string) => onSelect(id) } : {})}
         {...(onOpen ? { onActivate: (id: string) => onOpen(id) } : {})}
-        emptyMessage={emptyMessage ?? 'Nothing on the wire yet'}
+        emptyMessage={emptyMessage ?? i18n.t('views.wire.empty')}
         renderItem={(item: ListItem, state: ListItemState) => {
           const row = byId.get(item.id);
           if (row === undefined) return <text content={item.label} />;
@@ -104,6 +106,7 @@ export const WireScreen: (props: Record<string, never>) => RenderOutput =
   defineComponent<Record<string, never>>('WireScreen', () => {
     const app = useApp();
     const theme = useTheme();
+    const i18n = useI18n();
     useFocusScope({ id: WIRE_SCOPE });
     const rows = useStoreValue<WireRow[]>(WIRE_ROWS, []) ?? [];
     const filter = useStoreValue<string>(WIRE_FILTER, '') ?? '';
@@ -131,13 +134,19 @@ export const WireScreen: (props: Record<string, never>) => RenderOutput =
 
     const list = (
       <Panel
-        title="Wire"
+        title={i18n.t('views.wire.title')}
         {...(open && wide ? { width: width - aside - 1 } : { flex: 1 })}
-        meta={`${shown.length}${shown.length === rows.length ? '' : ` of ${rows.length}`} frames${following ? `  ${theme.glyphs.bulletFilled} following` : ''}`}
+        meta={shown.length === rows.length
+          ? following
+            ? i18n.t('views.wire.framesFollowing', { count: shown.length, bullet: theme.glyphs.bulletFilled })
+            : i18n.t('views.wire.frames', { count: shown.length })
+          : following
+            ? i18n.t('views.wire.framesOfFollowing', { count: shown.length, total: rows.length, bullet: theme.glyphs.bulletFilled })
+            : i18n.t('views.wire.framesOf', { count: shown.length, total: rows.length })}
       >
         <SearchBox
           value={filter}
-          placeholder="method, action type, channel, id"
+          placeholder={i18n.t('views.wire.filterPlaceholder')}
           focusId="wire.filter"
           onChange={(value: string) => app.store.set(WIRE_FILTER, value)}
         />
@@ -152,7 +161,9 @@ export const WireScreen: (props: Record<string, never>) => RenderOutput =
             app.store.set(WIRE_SELECTED, id);
           }}
           onOpen={() => { app.store.set(WIRE_FRAME, true); app.focus.focus('wire.frame'); }}
-          emptyMessage={rows.length === 0 ? `Nothing in ${file || 'the capture'} yet` : 'Nothing matches'}
+          emptyMessage={rows.length === 0
+            ? file ? i18n.t('views.wire.nothingIn', { file }) : i18n.t('views.wire.nothingInCapture')
+            : i18n.t('views.wire.noMatch')}
         />
         <text content={file} fg="subtle" truncate="start" />
       </Panel>
@@ -160,9 +171,11 @@ export const WireScreen: (props: Record<string, never>) => RenderOutput =
 
     const frame = current ? (
       <Panel
-        title={`${current.from === 'client' ? 'client' : 'host'} ${current.from === 'client' ? theme.glyphs.arrowRight : theme.glyphs.arrowLeft} ${current.method || current.kind}`}
+        title={current.from === 'client'
+          ? i18n.t('views.wire.fromClient', { arrow: theme.glyphs.arrowRight, method: current.method || current.kind })
+          : i18n.t('views.wire.fromHost', { arrow: theme.glyphs.arrowLeft, method: current.method || current.kind })}
         {...(wide ? { width: aside } : { flex: 1 })}
-        meta={current.id !== undefined ? `id ${current.id}` : current.kind}
+        meta={current.id !== undefined ? i18n.t('views.wire.frameId', { id: current.id }) : current.kind}
       >
         <Row gap={1}>
           <text content={current.at} fg="subtle" shrink={0} />
@@ -170,15 +183,15 @@ export const WireScreen: (props: Record<string, never>) => RenderOutput =
         </Row>
         <ScrollView flex={1} focusId="wire.frame">
           <Column>
-            {linesOf(current.frame).map((line, index) => (
+            {linesOf(current.frame, i18n).map((line, index) => (
               <text key={index} content={line} wrap="none" truncate="end" {...(current.kind === 'error' && index === 0 ? { fg: 'danger' as SemanticVariant } : {})} />
             ))}
           </Column>
         </ScrollView>
       </Panel>
     ) : (
-      <Panel title="Frame" {...(wide ? { width: aside } : { flex: 1 })}>
-        <text content="No frame under the highlight." fg="subtle" />
+      <Panel title={i18n.t('views.wire.frameTitle')} {...(wide ? { width: aside } : { flex: 1 })}>
+        <text content={i18n.t('views.wire.noFrame')} fg="subtle" />
       </Panel>
     );
 
@@ -193,10 +206,11 @@ export const WireScreen: (props: Record<string, never>) => RenderOutput =
 
 const WireHeader = defineComponent<Record<string, never>>('WireHeader', () => {
   const theme = useTheme();
+  const i18n = useI18n();
   const file = useStoreValue<string>(WIRE_FILE, '') ?? '';
   return (
     <Row gap={1}>
-      <text content="Wire" bold fg="accent" shrink={0} />
+      <text content={i18n.t('views.wire.title')} bold fg="accent" shrink={0} />
       <text content={theme.glyphs.separator} fg="subtle" shrink={0} />
       <text content={file} fg="muted" flex={1} truncate="start" />
     </Row>
@@ -205,17 +219,18 @@ const WireHeader = defineComponent<Record<string, never>>('WireHeader', () => {
 
 const WireHints = defineComponent<BoxProps>('WireHints', (props) => {
   const theme = useTheme();
+  const i18n = useI18n();
   const following = useStoreValue<boolean>(WIRE_FOLLOW, true) ?? true;
   return (
     <KeyHints
       {...props}
       hints={[
-        { keys: `${theme.glyphs.arrowUp}${theme.glyphs.arrowDown}`, label: 'frame' },
-        { keys: 'enter', label: 'open' },
-        { keys: 'esc', label: 'back' },
-        { keys: 'f', label: following ? 'stop following' : 'follow' },
-        { keys: 'ctrl+f', label: 'filter' },
-        { keys: 'ctrl+c', label: 'quit' },
+        { keys: `${theme.glyphs.arrowUp}${theme.glyphs.arrowDown}`, label: i18n.t('views.wire.hintFrame') },
+        { keys: 'enter', label: i18n.t('views.wire.hintOpen') },
+        { keys: 'esc', label: i18n.t('views.wire.hintBack') },
+        { keys: 'f', label: following ? i18n.t('views.wire.hintStopFollowing') : i18n.t('views.wire.hintFollow') },
+        { keys: 'ctrl+f', label: i18n.t('views.wire.hintFilter') },
+        { keys: 'ctrl+c', label: i18n.t('views.wire.hintQuit') },
       ]}
     />
   );
@@ -237,7 +252,9 @@ export interface WireOptions {
  */
 export function registerWire(app: TextUIApp, options: WireOptions): Disposable {
   const bag = createBag();
+  for (const bundle of registerMessages(app)) bag.add(bundle);
   if (options.builtins !== false) bag.add(registerBuiltins(app));
+  const t = app.i18n.t.bind(app.i18n);
   app.store.set(WIRE_FILE, options.file);
   app.store.set(WIRE_ROWS, []);
   app.store.set(WIRE_FOLLOW, true);
@@ -257,9 +274,9 @@ export function registerWire(app: TextUIApp, options: WireOptions): Disposable {
 
   bag.add(app.commands.register({
     id: 'wire.follow',
-    title: 'Follow the wire',
-    category: 'Wire',
-    description: 'Keep the highlight on the newest frame',
+    title: t('views.wire.followTitle'),
+    category: t('views.wire.category'),
+    description: t('views.wire.followDescription'),
     slots: ['palette'],
     keepOpen: true,
     checked: WIRE_FOLLOW,
@@ -267,25 +284,25 @@ export function registerWire(app: TextUIApp, options: WireOptions): Disposable {
   }));
   bag.add(app.commands.register({
     id: 'wire.filter',
-    title: 'Filter the wire',
-    category: 'Wire',
-    description: 'Keep the frames whose method, action type or channel match',
+    title: t('views.wire.filterTitle'),
+    category: t('views.wire.category'),
+    description: t('views.wire.filterDescription'),
     slots: ['palette'],
     run: () => app.focus.focus('wire.filter'),
   }));
   bag.add(app.commands.register({
     id: 'frame.open',
-    title: 'Open the frame',
-    category: 'Wire',
-    description: 'Read the frame under the highlight',
+    title: t('views.wire.openTitle'),
+    category: t('views.wire.category'),
+    description: t('views.wire.openDescription'),
     slots: ['palette'],
     run: () => { app.store.set(WIRE_FRAME, true); app.focus.focus('wire.frame'); },
   }));
   bag.add(app.commands.register({
     id: 'frame.close',
-    title: 'Back to the list',
-    category: 'Wire',
-    description: 'Put the frame away',
+    title: t('views.wire.closeTitle'),
+    category: t('views.wire.category'),
+    description: t('views.wire.closeDescription'),
     slots: ['palette'],
     run: () => { app.store.set(WIRE_FRAME, false); app.focus.focus('wire.list'); },
   }));

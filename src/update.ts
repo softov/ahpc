@@ -11,6 +11,7 @@
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
+import type { I18n } from '@textui/core';
 import { statePath } from './config.js';
 
 /** What the file holds: which package was asked, what npm said, and when. */
@@ -139,8 +140,9 @@ export const checkingUpdates = (on: boolean, env: NodeJS.ProcessEnv = process.en
  * line and truncates at the end, and the package name is enough to type
  * `npm i -g` from.
  */
-export const updateNotice = (self: { name: string; version: string }): string | null => {
+export const updateNotice = (self: { name: string; version: string }, i18n?: I18n): string | null => {
   const found = readUpdate();
   if (!found || found.name !== self.name || !newer(found.latest, self.version)) return null;
-  return `${self.name} ${found.latest} is on npm, this is ${self.version}`;
+  const values = { name: self.name, latest: found.latest, version: self.version };
+  return i18n ? i18n.t('views.update.notice', values) : `${self.name} ${found.latest} is on npm, this is ${self.version}`;
 };

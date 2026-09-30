@@ -4,6 +4,7 @@ import {
   defineComponent,
   useApp,
   useTheme,
+  useI18n,
   useStoreSubtree,
   useStoreValue,
 } from '@textui/core';
@@ -108,6 +109,7 @@ const BoodOverlay = defineComponent<Record<string, never>>('BoodOverlay', () => 
 const Header = defineComponent<Record<string, never>>('ChatHeader', () => {
   const app = useApp();
   const theme = useTheme();
+  const i18n = useI18n();
   const host = useStoreValue<HostState>(HOST);
   const status = useStoreValue<number>(STATUS, 1) ?? 1;
   // Subscribed, not asked. `screens.current()` is a method call in the middle
@@ -144,18 +146,18 @@ const Header = defineComponent<Record<string, never>>('ChatHeader', () => {
     <Row gap={1}>
       {wearsBood
         ? <Creature name={bood} form="inline" mood={moodOf(decoded.activity)} shrink={0} />
-        : <text content="Assistant" bold fg="accent" shrink={0} />}
+        : <text content={i18n.t('views.app.name')} bold fg="accent" shrink={0} />}
       <text content={theme.glyphs.separator} fg="subtle" shrink={0} />
       {session ? (
         <>
           <text content={theme.glyphs[decoded.glyph]} fg={decoded.tone} shrink={0} />
           <text content={session.title} flex={1} truncate="end" />
           {session.workingDirectories[0]
-            ? <text content={workspaceName(session.workingDirectories[0])} fg="muted" shrink={4} truncate="end" />
+            ? <text content={workspaceName(session.workingDirectories[0], i18n)} fg="muted" shrink={4} truncate="end" />
             : null}
         </>
       ) : (
-        <text content={host?.url ?? 'no host'} fg="muted" flex={1} truncate="end" />
+        <text content={host?.url ?? i18n.t('views.app.noHost')} fg="muted" flex={1} truncate="end" />
       )}
       {/* The palette's key, where the row's right end is free. It left the
           footer, which is the row every screen runs out of room on, and it is
@@ -164,10 +166,10 @@ const Header = defineComponent<Record<string, never>>('ChatHeader', () => {
       {session?.workingDirectories[0] ? null : (
         <Row gap={1} shrink={0}>
           <text content="f1" fg="accent" bold />
-          <text content="help" fg="muted" />
+          <text content={i18n.t('views.app.help')} fg="muted" />
           <text content={theme.glyphs.separator} fg="subtle" />
           <text content="ctrl+p" fg="accent" bold />
-          <text content="commands" fg="muted" />
+          <text content={i18n.t('views.app.commands')} fg="muted" />
         </Row>
       )}
     </Row>
@@ -183,6 +185,7 @@ const Header = defineComponent<Record<string, never>>('ChatHeader', () => {
 const Hints = defineComponent<BoxProps>('ChatHints', (props) => {
   const theme = useTheme();
   const app = useApp();
+  const i18n = useI18n();
   /**
    * Which key the footer names for a newline.
    *
@@ -238,10 +241,10 @@ const Hints = defineComponent<BoxProps>('ChatHints', (props) => {
       <KeyHints
         {...props}
         hints={[
-          { keys: 'a', label: 'approve' },
-          { keys: 'd', label: 'deny' },
-          { keys: '1-9', label: 'option' },
-          { keys: 'esc', label: 'read' },
+          { keys: 'a', label: i18n.t('views.app.hintApprove') },
+          { keys: 'd', label: i18n.t('views.app.hintDeny') },
+          { keys: '1-9', label: i18n.t('views.app.hintOption') },
+          { keys: 'esc', label: i18n.t('views.app.hintRead') },
         ]}
       />
     );
@@ -252,10 +255,10 @@ const Hints = defineComponent<BoxProps>('ChatHints', (props) => {
       <KeyHints
         {...props}
         hints={[
-          { keys: 'tab', label: 'next question' },
-          { keys: 'space', label: 'choose' },
-          { keys: 'enter', label: 'send answers' },
-          { keys: 'esc', label: 'read' },
+          { keys: 'tab', label: i18n.t('views.app.hintNextQuestion') },
+          { keys: 'space', label: i18n.t('views.app.hintChoose') },
+          { keys: 'enter', label: i18n.t('views.app.hintSendAnswers') },
+          { keys: 'esc', label: i18n.t('views.app.hintRead') },
         ]}
       />
     );
@@ -266,10 +269,10 @@ const Hints = defineComponent<BoxProps>('ChatHints', (props) => {
       <KeyHints
         {...props}
         hints={[
-          { keys: upDown, label: 'move' },
-          { keys: 'enter', label: 'choose' },
-          { keys: 'esc', label: 'back' },
-          { keys: 'ctrl+c', label: running ? 'stop' : 'quit' },
+          { keys: upDown, label: i18n.t('views.app.hintMove') },
+          { keys: 'enter', label: i18n.t('views.app.hintChoose') },
+          { keys: 'esc', label: i18n.t('views.app.hintBack') },
+          { keys: 'ctrl+c', label: running ? i18n.t('views.app.hintStop') : i18n.t('views.app.hintQuit') },
         ]}
       />
     );
@@ -280,10 +283,10 @@ const Hints = defineComponent<BoxProps>('ChatHints', (props) => {
       <KeyHints
         {...props}
         hints={[
-          { keys: 'enter', label: onSend ? (screen === 'new' ? 'start' : running ? 'queue' : 'send') : 'open' },
-          { keys: 'tab', label: 'next option' },
-          { keys: 'esc', label: 'write' },
-          { keys: 'ctrl+c', label: running ? 'stop' : 'quit' },
+          { keys: 'enter', label: onSend ? (screen === 'new' ? i18n.t('views.app.hintStart') : running ? i18n.t('views.app.hintQueue') : i18n.t('views.app.hintSend')) : i18n.t('views.app.hintOpen') },
+          { keys: 'tab', label: i18n.t('views.app.hintNextOption') },
+          { keys: 'esc', label: i18n.t('views.app.hintWrite') },
+          { keys: 'ctrl+c', label: running ? i18n.t('views.app.hintStop') : i18n.t('views.app.hintQuit') },
         ]}
       />
     );
@@ -295,23 +298,23 @@ const Hints = defineComponent<BoxProps>('ChatHints', (props) => {
         {...props}
         hints={composing
           ? [
-            { keys: 'enter', label: 'send' },
-            { keys: newline, label: 'newline' },
-            { keys: 'esc', label: 'read' },
-            { keys: 'ctrl+c', label: running ? 'stop' : 'quit' },
+            { keys: 'enter', label: i18n.t('views.app.hintSend') },
+            { keys: newline, label: i18n.t('views.app.hintNewline') },
+            { keys: 'esc', label: i18n.t('views.app.hintRead') },
+            { keys: 'ctrl+c', label: running ? i18n.t('views.app.hintStop') : i18n.t('views.app.hintQuit') },
           ]
           : [
-            { keys: upDown, label: 'move' },
-            { keys: 'enter', label: 'expand' },
-            { keys: 'i', label: 'write' },
-            { keys: 'G', label: 'follow' },
-            { keys: 'c', label: 'changes' },
-            { keys: 'k', label: 'skills' },
-            { keys: 'esc', label: 'back' },
+            { keys: upDown, label: i18n.t('views.app.hintMove') },
+            { keys: 'enter', label: i18n.t('views.app.hintExpand') },
+            { keys: 'i', label: i18n.t('views.app.hintWrite') },
+            { keys: 'G', label: i18n.t('views.app.hintFollow') },
+            { keys: 'c', label: i18n.t('views.app.hintChanges') },
+            { keys: 'k', label: i18n.t('views.app.hintSkills') },
+            { keys: 'esc', label: i18n.t('views.app.hintBack') },
             // The same key, and it says which: while a turn is running it
             // stops it, and when none is it leaves. A hint that always read
             // "stop" is wrong most of the time.
-            { keys: 'ctrl+c', label: running ? 'stop' : 'quit' },
+            { keys: 'ctrl+c', label: running ? i18n.t('views.app.hintStop') : i18n.t('views.app.hintQuit') },
           ]}
       />
     );
@@ -322,11 +325,11 @@ const Hints = defineComponent<BoxProps>('ChatHints', (props) => {
       <KeyHints
         {...props}
         hints={[
-          { keys: 'enter', label: 'start' },
-          { keys: newline, label: 'newline' },
-          { keys: 'tab', label: 'options' },
-          { keys: 'esc', label: 'sessions' },
-          { keys: 'ctrl+c', label: 'quit' },
+          { keys: 'enter', label: i18n.t('views.app.hintStart') },
+          { keys: newline, label: i18n.t('views.app.hintNewline') },
+          { keys: 'tab', label: i18n.t('views.app.hintOptions') },
+          { keys: 'esc', label: i18n.t('views.app.hintSessions') },
+          { keys: 'ctrl+c', label: i18n.t('views.app.hintQuit') },
         ]}
       />
     );
@@ -341,18 +344,18 @@ const Hints = defineComponent<BoxProps>('ChatHints', (props) => {
         {...props}
         hints={listing
           ? [
-            { keys: upDown, label: 'move' },
-            { keys: 'enter', label: 'open' },
-            { keys: 'ctrl+l', label: 'back to it' },
-            { keys: 'esc', label: 'back' },
+            { keys: upDown, label: i18n.t('views.app.hintMove') },
+            { keys: 'enter', label: i18n.t('views.app.hintOpen') },
+            { keys: 'ctrl+l', label: i18n.t('views.app.hintBackToIt') },
+            { keys: 'esc', label: i18n.t('views.app.hintBack') },
           ]
           : [
-            { keys: 'enter', label: 'run' },
-            { keys: 'ctrl+c', label: 'interrupt' },
-            { keys: 'tab', label: 'tabs' },
-            { keys: 'alt+1-9', label: 'go to' },
-            { keys: 'ctrl+l', label: 'list' },
-            { keys: 'esc', label: 'back' },
+            { keys: 'enter', label: i18n.t('views.app.hintRun') },
+            { keys: 'ctrl+c', label: i18n.t('views.app.hintInterrupt') },
+            { keys: 'tab', label: i18n.t('views.app.hintTabs') },
+            { keys: 'alt+1-9', label: i18n.t('views.app.hintGoTo') },
+            { keys: 'ctrl+l', label: i18n.t('views.app.hintList') },
+            { keys: 'esc', label: i18n.t('views.app.hintBack') },
           ]}
       />
     );
@@ -366,26 +369,26 @@ const Hints = defineComponent<BoxProps>('ChatHints', (props) => {
       <KeyHints
         {...props}
         hints={[
-          { keys: upDown, label: 'move' },
-          { keys: 'enter', label: screen === 'changes' || screen === 'files' || screen === 'automations' ? 'open' : 'on / off' },
+          { keys: upDown, label: i18n.t('views.app.hintMove') },
+          { keys: 'enter', label: screen === 'changes' || screen === 'files' || screen === 'automations' ? i18n.t('views.app.hintOpen') : i18n.t('views.app.hintOnOff') },
           // Only where they do something. A hint for a key that is inert on
           // this screen is worse than no hint.
           ...(screen === 'changes'
-            ? [{ keys: ']', label: 'changeset' }, { keys: 'r', label: 'read' }, { keys: 'x', label: 'do' }]
+            ? [{ keys: ']', label: i18n.t('views.app.hintChangeset') }, { keys: 'r', label: i18n.t('views.app.hintRead') }, { keys: 'x', label: i18n.t('views.app.hintDo') }]
             : []),
           // Named only where they do something. `enter` opens the detail, so
           // running one has a key of its own.
           ...(screen === 'automations'
             ? [
-              { keys: 'r', label: 'run' },
-              { keys: 'n', label: 'new' },
-              { keys: 'e', label: 'edit' },
-              { keys: 'o', label: 'on / off' },
-              { keys: 'd', label: 'forget' },
+              { keys: 'r', label: i18n.t('views.app.hintRun') },
+              { keys: 'n', label: i18n.t('views.app.hintNew') },
+              { keys: 'e', label: i18n.t('views.app.hintEdit') },
+              { keys: 'o', label: i18n.t('views.app.hintOnOff') },
+              { keys: 'd', label: i18n.t('views.app.hintForget') },
             ]
             : []),
-          { keys: 'esc', label: 'back' },
-          { keys: 'ctrl+c', label: 'quit' },
+          { keys: 'esc', label: i18n.t('views.app.hintBack') },
+          { keys: 'ctrl+c', label: i18n.t('views.app.hintQuit') },
         ]}
       />
     );
@@ -396,9 +399,9 @@ const Hints = defineComponent<BoxProps>('ChatHints', (props) => {
       <KeyHints
         {...props}
         hints={[
-          { keys: 'tab', label: 'move' },
-          { keys: 'esc', label: 'back' },
-          { keys: 'ctrl+c', label: 'quit' },
+          { keys: 'tab', label: i18n.t('views.app.hintMove') },
+          { keys: 'esc', label: i18n.t('views.app.hintBack') },
+          { keys: 'ctrl+c', label: i18n.t('views.app.hintQuit') },
         ]}
       />
     );
@@ -408,26 +411,27 @@ const Hints = defineComponent<BoxProps>('ChatHints', (props) => {
     <KeyHints
       {...props}
       hints={[
-        { keys: upDown, label: 'move' },
+        { keys: upDown, label: i18n.t('views.app.hintMove') },
         // Which one it is depends on where the detail pane is, and the pane is
         // right there on the screen saying so. Naming both is what fits.
-        { keys: leftRight, label: 'detail' },
-        { keys: 'enter', label: 'open' },
+        { keys: leftRight, label: i18n.t('views.app.hintDetail') },
+        { keys: 'enter', label: i18n.t('views.app.hintOpen') },
         // Named only while there is one to go back to. Escape on the
         // catalogue gives the session up, and the hint goes with it.
-        ...(reopenable ? [{ keys: 'f', label: 'reopen' }] : []),
-        { keys: 'n', label: 'new' },
+        ...(reopenable ? [{ keys: 'f', label: i18n.t('views.app.hintReopen') }] : []),
+        { keys: 'n', label: i18n.t('views.app.hintNew') },
         // `a` archives and `delete` disposes, and neither is here: the row is
         // one line and naming `ctrl+f` cost it the room. Both are a letter
         // away in the palette, and the filter is the one nothing else offers.
-        { keys: 'ctrl+f', label: 'filter' },
-        { keys: 'ctrl+c', label: 'quit' },
+        { keys: 'ctrl+f', label: i18n.t('views.app.hintFilter') },
+        { keys: 'ctrl+c', label: i18n.t('views.app.hintQuit') },
       ]}
     />
   );
 });
 
 const Status = defineComponent<Record<string, never>>('ChatStatus', () => {
+  const i18n = useI18n();
   const screen = useStoreValue<string | null>(SCREEN, 'sessions');
   // What the host last refused, where a person is already looking. A refusal
   // that only reaches a log is a client that appears to have ignored the key
@@ -450,7 +454,7 @@ const Status = defineComponent<Record<string, never>>('ChatStatus', () => {
   return (
     <Row gap={2}>
       {armed
-        ? <text content="ctrl+c again to quit" fg="warning" bold flex={1} truncate="end" />
+        ? <text content={i18n.t('views.app.quitArmed')} fg="warning" bold flex={1} truncate="end" />
         : error
         ? <text content={error} fg="danger" flex={1} truncate="end" />
         : notice

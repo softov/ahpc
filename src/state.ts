@@ -1,4 +1,5 @@
-import type { BindingPath, ReactiveStore } from '@textui/core';
+import type { BindingPath, I18n, ReactiveStore } from '@textui/core';
+import { createI18n } from '@textui/core';
 import type { ChatSession } from '@textui/chat';
 import type { HostEvent } from './ahp/connection.js';
 import type { AuthAsk } from './ahp/auth.js';
@@ -6,6 +7,8 @@ import type {
   Changeset, PendingInput, QueuedMessage, SessionSummary, SessionUri, Turn,
 } from './ahp/types.js';
 import { byUrgency, decodeStatus } from './ahp/status.js';
+import type { Activity } from './ahp/status.js';
+import { MESSAGES } from './i18n/index.js';
 
 /**
  * Where the conversation lives, and how the host's actions get there.
@@ -548,9 +551,20 @@ export function queue(store: ReactiveStore): QueuedMessage[] {
   return store.get<QueuedMessage[]>(QUEUE) ?? [];
 }
 
+let english: I18n | undefined;
+
+/** The messages in English, for a caller with no `I18n` of its own to pass. */
+export function inEnglish(): I18n {
+  if (english === undefined) {
+    english = createI18n('en');
+    english.register({ locale: 'en', messages: MESSAGES.en });
+  }
+  return english;
+}
+
 /** A short name for a `file://` working directory. */
-export function workspaceName(uri: string | undefined): string {
-  if (!uri) return 'no workspace';
+export function workspaceName(uri: string | undefined, i18n: I18n = inEnglish()): string {
+  if (!uri) return i18n.t('views.state.noWorkspace');
   return uri.replace(/^file:\/\//, '').split('/').filter(Boolean).pop() ?? '/';
 }
 
@@ -561,8 +575,8 @@ export function workspaceName(uri: string | undefined): string {
  * directory when it does not - which is the same answer for most hosts and the
  * right one for a host that names projects itself.
  */
-export function projectName(session: SessionSummary): string {
-  return session.project?.displayName || workspaceName(session.workingDirectories[0]);
+export function projectName(session: SessionSummary, i18n: I18n = inEnglish()): string {
+  return session.project?.displayName || workspaceName(session.workingDirectories[0], i18n);
 }
 
 /**
@@ -613,22 +627,32 @@ export function branchName(session: SessionSummary): string | undefined {
  * request are all AHP's business, and `@textui/chat` has no opinion about
  * any of them.
  */
-export function sessionView(session: SessionSummary): ChatSession {
+/** What a session is doing, in the reader's language. */
+export function statusLabel(activity: Activity, i18n: I18n = inEnglish()): string {
+  switch (activity) {
+    case 'input': return i18n.t('views.state.statusInput');
+    case 'running': return i18n.t('views.state.statusRunning');
+    case 'error': return i18n.t('views.state.statusError');
+    default: return i18n.t('views.state.statusIdle');
+  }
+}
+
+export function sessionView(session: SessionSummary, i18n: I18n = inEnglish()): ChatSession {
   const branch = branchName(session);
   const pull = pullRequestLabel(session);
   return {
     id: session.resource,
     title: session.title,
     provider: session.provider,
-    status: decodeStatus(session.status),
+    status: { ...decodeStatus(session.status), label: statusLabel(decodeStatus(session.status).activity, i18n) },
     createdAt: session.createdAt,
     modifiedAt: session.modifiedAt,
     workingDirectories: session.workingDirectories,
-    project: projectName(session),
+    project: projectName(session, i18n),
     ...(branch ? { branch } : {}),
     ...(pull ? { pullRequest: pull } : {}),
     ...(session.activity ? { activity: session.activity } : {}),
-    ...(session.origin?.kind === 'automation' ? { origin: 'by an automation' } : {}),
+    ...(session.origin?.kind === 'automation' ? { origin: i18n.t('views.state.byAutomation') } : {}),
     ...(session.changes ? { changes: session.changes } : {}),
   };
 }

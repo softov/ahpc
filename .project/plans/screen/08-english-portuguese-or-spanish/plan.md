@@ -78,9 +78,9 @@ The files read and the patterns to reuse are the `refs` above.
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - textui chrome reads through app.i18n](task-01-textui-chrome-reads-through-i18n.md) | todo | - |
+| [01 - textui chrome reads through app.i18n](task-01-textui-chrome-reads-through-i18n.md) | done | - |
 | [02 - the language is chosen at start](task-02-the-language-is-chosen-at-start.md) | done | - |
-| [03 - every string ahpc shows comes from a catalogue](task-03-every-string-comes-from-a-catalogue.md) | todo | 02 |
+| [03 - every string ahpc shows comes from a catalogue](task-03-every-string-comes-from-a-catalogue.md) | done | 02 |
 | [04 - command ids read noun.verb](task-04-command-ids-read-verb-noun.md) | done | - |
 
 ## Risks and tradeoffs
@@ -91,8 +91,8 @@ The files read and the patterns to reuse are the `refs` above.
 
 ## Resume state
 
-- **Done so far:** tasks 02 and 04 done 2026-09-30.
-- **Next action:** [task-01-textui-chrome-reads-through-i18n.md](task-01-textui-chrome-reads-through-i18n.md).
+- **Done so far:** every task done 2026-09-30.
+- **Next action:** Softov's review; then a textui release, the `@textui/*` range in `package.json`, `implemented.md`, and the plan closes.
 - **Open questions:** none.
 - **Watch out for:** the slash menu shows ids, so task 04 changes what tests type; the palette's filter searches titles, so a translated title is what a person searches for, and `keywords` should keep the English words.
 

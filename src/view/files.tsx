@@ -1,5 +1,5 @@
 import type { BoxProps, RenderOutput, SemanticVariant } from '@textui/core';
-import { defineComponent, useTheme } from '@textui/core';
+import { defineComponent, useI18n, useTheme } from '@textui/core';
 import type { ListItem, ListItemState } from '@textui/widgets';
 import { Column, EmptyState, List, Marquee, Row } from '@textui/widgets';
 import type { ResourceEntry } from '../ahp/types.js';
@@ -38,14 +38,15 @@ export const FileList: (props: FileListProps) => RenderOutput =
   defineComponent<FileListProps>('FileList', (props) => {
     const { at, entries, loading, failure, onOpen, onUp, focusId, autoFocus, ...rest } = props;
     const theme = useTheme();
+    const i18n = useI18n();
 
     if (failure !== undefined) {
       // The host's own words. A host that serves no filesystem answers
       // `-32601`, and a blank pane would be this client looking broken for
       // something the host said plainly.
-      return <EmptyState title="The host would not list it" message={failure} {...rest} />;
+      return <EmptyState title={i18n.t('views.files.refused')} message={failure} {...rest} />;
     }
-    if (loading === true) return <EmptyState title="Reading the directory" {...rest} />;
+    if (loading === true) return <EmptyState title={i18n.t('views.files.loading')} {...rest} />;
 
     const items: ListItem[] = [
       // The way up, as a row rather than a key, because it is where a person
@@ -93,7 +94,7 @@ export const FileList: (props: FileListProps) => RenderOutput =
           }}
           {...(focusId ? { focusId } : {})}
           {...(autoFocus ? { autoFocus: true } : {})}
-          emptyMessage="Nothing here"
+          emptyMessage={i18n.t('views.files.empty')}
         />
       </Column>
     );

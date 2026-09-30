@@ -318,13 +318,13 @@ export function createController(
       modelOffered.set(id, app.commands.register({
         id,
         title: property.title,
-        category: 'Compose',
+        category: app.i18n.t('category.compose'),
         slots: ['palette'],
         args: [{
           name: 'value',
           type: 'string' as const,
           required: true,
-          description: property.description ?? `Choose ${property.title.toLowerCase()}`,
+          description: property.description ?? app.i18n.t('commands.chooseProperty', { name: property.title.toLowerCase() }),
           get default(): string | undefined {
             const answers = app.store.get<Record<string, string>>(MODEL_CONFIG) ?? {};
             // What the host said it opens with, where nothing has been chosen.
@@ -371,13 +371,13 @@ export function createController(
       offered.set(id, app.commands.register({
         id,
         title: property.title,
-        category: 'Compose',
+        category: app.i18n.t('category.compose'),
         slots: ['palette'],
         args: [{
           name: 'value',
           type: 'string' as const,
           required: true,
-          description: property.description ?? `Choose ${property.title.toLowerCase()}`,
+          description: property.description ?? app.i18n.t('commands.chooseProperty', { name: property.title.toLowerCase() }),
           /*
            * What it is set to now, so the picker opens on that row.
            *
@@ -563,7 +563,7 @@ export function createController(
   const signIn = async (resource: string, token: string): Promise<boolean> => {
     if (!host.authenticate) {
       const current = app.store.get<AuthAsk | null>(AUTH_ASK);
-      if (current) app.store.set(AUTH_ASK, { ...current, words: 'This host takes no token.' });
+      if (current) app.store.set(AUTH_ASK, { ...current, words: app.i18n.t('commands.noToken') });
       return false;
     }
     try {
@@ -760,7 +760,7 @@ export function createController(
     async openLink(link) {
       const parsed = parseSessionLink(link);
       if (parsed === undefined) {
-        failed(new Error(`${link} is not an agent-host-session:// link`));
+        failed(new Error(app.i18n.t('commands.notSessionLink', { link })));
         return false;
       }
       // The catalogue as held, then as the host has it now: a session the
@@ -771,7 +771,7 @@ export function createController(
         row = sessionOfLink(parsed, sessions(app.store));
       }
       if (row === undefined) {
-        failed(new Error(`No session on this host matches ${link}`));
+        failed(new Error(app.i18n.t('commands.noSessionForLink', { link })));
         return false;
       }
       controller.open(row.resource as SessionUri);
@@ -946,14 +946,14 @@ export function createController(
       const uri = app.store.get<SessionUri>(OPEN);
       const input = pendingInput(app.store);
       if (!uri || input?.kind !== 'toolConfirmation') {
-        inputRefused(app.store, 'Nothing is waiting to be approved');
+        inputRefused(app.store, app.i18n.t('commands.nothingToApprove'));
         return;
       }
       // The option's label, not its id: a live host's option ids are whole
       // sentences with punctuation in them, and one of those in a status row
       // is the row's whole width spent on something nobody reads.
       const chosen = input.call.options?.find((option) => option.id === optionId);
-      sendingInput(app.store, chosen ? `Approving - ${chosen.label}...` : 'Approving...');
+      sendingInput(app.store, chosen ? app.i18n.t('commands.approvingOption', { option: chosen.label }) : app.i18n.t('commands.approving'));
       host.confirmToolCall(uri, input.call.id, true, optionId);
     },
 
@@ -961,10 +961,10 @@ export function createController(
       const uri = app.store.get<SessionUri>(OPEN);
       const input = pendingInput(app.store);
       if (!uri || input?.kind !== 'toolConfirmation') {
-        inputRefused(app.store, 'Nothing is waiting to be denied');
+        inputRefused(app.store, app.i18n.t('commands.nothingToDeny'));
         return;
       }
-      sendingInput(app.store, 'Denying...');
+      sendingInput(app.store, app.i18n.t('commands.denying'));
       host.confirmToolCall(uri, input.call.id, false);
     },
 
@@ -972,17 +972,20 @@ export function createController(
       const uri = app.store.get<SessionUri>(OPEN);
       const input = pendingInput(app.store);
       if (!uri || input?.kind !== 'chatInput') {
-        inputRefused(app.store, 'No question is waiting to be answered');
+        inputRefused(app.store, app.i18n.t('commands.nothingToAnswer'));
         return;
       }
       // An accept with no answers resumes the agent on the answers it already
       // had, which for a question it has just asked is none.
       const missing = input.questions.filter((q) => q.required && !answers[q.id]);
       if (accepted && missing.length > 0) {
-        inputRefused(app.store, `${String(missing.length)} still to answer`);
+        inputRefused(app.store, app.i18n.plural(missing.length, {
+          one: app.i18n.t('commands.stillToAnswer.one'),
+          other: app.i18n.t('commands.stillToAnswer.other'),
+        }));
         return;
       }
-      sendingInput(app.store, accepted ? 'Sending your answer...' : 'Declining...');
+      sendingInput(app.store, accepted ? app.i18n.t('commands.sendingAnswer') : app.i18n.t('commands.declining'));
       host.completeInput(uri, input.id, accepted, answers);
     },
 
@@ -1059,18 +1062,18 @@ export function createController(
     },
     file: async (uri) => {
       const read = host.resourceRead;
-      if (!read) throw new Error('This host serves no files.');
+      if (!read) throw new Error(app.i18n.t('commands.noFiles'));
       return await guard(() => read(uri));
     },
     automations: async () => {
       const all = host.automations;
-      if (!all) throw new Error('This host serves no automations.');
+      if (!all) throw new Error(app.i18n.t('commands.noAutomations'));
       return await guard(() => all());
     },
     onAutomations: (observer) => host.onAutomations?.(observer) ?? { close: () => {} },
     createAutomation: async (definition) => {
       const write = host.createAutomation;
-      if (!write) throw new Error('This host serves no automations.');
+      if (!write) throw new Error(app.i18n.t('commands.noAutomations'));
       return await guard(() => write(definition));
     },
     runAutomation: async (uri) => {
@@ -1083,7 +1086,7 @@ export function createController(
     },
     updateAutomation: async (uri, changes) => {
       const update = host.updateAutomation;
-      if (!update) throw new Error('This host cannot change an automation.');
+      if (!update) throw new Error(app.i18n.t('commands.cannotChangeAutomation'));
       await guard(() => update(uri, changes));
     },
     resolveSettings: (options) => guard(() => host.resolveConfig(options)),
@@ -1131,7 +1134,7 @@ export function createController(
   const watching = host.onSessions(refreshSoon);
   bag.add({ dispose: () => watching.close() });
   for (const command of commands(app, controller, host)) bag.add(app.commands.register(command));
-  for (const binding of keys(bindings)) bag.add(app.keybindings.register(binding));
+  for (const binding of keys(app.i18n, bindings)) bag.add(app.keybindings.register(binding));
 
   /*
    * Fill the connection's asker box, the way `sink.report` is filled.
@@ -1222,7 +1225,7 @@ function commands(
    */
   const step = (by: number): void => {
     const query = app.store.get<string>(FIND) ?? '';
-    const blocks = toBlocks(turns(app.store), app.store.get<QueuedMessage[]>(QUEUE) ?? []);
+    const blocks = toBlocks(turns(app.store), app.store.get<QueuedMessage[]>(QUEUE) ?? [], app.i18n);
     const found = findBlocks(blocks, query);
     if (found.length === 0) return;
     const from = Math.min(app.store.get<number>(FIND_AT) ?? 0, found.length - 1);
@@ -1322,8 +1325,8 @@ function commands(
        * JSON and starting again is one somebody keeps off.
        */
       id: 'creature.toggle',
-      title: 'Show creature',
-      category: 'View',
+      title: app.i18n.t('command.creature.toggle.title'),
+      category: app.i18n.t('category.view'),
       slots: ['palette', 'config'],
       run: () => {
         const showing = app.store.get<boolean>(BOOD_FLOAT) ?? false;
@@ -1332,8 +1335,8 @@ function commands(
     },
     {
       id: 'app.palette',
-      title: 'Command Palette',
-      category: 'View',
+      title: app.i18n.t('command.app.palette.title'),
+      category: app.i18n.t('category.view'),
       slots: [],
       run: () => {
         app.layers.open({
@@ -1365,9 +1368,9 @@ function commands(
      */
     {
       id: 'config.show',
-      title: 'Configure',
-      category: 'View',
-      description: 'Theme, layout and the rest of what this client decides',
+      title: app.i18n.t('command.config.show.title'),
+      category: app.i18n.t('category.view'),
+      description: app.i18n.t('command.config.show.description'),
       slots: ['palette'],
       run: () => {
         app.layers.open({
@@ -1379,7 +1382,7 @@ function commands(
           node: {
             component: 'CommandPalette',
             maxWidth: 90,
-            placeholder: 'Configure',
+            placeholder: app.i18n.t('commands.configurePlaceholder'),
             commands: app.commands.list({ slot: 'config', enabledOnly: true }),
             onClose: { handler: () => app.layers.close('palette') },
           },
@@ -1398,9 +1401,9 @@ function commands(
        * keys that do nothing here is a keymap that has to be second-guessed.
        */
       id: 'keys.show',
-      title: 'Show keys',
-      category: 'View',
-      description: 'Every key that does something here',
+      title: app.i18n.t('command.keys.show.title'),
+      category: app.i18n.t('category.view'),
+      description: app.i18n.t('command.keys.show.description'),
       slots: ['palette'],
       run: () => {
         app.layers.open({
@@ -1412,7 +1415,7 @@ function commands(
           node: {
             component: 'CommandPalette',
             maxWidth: 90,
-            placeholder: 'Keys',
+            placeholder: app.i18n.t('commands.keysPlaceholder'),
             commands: app.commands.list({ enabledOnly: true })
               .filter((command) => app.keybindings.forCommand(command.id).length > 0),
             onClose: { handler: () => app.layers.close('palette') },
@@ -1422,9 +1425,9 @@ function commands(
     },
     {
       id: 'screen.back',
-      title: 'Go back',
-      category: 'Screens',
-      description: 'Return to the previous screen',
+      title: app.i18n.t('command.screen.back.title'),
+      category: app.i18n.t('category.screens'),
+      description: app.i18n.t('command.screen.back.description'),
       slots: ['palette'],
       run: () => {
         // The composer is the root, so there is nothing under it to pop to -
@@ -1454,17 +1457,17 @@ function commands(
        * nothing at all.
        */
       id: 'automations.show',
-      title: 'Show automations',
-      category: 'Screens',
-      description: 'What the host runs on its own, and when it next fires',
+      title: app.i18n.t('command.automations.show.title'),
+      category: app.i18n.t('category.screens'),
+      description: app.i18n.t('command.automations.show.description'),
       slots: ['palette'],
       run: () => { app.screens.push('automations'); },
     },
     {
       id: 'automation.new',
-      title: 'New automation',
-      category: 'Automation',
-      description: 'A session the host starts without being asked',
+      title: app.i18n.t('command.automation.new.title'),
+      category: app.i18n.t('category.automation'),
+      description: app.i18n.t('command.automation.new.description'),
       slots: ['palette'],
       run: () => {
         app.store.set(AUTOMATION_EDIT, '');
@@ -1473,9 +1476,9 @@ function commands(
     },
     {
       id: 'automation.edit',
-      title: 'Edit automation',
-      category: 'Automation',
-      description: 'Change what it says, where and on what it runs, and when',
+      title: app.i18n.t('command.automation.edit.title'),
+      category: app.i18n.t('category.automation'),
+      description: app.i18n.t('command.automation.edit.description'),
       slots: ['palette'],
       when: `${AUTOMATION_ROW}`,
       run: () => {
@@ -1489,9 +1492,9 @@ function commands(
     },
     {
       id: 'automation.run',
-      title: 'Run automation now',
-      category: 'Automation',
-      description: 'Start a run, whatever the schedule says',
+      title: app.i18n.t('command.automation.run.title'),
+      category: app.i18n.t('category.automation'),
+      description: app.i18n.t('command.automation.run.description'),
       slots: ['palette'],
       when: `${AUTOMATION_ROW}`,
       run: async () => {
@@ -1507,9 +1510,9 @@ function commands(
     },
     {
       id: 'automation.toggle',
-      title: 'Turn automation on / off',
-      category: 'Automation',
-      description: 'Stop it firing, or let it fire again',
+      title: app.i18n.t('command.automation.toggle.title'),
+      category: app.i18n.t('category.automation'),
+      description: app.i18n.t('command.automation.toggle.description'),
       slots: ['palette'],
       when: `${AUTOMATION_ROW}`,
       run: async () => {
@@ -1522,9 +1525,9 @@ function commands(
     },
     {
       id: 'automation.delete',
-      title: 'Delete automation',
-      category: 'Automation',
-      description: 'Delete it and everything it has done',
+      title: app.i18n.t('command.automation.delete.title'),
+      category: app.i18n.t('category.automation'),
+      description: app.i18n.t('command.automation.delete.description'),
       slots: ['palette'],
       when: `${AUTOMATION_ROW}`,
       run: async () => {
@@ -1540,10 +1543,10 @@ function commands(
          * to lose the only copy of a schedule they wrote.
          */
         const yes = await confirm(app.layers, {
-          title: 'Forget this automation?',
-          message: `${found.title} and its history go, and nothing here brings them back.`,
-          confirmLabel: 'Forget it',
-          cancelLabel: 'Keep it',
+          title: app.i18n.t('commands.forgetAutomation.title'),
+          message: app.i18n.t('commands.forgetAutomation.message', { name: found.title }),
+          confirmLabel: app.i18n.t('commands.forgetAutomation.confirm'),
+          cancelLabel: app.i18n.t('commands.forgetAutomation.cancel'),
           tone: 'danger',
         });
         if (!yes) return;
@@ -1561,9 +1564,9 @@ function commands(
      */
     {
       id: 'automation.showDetails',
-      title: 'Show automation details',
-      category: 'Automation',
-      description: 'Show what it says, where it runs and what it has done',
+      title: app.i18n.t('command.automation.showDetails.title'),
+      category: app.i18n.t('category.automation'),
+      description: app.i18n.t('command.automation.showDetails.description'),
       slots: ['palette'],
       when: `${SCREEN} == 'automations' && ${AUTOMATION_ROW}`,
       run: () => {
@@ -1573,9 +1576,9 @@ function commands(
     },
     {
       id: 'automation.hideDetails',
-      title: 'Hide automation details',
-      category: 'Automation',
-      description: 'Hide the detail pane, and give the list the width',
+      title: app.i18n.t('command.automation.hideDetails.title'),
+      category: app.i18n.t('category.automation'),
+      description: app.i18n.t('command.automation.hideDetails.description'),
       slots: ['palette'],
       when: `${SCREEN} == 'automations'`,
       run: () => {
@@ -1586,9 +1589,9 @@ function commands(
     },
     {
       id: 'sessions.show',
-      title: 'Show sessions',
-      category: 'Screens',
-      description: 'Every session on the host',
+      title: app.i18n.t('command.sessions.show.title'),
+      category: app.i18n.t('category.screens'),
+      description: app.i18n.t('command.sessions.show.description'),
       slots: ['palette'],
       run: () => toSessions(),
     },
@@ -1604,16 +1607,16 @@ function commands(
        * else gets opened.
        */
       id: 'link.open',
-      title: 'Open a session link',
-      category: 'Session',
-      description: 'Follow an agent-host-session:// link in this transcript',
+      title: app.i18n.t('command.link.open.title'),
+      category: app.i18n.t('category.session'),
+      description: app.i18n.t('command.link.open.description'),
       slots: ['palette'],
       when: `${OPEN}`,
       args: [{
         name: 'link',
         type: 'string' as const,
         required: true,
-        description: 'The link to follow',
+        description: app.i18n.t('commands.linkArg'),
         choices: () => linksIn(app.store.get<Turn[]>(TURNS) ?? []).map((found) => ({
           value: found.link,
           label: found.link.replace(/^agent-host-session:\/\//, ''),
@@ -1626,9 +1629,9 @@ function commands(
     },
     {
       id: 'changes.show',
-      title: 'Show changes',
-      category: 'Screens',
-      description: 'The files this session changed',
+      title: app.i18n.t('command.changes.show.title'),
+      category: app.i18n.t('category.screens'),
+      description: app.i18n.t('command.changes.show.description'),
       slots: ['palette'],
       when: `${OPEN}`,
       // Always the list, never wherever it was left. A screen that reopens on
@@ -1644,9 +1647,9 @@ function commands(
        * the changed files would be a changeset with a worse name.
        */
       id: 'files.show',
-      title: 'Show files',
-      category: 'Screens',
-      description: 'The project, as the host sees it',
+      title: app.i18n.t('command.files.show.title'),
+      category: app.i18n.t('category.screens'),
+      description: app.i18n.t('command.files.show.description'),
       slots: ['palette'],
       when: `${OPEN}`,
       run: () => {
@@ -1659,27 +1662,27 @@ function commands(
     },
     {
       id: 'skills.show',
-      title: 'Show skills and commands',
-      category: 'Screens',
-      description: 'What plugins and directories gave this session',
+      title: app.i18n.t('command.skills.show.title'),
+      category: app.i18n.t('category.screens'),
+      description: app.i18n.t('command.skills.show.description'),
       slots: ['palette'],
       when: `${OPEN}`,
       run: () => app.screens.push('skills'),
     },
     {
       id: 'mcp.show',
-      title: 'Show MCP servers',
-      category: 'Screens',
-      description: 'Which servers this session has, and whether they answered',
+      title: app.i18n.t('command.mcp.show.title'),
+      category: app.i18n.t('category.screens'),
+      description: app.i18n.t('command.mcp.show.description'),
       slots: ['palette'],
       when: `${OPEN}`,
       run: () => app.screens.push('mcp'),
     },
     {
       id: 'usage.show',
-      title: 'Show usage',
-      category: 'Screens',
-      description: 'Tokens, cost and the context window',
+      title: app.i18n.t('command.usage.show.title'),
+      category: app.i18n.t('category.screens'),
+      description: app.i18n.t('command.usage.show.description'),
       slots: ['palette'],
       when: `${OPEN}`,
       run: () => app.screens.push('usage'),
@@ -1699,8 +1702,8 @@ function commands(
        * being silently dropped.
        */
       id: 'changes.scope',
-      title: 'Next changeset',
-      category: 'Changes',
+      title: app.i18n.t('command.changes.scope.title'),
+      category: app.i18n.t('category.changes'),
       run: () => {
         const offered = (app.store.get<ChangesetScope[]>(CHANGE_SCOPES) ?? [])
           .filter((scope) => scope.variables.length === 0);
@@ -1723,8 +1726,8 @@ function commands(
        * files the other has been through.
        */
       id: 'changes.review',
-      title: 'Mark this file read',
-      category: 'Changes',
+      title: app.i18n.t('command.changes.review.title'),
+      category: app.i18n.t('category.changes'),
       run: () => {
         const at = app.store.get<string>(CHANGE_AT) ?? '';
         const row = app.store.get<string>(CHANGE_ROW) ?? '';
@@ -1750,14 +1753,14 @@ function commands(
        * `--yes` is in the shell.
        */
       id: 'changes.run',
-      title: 'Do something with these changes',
-      category: 'Changes',
+      title: app.i18n.t('command.changes.run.title'),
+      category: app.i18n.t('category.changes'),
       when: `${SCREEN} == 'changes'`,
       args: [{
         name: 'operation',
         type: 'string' as const,
         required: true,
-        description: 'Which of the verbs this changeset offers',
+        description: app.i18n.t('commands.operationArg'),
         // What the changeset advertises, now. An id that was not offered is
         // one the host will refuse, so there is nothing to gain by listing
         // more than it says.
@@ -1783,7 +1786,7 @@ function commands(
             title: operation.label,
             message: operation.confirmation,
             confirmLabel: operation.label,
-            cancelLabel: 'Leave it',
+            cancelLabel: app.i18n.t('commands.operationCancel'),
             // The presence of a confirmation is the host calling this
             // destructive, so the button is styled as one.
             tone: 'danger',
@@ -1803,10 +1806,10 @@ function commands(
              * working tree.
              */
             ask: (request: { uri: string }) => confirm(app.layers, {
-              title: 'Let the host write?',
-              message: `${operation.label} needs write access to ${request.uri.replace(/^file:\/\//, '')}.`,
-              confirmLabel: 'Allow',
-              cancelLabel: 'No',
+              title: app.i18n.t('commands.hostWrite.title'),
+              message: app.i18n.t('commands.hostWrite.message', { operation: operation.label, path: request.uri.replace(/^file:\/\//, '') }),
+              confirmLabel: app.i18n.t('commands.hostWrite.confirm'),
+              cancelLabel: app.i18n.t('commands.hostWrite.cancel'),
               tone: 'danger',
             }),
           });
@@ -1820,9 +1823,9 @@ function commands(
     },
     {
       id: 'changes.close',
-      title: 'Back to the file list',
-      category: 'Screens',
-      description: 'Close the open file',
+      title: app.i18n.t('command.changes.close.title'),
+      category: app.i18n.t('category.screens'),
+      description: app.i18n.t('command.changes.close.description'),
       // Not in the palette: it is what escape does on one screen, and a
       // palette entry for it would be offering "go back" as a command.
       slots: [],
@@ -1831,18 +1834,18 @@ function commands(
     },
     {
       id: 'settings.show',
-      title: 'Show session settings',
-      category: 'Screens',
-      description: 'The options the host offers for this session',
+      title: app.i18n.t('command.settings.show.title'),
+      category: app.i18n.t('category.screens'),
+      description: app.i18n.t('command.settings.show.description'),
       slots: ['palette', 'config'],
       when: `${OPEN}`,
       run: () => app.screens.push('settings'),
     },
     {
       id: 'hosts.show',
-      title: 'Show hosts',
-      category: 'Screens',
-      description: 'Manage all hosts',
+      title: app.i18n.t('command.hosts.show.title'),
+      category: app.i18n.t('category.screens'),
+      description: app.i18n.t('command.hosts.show.description'),
       slots: ['palette'],
       run: () => app.screens.push('hosts')
     },
@@ -1862,9 +1865,9 @@ function commands(
      */
     {
       id: 'markdown.toggle',
-      title: 'Render markdown',
-      category: 'View',
-      description: 'Draw what the agent said as markdown, or as it typed it',
+      title: app.i18n.t('command.markdown.toggle.title'),
+      category: app.i18n.t('category.view'),
+      description: app.i18n.t('command.markdown.toggle.description'),
       slots: ['palette', 'config'],
       run: () => {
         const on = app.store.get<boolean>(MARKDOWN) ?? true;
@@ -1887,16 +1890,16 @@ function commands(
      */
     {
       id: 'editor.open',
-      title: 'Edit in $EDITOR',
-      category: 'Compose',
-      description: 'Open the message in an external editor',
+      title: app.i18n.t('command.editor.open.title'),
+      category: app.i18n.t('category.compose'),
+      description: app.i18n.t('command.editor.open.description'),
       slots: ['palette'],
       // The draft it edits belongs to the composer, and only two screens have one.
       when: `${SCREEN} == 'chat' || ${SCREEN} == 'new'`,
       run: async () => {
         const editor = process.env.VISUAL ?? process.env.EDITOR;
         if (!editor) {
-          controller.report(new Error('No $VISUAL or $EDITOR is set, so there is no editor to open.'));
+          controller.report(new Error(app.i18n.t('commands.noEditor')));
           return;
         }
         // A directory of its own, so the name is not guessable and nothing
@@ -1937,9 +1940,9 @@ function commands(
     },
     {
       id: 'theme.change',
-      title: 'Change theme',
-      category: 'View',
-      description: 'Colors and shapes',
+      title: app.i18n.t('command.theme.change.title'),
+      category: app.i18n.t('category.view'),
+      description: app.i18n.t('command.theme.change.description'),
       slots: ['palette', 'config'],
       // The command says what it needs and the palette asks. Wearing it while
       // the highlight moves is what makes a theme choosable at all: the names
@@ -1967,9 +1970,9 @@ function commands(
     },
     {
       id: 'layout.change',
-      title: 'Change layout',
-      category: 'View',
-      description: 'Where the panels and controls go',
+      title: app.i18n.t('command.layout.change.title'),
+      category: app.i18n.t('category.view'),
+      description: app.i18n.t('command.layout.change.description'),
       slots: ['palette', 'config'],
       args: [{
         name: 'id',
@@ -1997,9 +2000,9 @@ function commands(
     // will be sent as, each asked by the palette, anchored above its chip.
     {
       id: 'harness.choose',
-      title: 'Choose harness',
-      category: 'Compose',
-      description: 'The agent that runs the session',
+      title: app.i18n.t('command.harness.choose.title'),
+      category: app.i18n.t('category.compose'),
+      description: app.i18n.t('command.harness.choose.description'),
       slots: ['palette'],
       // Fixed once a session exists: it is the process the conversation is
       // running in, and a chip offering to change it would be offering a lie.
@@ -2008,7 +2011,7 @@ function commands(
         name: 'id',
         type: 'string' as const,
         required: true,
-        description: 'Which agent runs this',
+        description: app.i18n.t('commands.harnessArg'),
         choices: listAgents,
       }],
       run: (args: Record<string, unknown>) => {
@@ -2022,9 +2025,9 @@ function commands(
     },
     {
       id: 'model.choose',
-      title: 'Choose model',
-      category: 'Compose',
-      description: 'The model the agent uses',
+      title: app.i18n.t('command.model.choose.title'),
+      category: app.i18n.t('category.compose'),
+      description: app.i18n.t('command.model.choose.description'),
       slots: ['palette'],
       // The model rides on the message being composed, so it needs a composer.
       when: `${SCREEN} == 'chat' || ${SCREEN} == 'new'`,
@@ -2032,7 +2035,7 @@ function commands(
         name: 'id',
         type: 'string' as const,
         required: true,
-        description: 'What the next message runs on',
+        description: app.i18n.t('commands.modelArg'),
         choices: listModels,
       }],
       run: (args: Record<string, unknown>) => {
@@ -2057,9 +2060,9 @@ function commands(
      */
     {
       id: 'chat.new',
-      title: 'New chat',
-      category: 'Session',
-      description: 'Open another conversation in this session',
+      title: app.i18n.t('command.chat.new.title'),
+      category: app.i18n.t('category.session'),
+      description: app.i18n.t('command.chat.new.description'),
       slots: ['palette'],
       when: CAN_ADD_CHAT,
       run: () => void controller.createChat(),
@@ -2073,9 +2076,9 @@ function commands(
      */
     {
       id: 'chat.fork',
-      title: 'Fork from this turn',
-      category: 'Session',
-      description: 'A new chat carrying this conversation up to the turn under the cursor',
+      title: app.i18n.t('command.chat.fork.title'),
+      category: app.i18n.t('category.session'),
+      description: app.i18n.t('command.chat.fork.description'),
       slots: ['palette'],
       when: CAN_FORK,
       run: () => {
@@ -2087,9 +2090,9 @@ function commands(
     },
     {
       id: 'sidechat.new',
-      title: 'Side chat from this turn',
-      category: 'Session',
-      description: 'A new chat with this turn as context, without copying it in',
+      title: app.i18n.t('command.sidechat.new.title'),
+      category: app.i18n.t('category.session'),
+      description: app.i18n.t('command.sidechat.new.description'),
       slots: ['palette'],
       when: CAN_SIDE_CHAT,
       run: () => {
@@ -2101,16 +2104,16 @@ function commands(
     },
     {
       id: 'chat.switch',
-      title: 'Switch chat',
-      category: 'Session',
-      description: 'Read a different conversation in this session',
+      title: app.i18n.t('command.chat.switch.title'),
+      category: app.i18n.t('category.session'),
+      description: app.i18n.t('command.chat.switch.description'),
       slots: ['palette'],
       when: HAS_CHATS,
       args: [{
         name: 'chat',
         type: 'string' as const,
         required: true,
-        description: 'Which conversation to read',
+        description: app.i18n.t('commands.chatArg'),
         get default(): string | undefined {
           return app.store.get<string>(CHAT_URI) ?? undefined;
         },
@@ -2126,9 +2129,9 @@ function commands(
     },
     {
       id: 'chat.close',
-      title: 'Close chat',
-      category: 'Session',
-      description: 'Dispose the conversation being read',
+      title: app.i18n.t('command.chat.close.title'),
+      category: app.i18n.t('category.session'),
+      description: app.i18n.t('command.chat.close.description'),
       slots: ['palette'],
       when: HAS_CHATS,
       run: () => {
@@ -2145,9 +2148,9 @@ function commands(
      */
     {
       id: 'terminal.new',
-      title: 'New terminal',
-      category: 'Terminal',
-      description: 'Start a shell on the host, in the workspace directory',
+      title: app.i18n.t('command.terminal.new.title'),
+      category: app.i18n.t('category.terminal'),
+      description: app.i18n.t('command.terminal.new.description'),
       slots: ['palette'],
       run: () => {
         const where = app.store.get<string>(WORKSPACE);
@@ -2159,9 +2162,9 @@ function commands(
     },
     {
       id: 'terminal.interrupt',
-      title: 'Interrupt',
-      category: 'Terminal',
-      description: 'Send ctrl+c to the shell',
+      title: app.i18n.t('command.terminal.interrupt.title'),
+      category: app.i18n.t('category.terminal'),
+      description: app.i18n.t('command.terminal.interrupt.description'),
       slots: ['palette'],
       when: OPEN_TERMINAL,
       // `\u0003` is what a terminal sends for ctrl+c, and the shell is what
@@ -2171,9 +2174,9 @@ function commands(
     },
     {
       id: 'terminal.clear',
-      title: 'Clear terminal',
-      category: 'Terminal',
-      description: 'Empty the scrollback of the open terminal',
+      title: app.i18n.t('command.terminal.clear.title'),
+      category: app.i18n.t('category.terminal'),
+      description: app.i18n.t('command.terminal.clear.description'),
       slots: ['palette'],
       when: OPEN_TERMINAL,
       // The host's own action, not a screen wiping what it drew: every client
@@ -2183,16 +2186,16 @@ function commands(
     },
     {
       id: 'terminal.rename',
-      title: 'Rename terminal',
-      category: 'Terminal',
-      description: 'Give the open terminal a name',
+      title: app.i18n.t('command.terminal.rename.title'),
+      category: app.i18n.t('category.terminal'),
+      description: app.i18n.t('command.terminal.rename.description'),
       slots: ['palette'],
       when: OPEN_TERMINAL,
       args: [{
         name: 'title',
         type: 'string' as const,
         required: true,
-        description: 'What to call it',
+        description: app.i18n.t('commands.terminalNameArg'),
       }],
       run: (args: Record<string, unknown>) => {
         const title = String(args.title ?? '').trim();
@@ -2201,9 +2204,9 @@ function commands(
     },
     {
       id: 'terminal.close',
-      title: 'Close terminal',
-      category: 'Terminal',
-      description: 'Kill the shell being read',
+      title: app.i18n.t('command.terminal.close.title'),
+      category: app.i18n.t('category.terminal'),
+      description: app.i18n.t('command.terminal.close.description'),
       slots: ['palette'],
       when: OPEN_TERMINAL,
       run: () => void controller.terminals.close(),
@@ -2214,11 +2217,11 @@ function commands(
      */
     {
       id: 'terminal.jump',
-      title: 'Go to terminal',
-      category: 'Terminal',
-      description: 'Read the terminal at this place in the tabs',
+      title: app.i18n.t('command.terminal.jump.title'),
+      category: app.i18n.t('category.terminal'),
+      description: app.i18n.t('command.terminal.jump.description'),
       when: `${SCREEN} == 'terminal'`,
-      args: [{ name: 'index', type: 'number' as const, required: true, description: 'Its place, from 1' }],
+      args: [{ name: 'index', type: 'number' as const, required: true, description: app.i18n.t('commands.terminalIndexArg') }],
       run: (args: Record<string, unknown>) => {
         const rows = app.store.get<TerminalRow[]>(TERMINALS) ?? [];
         const found = rows[Number(args.index) - 1];
@@ -2227,25 +2230,25 @@ function commands(
     },
     {
       id: 'terminal.next',
-      title: 'Next terminal',
-      category: 'Terminal',
+      title: app.i18n.t('command.terminal.next.title'),
+      category: app.i18n.t('category.terminal'),
       slots: ['palette'],
       when: `${SCREEN} == 'terminal'`,
       run: () => stepTerminal(1),
     },
     {
       id: 'terminal.previous',
-      title: 'Previous terminal',
-      category: 'Terminal',
+      title: app.i18n.t('command.terminal.previous.title'),
+      category: app.i18n.t('category.terminal'),
       slots: ['palette'],
       when: `${SCREEN} == 'terminal'`,
       run: () => stepTerminal(-1),
     },
     {
       id: 'terminals.list',
-      title: 'List terminals',
-      category: 'Terminal',
-      description: 'Every terminal on the host, and back to the one being read',
+      title: app.i18n.t('command.terminals.list.title'),
+      category: app.i18n.t('category.terminal'),
+      description: app.i18n.t('command.terminals.list.description'),
       slots: ['palette'],
       when: `${SCREEN} == 'terminal'`,
       run: () => {
@@ -2257,8 +2260,8 @@ function commands(
     },
     {
       id: 'terminal.focusSwitch',
-      title: 'Switch terminal focus',
-      category: 'Terminal',
+      title: app.i18n.t('command.terminal.focusSwitch.title'),
+      category: app.i18n.t('category.terminal'),
       when: `${SCREEN} == 'terminal'`,
       run: () => {
         app.focus.focus(app.focus.focused() === 'terminal.tabs' ? 'terminal.input' : 'terminal.tabs');
@@ -2266,17 +2269,17 @@ function commands(
     },
     {
       id: 'terminals.show',
-      title: 'Show terminals',
-      category: 'Screens',
-      description: 'The shells running on the host',
+      title: app.i18n.t('command.terminals.show.title'),
+      category: app.i18n.t('category.screens'),
+      description: app.i18n.t('command.terminals.show.description'),
       slots: ['palette'],
       run: () => { app.screens.push('terminal'); },
     },
     {
       id: 'workspace.choose',
-      title: 'Choose workspace',
-      category: 'Compose',
-      description: 'Choose the directory the session works in, from the host\'s own',
+      title: app.i18n.t('command.workspace.choose.title'),
+      category: app.i18n.t('category.compose'),
+      description: app.i18n.t('command.workspace.choose.description'),
       slots: ['palette'],
       when: `!${OPEN}`,
       /*
@@ -2297,15 +2300,15 @@ function commands(
         const served = sessions(app.store).flatMap((one) => one.workingDirectories)[0];
         const listable = held !== '' && await controller.files(at).then(() => true, () => false);
         const start = listable ? at : served ?? at;
-        const picked = await pick(app, { start, wants: 'directory', title: 'Workspace', placeholder: 'Filter this directory…' });
+        const picked = await pick(app, { start, wants: 'directory', title: app.i18n.t('commands.workspacePicker.title'), placeholder: app.i18n.t('commands.workspacePicker.placeholder') });
         if (picked !== null) workspace(decodeURIComponent(picked.replace(/^file:\/\//, '')));
       },
     },
     {
       id: 'workspace.type',
-      title: 'Type workspace path',
-      category: 'Compose',
-      description: 'Type the directory the session works in',
+      title: app.i18n.t('command.workspace.type.title'),
+      category: app.i18n.t('category.compose'),
+      description: app.i18n.t('command.workspace.type.description'),
       slots: ['palette'],
       when: `!${OPEN}`,
       // For a host that lists nothing - one without the `resource*` family -
@@ -2314,7 +2317,7 @@ function commands(
         name: 'path',
         type: 'string' as const,
         required: true,
-        description: 'Where the agent works. A path on the host, not on this machine.',
+        description: app.i18n.t('commands.workspacePathArg'),
       }],
       run: (args: Record<string, unknown>) => {
         const path = String(args.path ?? '').trim();
@@ -2323,8 +2326,8 @@ function commands(
     },
     {
       id: 'session.start',
-      title: 'Start session',
-      category: 'Compose',
+      title: app.i18n.t('command.session.start.title'),
+      category: app.i18n.t('category.compose'),
       slots: ['palette'],
       when: `!${OPEN}`,
       run: () => {
@@ -2342,9 +2345,9 @@ function commands(
 
     {
       id: 'session.open',
-      title: 'Open session',
-      category: 'Session',
-      description: 'Show the conversation',
+      title: app.i18n.t('command.session.open.title'),
+      category: app.i18n.t('category.session'),
+      description: app.i18n.t('command.session.open.description'),
       slots: ['palette'],
       // It opens the row under the cursor, so it needs one.
       when: `${SELECTED} || ${OPEN}`,
@@ -2366,9 +2369,9 @@ function commands(
        * where the reader had scrolled, which re-opening would throw away.
        */
       id: 'session.reopen',
-      title: 'Reopen session',
-      category: 'Session',
-      description: 'Return to the conversation that was open',
+      title: app.i18n.t('command.session.reopen.title'),
+      category: app.i18n.t('category.session'),
+      description: app.i18n.t('command.session.reopen.description'),
       slots: ['palette'],
       when: `${OPEN}`,
       run: () => {
@@ -2378,9 +2381,9 @@ function commands(
     },
     {
       id: 'session.new',
-      title: 'New session',
-      category: 'Session',
-      description: 'Start a new conversation',
+      title: app.i18n.t('command.session.new.title'),
+      category: app.i18n.t('category.session'),
+      description: app.i18n.t('command.session.new.description'),
       slots: ['palette'],
       run: () => {
         // Nothing open, so the control row describes a session that does not
@@ -2392,18 +2395,18 @@ function commands(
     },
     {
       id: 'sessions.refresh',
-      title: 'Refresh sessions',
-      category: 'Session',
-      description: 'Reload the list from the host',
+      title: app.i18n.t('command.sessions.refresh.title'),
+      category: app.i18n.t('category.session'),
+      description: app.i18n.t('command.sessions.refresh.description'),
       slots: ['palette'],
       keepOpen: true,
       run: () => void controller.refresh(true),
     },
     {
       id: 'session.archive',
-      title: 'Archive / unarchive',
-      category: 'Session',
-      description: 'Hide or show this session',
+      title: app.i18n.t('command.session.archive.title'),
+      category: app.i18n.t('category.session'),
+      description: app.i18n.t('command.session.archive.description'),
       slots: ['palette'],
       // It acts on the session being read, or the one selected in the catalogue.
       when: `${OPEN} || ${SELECTED}`,
@@ -2420,9 +2423,9 @@ function commands(
     },
     {
       id: 'session.read',
-      title: 'Mark read / unread',
-      category: 'Session',
-      description: 'Mark this session read or unread',
+      title: app.i18n.t('command.session.read.title'),
+      category: app.i18n.t('category.session'),
+      description: app.i18n.t('command.session.read.description'),
       slots: ['palette'],
       // It acts on the session being read, or the one selected in the catalogue.
       when: `${OPEN} || ${SELECTED}`,
@@ -2435,9 +2438,9 @@ function commands(
     },
     {
       id: 'session.dispose',
-      title: 'Dispose session',
-      category: 'Session',
-      description: 'End it on the host, for every client',
+      title: app.i18n.t('command.session.dispose.title'),
+      category: app.i18n.t('category.session'),
+      description: app.i18n.t('command.session.dispose.description'),
       slots: ['palette'],
       // It acts on the session being read, or the one selected in the catalogue.
       when: `${OPEN} || ${SELECTED}`,
@@ -2447,10 +2450,10 @@ function commands(
         // The host frees the session and tells every other client. Ending
         // somebody else's conversation is not an undo, so it is asked for.
         const yes = await confirm(app.layers, {
-          title: 'Dispose session',
-          message: 'The host ends this session for every client watching it. The record of what happened stays.',
-          confirmLabel: 'Dispose',
-          cancelLabel: 'Keep',
+          title: app.i18n.t('commands.disposeSession.title'),
+          message: app.i18n.t('commands.disposeSession.message'),
+          confirmLabel: app.i18n.t('commands.disposeSession.confirm'),
+          cancelLabel: app.i18n.t('commands.disposeSession.cancel'),
           tone: 'danger',
         });
         if (yes) await controller.disposeSession(uri);
@@ -2458,9 +2461,9 @@ function commands(
     },
     {
       id: 'archived.show',
-      title: 'Show archived sessions',
-      category: 'Session',
-      description: 'List the sessions that have been put away',
+      title: app.i18n.t('command.archived.show.title'),
+      category: app.i18n.t('category.session'),
+      description: app.i18n.t('command.archived.show.description'),
       slots: ['palette'],
       keepOpen: true,
       // A switch, and the palette says which way it is set. The title used to
@@ -2478,8 +2481,8 @@ function commands(
      */
     {
       id: 'app.interrupt',
-      title: 'Quit on a second ctrl+c',
-      category: 'Application',
+      title: app.i18n.t('command.app.interrupt.title'),
+      category: app.i18n.t('category.application'),
       run: () => {
         if (quitting) {
           clearTimeout(quitting);
@@ -2495,9 +2498,9 @@ function commands(
     },
     {
       id: 'turn.stop',
-      title: 'Stop turn',
-      category: 'Chat',
-      description: 'Stop the agent where it is',
+      title: app.i18n.t('command.turn.stop.title'),
+      category: app.i18n.t('category.chat'),
+      description: app.i18n.t('command.turn.stop.description'),
       slots: ['palette'],
       // On the screen that is showing the turn. A session left open behind
       // you keeps its status - a blocked one reads 24 for ever - so a clause
@@ -2509,9 +2512,9 @@ function commands(
     },
     {
       id: 'tool.approve',
-      title: 'Approve tool call',
-      category: 'Chat',
-      description: 'Let the agent run what it is waiting on',
+      title: app.i18n.t('command.tool.approve.title'),
+      category: app.i18n.t('category.chat'),
+      description: app.i18n.t('command.tool.approve.description'),
       slots: ['palette'],
       // There is nothing to approve until the agent has asked.
       when: `${INPUT}`,
@@ -2520,9 +2523,9 @@ function commands(
     },
     {
       id: 'tool.deny',
-      title: 'Deny tool call',
-      category: 'Chat',
-      description: 'Refuse what the agent is waiting on',
+      title: app.i18n.t('command.tool.deny.title'),
+      category: app.i18n.t('category.chat'),
+      description: app.i18n.t('command.tool.deny.description'),
       slots: ['palette'],
       // There is nothing to deny until the agent has asked.
       when: `${INPUT}`,
@@ -2530,20 +2533,20 @@ function commands(
     },
     {
       id: 'message.send',
-      title: 'Send message',
-      category: 'Chat',
-      description: 'Send what is in the composer',
+      title: app.i18n.t('command.message.send.title'),
+      category: app.i18n.t('category.chat'),
+      description: app.i18n.t('command.message.send.description'),
       slots: ['palette'],
       // `send` returns without a session, so offering it without one is offering nothing.
       when: `${OPEN}`,
-      args: [{ name: 'text', type: 'string' as const, required: true, description: 'What to say' }],
+      args: [{ name: 'text', type: 'string' as const, required: true, description: app.i18n.t('commands.messageArg') }],
       run: (args: Record<string, unknown>) => controller.send(String(args.text ?? '')),
     },
     {
       id: 'composer.focus',
-      title: 'Write a message',
-      category: 'Chat',
-      description: 'Focus the composer',
+      title: app.i18n.t('command.composer.focus.title'),
+      category: app.i18n.t('category.chat'),
+      description: app.i18n.t('command.composer.focus.description'),
       slots: ['palette'],
       // Focus goes to a field that is only mounted on these two screens.
       when: `${SCREEN} == 'chat' || ${SCREEN} == 'new'`,
@@ -2558,9 +2561,9 @@ function commands(
        * front of me", and which of the two that is depends on where you are.
        */
       id: 'chat.find',
-      title: 'Find in conversation',
-      category: 'Chat',
-      description: 'Search what has been said in this session',
+      title: app.i18n.t('command.chat.find.title'),
+      category: app.i18n.t('category.chat'),
+      description: app.i18n.t('command.chat.find.description'),
       slots: ['palette'],
       when: `${SCREEN} == 'chat'`,
       run: () => {
@@ -2583,22 +2586,22 @@ function commands(
        * conversation reads as broken rather than as finished.
        */
       id: 'chat.find.next',
-      title: 'Next match',
-      category: 'Chat',
+      title: app.i18n.t('command.chat.find.next.title'),
+      category: app.i18n.t('category.chat'),
       when: `${SCREEN} == 'chat' && ${FINDING}`,
       run: () => step(1),
     },
     {
       id: 'chat.find.previous',
-      title: 'Previous match',
-      category: 'Chat',
+      title: app.i18n.t('command.chat.find.previous.title'),
+      category: app.i18n.t('category.chat'),
       when: `${SCREEN} == 'chat' && ${FINDING}`,
       run: () => step(-1),
     },
     {
       id: 'chat.find.close',
-      title: 'Close the find box',
-      category: 'Chat',
+      title: app.i18n.t('command.chat.find.close.title'),
+      category: app.i18n.t('category.chat'),
       // Not in the palette: escape closes it and it is only reachable while
       // it is open, so a row for it is a row that never applies.
       when: `${SCREEN} == 'chat' && ${FINDING}`,
@@ -2610,9 +2613,9 @@ function commands(
     },
     {
       id: 'sessions.filter',
-      title: 'Filter sessions',
-      category: 'Session',
-      description: 'Narrow the list as you type',
+      title: app.i18n.t('command.sessions.filter.title'),
+      category: app.i18n.t('category.session'),
+      description: app.i18n.t('command.sessions.filter.description'),
       slots: ['palette'],
       // The filter box belongs to the catalogue.
       when: `${SCREEN} == 'sessions'`,
@@ -2637,9 +2640,9 @@ function commands(
      */
     {
       id: 'session.showDetails',
-      title: 'Show session details',
-      category: 'Session',
-      description: 'Show the detail pane, and read it',
+      title: app.i18n.t('command.session.showDetails.title'),
+      category: app.i18n.t('category.session'),
+      description: app.i18n.t('command.session.showDetails.description'),
       slots: ['palette'],
       // The pane is the catalogue's, so the command is too. Without this it
       // was offered on every screen and did nothing on all but one.
@@ -2651,9 +2654,9 @@ function commands(
     },
     {
       id: 'session.hideDetails',
-      title: 'Hide session details',
-      category: 'Session',
-      description: 'Hide the detail pane, and give the list the width',
+      title: app.i18n.t('command.session.hideDetails.title'),
+      category: app.i18n.t('category.session'),
+      description: app.i18n.t('command.session.hideDetails.description'),
       slots: ['palette'],
       when: `${SCREEN} == 'sessions'`,
       run: () => {
@@ -2669,9 +2672,9 @@ function commands(
     },
     {
       id: 'transcript.focus',
-      title: 'Read the transcript',
-      category: 'Chat',
-      description: 'Focus the transcript',
+      title: app.i18n.t('command.transcript.focus.title'),
+      category: app.i18n.t('category.chat'),
+      description: app.i18n.t('command.transcript.focus.description'),
       slots: ['palette'],
       // The transcript is the conversation's, and nothing else mounts it.
       when: `${SCREEN} == 'chat'`,
@@ -2679,9 +2682,9 @@ function commands(
     },
     {
       id: 'queue.clear',
-      title: 'Drop queued messages',
-      category: 'Chat',
-      description: 'Forget the messages waiting to be sent',
+      title: app.i18n.t('command.queue.clear.title'),
+      category: app.i18n.t('category.chat'),
+      description: app.i18n.t('command.queue.clear.description'),
       slots: ['palette'],
       when: `${QUEUE}`,
       // One dispatch each, because that is what the protocol offers - and the
@@ -2694,9 +2697,9 @@ function commands(
     },
     {
       id: 'chat.expand',
-      title: 'Expand / collapse the selected block',
-      category: 'Chat',
-      description: 'Expand / collapse the selected block',
+      title: app.i18n.t('command.chat.expand.title'),
+      category: app.i18n.t('category.chat'),
+      description: app.i18n.t('command.chat.expand.description'),
       slots: [],
       run: (args: Record<string, unknown>) => {
         const id = String(args.id ?? '');
@@ -2708,9 +2711,9 @@ function commands(
     },
     {
       id: 'chat.running',
-      title: 'Is a turn running',
-      category: 'Chat',
-      description: 'Is a turn running',
+      title: app.i18n.t('command.chat.running.title'),
+      category: app.i18n.t('category.chat'),
+      description: app.i18n.t('command.chat.running.description'),
       slots: [],
       run: () => running(),
     },
@@ -2797,8 +2800,8 @@ export const commandIdFor = (id: string): string => RENAMED[id] ?? id;
  * mean the second after somebody rebound the first, which is not what
  * rebinding a key means. `null` takes the chord away and binds nothing.
  */
-function keys(over?: Record<string, string | null>): Binding[] {
-  const defaults = shipped();
+function keys(i18n: TextUIApp['i18n'], over?: Record<string, string | null>): Binding[] {
+  const defaults = shipped(i18n);
   if (!over || Object.keys(over).length === 0) return defaults;
   const named = new Set(Object.keys(over));
   return [
@@ -2810,7 +2813,7 @@ function keys(over?: Record<string, string | null>): Binding[] {
 }
 
 /** What this client ships with. */
-function shipped(): Binding[] {
+function shipped(i18n: TextUIApp['i18n']): Binding[] {
   return [
     // Global: nothing types these, so they are safe wherever focus is.
     { keys: 'ctrl+p', commandId: 'app.palette' },
@@ -2844,7 +2847,7 @@ function shipped(): Binding[] {
       keys: `alt+${String(index + 1)}`,
       commandId: 'terminal.jump',
       args: { index: index + 1 },
-      title: `Go to terminal ${String(index + 1)}`,
+      title: i18n.t('commands.goToTerminal', { index: index + 1 }),
       when: `${SCREEN} == 'terminal'`,
     })),
     { keys: 'alt+right', commandId: 'terminal.next', when: `${SCREEN} == 'terminal'` },

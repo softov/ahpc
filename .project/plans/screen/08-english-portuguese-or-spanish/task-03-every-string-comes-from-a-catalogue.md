@@ -1,6 +1,6 @@
 ---
 title: Every string ahpc shows comes from a catalogue
-status: todo
+status: done
 depends: [task-02-the-language-is-chosen-at-start.md]
 layer: "ahpc screen"
 refs:
@@ -36,3 +36,10 @@ Every string the TUI shows reads through `app.i18n.t`, with an `en` bundle that 
 
 ## Resume
 
+Done 2026-09-30.
+`src/i18n/<locale>/{commands,screens,views,textui}.ts`, registered first in `registerChat` and in `registerWire`; 193 command keys, 136 screen keys, 183 view keys, and pt-BR and es for textui's 115.
+`test/i18n.test.ts` holds the catalogues to one key set and one set of placeholders, and every key the code asks for to an English message.
+Departure: commands carry no `keywords` with the English title; the palette searches ids, which are English noun.verb, so an English search finds a command in any language.
+Two English strings changed: "1 files" reads "1 file", and the Changes and Files titles lost a trailing space.
+Left English: whatever the host sends (titles, model and harness names, config titles and values, activity lines), protocol values, key chords, CLI output.
+Checked with `ahpc --static --lang pt-br` on the sessions and new-session screens.

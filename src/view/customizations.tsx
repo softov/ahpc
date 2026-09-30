@@ -1,5 +1,5 @@
-import type { BoxProps, RenderOutput, SemanticVariant } from '@textui/core';
-import { defineComponent, stringWidth, useTheme } from '@textui/core';
+import type { BoxProps, I18n, RenderOutput, SemanticVariant } from '@textui/core';
+import { defineComponent, stringWidth, useI18n, useTheme } from '@textui/core';
 import type { ListItem, ListItemState } from '@textui/widgets';
 import { Column, List, Marquee, Row } from '@textui/widgets';
 import type { Customization, McpState } from '../ahp/types.js';
@@ -32,15 +32,15 @@ export interface CustomizationListProps extends BoxProps {
 }
 
 /** What an MCP server's state means, in a word and a colour. */
-const MCP: Record<McpState, { label: string; tone: SemanticVariant }> = {
-  starting: { label: 'starting', tone: 'warning' },
-  ready: { label: 'ready', tone: 'success' },
+const mcpStates = (i18n: I18n): Record<McpState, { label: string; tone: SemanticVariant }> => ({
+  starting: { label: i18n.t('views.customizations.starting'), tone: 'warning' },
+  ready: { label: i18n.t('views.customizations.ready'), tone: 'success' },
   // Not an error: the server is reachable and nobody has signed in, which is
   // something a person can go and fix rather than something that broke.
-  authRequired: { label: 'sign in', tone: 'warning' },
-  error: { label: 'failed', tone: 'danger' },
-  stopped: { label: 'stopped', tone: 'muted' },
-};
+  authRequired: { label: i18n.t('views.customizations.signIn'), tone: 'warning' },
+  error: { label: i18n.t('views.customizations.failed'), tone: 'danger' },
+  stopped: { label: i18n.t('views.customizations.stopped'), tone: 'muted' },
+});
 
 export const CustomizationList: (props: CustomizationListProps) => RenderOutput =
   defineComponent<CustomizationListProps>('CustomizationList', (props) => {
@@ -48,6 +48,8 @@ export const CustomizationList: (props: CustomizationListProps) => RenderOutput 
       items, onToggle, onSelect, selectedId, emptyMessage, focusId, autoFocus, ...rest
     } = props;
     const theme = useTheme();
+    const i18n = useI18n();
+    const MCP = mcpStates(i18n);
 
     const dot = `  ${theme.glyphs.separator}  `;
     const byId = new Map(items.map((item) => [item.id, item]));
@@ -68,7 +70,7 @@ export const CustomizationList: (props: CustomizationListProps) => RenderOutput 
           // worth reading when it is.
           item.problem ?? '',
         ].filter(Boolean).join(dot),
-        meta: mcp?.label ?? (item.enabled ? '' : 'off'),
+        meta: mcp?.label ?? (item.enabled ? '' : i18n.t('views.customizations.off')),
         tone: (item.problem && !mcp
           ? 'danger'
           : mcp?.tone ?? (item.enabled ? 'muted' : 'subtle')) as SemanticVariant,
@@ -111,7 +113,7 @@ export const CustomizationList: (props: CustomizationListProps) => RenderOutput 
           );
         }}
         {...(selectedId ? { selectedId } : {})}
-        emptyMessage={emptyMessage ?? 'The host contributed none'}
+        emptyMessage={emptyMessage ?? i18n.t('views.customizations.empty')}
         {...(onSelect ? { onSelect } : {})}
         {...(onToggle
           ? {

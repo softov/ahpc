@@ -277,7 +277,7 @@ async function still(options: Options): Promise<void> {
     before: async (app) => {
       const controller = app.services.require(CONTROLLER);
       // What the file says, if anything; a still never asks the registry.
-      app.store.set(UPDATE_NOTICE, updateNotice(manifest()));
+      app.store.set(UPDATE_NOTICE, updateNotice(manifest(), app.i18n));
       // A URI, or the link the reference host's tools answer with.
       if (options.session) {
         if (parseSessionLink(options.session)) await controller.openLink(options.session);
@@ -436,7 +436,7 @@ export async function tui(argv: string[]): Promise<void> {
    * let go of so quitting does not wait six hours for it.
    */
   const self = manifest();
-  const say = (): void => { app.store.set(UPDATE_NOTICE, updateNotice(self)); };
+  const say = (): void => { app.store.set(UPDATE_NOTICE, updateNotice(self, app.i18n)); };
   say();
   if (checkingUpdates(options.updateCheck)) {
     const refresh = (): void => { void refreshUpdate({ name: self.name, registry: registry() }).then(say); };

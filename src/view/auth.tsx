@@ -1,5 +1,5 @@
 import type { RenderOutput } from '@textui/core';
-import { defineComponent, useEffect, useRequiredService, useStoreValue } from '@textui/core';
+import { defineComponent, useEffect, useI18n, useRequiredService, useStoreValue } from '@textui/core';
 import { Column, Dialog, Field, Form, FormActions, TextInput, useForm } from '@textui/widgets';
 import { CONTROLLER } from '../control.js';
 import { AUTH_ASK } from '../state.js';
@@ -22,13 +22,14 @@ import type { AuthAsk } from '../ahp/auth.js';
 export const SignInPrompt: (props: Record<string, never>) => RenderOutput =
   defineComponent<Record<string, never>>('SignInPrompt', () => {
     const controller = useRequiredService(CONTROLLER);
+    const i18n = useI18n();
     const ask = useStoreValue<AuthAsk | null>(AUTH_ASK, null) ?? null;
 
     const form = useForm<{ token: string }>({
       initialValues: { token: '' },
       // Empty is not a credential. `FormActions` disables submit until
       // something is typed, and this is what stops a whitespace-only one too.
-      validate: (values) => (values.token.trim() === '' ? { token: 'A token is needed' } : {}),
+      validate: (values) => (values.token.trim() === '' ? { token: i18n.t('views.auth.tokenNeeded') } : {}),
       onSubmit: async (values) => {
         if (ask === null) return;
         const taken = await controller.signIn(ask.resource, values.token.trim());
@@ -48,7 +49,7 @@ export const SignInPrompt: (props: Record<string, never>) => RenderOutput =
     if (ask === null) return null;
 
     return (
-      <Dialog title="Sign in" width={62}>
+      <Dialog title={i18n.t('views.auth.title')} width={62}>
         <Column gap={1}>
           <Column gap={0}>
             {/* The host's own name for it when it gave one, and the identifier
@@ -58,29 +59,29 @@ export const SignInPrompt: (props: Record<string, never>) => RenderOutput =
             {ask.name !== undefined ? <text content={ask.resource} fg="muted" /> : null}
           </Column>
           {ask.reason === 'expired'
-            ? <text content="The token the host was holding has expired." fg="warning" wrap="word" />
+            ? <text content={i18n.t('views.auth.expired')} fg="warning" wrap="word" />
             : null}
           <text
             content={ask.words !== ''
               ? ask.words
-              : `${ask.name ?? ask.resource} needs signing in to before the host will go on.`}
+              : i18n.t('views.auth.needed', { name: ask.name ?? ask.resource })}
             fg={ask.words !== '' ? 'danger' : 'subtle'}
             wrap="word"
           />
           <Form form={form as never}>
-            <Field name="token" label="Token" labelWidth={6} required>
+            <Field name="token" label={i18n.t('views.auth.tokenLabel')} labelWidth={6} required>
               <TextInput
                 value={form.values.token}
                 mask="*"
                 autoFocus
-                placeholder="paste or type the token"
+                placeholder={i18n.t('views.auth.tokenPlaceholder')}
                 onChange={(value: string) => { form.setValue('token', value); form.touch('token'); }}
                 onSubmit={() => { void form.submit(); }}
               />
             </Field>
             <FormActions
-              submitLabel="Sign in"
-              cancelLabel="Cancel"
+              submitLabel={i18n.t('views.auth.submit')}
+              cancelLabel={i18n.t('views.auth.cancel')}
               requireDirty
               onCancel={() => controller.dismissSignIn()}
             />

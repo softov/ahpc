@@ -1,5 +1,7 @@
+import type { I18n } from '@textui/core';
 import type { Block } from '@textui/chat';
 import type { QueuedMessage, ToolCall, Turn } from './ahp/types.js';
+import { inEnglish } from './state.js';
 
 export type { Block } from '@textui/chat';
 export { selectable } from '@textui/chat';
@@ -12,12 +14,14 @@ export { selectable } from '@textui/chat';
  * readable name comes with the URL rather than instead of it, since the URL is
  * what `authenticate` names.
  */
-function signIn(call: ToolCall): string {
+function signIn(call: ToolCall, i18n: I18n): string {
   const server = call.auth === undefined
     ? ''
     : call.auth.name === undefined ? call.auth.resource : `${call.auth.name} (${call.auth.resource})`;
   const why = call.auth?.description ?? call.auth?.reason;
-  return `${call.name} needs a sign-in: ${server}${why === undefined ? '' : ` (${why})`}`;
+  return why === undefined
+    ? i18n.t('views.blocks.signIn', { tool: call.name, server })
+    : i18n.t('views.blocks.signInWhy', { tool: call.name, server, why });
 }
 
 /**
@@ -33,7 +37,7 @@ function signIn(call: ToolCall): string {
  * in one stream, and "let me search for those" means something before the
  * searches and nothing after them.
  */
-export function toBlocks(turns: Turn[], queued: QueuedMessage[] = []): Block[] {
+export function toBlocks(turns: Turn[], queued: QueuedMessage[] = [], i18n: I18n = inEnglish()): Block[] {
   const blocks: Block[] = [];
 
   for (const turn of turns) {
@@ -52,7 +56,9 @@ export function toBlocks(turns: Turn[], queued: QueuedMessage[] = []): Block[] {
         : total),
       { added: 0, removed: 0 },
     );
-    const elapsed = running ? 'running' : turn.elapsedMs ? `${(turn.elapsedMs / 1000).toFixed(1)}s` : '';
+    const elapsed = running
+      ? i18n.t('views.blocks.running')
+      : turn.elapsedMs ? i18n.t('views.blocks.elapsed', { seconds: (turn.elapsedMs / 1000).toFixed(1) }) : '';
     const meta = edits.added > 0 || edits.removed > 0
       ? `${elapsed}${elapsed === '' ? '' : ' '}+${edits.added} -${edits.removed}`
       : elapsed;
@@ -92,7 +98,7 @@ export function toBlocks(turns: Turn[], queued: QueuedMessage[] = []): Block[] {
             // a person, and a notice is the row that says so without claiming
             // either. `@textui/chat` has no `auth-required` tool status, so it
             // is drawn from the block kind that already exists.
-            blocks.push({ kind: 'notice', id: part.id, turnId: turn.id, content: signIn(part.call) });
+            blocks.push({ kind: 'notice', id: part.id, turnId: turn.id, content: signIn(part.call, i18n) });
             break;
           }
           blocks.push({ kind: 'tool', id: part.id, turnId: turn.id, call: { ...part.call, status: part.call.status } });

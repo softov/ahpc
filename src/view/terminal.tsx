@@ -1,5 +1,5 @@
-import type { RenderOutput } from '@textui/core';
-import { defineComponent, useFocus, useInput, useState, useTheme } from '@textui/core';
+import type { I18n, RenderOutput } from '@textui/core';
+import { defineComponent, useFocus, useI18n, useInput, useState, useTheme } from '@textui/core';
 import type { ListItem, ListItemState } from '@textui/widgets';
 import { Column, Divider, Feed, List, Row, TextArea } from '@textui/widgets';
 import type { TerminalRow, TerminalState } from '../ahp/types.js';
@@ -37,8 +37,10 @@ export interface TerminalViewProps {
 }
 
 /** What a terminal is called on a tab or a row, with how it ended when it has. */
-function labelOf(row: TerminalRow, index: number): string {
-  return `${String(index + 1)} ${row.title}${row.exitCode !== undefined ? ` (exit ${String(row.exitCode)})` : ''}`;
+function labelOf(row: TerminalRow, index: number, i18n: I18n): string {
+  return row.exitCode !== undefined
+    ? i18n.t('views.terminal.labelExited', { number: String(index + 1), title: row.title, code: String(row.exitCode) })
+    : i18n.t('views.terminal.label', { number: String(index + 1), title: row.title });
 }
 
 interface TerminalTabsProps {
@@ -56,6 +58,7 @@ interface TerminalTabsProps {
 const TerminalTabs: (props: TerminalTabsProps) => RenderOutput =
   defineComponent<TerminalTabsProps>('TerminalTabs', ({ rows, open, onSelect }) => {
     const focus = useFocus({ id: 'terminal.tabs' });
+    const i18n = useI18n();
     const at = Math.max(0, rows.findIndex((row) => row.resource === open));
     useInput((event) => {
       const step = event.name === 'right' ? 1 : event.name === 'left' ? -1 : 0;
@@ -71,7 +74,7 @@ const TerminalTabs: (props: TerminalTabsProps) => RenderOutput =
           return (
             <text
               key={row.resource}
-              content={labelOf(row, index)}
+              content={labelOf(row, index, i18n)}
               fg={here ? (focus.focused ? 'accent' : 'text') : 'subtle'}
               bold={here}
               underline={here && focus.focused}
@@ -86,6 +89,7 @@ const TerminalTabs: (props: TerminalTabsProps) => RenderOutput =
 export const TerminalView: (props: TerminalViewProps) => RenderOutput =
   defineComponent<TerminalViewProps>('TerminalView', ({ rows, open, state, draft, onDraft, onSend, onSelect, listing, onOpen }) => {
     const theme = useTheme();
+    const i18n = useI18n();
     // The list's cursor, starting on the one being read. Held here because the
     // list's `selectedId` is the selection, not where it starts.
     const [cursor, setCursor] = useState<string | null>(null);
@@ -93,10 +97,10 @@ export const TerminalView: (props: TerminalViewProps) => RenderOutput =
 
     if (listing) {
       const byUri = new Map(rows.map((row) => [row.resource, row]));
-      const items: ListItem[] = rows.map((row, index) => ({ id: row.resource, label: labelOf(row, index) }));
+      const items: ListItem[] = rows.map((row, index) => ({ id: row.resource, label: labelOf(row, index, i18n) }));
       return (
         <Column flex={1} gap={0}>
-          <text content={`Terminals (${String(rows.length)})`} fg="muted" bold />
+          <text content={i18n.t('views.terminal.listTitle', { count: String(rows.length) })} fg="muted" bold />
           <Divider dim />
           <List
             items={items}
@@ -106,14 +110,14 @@ export const TerminalView: (props: TerminalViewProps) => RenderOutput =
             {...(on ? { selectedId: on } : {})}
             onSelect={(uri: string) => setCursor(uri)}
             onActivate={(uri: string) => { setCursor(null); onOpen?.(uri); }}
-            emptyMessage="No terminals"
+            emptyMessage={i18n.t('views.terminal.empty')}
             renderItem={(item: ListItem, itemState: ListItemState) => {
               const row = byUri.get(item.id);
               return (
                 <Row gap={1}>
                   <text content={item.id === open ? theme.glyphs.bulletFilled : ' '} fg="accent" shrink={0} />
                   <text content={item.label} flex={1} truncate="end" {...(itemState.selected ? {} : { fg: row?.exitCode !== undefined ? 'muted' : 'text' })} />
-                  <text content={row?.exitCode !== undefined ? 'ended' : 'running'} fg={row?.exitCode !== undefined ? 'danger' : 'success'} shrink={0} />
+                  <text content={row?.exitCode !== undefined ? i18n.t('views.terminal.ended') : i18n.t('views.terminal.running')} fg={row?.exitCode !== undefined ? 'danger' : 'success'} shrink={0} />
                 </Row>
               );
             }}
@@ -144,7 +148,7 @@ export const TerminalView: (props: TerminalViewProps) => RenderOutput =
             <Row justify="between">
               <text content={state.cwd ?? state.title} fg="muted" />
               {/* Said, not discovered. */}
-              <text content={state.isPty ? '' : 'plain text'} fg="subtle" />
+              <text content={state.isPty ? '' : i18n.t('views.terminal.plainText')} fg="subtle" />
             </Row>
           ) : null}
           <Divider dim />
@@ -167,7 +171,7 @@ export const TerminalView: (props: TerminalViewProps) => RenderOutput =
             ? (
               <Column flex={1}>
                 <text
-                  content={state === null ? 'Opening…' : 'Nothing said yet. Type a command below.'}
+                  content={state === null ? i18n.t('views.terminal.opening') : i18n.t('views.terminal.noOutput')}
                   fg="subtle"
                 />
               </Column>
@@ -184,13 +188,13 @@ export const TerminalView: (props: TerminalViewProps) => RenderOutput =
             )}
 
           {state?.exitCode !== undefined
-            ? <text content={`The shell exited (${String(state.exitCode)}).`} fg="danger" />
+            ? <text content={i18n.t('views.terminal.exited', { code: String(state.exitCode) })} fg="danger" />
             : (
               <Column border={theme.border}>
                 <TextArea
                   value={draft}
                   onChange={onDraft}
-                  placeholder="A command, and enter"
+                  placeholder={i18n.t('views.terminal.placeholder')}
                   focusId="terminal.input"
                   // The keyboard's place on this screen, including on the way
                   // back from the list, where the field is only mounting.

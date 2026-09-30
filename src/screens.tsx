@@ -1,10 +1,11 @@
-import type { ArgSpec, BindingPath, RenderOutput, SemanticVariant, TextUIApp, UnicodeLevel } from '@textui/core';
+import type { ArgSpec, BindingPath, I18n, RenderOutput, SemanticVariant, TextUIApp, UnicodeLevel } from '@textui/core';
 import {
   defineComponent,
   useApp,
   useCapabilities,
   useEffect,
   useFocusScope,
+  useI18n,
   useMemo,
   useRequiredService,
   useSize,
@@ -15,7 +16,8 @@ import {
   useTheme,
 } from '@textui/core';
 import { Badge, Column, Divider, EmptyState, Field, Form, FormActions, Marquee, Panel, RadioGroup, Row, SearchBox, Select, TextArea, TextInput, argumentOf, useForm } from '@textui/widgets';
-import { PRESETS, presetFor, scheduleProblem, zoneIsKnownHere } from './schedule.js';
+import { PRESETS, presetFor, presetLabel, scheduleProblem, zoneIsKnownHere } from './schedule.js';
+import type { Preset } from './schedule.js';
 import {
   AUTOMATIONS_SCOPE, CHANGES_SCOPE, CHAT_SCOPE, CONTROLLER, MCP_SCOPE, SESSIONS_SCOPE, SKILLS_SCOPE, modelCommand, settingCommand,
 } from './control.js';
@@ -25,7 +27,7 @@ import { branchName, branchDrift, pullRequestLabel,
   MODEL, MODEL_CONFIG, OPEN, OPEN_FILE, CHAT_URI, PROVIDER, QUEUE, SELECTED, SESSIONS, SETTINGS, SIDEBAR,
   CHATS, CURSOR, FIND, FINDING, FIND_AT, OPEN_TERMINAL, PRESENT, SPLIT_AT, SPLIT_DEFAULT, TERMINAL, TERMINALS, TERMINAL_LIST, TURNS, WORKSPACE,
   ANSWERS, INPUT_STATUS, MARKDOWN, boodFloorFor,
-  hiddenSessions, openSession, sessionView, visibleSessions, workspaceName,
+  hiddenSessions, openSession, sessionView, statusLabel, visibleSessions, workspaceName,
 } from './state.js';
 import type { HostState, InputStatus } from './state.js';
 import { toBlocks } from './blocks.js';
@@ -99,7 +101,7 @@ function chipLabel(property: ConfigProperty, value: string | undefined): string 
  * this" or "what may it do without asking", which are the two questions
  * somebody reading a catalogue of agents actually has.
  */
-function describe(session: SessionSummary, detail: SessionDetail | null): DetailField[] {
+function describe(i18n: I18n, session: SessionSummary, detail: SessionDetail | null): DetailField[] {
   const status = decodeStatus(session.status);
   const setting = (key: string): string => {
     const value = detail?.config.values[key];
@@ -110,13 +112,24 @@ function describe(session: SessionSummary, detail: SessionDetail | null): Detail
     return property?.values.find((choice) => choice.value === value)?.label ?? value;
   };
   const changes = session.changes;
+  const files = i18n.plural(changes?.files ?? 0, {
+    one: i18n.t('screens.sessionDetail.files.one'),
+    other: i18n.t('screens.sessionDetail.files.other'),
+  });
 
   return [
-    { id: 'status', label: 'Status', value: status.label, tone: status.tone as SemanticVariant },
-    { id: 'activity', label: 'Doing', value: session.activity ?? detail?.activity ?? '', absent: 'nothing it says' },
-    { id: 'flags', label: 'Flags', value: [status.read ? 'read' : 'unread', status.archived ? 'archived' : ''].filter(Boolean).join(', ') },
-    { id: 'provider', label: 'Harness', value: session.provider },
-    { id: 'model', label: 'Model', value: detail?.model?.displayName ?? '', absent: 'nothing said yet' },
+    { id: 'status', label: i18n.t('screens.sessionDetail.status'), value: statusLabel(status.activity, i18n), tone: status.tone as SemanticVariant },
+    { id: 'activity', label: i18n.t('screens.sessionDetail.doing'), value: session.activity ?? detail?.activity ?? '', absent: i18n.t('screens.sessionDetail.doingAbsent') },
+    {
+      id: 'flags',
+      label: i18n.t('screens.sessionDetail.flags'),
+      value: [
+        status.read ? i18n.t('screens.sessionDetail.read') : i18n.t('screens.sessionDetail.unread'),
+        status.archived ? i18n.t('screens.sessionDetail.archived') : '',
+      ].filter(Boolean).join(', '),
+    },
+    { id: 'provider', label: i18n.t('screens.sessionDetail.harness'), value: session.provider },
+    { id: 'model', label: i18n.t('screens.sessionDetail.model'), value: detail?.model?.displayName ?? '', absent: i18n.t('screens.sessionDetail.modelAbsent') },
     // What this model takes, which is not what the harness takes. Three of
     // Claude's models accept five thinking levels, some accept one and some
     // accept none, so the session-wide setting below can be a choice this
@@ -128,7 +141,7 @@ function describe(session: SessionSummary, detail: SessionDetail | null): Detail
       // five values three ways, and a client with its own list is one that
       // disagrees with whichever host it is talking to.
       value: option.values
-        .map((one) => (one.value === option.default ? `${one.label} (default)` : one.label))
+        .map((one) => (one.value === option.default ? i18n.t('screens.sessionDetail.defaultValue', { label: one.label }) : one.label))
         .join(', '),
     })),
     // The host's own questions, in the host's own order. Naming them here is
@@ -141,46 +154,46 @@ function describe(session: SessionSummary, detail: SessionDetail | null): Detail
         label: property.title,
         value: setting(property.key),
       })),
-    { id: 'workspace', label: 'Workspace', value: session.workingDirectories.map((dir) => dir.replace(/^file:\/\//, '')).join(', '), absent: 'the host\'s own directory' },
+    { id: 'workspace', label: i18n.t('screens.sessionDetail.workspace'), value: session.workingDirectories.map((dir) => dir.replace(/^file:\/\//, '')).join(', '), absent: i18n.t('screens.sessionDetail.workspaceAbsent') },
     {
       id: 'branch',
-      label: 'Branch',
+      label: i18n.t('screens.sessionDetail.branch'),
       value: [branchName(session), branchDrift(session), pullRequestLabel(session)].filter(Boolean).join('  '),
-      absent: 'not a repository, or the host does not say',
+      absent: i18n.t('screens.sessionDetail.branchAbsent'),
     },
     // The identifiers, in full and copyable. A URI you can read half of is
     // worse than one you cannot see at all: it looks like the whole thing.
-    { id: 'session', label: 'Session', value: session.resource },
-    { id: 'chat', label: 'Chat', value: detail?.chat ?? '', absent: 'no chat yet' },
+    { id: 'session', label: i18n.t('screens.sessionDetail.session'), value: session.resource },
+    { id: 'chat', label: i18n.t('screens.sessionDetail.chat'), value: detail?.chat ?? '', absent: i18n.t('screens.sessionDetail.chatAbsent') },
     // Only when there is more than one. A session with a single chat is a
     // session where the two are the same thing, and a row saying "1 of 1" is
     // a row that tells nobody anything.
     ...((detail?.chats.length ?? 0) > 1
-      ? [{ id: 'chats', label: 'Chats', value: String(detail?.chats.length ?? 0) }]
+      ? [{ id: 'chats', label: i18n.t('screens.sessionDetail.chats'), value: String(detail?.chats.length ?? 0) }]
       : []),
     // What the host said when it would not answer. `-32001 No agent for
     // session` is a live catalogue listing something whose agent has exited:
     // the row is real, and everything on the session channel is not there.
-    { id: 'lifecycle', label: 'Lifecycle', value: detail?.refusal ?? detail?.lifecycle ?? '', ...(detail?.refusal ? { tone: 'danger' as SemanticVariant } : {}) },
-    { id: 'created', label: 'Started', value: session.createdAt.slice(0, 16).replace('T', ' ') },
-    { id: 'modified', label: 'Updated', value: session.modifiedAt.slice(0, 16).replace('T', ' ') },
+    { id: 'lifecycle', label: i18n.t('screens.sessionDetail.lifecycle'), value: detail?.refusal ?? detail?.lifecycle ?? '', ...(detail?.refusal ? { tone: 'danger' as SemanticVariant } : {}) },
+    { id: 'created', label: i18n.t('screens.sessionDetail.started'), value: session.createdAt.slice(0, 16).replace('T', ' ') },
+    { id: 'modified', label: i18n.t('screens.sessionDetail.updated'), value: session.modifiedAt.slice(0, 16).replace('T', ' ') },
     {
       id: 'changes',
-      label: 'Changes',
+      label: i18n.t('screens.sessionDetail.changes'),
       value: changes?.files
-        ? `${changes.files} files  +${changes.additions ?? 0} -${changes.deletions ?? 0}`
+        ? `${files}  +${changes.additions ?? 0} -${changes.deletions ?? 0}`
         : '',
       // Green and red, the way a diff says it.
       ...(changes?.files
         ? {
           parts: [
-            { text: `${changes.files} files` },
+            { text: files },
             { text: `+${changes.additions ?? 0}`, tone: 'success' as SemanticVariant },
             { text: `-${changes.deletions ?? 0}`, tone: 'danger' as SemanticVariant },
           ],
         }
         : {}),
-      absent: 'nothing yet',
+      absent: i18n.t('screens.sessionDetail.changesAbsent'),
     },
   ];
 }
@@ -190,6 +203,7 @@ function describe(session: SessionSummary, detail: SessionDetail | null): Detail
 export const SessionsScreen: (props: Record<string, never>) => RenderOutput =
   defineComponent<Record<string, never>>('SessionsScreen', () => {
     const app = useApp();
+    const i18n = useI18n();
     const theme = useTheme();
     const controller = useRequiredService(CONTROLLER);
     // While this is mounted, `n` `r` `a` `x` `d` mean what the catalogue means
@@ -277,20 +291,22 @@ export const SessionsScreen: (props: Record<string, never>) => RenderOutput =
       <Row flex={1} gap={1}>
         {alone ? null : (
         <Panel
-          title="Sessions"
+          title={i18n.t('screens.sessions.title')}
           {...(reading ? { width: aside } : { flex: 1 })}
-          meta={waiting > 0 ? `${theme.glyphs.warning} ${waiting} waiting on you` : `${sessions.length} shown`}
+          meta={waiting > 0
+            ? i18n.t('screens.sessions.waiting', { glyph: theme.glyphs.warning, count: waiting })
+            : i18n.plural(sessions.length, { one: i18n.t('screens.sessions.shown.one'), other: i18n.t('screens.sessions.shown.other') })}
         >
           <SearchBox
             value={filter}
-            placeholder="title, provider or workspace"
+            placeholder={i18n.t('screens.sessions.filterPlaceholder')}
             // Named, so `ctrl+f` has something to focus. A control whose id
             // comes from its instance cannot be the target of a command.
             focusId="chat.filter"
             onChange={(value: string) => app.store.set(FILTER, value)}
           />
           <SessionList
-            sessions={sessions.map(sessionView)}
+            sessions={sessions.map((one) => sessionView(one, i18n))}
             selectedId={selected}
             focusId="chat.sessions"
             // The list, not the filter. Whatever registers first would
@@ -302,7 +318,7 @@ export const SessionsScreen: (props: Record<string, never>) => RenderOutput =
             flex={1}
             onSelect={(uri: string) => app.store.set(SELECTED, uri)}
             onOpen={(uri: string) => { controller.open(uri); app.screens.push('chat'); }}
-            emptyMessage={filter ? 'Nothing matches' : 'No sessions on this host'}
+            emptyMessage={filter ? i18n.t('screens.sessions.noMatch') : i18n.t('screens.sessions.empty')}
           />
           {/*
             * What the switch is doing, both ways round.
@@ -315,25 +331,25 @@ export const SessionsScreen: (props: Record<string, never>) => RenderOutput =
             * is there only when it has something to do.
             */}
           {archived
-            ? <text content="x  hide archived" fg="subtle" />
+            ? <text content={i18n.t('screens.sessions.hideArchived')} fg="subtle" />
             : hidden > 0
-              ? <text content={`x  show archived (${hidden})`} fg="subtle" />
+              ? <text content={i18n.t('screens.sessions.showArchived', { count: hidden })} fg="subtle" />
               : null}
         </Panel>
         )}
 
         {open ? (
         <Panel
-          title="Session"
+          title={i18n.t('screens.sessions.detailTitle')}
           {...(reading || alone ? { flex: 1 } : { width: aside })}
-          meta={current ? 'enter copies' : ''}
+          meta={current ? i18n.t('screens.sessions.enterCopies') : ''}
         >
           {current && status ? (
             <Column gap={1} flex={1}>
               <Row gap={1}>
                 <text content={theme.glyphs[status.glyph]} fg={status.tone} />
                 <text content={current.title} bold wrap="word" flex={1} />
-                {status.archived ? <Badge label="archived" tone="muted" /> : null}
+                {status.archived ? <Badge label={i18n.t('screens.sessions.archived')} tone="muted" /> : null}
               </Row>
               {/* Right arrow reaches this, up and down walk it, enter copies
                   the row. The identifiers are the reason: they are what gets
@@ -344,7 +360,7 @@ export const SessionsScreen: (props: Record<string, never>) => RenderOutput =
                   width reveals the pane without taking the keyboard off
                   whatever was holding it. */}
               <SessionDetails
-                fields={describe(current, detail)}
+                fields={describe(i18n, current, detail)}
                 focusId="chat.details"
                 claim={asked === true}
                 // Whole, not just the row under the cursor. The values here
@@ -362,7 +378,7 @@ export const SessionsScreen: (props: Record<string, never>) => RenderOutput =
               />
             </Column>
           ) : (
-            <EmptyState title="Nothing selected" message="Choose a session on the left." />
+            <EmptyState title={i18n.t('screens.sessions.nothingSelected')} message={i18n.t('screens.sessions.chooseSession')} />
           )}
         </Panel>
         ) : null}
@@ -440,6 +456,7 @@ function usePathCompletions(draft: string, channel: string | null): Completion[]
 export const TerminalScreen: (props: Record<string, never>) => RenderOutput =
   defineComponent<Record<string, never>>('TerminalScreen', () => {
     const app = useApp();
+    const i18n = useI18n();
     const controller = useRequiredService(CONTROLLER);
     useFocusScope({ id: 'chat.terminal' });
 
@@ -480,8 +497,8 @@ export const TerminalScreen: (props: Record<string, never>) => RenderOutput =
     if (rows.length === 0 && open === null) {
       return (
         <EmptyState
-          title="No terminals"
-          message="ctrl+p, then Open a terminal. The shell runs on the host, in a directory it serves."
+          title={i18n.t('screens.terminal.empty')}
+          message={i18n.t('screens.terminal.emptyHint')}
           flex={1}
         />
       );
@@ -525,6 +542,7 @@ function useHarnessCommands(): Customization[] {
 const WHERE = ['isolation', 'branch'];
 
 function useComposerOptions(): ComposerOption[] {
+  const i18n = useI18n();
   const unicode = useCapabilities().unicode;
   const controller = useRequiredService(CONTROLLER);
   const open = useStoreValue<string | null>(OPEN, null) ?? null;
@@ -581,7 +599,7 @@ function useComposerOptions(): ComposerOption[] {
       id: 'model',
       icon: settingIcon(unicode, 'model'),
       label: models?.find((found) => found.id === model)?.displayName
-        ?? (model || (models !== null && models.length === 0 ? 'no models' : 'default')),
+        ?? (model || (models !== null && models.length === 0 ? i18n.t('screens.composer.noModels') : i18n.t('screens.composer.defaultModel'))),
       ...(models !== null && models.length === 0 ? {} : { commandId: 'model.choose' }),
     },
     /*
@@ -614,7 +632,7 @@ function useComposerOptions(): ComposerOption[] {
     {
       id: 'workspace',
       icon: settingIcon(unicode, 'workspace'),
-      label: workspaceName(workspace ? `file://${workspace}` : undefined),
+      label: workspaceName(workspace ? `file://${workspace}` : undefined, i18n),
       where: true,
       ...(open ? {} : { commandId: 'workspace.choose' }),
     },
@@ -747,6 +765,7 @@ function hitlInput(input: PendingInput): ChatPendingInput {
 export const ChatScreen: (props: Record<string, never>) => RenderOutput =
   defineComponent<Record<string, never>>('ChatScreen', () => {
     const app = useApp();
+    const i18n = useI18n();
     const controller = useRequiredService(CONTROLLER);
     useFocusScope({ id: CHAT_SCOPE });
 
@@ -796,7 +815,7 @@ export const ChatScreen: (props: Record<string, never>) => RenderOutput =
      * time, which is a change as far as anything can tell, and a screen that
      * re-renders for the draft dragged four hundred blocks along with it.
      */
-    const blocks = useMemo(() => toBlocks(turns, queued), [turns, queued]);
+    const blocks = useMemo(() => toBlocks(turns, queued, i18n), [turns, queued]);
 
     /*
      * Find, over the conversation on screen.
@@ -852,7 +871,7 @@ export const ChatScreen: (props: Record<string, never>) => RenderOutput =
       <Column padding={[0, 0, 1, 0]}>
         {session ? (
           <ChatSessionHead
-            session={sessionView(session)}
+            session={sessionView(session, i18n)}
             present={present}
             {...(model ? { model } : {})}
             {...(chat ? { chat } : {})}
@@ -860,7 +879,7 @@ export const ChatScreen: (props: Record<string, never>) => RenderOutput =
               // Where a session holds several, which one is being read is the
               // first thing somebody needs from the header - a transcript
               // that changed under the same title is otherwise unexplained.
-              ? [{ label: 'Chat', value: `${String(reading + 1)} of ${String(chats.length)}` }, ...settingRows]
+              ? [{ label: i18n.t('screens.chat.chatLabel'), value: i18n.t('screens.chat.chatOf', { at: reading + 1, total: chats.length }) }, ...settingRows]
               : settingRows}
           />
         ) : null}
@@ -906,7 +925,7 @@ export const ChatScreen: (props: Record<string, never>) => RenderOutput =
     }, [uri, paging, controller]);
 
     if (!session) {
-      return <EmptyState title="No session open" message="Open one from the catalogue." flex={1} />;
+      return <EmptyState title={i18n.t('screens.chat.noSession')} message={i18n.t('screens.chat.noSessionHint')} flex={1} />;
     }
 
     return (
@@ -923,7 +942,7 @@ export const ChatScreen: (props: Record<string, never>) => RenderOutput =
           <Row justify="end" gap={1}>
             <SearchBox
               value={query}
-              placeholder="find in this conversation"
+              placeholder={i18n.t('screens.chat.findPlaceholder')}
               width={40}
               focusId="chat.find"
               onChange={(next: string) => {
@@ -943,8 +962,8 @@ export const ChatScreen: (props: Record<string, never>) => RenderOutput =
             />
             <text
               content={query.trim() === '' ? '' : found.length === 0
-                ? 'no match'
-                : `${String(at + 1)} of ${String(found.length)}`}
+                ? i18n.t('screens.chat.noMatch')
+                : i18n.t('screens.chat.findPosition', { at: at + 1, total: found.length })}
               fg={query.trim() !== '' && found.length === 0 ? 'danger' : 'accent'}
             />
           </Row>
@@ -1066,6 +1085,7 @@ export const ChatScreen: (props: Record<string, never>) => RenderOutput =
 export const NewSessionScreen: (props: Record<string, never>) => RenderOutput =
   defineComponent<Record<string, never>>('NewSessionScreen', () => {
     const app = useApp();
+    const i18n = useI18n();
     const controller = useRequiredService(CONTROLLER);
     const theme = useTheme();
 
@@ -1091,9 +1111,9 @@ export const NewSessionScreen: (props: Record<string, never>) => RenderOutput =
         {/* No figure here any more. There is one, and it is on the floating
             layer over every screen - two of them would be two mascots. */}
         <Column flex={1} justify="center" align="center" gap={0}>
-          <text content="A new session" fg="muted" />
-          <text content="The first message is what starts it." fg="subtle" />
-          <text content={`${theme.glyphs.chevronLeft} esc for the sessions you already have`} fg="subtle" />
+          <text content={i18n.t('screens.newSession.title')} fg="muted" />
+          <text content={i18n.t('screens.newSession.firstMessage')} fg="subtle" />
+          <text content={i18n.t('screens.newSession.back', { glyph: theme.glyphs.chevronLeft })} fg="subtle" />
         </Column>
 
         <ChatComposer
@@ -1186,6 +1206,7 @@ export const NewSessionScreen: (props: Record<string, never>) => RenderOutput =
 export const ChangesScreen: (props: Record<string, never>) => RenderOutput =
   defineComponent<Record<string, never>>('ChangesScreen', () => {
     const app = useApp();
+    const i18n = useI18n();
     const controller = useRequiredService(CONTROLLER);
     const changes = useStoreValue<Changeset>(CHANGES, { status: 'complete', files: [] })
       ?? { status: 'complete', files: [] };
@@ -1298,16 +1319,16 @@ export const ChangesScreen: (props: Record<string, never>) => RenderOutput =
       return () => { live = false; };
     }, [file?.uri ?? '']);
 
-    const title = `Changes ${session ? `- ${session.title}` : ''}`;
+    const title = session ? i18n.t('screens.changes.titleOf', { title: session.title }) : i18n.t('screens.changes.title');
 
     if (file) {
       const kind = !file.before ? 'new' : !file.after ? 'deleted' : 'edited';
       return (
         <Panel title={title} flex={1}>
           {failure !== null ? (
-            <EmptyState title="The host would not send it" message={failure} flex={1} />
+            <EmptyState title={i18n.t('screens.changes.refused')} message={failure} flex={1} />
           ) : !loaded ? (
-            <EmptyState title="Reading the file" flex={1} />
+            <EmptyState title={i18n.t('screens.changes.reading')} flex={1} />
           ) : (
             <FileDiff
               path={file.uri.replace(/^file:\/\//, '')}
@@ -1336,7 +1357,7 @@ export const ChangesScreen: (props: Record<string, never>) => RenderOutput =
               return (
                 <text
                   key={scope.uriTemplate}
-                  content={reachable ? scope.label : `${scope.label} (needs a turn)`}
+                  content={reachable ? scope.label : i18n.t('screens.changes.needsTurn', { label: scope.label })}
                   {...(here ? { fg: 'accent' as SemanticVariant, bold: true } : {})}
                   {...(reachable ? {} : { fg: 'muted' as SemanticVariant })}
                 />
@@ -1407,6 +1428,7 @@ function strings(value: unknown): Record<string, string> {
 export const NewAutomationScreen: (props: Record<string, never>) => RenderOutput =
   defineComponent<Record<string, never>>('NewAutomationScreen', () => {
     const app = useApp();
+    const i18n = useI18n();
     const theme = useTheme();
     const width = useSize().width;
     const controller = useRequiredService(CONTROLLER);
@@ -1479,16 +1501,16 @@ export const NewAutomationScreen: (props: Record<string, never>) => RenderOutput
       },
       validate: (values) => {
         const errors: { title?: string; message?: string; expression?: string; timeZone?: string } = {};
-        if (values.title.trim() === '') errors.title = 'An automation needs a name to be found by';
+        if (values.title.trim() === '') errors.title = i18n.t('screens.automation.nameRequired');
         // The first message is what the automation is *for*: a session created
         // and never spoken to does nothing at all.
-        if (values.message.trim() === '') errors.message = 'Every run starts with this, so it cannot be empty';
+        if (values.message.trim() === '') errors.message = i18n.t('screens.automation.promptRequired');
         // Blank is manual-only, which is a choice. Anything else has to parse.
         if (values.expression.trim() !== '') {
-          const problem = scheduleProblem(values.expression);
+          const problem = scheduleProblem(values.expression, i18n);
           if (problem !== undefined) errors.expression = problem;
           else if (!zoneIsKnownHere(values.timeZone)) {
-            errors.timeZone = `This machine does not know ${values.timeZone}`;
+            errors.timeZone = i18n.t('screens.automation.unknownZone', { zone: values.timeZone });
           }
         }
         return errors;
@@ -1594,9 +1616,18 @@ export const NewAutomationScreen: (props: Record<string, never>) => RenderOutput
     // the rest. Each column's labels are as wide as its longest, so every
     // value in a column starts in the same place and no label is cut short;
     // the first column also holds the form's own labels, Name and Prompt.
-    const titles = ['Harness', 'Model', ...asked.map(({ property }) => property.title)];
+    const harnessLabel = i18n.t('screens.automation.harnessLabel');
+    const modelLabel = i18n.t('screens.automation.modelLabel');
+    const nameLabel = i18n.t('screens.automation.nameLabel');
+    const promptLabel = i18n.t('screens.automation.promptLabel');
+    const runsLabel = i18n.t('screens.automation.runsLabel');
+    const scheduleLabel = i18n.t('screens.automation.scheduleLabel');
+    const inLabel = i18n.t('screens.automation.inLabel');
+    const missedLabel = i18n.t('screens.automation.missedLabel');
+    const zoneLabel = i18n.t('screens.automation.zoneLabel');
+    const titles = [harnessLabel, modelLabel, ...asked.map(({ property }) => property.title)];
     const labelsAt = Array.from({ length: perRow }, (_, column) => Math.min(16, Math.max(
-      column === 0 ? 10 : 0,
+      column === 0 ? Math.max(10, ...[nameLabel, promptLabel, runsLabel, scheduleLabel].map((label) => label.length + 1)) : 0,
       ...titles.filter((_, index) => index % perRow === column).map((title) => title.length + 1),
     )));
     const labels = labelsAt[0] as number;
@@ -1609,10 +1640,10 @@ export const NewAutomationScreen: (props: Record<string, never>) => RenderOutput
     // last, an empty cell that keeps a short final row on the same columns.
     const cell = (index: number, labelWidth: number): unknown => {
       if (index === 0) return (
-        <Field name="harness" label="Harness" key="harness" labelWidth={labelWidth} flex={1} basis={0}>
+        <Field name="harness" label={harnessLabel} key="harness" labelWidth={labelWidth} flex={1} basis={0}>
           <Select
             options={[
-              ...(provider === '' ? [{ value: '', label: "The host's default" }] : []),
+              ...(provider === '' ? [{ value: '', label: i18n.t('screens.automation.hostDefault') }] : []),
               ...agents.map((one) => ({ value: one.provider, label: one.displayName })),
             ]}
             value={provider}
@@ -1630,10 +1661,10 @@ export const NewAutomationScreen: (props: Record<string, never>) => RenderOutput
         </Field>
       );
       if (index === 1) return (
-        <Field name="model" label="Model" key="model" labelWidth={labelWidth} flex={1} basis={0}>
+        <Field name="model" label={modelLabel} key="model" labelWidth={labelWidth} flex={1} basis={0}>
           <Select
             options={[
-              { value: '', label: agent && agent.models.length === 0 ? 'No models' : 'Default' },
+              { value: '', label: agent && agent.models.length === 0 ? i18n.t('screens.automation.noModels') : i18n.t('screens.automation.defaultChoice') },
               ...(agent?.models ?? []).map((one) => ({ value: one.id, label: one.displayName })),
               // One the harness no longer lists is still what the
               // automation says, so it is shown rather than dropped.
@@ -1664,7 +1695,7 @@ export const NewAutomationScreen: (props: Record<string, never>) => RenderOutput
           {property.values.length > 0 ? (
             <Select
               options={[
-                ...(value === '' ? [{ value: '', label: 'Default' }] : []),
+                ...(value === '' ? [{ value: '', label: i18n.t('screens.automation.defaultChoice') }] : []),
                 ...property.values.map((one) => ({ value: one.value, label: one.label })),
                 ...(value !== '' && !property.values.some((one) => one.value === value) ? [{ value, label: value }] : []),
               ]}
@@ -1687,7 +1718,7 @@ export const NewAutomationScreen: (props: Record<string, never>) => RenderOutput
     };
 
     return (
-      <Panel title={editing ? `Edit ${editing.title}` : 'A new automation'} flex={1}>
+      <Panel title={editing ? i18n.t('screens.automation.editTitle', { title: editing.title }) : i18n.t('screens.automation.newTitle')} flex={1}>
         <Form form={form as never} flex={1}>
           <Column gap={0} flex={1}>
             {/* Paired, so the whole form fits a 24-row terminal. That is not
@@ -1696,18 +1727,18 @@ export const NewAutomationScreen: (props: Record<string, never>) => RenderOutput
                 somebody who cannot scroll to it - this library's scroll view
                 does not follow focus, so there is nowhere to put the overflow. */}
             <Row gap={1}>
-              <Field name="title" label="Name" labelWidth={labels} required flex={Math.max(1, perRow - 1)} basis={0}>
+              <Field name="title" label={nameLabel} labelWidth={labels} required flex={Math.max(1, perRow - 1)} basis={0}>
                 <TextInput
                   value={form.values.title}
                   autoFocus
-                  placeholder="Nightly framework build"
+                  placeholder={i18n.t('screens.automation.namePlaceholder')}
                   onChange={(value: string) => { form.setValue('title', value); form.touch('title'); }}
                 />
               </Field>
-              <Field name="directory" label="in" labelWidth={3} flex={1} basis={0}>
+              <Field name="directory" label={inLabel} labelWidth={inLabel.length + 1} flex={1} basis={0}>
                 <TextInput
                   value={form.values.directory}
-                  placeholder="the host's default directory"
+                  placeholder={i18n.t('screens.automation.directoryPlaceholder')}
                   onChange={(value: string) => { form.setValue('directory', value); form.touch('directory'); }}
                 />
               </Field>
@@ -1721,10 +1752,10 @@ export const NewAutomationScreen: (props: Record<string, never>) => RenderOutput
             ))}
             {/* The prompt every run's session opens with, so a paragraph
                 rather than a line. Enter is a newline here; tab leaves. */}
-            <Field name="message" label="Prompt" labelWidth={labels} required>
+            <Field name="message" label={promptLabel} labelWidth={labels} required>
               <TextArea
                 value={form.values.message}
-                placeholder="Review what changed today and list anything that needs a person"
+                placeholder={i18n.t('screens.automation.promptPlaceholder')}
                 maxRows={4}
                 // `TextInput`'s inset: a padding cell, and a border cell in a
                 // theme that draws input borders. Without it this text starts
@@ -1738,14 +1769,14 @@ export const NewAutomationScreen: (props: Record<string, never>) => RenderOutput
                 which stays the authoritative value - so a preset is a way of
                 filling the field in, never a second place the answer lives. */}
             <Row gap={1}>
-              <Field name="preset" label="Runs" labelWidth={labels} flex={2}>
+              <Field name="preset" label={runsLabel} labelWidth={labels} flex={2}>
                 <Select
                   options={[
-                    ...PRESETS.map((one) => ({ value: one.id, label: one.label })),
+                    ...PRESETS.map((one) => ({ value: one.id, label: presetLabel(one, i18n) })),
                     // Only reachable by typing. Offering it as a choice would be
                     // offering to clear the field somebody just filled in.
                     ...(presetFor(form.values.expression) === undefined
-                      ? [{ value: 'custom', label: 'Something else, written below' }]
+                      ? [{ value: 'custom', label: i18n.t('screens.automation.customSchedule') }]
                       : []),
                   ]}
                   value={presetFor(form.values.expression)?.id ?? 'custom'}
@@ -1761,11 +1792,11 @@ export const NewAutomationScreen: (props: Record<string, never>) => RenderOutput
               {/* What the host does about occurrences it missed while it was
                   down. Only a question when there is a schedule to miss. */}
               {form.values.expression.trim() !== '' ? (
-                <Field name="misfire" label="Missed" labelWidth={6} flex={1}>
+                <Field name="misfire" label={missedLabel} labelWidth={missedLabel.length} flex={1}>
                   <Select
                     options={[
-                      { value: 'runOnce', label: 'Run once' },
-                      { value: 'skip', label: 'Skip' },
+                      { value: 'runOnce', label: i18n.t('screens.automation.runOnce') },
+                      { value: 'skip', label: i18n.t('screens.automation.skip') },
                     ]}
                     value={form.values.misfire}
                     mode="floating"
@@ -1782,9 +1813,9 @@ export const NewAutomationScreen: (props: Record<string, never>) => RenderOutput
             <Row gap={1}>
               <Field
                 name="expression"
-                label="Schedule"
+                label={scheduleLabel}
                 labelWidth={labels}
-                hint="minute hour day month weekday"
+                hint={i18n.t('screens.automation.scheduleHint')}
                 flex={2}
               >
                 <TextInput
@@ -1793,7 +1824,7 @@ export const NewAutomationScreen: (props: Record<string, never>) => RenderOutput
                   onChange={(value: string) => { form.setValue('expression', value); form.touch('expression'); }}
                 />
               </Field>
-              <Field name="timeZone" label="Zone" labelWidth={5} flex={1}>
+              <Field name="timeZone" label={zoneLabel} labelWidth={zoneLabel.length + 1} flex={1}>
                 <TextInput
                   value={form.values.timeZone}
                   placeholder="UTC"
@@ -1809,14 +1840,14 @@ export const NewAutomationScreen: (props: Record<string, never>) => RenderOutput
                 claiming to understand what only the host evaluates. */}
             <text
               content={form.values.expression.trim() === ''
-                ? 'No schedule: it runs when somebody presses Run.'
+                ? i18n.t('screens.automation.noSchedule')
                 : presetFor(form.values.expression)
-                  ? `${presetFor(form.values.expression)?.label}. The host works out the next one.`
-                  : 'The host works out when this comes round, and the list will say.'}
+                  ? i18n.t('screens.automation.presetNote', { preset: presetLabel(presetFor(form.values.expression) as Preset, i18n) })
+                  : i18n.t('screens.automation.customNote')}
               fg="subtle"
             />
             {failure !== null ? <text content={failure} fg="danger" wrap="word" /> : null}
-            <FormActions submitLabel={editing ? 'Save' : 'Create'} cancelLabel="Cancel" onCancel={() => app.screens.pop()} />
+            <FormActions submitLabel={editing ? i18n.t('screens.automation.save') : i18n.t('screens.automation.create')} cancelLabel={i18n.t('screens.automation.cancel')} onCancel={() => app.screens.pop()} />
           </Column>
         </Form>
       </Panel>
@@ -1842,6 +1873,7 @@ export const NewAutomationScreen: (props: Record<string, never>) => RenderOutput
 export const AutomationsScreen: (props: Record<string, never>) => RenderOutput =
   defineComponent<Record<string, never>>('AutomationsScreen', () => {
     const app = useApp();
+    const i18n = useI18n();
     const controller = useRequiredService(CONTROLLER);
     useFocusScope({ id: AUTOMATIONS_SCOPE });
     const theme = useTheme();
@@ -1895,16 +1927,16 @@ export const AutomationsScreen: (props: Record<string, never>) => RenderOutput =
 
     if (failure !== null) {
       return (
-        <Panel title="Automations" flex={1}>
-          <EmptyState title="Nothing to schedule here" message={failure} flex={1} />
+        <Panel title={i18n.t('screens.automations.title')} flex={1}>
+          <EmptyState title={i18n.t('screens.automations.unavailable')} message={failure} flex={1} />
         </Panel>
       );
     }
 
     if (loading && automations.length === 0) {
       return (
-        <Panel title="Automations" flex={1}>
-          <EmptyState title="Asking the host" message="Reading what it holds." flex={1} />
+        <Panel title={i18n.t('screens.automations.title')} flex={1}>
+          <EmptyState title={i18n.t('screens.automations.loading')} message={i18n.t('screens.automations.loadingHint')} flex={1} />
         </Panel>
       );
     }
@@ -1912,9 +1944,9 @@ export const AutomationsScreen: (props: Record<string, never>) => RenderOutput =
     const current = automations.find((one) => one.resource === row) ?? null;
     const list = (
       <Panel
-        title="Automations"
+        title={i18n.t('screens.automations.title')}
         {...(reading ? { width: aside } : { flex: 1 })}
-        meta={`${automations.length} held`}
+        meta={i18n.plural(automations.length, { one: i18n.t('screens.automations.held.one'), other: i18n.t('screens.automations.held.other') })}
       >
         <AutomationList
           automations={automations}
@@ -1934,9 +1966,9 @@ export const AutomationsScreen: (props: Record<string, never>) => RenderOutput =
 
     const pane = (
       <Panel
-        title="Automation"
+        title={i18n.t('screens.automations.detailTitle')}
         {...(reading || alone ? { flex: 1 } : { width: aside })}
-        meta={current ? 'e edits  r runs' : ''}
+        meta={current ? i18n.t('screens.automations.keys') : ''}
       >
         {current ? (
           <Column gap={1} flex={1}>
@@ -1949,12 +1981,12 @@ export const AutomationsScreen: (props: Record<string, never>) => RenderOutput =
               <text content={current.title} bold wrap="word" flex={1} />
             </Row>
             <SessionDetails
-              fields={automationFields(current)}
+              fields={automationFields(current, Date.now(), i18n)}
               focusId="automation.details"
               claim={asked === true}
               values="all"
             />
-            <text content={`Runs${current.runs.length > 0 ? ` (${current.runs.length})` : ''}`} fg="muted" bold />
+            <text content={current.runs.length > 0 ? i18n.t('screens.automations.runsCount', { count: current.runs.length }) : i18n.t('screens.automations.runs')} fg="muted" bold />
             <AutomationRuns
               runs={current.runs}
               {...(current.moreRuns ? { more: true } : {})}
@@ -1964,7 +1996,7 @@ export const AutomationsScreen: (props: Record<string, never>) => RenderOutput =
             />
           </Column>
         ) : (
-          <EmptyState title="Nothing selected" message="Choose an automation on the left." />
+          <EmptyState title={i18n.t('screens.automations.nothingSelected')} message={i18n.t('screens.automations.chooseAutomation')} />
         )}
       </Panel>
     );
@@ -1993,6 +2025,7 @@ export const AutomationsScreen: (props: Record<string, never>) => RenderOutput =
 export const FilesScreen: (props: Record<string, never>) => RenderOutput =
   defineComponent<Record<string, never>>('FilesScreen', () => {
     const app = useApp();
+    const i18n = useI18n();
     const controller = useRequiredService(CONTROLLER);
     const session = openSession(app.store);
     /*
@@ -2060,16 +2093,16 @@ export const FilesScreen: (props: Record<string, never>) => RenderOutput =
       return () => { live = false; };
     }, [open]);
 
-    const title = `Files ${session ? `- ${session.title}` : ''}`;
+    const title = session ? i18n.t('screens.files.titleOf', { title: session.title }) : i18n.t('screens.files.title');
 
     if (open) {
       const name = open.replace(/^file:\/\//, '');
       return (
         <Panel title={title} flex={1}>
           {body === null ? (
-            <EmptyState title="Reading the file" message={name} flex={1} />
+            <EmptyState title={i18n.t('screens.files.reading')} message={name} flex={1} />
           ) : body.binary === true ? (
-            <EmptyState title="Not text" message={`${name} came back as bytes, so there is nothing to show.`} flex={1} />
+            <EmptyState title={i18n.t('screens.files.notText')} message={i18n.t('screens.files.binary', { name })} flex={1} />
           ) : (
             <Column flex={1}>
               <Marquee content={name} truncate="start" fg="muted" />
@@ -2139,15 +2172,16 @@ function CustomizationPanel(props: {
   keep(item: Customization): boolean;
 }): RenderOutput {
   const app = useApp();
+  const i18n = useI18n();
   const controller = useRequiredService(CONTROLLER);
   const uri = useStoreValue<string>(OPEN, '') ?? '';
   const { items, loading } = useCustomizations();
   const shown = items.filter(props.keep);
 
   if (!uri) {
-    return <EmptyState title="No session open" message="Open one from the catalogue." flex={1} />;
+    return <EmptyState title={i18n.t('screens.customizations.noSession')} message={i18n.t('screens.customizations.noSessionHint')} flex={1} />;
   }
-  if (loading) return <EmptyState title="Asking the host" flex={1} />;
+  if (loading) return <EmptyState title={i18n.t('screens.customizations.loading')} flex={1} />;
   if (shown.length === 0) {
     return <EmptyState title={props.empty.title} message={props.empty.message} flex={1} />;
   }
@@ -2177,13 +2211,14 @@ function CustomizationPanel(props: {
 
 export const SkillsScreen: (props: Record<string, never>) => RenderOutput =
   defineComponent<Record<string, never>>('SkillsScreen', () => {
+    const i18n = useI18n();
     useFocusScope({ id: SKILLS_SCOPE });
     return CustomizationPanel({
-      title: 'Skills and commands',
+      title: i18n.t('screens.skills.title'),
       scopeId: SKILLS_SCOPE,
       empty: {
-        title: 'Nothing contributed',
-        message: 'No plugin or directory gave this session a skill, a prompt or an agent.',
+        title: i18n.t('screens.skills.empty'),
+        message: i18n.t('screens.skills.emptyHint'),
       },
       // The containers too, because turning a plugin off is how you turn off
       // the six skills it brought, and a list of only the leaves offers six
@@ -2197,13 +2232,14 @@ export const SkillsScreen: (props: Record<string, never>) => RenderOutput =
 
 export const McpScreen: (props: Record<string, never>) => RenderOutput =
   defineComponent<Record<string, never>>('McpScreen', () => {
+    const i18n = useI18n();
     useFocusScope({ id: MCP_SCOPE });
     return CustomizationPanel({
-      title: 'MCP servers',
+      title: i18n.t('screens.mcp.title'),
       scopeId: MCP_SCOPE,
       empty: {
-        title: 'No MCP servers',
-        message: 'This session was given none, by the host or by a plugin.',
+        title: i18n.t('screens.mcp.empty'),
+        message: i18n.t('screens.mcp.emptyHint'),
       },
       keep: (item) => item.kind === 'mcpServer',
     });
@@ -2212,12 +2248,12 @@ export const McpScreen: (props: Record<string, never>) => RenderOutput =
 // ------------------------------------------------------------------- 9. usage
 
 /** The model a turn billed to, with what automatic routing resolved it to. */
-function billedModel(turn: Turn): string {
-  const billed = turn.usage?.model ?? turn.model?.id;
+function billedModel(i18n: I18n, turn: Turn): string {
+  const billed = turn.usage?.model ?? turn.model?.id ?? i18n.t('screens.usage.unknownModel');
   if (turn.usage?.resolvedModel !== undefined) {
-    return `${billed ?? 'the host did not say'} -> ${turn.usage.resolvedModel}`;
+    return `${billed} -> ${turn.usage.resolvedModel}`;
   }
-  return billed ?? 'the host did not say';
+  return billed;
 }
 
 /**
@@ -2234,6 +2270,7 @@ function billedModel(turn: Turn): string {
 export const UsageScreen: (props: Record<string, never>) => RenderOutput =
   defineComponent<Record<string, never>>('UsageScreen', () => {
     const app = useApp();
+    const i18n = useI18n();
     const controller = useRequiredService(CONTROLLER);
     const session = openSession(app.store);
     const turns = useStoreValue<Turn[]>(TURNS, []) ?? [];
@@ -2278,39 +2315,39 @@ export const UsageScreen: (props: Record<string, never>) => RenderOutput =
     const window = latest === undefined ? undefined : rowFor(latest)?.contextWindow;
 
     return (
-      <Panel title="Usage" flex={1}>
+      <Panel title={i18n.t('screens.usage.title')} flex={1}>
         <Column gap={1} flex={1}>
           {sessionCost !== undefined ? (
-            <text content={`This session has spent ${sessionCost} credits.`} bold />
+            <text content={i18n.t('screens.usage.sessionCost', { cost: sessionCost })} bold />
           ) : (
-            <text content="The host has reported no session total." fg="muted" />
+            <text content={i18n.t('screens.usage.noSessionCost')} fg="muted" />
           )}
           {latest === undefined ? null : window !== undefined ? (
             <text
-              content={`The current model holds ${latest.usage?.inputTokens} / ${window} tokens.`}
+              content={i18n.t('screens.usage.window', { used: latest.usage?.inputTokens, window })}
               fg="muted"
             />
           ) : (
-            <text content="The host does not say how large the current model's window is." fg="muted" />
+            <text content={i18n.t('screens.usage.noWindow')} fg="muted" />
           )}
           <Divider />
           {billed.length === 0 ? (
-            <EmptyState title="Nothing to show" message="This session has no turns yet." flex={1} />
+            <EmptyState title={i18n.t('screens.usage.empty')} message={i18n.t('screens.usage.emptyHint')} flex={1} />
           ) : (
             billed.map((turn) => (
               turn.usage === undefined ? (
-                <text key={turn.id} content="A turn reported nothing." fg="muted" />
+                <text key={turn.id} content={i18n.t('screens.usage.turnUnreported')} fg="muted" />
               ) : (
                 <Row key={turn.id} gap={2}>
-                  <text content={billedModel(turn)} />
+                  <text content={billedModel(i18n, turn)} />
                   {turn.usage.inputTokens !== undefined
-                    ? <text content={`in ${turn.usage.inputTokens}`} fg="subtle" /> : null}
+                    ? <text content={i18n.t('screens.usage.input', { count: turn.usage.inputTokens })} fg="subtle" /> : null}
                   {turn.usage.outputTokens !== undefined
-                    ? <text content={`out ${turn.usage.outputTokens}`} fg="subtle" /> : null}
+                    ? <text content={i18n.t('screens.usage.output', { count: turn.usage.outputTokens })} fg="subtle" /> : null}
                   {turn.usage.cacheReadTokens !== undefined
-                    ? <text content={`cached ${turn.usage.cacheReadTokens}`} fg="subtle" /> : null}
+                    ? <text content={i18n.t('screens.usage.cached', { count: turn.usage.cacheReadTokens })} fg="subtle" /> : null}
                   {turn.usage.cost !== undefined
-                    ? <text content={`${turn.usage.cost} credits`} fg="subtle" /> : null}
+                    ? <text content={i18n.t('screens.usage.turnCost', { cost: turn.usage.cost })} fg="subtle" /> : null}
                 </Row>
               )
             ))
@@ -2324,6 +2361,7 @@ export const UsageScreen: (props: Record<string, never>) => RenderOutput =
 
 export const SettingsScreen: (props: Record<string, never>) => RenderOutput =
   defineComponent<Record<string, never>>('SettingsScreen', () => {
+    const i18n = useI18n();
     const controller = useRequiredService(CONTROLLER);
     const uri = useStoreValue<string>(OPEN, '');
     const [config, setConfig] = useState<SessionConfig | null>(null);
@@ -2334,16 +2372,16 @@ export const SettingsScreen: (props: Record<string, never>) => RenderOutput =
         .catch((error: unknown) => controller.report(error));
     }, [uri ?? '']);
 
-    if (!config) return <EmptyState title="Reading the session" flex={1} />;
+    if (!config) return <EmptyState title={i18n.t('screens.settings.loading')} flex={1} />;
 
     return (
-      <Panel title="Session settings" flex={1}>
+      <Panel title={i18n.t('screens.settings.title')} flex={1}>
         <Column gap={1} flex={1}>
           {config.properties.map((property) => (
             <Column key={property.key} gap={0}>
               <Row gap={1}>
                 <text content={property.title} bold />
-                {!property.sessionMutable ? <text content="fixed for this session" fg="subtle" /> : null}
+                {!property.sessionMutable ? <text content={i18n.t('screens.settings.fixed')} fg="subtle" /> : null}
               </Row>
               {property.description ? <text content={property.description} fg="muted" wrap="word" /> : null}
               <RadioGroup
@@ -2360,7 +2398,7 @@ export const SettingsScreen: (props: Record<string, never>) => RenderOutput =
           ))}
           <text content="" flex={1} />
           <text
-            content="Only what the schema marks changeable on a running session is offered. The action merges one key - sending the whole object writes back what another client just changed."
+            content={i18n.t('screens.settings.note')}
             fg="subtle"
             wrap="word"
           />
@@ -2374,6 +2412,7 @@ export const SettingsScreen: (props: Record<string, never>) => RenderOutput =
 export const HostsScreen: (props: Record<string, never>) => RenderOutput =
   defineComponent<Record<string, never>>('HostsScreen', () => {
     const app = useApp();
+    const i18n = useI18n();
     const host = useStoreValue<HostState>(HOST);
     const [agents, setAgents] = useState<Agent[]>([]);
 
@@ -2382,22 +2421,22 @@ export const HostsScreen: (props: Record<string, never>) => RenderOutput =
     }, []);
 
     return (
-      <Panel title="Hosts" flex={1}>
+      <Panel title={i18n.t('screens.hosts.title')} flex={1}>
         <Column gap={1} flex={1}>
           <ConnectionBadge url={host?.url ?? ''} state={host?.state ?? 'offline'} />
-          <text content="An agent host is a sessions server. Several clients watch and drive the same sessions; none of them owns the process running the agent." fg="muted" wrap="word" />
+          <text content={i18n.t('screens.hosts.about')} fg="muted" wrap="word" />
           {/* Which of the two is answering, and how to ask for the other. The
               seam is one interface, so this is the only screen that has any
               reason to mention that there are two implementations of it. */}
           {host?.id === 'fake' ? (
             <text
-              content="This is the scripted host: five seeded sessions and an agent that answers four ways. Start with --host ws://… to drive a real one instead."
+              content={i18n.t('screens.hosts.fake')}
               fg="subtle"
               wrap="word"
             />
           ) : (
             <text
-              content="A live host. What it says is what it sent."
+              content={i18n.t('screens.hosts.live')}
               fg="subtle"
               wrap="word"
             />

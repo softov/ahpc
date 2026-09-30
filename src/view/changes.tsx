@@ -1,5 +1,5 @@
 import type { BoxProps, RenderOutput, SemanticVariant } from '@textui/core';
-import { defineComponent, useTheme } from '@textui/core';
+import { defineComponent, useI18n, useTheme } from '@textui/core';
 import type { ListItem, ListItemState } from '@textui/widgets';
 import { Column, EmptyState, List, Marquee, Row } from '@textui/widgets';
 import type { Changeset } from '../ahp/types.js';
@@ -42,12 +42,13 @@ export const ChangesList: (props: ChangesListProps) => RenderOutput =
   defineComponent<ChangesListProps>('ChangesList', (props) => {
     const { changes, onOpen, onSelect, reviewable, focusId, autoFocus, ...rest } = props;
     const theme = useTheme();
+    const i18n = useI18n();
 
     if (changes.files.length === 0) {
       return (
         <EmptyState
-          title={changes.status === 'computing' ? 'Working out what changed' : 'Nothing changed'}
-          message={changes.status === 'computing' ? 'The host is still computing the changeset.' : 'No file was created, edited or deleted.'}
+          title={changes.status === 'computing' ? i18n.t('views.changes.computingTitle') : i18n.t('views.changes.empty')}
+          message={changes.status === 'computing' ? i18n.t('views.changes.computingMessage') : i18n.t('views.changes.emptyMessage')}
           {...rest}
         />
       );
@@ -69,7 +70,7 @@ export const ChangesList: (props: ChangesListProps) => RenderOutput =
     return (
       <Column {...rest}>
         {changes.status === 'computing' ? (
-          <text content={`${theme.glyphs.ellipsis} still computing - this is not the whole list`} fg="warning" />
+          <text content={i18n.t('views.changes.partial', { ellipsis: theme.glyphs.ellipsis })} fg="warning" />
         ) : null}
         <List
           items={items}
@@ -107,7 +108,7 @@ export const ChangesList: (props: ChangesListProps) => RenderOutput =
           {...(onSelect ? { onSelect: (uri: string) => onSelect(uri) } : {})}
           {...(focusId ? { focusId } : {})}
           {...(autoFocus ? { autoFocus: true } : {})}
-          emptyMessage="Nothing changed"
+          emptyMessage={i18n.t('views.changes.empty')}
         />
       </Column>
     );

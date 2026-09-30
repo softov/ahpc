@@ -22,6 +22,9 @@
  * until the morning it does not run.
  */
 
+import type { I18n } from '@textui/core';
+import { inEnglish } from './state.js';
+
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
 const DAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 
@@ -51,29 +54,41 @@ function valueOf(text: string, field: Field): number | undefined {
   return value < field.min || value > field.max ? undefined : value;
 }
 
+/** A field's name, in the reader's language. */
+function fieldName(field: Field, i18n: I18n): string {
+  switch (field.name) {
+    case 'minute': return i18n.t('views.schedule.fieldMinute');
+    case 'hour': return i18n.t('views.schedule.fieldHour');
+    case 'day of month': return i18n.t('views.schedule.fieldDayOfMonth');
+    case 'month': return i18n.t('views.schedule.fieldMonth');
+    default: return i18n.t('views.schedule.fieldDayOfWeek');
+  }
+}
+
 /** What is wrong with one field, or nothing. */
-function checkField(text: string, field: Field): string | undefined {
+function checkField(text: string, field: Field, i18n: I18n): string | undefined {
+  const name = fieldName(field, i18n);
   for (const term of text.split(',')) {
-    if (term === '') return `${field.name} has an empty entry`;
+    if (term === '') return i18n.t('views.schedule.emptyEntry', { field: name });
     const parts = term.split('/');
-    if (parts.length > 2) return `${term} has more than one step`;
+    if (parts.length > 2) return i18n.t('views.schedule.twoSteps', { term });
     const [range, step] = parts as [string, string | undefined];
     if (step !== undefined && (!/^\d+$/.test(step) || Number(step) === 0)) {
-      return `${step} is not a step - a step must be a positive whole number`;
+      return i18n.t('views.schedule.notAStep', { step });
     }
     if (range === '*') continue;
     if (range.includes('-')) {
       const ends = range.split('-');
-      if (ends.length > 2) return `${range} is not a range`;
+      if (ends.length > 2) return i18n.t('views.schedule.notARange', { range });
       const [a, b] = ends as [string, string];
       const from = valueOf(a, field);
       const to = valueOf(b, field);
-      if (from === undefined) return `${a} is not a ${field.name}`;
-      if (to === undefined) return `${b} is not a ${field.name}`;
-      if (to < from) return `${range} runs backwards`;
+      if (from === undefined) return i18n.t('views.schedule.notA', { value: a, field: name });
+      if (to === undefined) return i18n.t('views.schedule.notA', { value: b, field: name });
+      if (to < from) return i18n.t('views.schedule.backwards', { range });
       continue;
     }
-    if (valueOf(range, field) === undefined) return `${range} is not a ${field.name}`;
+    if (valueOf(range, field) === undefined) return i18n.t('views.schedule.notA', { value: range, field: name });
   }
   return undefined;
 }
@@ -84,16 +99,16 @@ function checkField(text: string, field: Field): string | undefined {
  * A sentence rather than a boolean because it is shown under the field being
  * typed into, and "invalid" tells somebody only that they are not finished.
  */
-export function scheduleProblem(expression: string): string | undefined {
+export function scheduleProblem(expression: string, i18n: I18n = inEnglish()): string | undefined {
   const trimmed = expression.trim();
-  if (trimmed === '') return 'A schedule needs five fields, like 0 9 * * 1-5';
-  if (trimmed.startsWith('@')) return 'AHP has no @daily or @hourly - write the five fields out';
+  if (trimmed === '') return i18n.t('views.schedule.needsFive');
+  if (trimmed.startsWith('@')) return i18n.t('views.schedule.noMacros');
   const fields = trimmed.split(/\s+/);
   if (fields.length !== 5) {
-    return `A schedule has five fields - minute, hour, day, month, weekday - and this has ${fields.length}`;
+    return i18n.t('views.schedule.fieldCount', { count: fields.length });
   }
   for (let at = 0; at < FIELDS.length; at++) {
-    const problem = checkField(fields[at] as string, FIELDS[at] as Field);
+    const problem = checkField(fields[at] as string, FIELDS[at] as Field, i18n);
     if (problem !== undefined) return problem;
   }
   return undefined;
@@ -146,6 +161,19 @@ export const PRESETS: Preset[] = [
   { id: 'weekdays', label: 'Weekdays at 09:00', expression: '0 9 * * 1-5' },
   { id: 'saturday', label: 'Saturdays at 23:00', expression: '0 23 * * 6' },
 ];
+
+/** A preset's label, in the reader's language. */
+export function presetLabel(preset: Preset, i18n: I18n = inEnglish()): string {
+  switch (preset.id) {
+    case 'manual': return i18n.t('views.schedule.presetManual');
+    case 'half-hourly': return i18n.t('views.schedule.presetHalfHourly');
+    case 'hourly': return i18n.t('views.schedule.presetHourly');
+    case 'daily': return i18n.t('views.schedule.presetDaily');
+    case 'weekdays': return i18n.t('views.schedule.presetWeekdays');
+    case 'saturday': return i18n.t('views.schedule.presetSaturday');
+    default: return preset.label;
+  }
+}
 
 /**
  * Which preset an expression is, if it is one.

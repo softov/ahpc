@@ -1,6 +1,6 @@
 ---
 title: textui chrome reads through app.i18n
-status: todo
+status: done
 depends: []
 layer: "textui widgets, chat"
 refs:
@@ -36,3 +36,7 @@ An app that registers `pt-BR` entries for those keys sees them; one that registe
 
 ## Resume
 
+Done 2026-09-30.
+`I18n.t` takes an optional English fallback, so textui keeps its English in the source and needs no bundle of its own; 115 `textui.*` keys across widgets and chat, with `ConfirmDialog` and `PromptDialog` components so the `confirm()` and `prompt()` helpers can reach the app's i18n.
+Tests: core `test/i18n.test.ts` (fallback), chat `test/i18n.test.tsx` (a pt-BR bundle, and a locale changed after the first frame).
+Left English: form validator messages (callers pass their own), shell and layout names (identifiers), and `ChatSessionHead`'s dates, which use the machine's locale through `toLocaleString`.

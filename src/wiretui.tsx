@@ -59,7 +59,7 @@ export async function wireTui(options: WireTuiOptions): Promise<void> {
       registerWire(booted, { file: options.file });
       booted.commands.register({
         id: 'app.quit',
-        title: 'Quit',
+        title: booted.i18n.t('views.wireTui.quit'),
         slots: ['palette'],
         run: () => void app.stop().then(() => process.exit(0)),
       });
