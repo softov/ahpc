@@ -1355,6 +1355,46 @@ function commands(
       },
     },
     /*
+     * The palette, opened on one command's question.
+     *
+     * A key bound straight to a command that takes an argument runs it with
+     * nothing, and textui refuses that: `x` on the changes screen was "needs:
+     * operation". So a key that means "choose one" is bound here with the
+     * command as its argument, and the palette asks what that command asks.
+     */
+    {
+      id: 'app.ask',
+      title: app.i18n.t('command.app.ask.title'),
+      category: app.i18n.t('category.view'),
+      slots: [],
+      args: [{
+        name: 'command',
+        type: 'string' as const,
+        required: true,
+        description: app.i18n.t('commands.askArg'),
+      }],
+      run: (args: Record<string, unknown>) => {
+        const id = String(args.command ?? '');
+        // Gated like the command itself, so the key does nothing where the
+        // command would not run.
+        if (!app.commands.enabled(id)) return;
+        app.layers.open({
+          id: 'palette',
+          layer: 'modal',
+          scrim: true,
+          trapFocus: true,
+          dismissOnEscape: true,
+          node: {
+            component: 'CommandPalette',
+            maxWidth: 90,
+            openAt: id,
+            commands: app.commands.list({ slot: 'palette', enabledOnly: true }),
+            onClose: { handler: () => app.layers.close('palette') },
+          },
+        });
+      },
+    },
+    /*
      * The palette, with only the commands that configure this client in it.
      *
      * A slot rather than a screen of its own. Every one of these already
@@ -2866,7 +2906,7 @@ function shipped(i18n: TextUIApp['i18n']): Binding[] {
      * that has never heard of the kitty protocol. It also leaves `ctrl+t`
      * unclaimed, which is what the other agent CLIs spend on a todo list.
      */
-    { keys: 'alt+t', commandId: 'theme.change' },
+    { keys: 'alt+t', commandId: 'app.ask', args: { command: 'theme.change' } },
     /*
      * Three, and `alt+m` is the one to reach for.
      *
@@ -2948,7 +2988,7 @@ function shipped(i18n: TextUIApp['i18n']): Binding[] {
     // out of it is escape - the pair that makes every other letter reachable.
     { keys: 'c', commandId: 'changes.show', scopeId: CHAT_SCOPE },
     { keys: 'f', commandId: 'files.show', scopeId: CHAT_SCOPE },
-    { keys: 'l', commandId: 'link.open', scopeId: CHAT_SCOPE },
+    { keys: 'l', commandId: 'app.ask', args: { command: 'link.open' }, scopeId: CHAT_SCOPE },
     /*
      * On the changes screen, and nowhere else.
      *
@@ -2966,7 +3006,7 @@ function shipped(i18n: TextUIApp['i18n']): Binding[] {
     // `x` for "do something to this". The command takes which one as an
     // argument, so the key opens the picker rather than committing to a verb -
     // which is right, because the verbs differ per changeset and per host.
-    { keys: 'x', commandId: 'changes.run', scopeId: CHANGES_SCOPE },
+    { keys: 'x', commandId: 'app.ask', args: { command: 'changes.run' }, scopeId: CHANGES_SCOPE },
     // Scoped to the screen, so a letter is a letter everywhere else. `enter`
     // is the list's own and opens the detail, so running one is a key of its
     // own and never the thing a stray enter does.

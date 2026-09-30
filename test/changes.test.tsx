@@ -245,6 +245,19 @@ describe('running one of the verbs from the screen', () => {
     await t.unmount();
   });
 
+  it('asks which verb on x, and runs the one chosen', async () => {
+    const t = await changes();
+    // The key names no verb, so it opens the question rather than running
+    // the command with nothing - which textui refuses, and used to throw.
+    await t.press('x');
+    for (let i = 0; i < 10; i++) await t.settle();
+    expect(t.hasText('Revert This File')).toBe(true);
+    await t.press('enter');
+    for (let i = 0; i < 10; i++) await t.settle();
+    expect(t.hasText('Put this file back the way the agent found it?')).toBe(true);
+    await t.unmount();
+  });
+
   it('does nothing at all when the confirmation is declined', async () => {
     const t = await changes();
     void t.app.execute('changes.run', { operation: 'revert' });
