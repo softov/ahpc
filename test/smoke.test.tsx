@@ -585,15 +585,15 @@ describe('the slash menu', () => {
   });
 
   it('runs the row that was clicked', async () => {
-    const m = await composing('/go');
-    const row = m.t.lines().findIndex((line) => line.includes('/go.new'));
+    const m = await composing('/go.sessions');
+    const row = m.t.lines().findIndex((line) => line.includes('/go.sessions'));
     expect(row).toBeGreaterThan(-1);
 
     const before = turnsIn(m);
     m.t.click(10, row);
     for (let i = 0; i < 8; i++) await m.t.settle();
 
-    expect(m.t.app.screens.current()?.id).toBe('new');
+    expect(m.t.app.screens.current()?.id).toBe('sessions');
     expect(turnsIn(m)).toBe(before);
     await m.t.unmount();
   });
@@ -2666,7 +2666,7 @@ describe('more than one chat in a session', () => {
     for (let i = 0; i < 6; i++) await m.t.settle();
     m.t.type('new chat');
     for (let i = 0; i < 6; i++) await m.t.settle();
-    expect(m.t.hasText('New chat here')).toBe(true);
+    expect(m.t.hasText('Open another conversation in this session')).toBe(true);
     await m.t.unmount();
   });
 

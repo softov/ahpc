@@ -1322,7 +1322,7 @@ function commands(
        * JSON and starting again is one somebody keeps off.
        */
       id: 'bood.toggle',
-      title: 'Show the creature',
+      title: 'Show creature',
       category: 'View',
       slots: ['palette', 'config'],
       run: () => {
@@ -1333,7 +1333,7 @@ function commands(
     {
       id: 'app.palette',
       title: 'Command Palette',
-      category: 'Navigation',
+      category: 'View',
       slots: [],
       run: () => {
         app.layers.open({
@@ -1344,7 +1344,7 @@ function commands(
           dismissOnEscape: true,
           node: {
             component: 'CommandPalette',
-            width: 62,
+            maxWidth: 90,
             commands: app.commands.list({ slot: 'palette', enabledOnly: true }),
             onClose: { handler: () => app.layers.close('palette') },
           },
@@ -1365,8 +1365,8 @@ function commands(
      */
     {
       id: 'app.config',
-      title: 'Configuration',
-      category: 'Navigation',
+      title: 'Configure',
+      category: 'View',
       description: 'Theme, layout and the rest of what this client decides',
       slots: ['palette'],
       run: () => {
@@ -1378,7 +1378,7 @@ function commands(
           dismissOnEscape: true,
           node: {
             component: 'CommandPalette',
-            width: 62,
+            maxWidth: 90,
             placeholder: 'Configure',
             commands: app.commands.list({ slot: 'config', enabledOnly: true }),
             onClose: { handler: () => app.layers.close('palette') },
@@ -1398,8 +1398,8 @@ function commands(
        * keys that do nothing here is a keymap that has to be second-guessed.
        */
       id: 'help.keys',
-      title: 'Keys',
-      category: 'Help',
+      title: 'Show keys',
+      category: 'View',
       description: 'Every key that does something here',
       slots: ['palette'],
       run: () => {
@@ -1411,7 +1411,7 @@ function commands(
           dismissOnEscape: true,
           node: {
             component: 'CommandPalette',
-            width: 62,
+            maxWidth: 90,
             placeholder: 'Keys',
             commands: app.commands.list({ enabledOnly: true })
               .filter((command) => app.keybindings.forCommand(command.id).length > 0),
@@ -1422,8 +1422,8 @@ function commands(
     },
     {
       id: 'go.back',
-      title: 'Back',
-      category: 'Navigation',
+      title: 'Go back',
+      category: 'Screens',
       description: 'Return to the previous screen',
       slots: ['palette'],
       run: () => {
@@ -1454,16 +1454,16 @@ function commands(
        * nothing at all.
        */
       id: 'go.automations',
-      title: 'What the host runs on its own',
+      title: 'Show automations',
       category: 'Screens',
-      description: 'Show the automations',
+      description: 'What the host runs on its own, and when it next fires',
       slots: ['palette'],
       run: () => { app.screens.push('automations'); },
     },
     {
       id: 'automation.new',
-      title: 'Write a new automation',
-      category: 'Automations',
+      title: 'New automation',
+      category: 'Automation',
       description: 'A session the host starts without being asked',
       slots: ['palette'],
       run: () => {
@@ -1473,8 +1473,8 @@ function commands(
     },
     {
       id: 'automation.edit',
-      title: 'Edit this automation',
-      category: 'Automations',
+      title: 'Edit automation',
+      category: 'Automation',
       description: 'Change what it says, where and on what it runs, and when',
       slots: ['palette'],
       when: `${AUTOMATION_ROW}`,
@@ -1489,8 +1489,8 @@ function commands(
     },
     {
       id: 'automation.run',
-      title: 'Run this automation now',
-      category: 'Automations',
+      title: 'Run automation now',
+      category: 'Automation',
       description: 'Start a run, whatever the schedule says',
       slots: ['palette'],
       when: `${AUTOMATION_ROW}`,
@@ -1507,8 +1507,8 @@ function commands(
     },
     {
       id: 'automation.toggle',
-      title: 'Switch this automation on or off',
-      category: 'Automations',
+      title: 'Turn automation on / off',
+      category: 'Automation',
       description: 'Stop it firing, or let it fire again',
       slots: ['palette'],
       when: `${AUTOMATION_ROW}`,
@@ -1522,8 +1522,8 @@ function commands(
     },
     {
       id: 'automation.remove',
-      title: 'Forget this automation',
-      category: 'Automations',
+      title: 'Delete automation',
+      category: 'Automation',
       description: 'Delete it and everything it has done',
       slots: ['palette'],
       when: `${AUTOMATION_ROW}`,
@@ -1561,8 +1561,8 @@ function commands(
      */
     {
       id: 'automation.openDetails',
-      title: 'Open the automation detail',
-      category: 'Automations',
+      title: 'Show automation details',
+      category: 'Automation',
       description: 'Show what it says, where it runs and what it has done',
       slots: ['palette'],
       when: `${SCREEN} == 'automations' && ${AUTOMATION_ROW}`,
@@ -1573,8 +1573,8 @@ function commands(
     },
     {
       id: 'automation.closeDetails',
-      title: 'Put the automation detail away',
-      category: 'Automations',
+      title: 'Hide automation details',
+      category: 'Automation',
       description: 'Hide the detail pane, and give the list the width',
       slots: ['palette'],
       when: `${SCREEN} == 'automations'`,
@@ -1586,19 +1586,11 @@ function commands(
     },
     {
       id: 'go.sessions',
-      title: 'Sessions',
+      title: 'Show sessions',
       category: 'Screens',
-      description: 'List all sessions',
+      description: 'Every session on the host',
       slots: ['palette'],
       run: () => toSessions(),
-    },
-    {
-      id: 'go.new',
-      title: 'New session',
-      category: 'Screens',
-      description: 'Start a new conversation',
-      slots: ['palette'],
-      run: () => { app.screens.reset('new'); app.focus.focus('chat.composer'); },
     },
     {
       /*
@@ -1634,9 +1626,9 @@ function commands(
     },
     {
       id: 'go.changes',
-      title: 'What this session changed',
+      title: 'Show changes',
       category: 'Screens',
-      description: 'Show the files',
+      description: 'The files this session changed',
       slots: ['palette'],
       when: `${OPEN}`,
       // Always the list, never wherever it was left. A screen that reopens on
@@ -1652,7 +1644,7 @@ function commands(
        * the changed files would be a changeset with a worse name.
        */
       id: 'go.files',
-      title: 'Browse the host\'s files',
+      title: 'Show files',
       category: 'Screens',
       description: 'The project, as the host sees it',
       slots: ['palette'],
@@ -1667,7 +1659,7 @@ function commands(
     },
     {
       id: 'go.skills',
-      title: 'Skills and commands',
+      title: 'Show skills and commands',
       category: 'Screens',
       description: 'What plugins and directories gave this session',
       slots: ['palette'],
@@ -1676,7 +1668,7 @@ function commands(
     },
     {
       id: 'go.mcp',
-      title: 'MCP servers',
+      title: 'Show MCP servers',
       category: 'Screens',
       description: 'Which servers this session has, and whether they answered',
       slots: ['palette'],
@@ -1685,7 +1677,7 @@ function commands(
     },
     {
       id: 'go.usage',
-      title: 'What this session has spent',
+      title: 'Show usage',
       category: 'Screens',
       description: 'Tokens, cost and the context window',
       slots: ['palette'],
@@ -1839,16 +1831,16 @@ function commands(
     },
     {
       id: 'go.settings',
-      title: 'Session settings',
+      title: 'Show session settings',
       category: 'Screens',
-      description: 'Settings for this session',
+      description: 'The options the host offers for this session',
       slots: ['palette', 'config'],
       when: `${OPEN}`,
       run: () => app.screens.push('settings'),
     },
     {
       id: 'go.hosts',
-      title: 'Hosts',
+      title: 'Show hosts',
       category: 'Screens',
       description: 'Manage all hosts',
       slots: ['palette'],
@@ -1870,7 +1862,7 @@ function commands(
      */
     {
       id: 'view.markdown',
-      title: 'Markdown or raw text',
+      title: 'Render markdown',
       category: 'View',
       description: 'Draw what the agent said as markdown, or as it typed it',
       slots: ['palette', 'config'],
@@ -1945,9 +1937,9 @@ function commands(
     },
     {
       id: 'view.theme',
-      title: 'Theme',
+      title: 'Change theme',
       category: 'View',
-      description: 'Change the colors and shapes',
+      description: 'Colors and shapes',
       slots: ['palette', 'config'],
       // The command says what it needs and the palette asks. Wearing it while
       // the highlight moves is what makes a theme choosable at all: the names
@@ -1975,9 +1967,9 @@ function commands(
     },
     {
       id: 'view.shell',
-      title: 'Layout',
+      title: 'Change layout',
       category: 'View',
-      description: 'Change the layout and controls',
+      description: 'Where the panels and controls go',
       slots: ['palette', 'config'],
       args: [{
         name: 'id',
@@ -2005,9 +1997,9 @@ function commands(
     // will be sent as, each asked by the palette, anchored above its chip.
     {
       id: 'compose.harness',
-      title: 'Harness',
+      title: 'Choose harness',
       category: 'Compose',
-      description: 'Select the agent harness',
+      description: 'The agent that runs the session',
       slots: ['palette'],
       // Fixed once a session exists: it is the process the conversation is
       // running in, and a chip offering to change it would be offering a lie.
@@ -2030,9 +2022,9 @@ function commands(
     },
     {
       id: 'compose.model',
-      title: 'Model',
+      title: 'Choose model',
       category: 'Compose',
-      description: 'Select the model',
+      description: 'The model the agent uses',
       slots: ['palette'],
       // The model rides on the message being composed, so it needs a composer.
       when: `${SCREEN} == 'chat' || ${SCREEN} == 'new'`,
@@ -2065,7 +2057,7 @@ function commands(
      */
     {
       id: 'chat.new',
-      title: 'New chat here',
+      title: 'New chat',
       category: 'Session',
       description: 'Open another conversation in this session',
       slots: ['palette'],
@@ -2109,7 +2101,7 @@ function commands(
     },
     {
       id: 'chat.switch',
-      title: 'Chat',
+      title: 'Switch chat',
       category: 'Session',
       description: 'Read a different conversation in this session',
       slots: ['palette'],
@@ -2134,7 +2126,7 @@ function commands(
     },
     {
       id: 'chat.close',
-      title: 'Close this chat',
+      title: 'Close chat',
       category: 'Session',
       description: 'Dispose the conversation being read',
       slots: ['palette'],
@@ -2153,7 +2145,7 @@ function commands(
      */
     {
       id: 'terminal.new',
-      title: 'Open a terminal',
+      title: 'New terminal',
       category: 'Terminal',
       description: 'Start a shell on the host, in the workspace directory',
       slots: ['palette'],
@@ -2209,7 +2201,7 @@ function commands(
     },
     {
       id: 'terminal.close',
-      title: 'Close this terminal',
+      title: 'Close terminal',
       category: 'Terminal',
       description: 'Kill the shell being read',
       slots: ['palette'],
@@ -2251,7 +2243,7 @@ function commands(
     },
     {
       id: 'terminal.list',
-      title: 'List the terminals',
+      title: 'List terminals',
       category: 'Terminal',
       description: 'Every terminal on the host, and back to the one being read',
       slots: ['palette'],
@@ -2265,7 +2257,7 @@ function commands(
     },
     {
       id: 'terminal.focusSwitch',
-      title: 'Between the tabs and the command field',
+      title: 'Switch terminal focus',
       category: 'Terminal',
       when: `${SCREEN} == 'terminal'`,
       run: () => {
@@ -2274,15 +2266,15 @@ function commands(
     },
     {
       id: 'go.terminal',
-      title: 'Terminals',
-      category: 'Go',
+      title: 'Show terminals',
+      category: 'Screens',
       description: 'The shells running on the host',
       slots: ['palette'],
       run: () => { app.screens.push('terminal'); },
     },
     {
       id: 'compose.workspace',
-      title: 'Workspace',
+      title: 'Choose workspace',
       category: 'Compose',
       description: 'Choose the directory the session works in, from the host\'s own',
       slots: ['palette'],
@@ -2311,7 +2303,7 @@ function commands(
     },
     {
       id: 'compose.workspace.path',
-      title: 'Workspace path',
+      title: 'Type workspace path',
       category: 'Compose',
       description: 'Type the directory the session works in',
       slots: ['palette'],
@@ -2331,7 +2323,7 @@ function commands(
     },
     {
       id: 'compose.start',
-      title: 'Start a session with what has been typed',
+      title: 'Start session',
       category: 'Compose',
       slots: ['palette'],
       when: `!${OPEN}`,
@@ -2374,7 +2366,7 @@ function commands(
        * where the reader had scrolled, which re-opening would throw away.
        */
       id: 'session.reopen',
-      title: 'Reopen the session',
+      title: 'Reopen session',
       category: 'Session',
       description: 'Return to the conversation that was open',
       slots: ['palette'],
@@ -2400,9 +2392,9 @@ function commands(
     },
     {
       id: 'session.refresh',
-      title: 'Refresh the catalogue',
+      title: 'Refresh sessions',
       category: 'Session',
-      description: 'Reload list from the host',
+      description: 'Reload the list from the host',
       slots: ['palette'],
       keepOpen: true,
       run: () => void controller.refresh(true),
@@ -2445,7 +2437,7 @@ function commands(
       id: 'session.dispose',
       title: 'Dispose session',
       category: 'Session',
-      description: 'Delete this session',
+      description: 'End it on the host, for every client',
       slots: ['palette'],
       // It acts on the session being read, or the one selected in the catalogue.
       when: `${OPEN} || ${SELECTED}`,
@@ -2466,7 +2458,7 @@ function commands(
     },
     {
       id: 'session.toggleArchived',
-      title: 'Archived sessions',
+      title: 'Show archived sessions',
       category: 'Session',
       description: 'List the sessions that have been put away',
       slots: ['palette'],
@@ -2503,9 +2495,9 @@ function commands(
     },
     {
       id: 'chat.stop',
-      title: 'Stop the turn',
+      title: 'Stop turn',
       category: 'Chat',
-      description: 'Force session to stop running',
+      description: 'Stop the agent where it is',
       slots: ['palette'],
       // On the screen that is showing the turn. A session left open behind
       // you keeps its status - a blocked one reads 24 for ever - so a clause
@@ -2517,9 +2509,9 @@ function commands(
     },
     {
       id: 'chat.approve',
-      title: 'Approve what the agent is waiting on',
+      title: 'Approve tool call',
       category: 'Chat',
-      description: 'Approve the tool call ',
+      description: 'Let the agent run what it is waiting on',
       slots: ['palette'],
       // There is nothing to approve until the agent has asked.
       when: `${INPUT}`,
@@ -2528,9 +2520,9 @@ function commands(
     },
     {
       id: 'chat.deny',
-      title: 'Deny it',
+      title: 'Deny tool call',
       category: 'Chat',
-      description: 'Deny the tool call',
+      description: 'Refuse what the agent is waiting on',
       slots: ['palette'],
       // There is nothing to deny until the agent has asked.
       when: `${INPUT}`,
@@ -2538,9 +2530,9 @@ function commands(
     },
     {
       id: 'chat.send',
-      title: 'Send a message',
+      title: 'Send message',
       category: 'Chat',
-      description: 'Send a message',
+      description: 'Send what is in the composer',
       slots: ['palette'],
       // `send` returns without a session, so offering it without one is offering nothing.
       when: `${OPEN}`,
@@ -2566,7 +2558,7 @@ function commands(
        * front of me", and which of the two that is depends on where you are.
        */
       id: 'chat.find',
-      title: 'Find in the conversation',
+      title: 'Find in conversation',
       category: 'Chat',
       description: 'Search what has been said in this session',
       slots: ['palette'],
@@ -2618,9 +2610,9 @@ function commands(
     },
     {
       id: 'session.filter',
-      title: 'Filter the catalogue',
+      title: 'Filter sessions',
       category: 'Session',
-      description: 'Filter the catalogue',
+      description: 'Narrow the list as you type',
       slots: ['palette'],
       // The filter box belongs to the catalogue.
       when: `${SCREEN} == 'sessions'`,
@@ -2645,7 +2637,7 @@ function commands(
      */
     {
       id: 'session.openDetails',
-      title: 'Open the session detail',
+      title: 'Show session details',
       category: 'Session',
       description: 'Show the detail pane, and read it',
       slots: ['palette'],
@@ -2659,7 +2651,7 @@ function commands(
     },
     {
       id: 'session.closeDetails',
-      title: 'Put the session detail away',
+      title: 'Hide session details',
       category: 'Session',
       description: 'Hide the detail pane, and give the list the width',
       slots: ['palette'],
@@ -2689,7 +2681,7 @@ function commands(
       id: 'chat.clearQueue',
       title: 'Drop queued messages',
       category: 'Chat',
-      description: 'Drop queued messages',
+      description: 'Forget the messages waiting to be sent',
       slots: ['palette'],
       when: `${QUEUE}`,
       // One dispatch each, because that is what the protocol offers - and the
