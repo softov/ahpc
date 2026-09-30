@@ -20,6 +20,7 @@ import { SERVER } from '../mcp/serve.js';
 import { stdio } from '../mcp/stdio.js';
 import { serve as serveHttp } from '../mcp/http.js';
 import type { Answer, ModelSelection, SessionUri, Turn } from '../ahp/types.js';
+import { detectLocale } from '../i18n/locale.js';
 
 export const HELP = `ahpc - drive an agent host from a shell
 
@@ -368,6 +369,7 @@ export async function cli(command: string, rest: string[]): Promise<number> {
     const theme = args.value('--theme') ?? settings.theme;
     const shell = args.value('--shell') ?? settings.shell;
     const filter = args.value('--filter');
+    const locale = detectLocale(args.value('--lang'), settings.lang);
     await wireTui({
       file,
       follow: args.has('--follow'),
@@ -375,6 +377,7 @@ export async function cli(command: string, rest: string[]): Promise<number> {
       ...(filter === undefined ? {} : { filter }),
       ...(theme === undefined ? {} : { theme }),
       ...(shell === undefined ? {} : { shell }),
+      locale,
     });
     return 0;
   }

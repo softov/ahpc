@@ -16,6 +16,8 @@ import { follow, matches, rowText } from './wire.js';
 export interface WireTuiOptions {
   file: string;
   theme?: string;
+  /** A shipped locale, already chosen. */
+  locale?: string;
   shell?: string;
   /** Keep printing as the file grows, off a terminal. */
   follow?: boolean;
@@ -50,6 +52,7 @@ export async function wireTui(options: WireTuiOptions): Promise<void> {
   const app = createApp({
     terminal,
     ...(options.theme ? { theme: options.theme } : {}),
+    ...(options.locale ? { locale: options.locale } : {}),
     ...(options.shell ? { shell: options.shell } : {}),
     session: { managed: true, altScreen: true, mouse: true, title: 'wire' },
     onBoot: (booted) => {

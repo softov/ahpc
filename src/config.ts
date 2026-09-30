@@ -20,6 +20,8 @@ export interface Config {
   connectionTokenFile?: string;
   /** The theme to open on. */
   theme?: string;
+  /** The language to read in: `en`, `pt-br` or `es`. `--lang` wins over it. */
+  lang?: string;
   /** The shell layout. */
   shell?: string;
   /**

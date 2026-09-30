@@ -12,6 +12,7 @@ import { connectionToken, loadConfig } from './config.js';
 import { UPDATE_NOTICE, reportHostError } from './state.js';
 import { MAX_AGE_MS, checkingUpdates, readUpdate, refreshUpdate, registry, stale, updateNotice } from './update.js';
 import { manifest } from './version.js';
+import { detectLocale } from './i18n/locale.js';
 
 /**
  * The entry point.
@@ -48,6 +49,8 @@ interface Options {
   session?: string;
   theme: string;
   shell: string;
+  /** `--lang`, before the config file and the system are asked. */
+  lang?: string;
   /** The header trades its name for a creature, on an open session. */
   boodInline: boolean;
   /** The creature roams the whole application. */
@@ -141,6 +144,8 @@ Knowing when it is old
 
 Appearance
   --theme <name>        workbench, paper-light, ...
+  --lang <tag>          en, pt-br or es. Without it: lang in the file,
+                        then LC_ALL, LC_MESSAGES, LANG; English otherwise
   --shell <name>        The shell layout
   --screen <name>       Which screen to open on
   --bood                Let the creature loose on the whole screen. It
@@ -203,6 +208,7 @@ export function parse(argv: string[]): Options {
       case '--answer': options.answer = true; break;
       case '--screen': options.screen = String(argv[++i]); break;
       case '--theme': options.theme = String(argv[++i]); break;
+      case '--lang': options.lang = String(argv[++i]); break;
       case '--shell': options.shell = String(argv[++i]); break;
       case '--bood': options.boodFloat = true; break;
       case '--session': options.session = String(argv[++i]); break;
@@ -255,6 +261,7 @@ async function still(options: Options): Promise<void> {
     capabilities: overrides(options),
     theme: options.theme,
     shell: options.shell,
+    ...(options.lang ? { locale: options.lang } : {}),
     onBoot: (booted) => {
       registerChat(booted, {
         host, workspace: workspaceFor(options),
@@ -353,6 +360,7 @@ export async function tui(argv: string[]): Promise<void> {
     file,
   );
   if (file.theme && !argv.includes('--theme')) options.theme = file.theme;
+  options.lang = detectLocale(options.lang, file.lang);
   if (file.shell && !argv.includes('--shell')) options.shell = file.shell;
   if (file.boodInline !== undefined) options.boodInline = file.boodInline;
   if (file.boodFloat !== undefined && !argv.includes('--bood')) options.boodFloat = file.boodFloat;
@@ -375,6 +383,7 @@ export async function tui(argv: string[]): Promise<void> {
     // while it runs, and the screens are the same graph under either.
     theme: options.theme,
     shell: options.shell,
+    ...(options.lang ? { locale: options.lang } : {}),
     session: { managed: true, altScreen: true, mouse: true, title: 'assistant' },
     onBoot: (booted) => {
       registerChat(booted, {
