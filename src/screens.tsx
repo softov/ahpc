@@ -170,6 +170,16 @@ function describe(session: SessionSummary, detail: SessionDetail | null): Detail
       value: changes?.files
         ? `${changes.files} files  +${changes.additions ?? 0} -${changes.deletions ?? 0}`
         : '',
+      // Green and red, the way a diff says it.
+      ...(changes?.files
+        ? {
+          parts: [
+            { text: `${changes.files} files` },
+            { text: `+${changes.additions ?? 0}`, tone: 'success' as SemanticVariant },
+            { text: `-${changes.deletions ?? 0}`, tone: 'danger' as SemanticVariant },
+          ],
+        }
+        : {}),
       absent: 'nothing yet',
     },
   ];
