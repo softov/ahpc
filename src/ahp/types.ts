@@ -141,6 +141,8 @@ export interface ToolCall {
   status: ToolCallStatus;
   /** The command. The only thing separating twenty identical rows. */
   input?: string;
+  /** The host's one line for the call, AHP's `invocationMessage`: the row reads as this. */
+  invocation?: string;
   /** What it meant to do. Markdown. */
   intention?: string;
   /**

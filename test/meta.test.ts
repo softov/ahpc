@@ -60,6 +60,8 @@ describe('a running tool call with a progress line', () => {
     await settle();
     expect(callOf(reader.view(), 'c1')?.status).toBe('running');
     expect(callOf(reader.view(), 'c1')?.progress).toBeUndefined();
+    // The host's line for the call is its own field, not folded into the intention.
+    expect(callOf(reader.view(), 'c1')?.invocation).toBe('look for the bug');
 
     await scripted.act(CHAT, {
       type: 'chat/toolCallContentChanged', turnId: 't1', toolCallId: 'c1', content: [],

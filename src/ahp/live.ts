@@ -633,9 +633,8 @@ function toolCall(value: unknown): ToolCall {
     // A `ContentRef` is a promise of content rather than content: reporting
     // nothing is better than reporting the reference as if it were the command.
     ...(typeof input === 'string' ? { input } : {}),
-    ...(plain(call.intention) ?? plain(call.invocationMessage)
-      ? { intention: (plain(call.intention) ?? plain(call.invocationMessage)) as string }
-      : {}),
+    ...(plain(call.invocationMessage) ? { invocation: plain(call.invocationMessage) as string } : {}),
+    ...(plain(call.intention) ? { intention: plain(call.intention) as string } : {}),
     ...(progress !== undefined ? { progress } : {}),
     ...(plain(call.pastTenseMessage) ? { outcome: plain(call.pastTenseMessage) as string } : {}),
     ...(text ? { output: text } : {}),
