@@ -1,6 +1,6 @@
 ---
 title: The language is chosen at start
-status: todo
+status: done
 depends: []
 layer: "ahpc cli"
 refs:
@@ -23,7 +23,7 @@ ahpc starts in the language `--lang` names, else the system's, else English, and
 
 1. Write `detectLocale` as a pure function of the flag and an env record.
 2. Wire it where `--theme` is read, for both the TUI and `ahpc wire`.
-3. Add `lang` to the config if open question 2 is answered yes.
+3. Add `lang` to the config; `--lang` wins over it.
 
 ## Validation
 
@@ -32,3 +32,7 @@ ahpc starts in the language `--lang` names, else the system's, else English, and
 
 ## Resume
 
+Done 2026-09-30.
+`src/i18n/locale.ts` holds `detectLocale` and `shipped`; `src/tui.tsx` and `ahpc wire` pass the result to `createApp` as `locale`, and `lang` is in the config.
+`test/locale.test.ts` covers the order, the tag spellings, `C` and a language not shipped.
+Nothing is translated yet, so the locale is set and unread until task 01 and task 03.

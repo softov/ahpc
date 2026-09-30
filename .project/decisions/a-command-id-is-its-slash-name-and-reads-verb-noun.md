@@ -1,6 +1,7 @@
 ---
 title: A command id is its slash name, and it reads verb.noun
-status: accepted
+status: superseded
+superseded-by: decisions/a-command-id-reads-noun-verb.md
 date: 2026-09-30
 refs:
   - "[code://src/screens.tsx#L688-L710](../../src/screens.tsx#L688-L710) - `slashCommands`, which offers a client command under its id"

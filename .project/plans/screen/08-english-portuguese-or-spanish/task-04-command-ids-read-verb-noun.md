@@ -1,5 +1,5 @@
 ---
-title: Command ids read verb.noun
+title: Command ids read noun.verb
 status: todo
 depends: []
 layer: "ahpc screen"
@@ -11,7 +11,22 @@ refs:
 
 ## Objective
 
-Every command in the palette slot has a verb.noun id, per [decision 1](../../../decisions/a-command-id-is-its-slash-name-and-reads-verb-noun.md), and a config that binds an old id still works.
+Every command in the palette slot has a noun.verb id, per [decision 1](../../../decisions/a-command-id-reads-noun-verb.md), and a config that binds an old id still works.
+Commands outside the palette slot keep their ids: nobody types them.
+
+The table, from the scheme Softov chose on 2026-09-30 (plural to show, singular to act); ids not listed are already noun.verb and stay.
+
+| Old | New |
+| --- | --- |
+| `go.automations` `go.sessions` `go.changes` `go.files` `go.skills` `go.mcp` `go.usage` `go.settings` `go.hosts` `go.terminal` | `automations.show` `sessions.show` `changes.show` `files.show` `skills.show` `mcp.show` `usage.show` `settings.show` `hosts.show` `terminals.show` |
+| `go.back` `help.keys` `app.config` `session.toggleArchived` | `screen.back` `keys.show` `config.show` `archived.show` |
+| `bood.toggle` `view.markdown` `view.theme` `view.shell` | `creature.toggle` `markdown.toggle` `theme.change` `layout.change` |
+| `compose.harness` `compose.model` `compose.workspace` `compose.workspace.path` `compose.start` | `harness.choose` `model.choose` `workspace.choose` `workspace.type` `session.start` |
+| `automation.remove` `automation.openDetails` `automation.closeDetails` | `automation.delete` `automation.showDetails` `automation.hideDetails` |
+| `session.refresh` `session.filter` `session.openDetails` `session.closeDetails` | `sessions.refresh` `sessions.filter` `session.showDetails` `session.hideDetails` |
+| `chat.openLink` `chat.side` `chat.stop` `chat.approve` `chat.deny` `chat.send` | `link.open` `sidechat.new` `turn.stop` `tool.approve` `tool.deny` `message.send` |
+| `chat.focusComposer` `chat.focusTranscript` `chat.clearQueue` `terminal.list` | `composer.focus` `transcript.focus` `queue.clear` `terminals.list` |
+| `wire.openFrame` `wire.closeFrame` | `frame.open` `frame.close` |
 
 ## Files
 
@@ -22,14 +37,13 @@ Every command in the palette slot has a verb.noun id, per [decision 1](../../../
 
 ## Steps
 
-1. Draft the rename table (for example `go.automations` to `show.automations`, `session.new` to `new.session`, `automation.remove` to `delete.automation`) and show it to Softov before renaming.
-2. Rename, and add every old id to `ALIASES`.
-3. Resolve aliases where `keys` is read, so the binding lands on the new id.
+1. Rename per the table, and add every old id to `ALIASES`.
+2. Resolve aliases where `keys` is read, so the binding lands on the new id.
 
 ## Validation
 
 - A test binds `'ctrl+y': 'go.sessions'` and ctrl+y opens the sessions screen.
-- The slash test types `/show.sessions`.
+- The slash test types `/sessions.show`.
 - `npx vitest run` passes.
 
 ## Resume
