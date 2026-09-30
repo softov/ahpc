@@ -112,7 +112,11 @@ export function toBlocks(turns: Turn[], queued: QueuedMessage[] = []): Block[] {
   // head leaves it whenever the running turn ends, and an index would name a
   // different message every time one did.
   for (const message of queued) {
-    blocks.push({ kind: 'queued', id: `queued:${message.id}`, messageId: message.id, text: message.text });
+    // The model the way the header names one, the id alone.
+    blocks.push({
+      kind: 'queued', id: `queued:${message.id}`, messageId: message.id, text: message.text,
+      ...(message.model ? { model: message.model.id } : {}),
+    });
   }
 
   return blocks;

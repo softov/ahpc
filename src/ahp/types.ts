@@ -273,6 +273,8 @@ export type PendingInput = ToolConfirmation | ChatInputRequest;
 export interface QueuedMessage {
   id: string;
   text: string;
+  /** The model the host will run it on, as it recorded it; absent when it recorded none. */
+  model?: ModelSelection;
 }
 
 /** Keyed by question id. The value names its own kind. */

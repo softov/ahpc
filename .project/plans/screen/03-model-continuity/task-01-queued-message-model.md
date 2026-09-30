@@ -1,6 +1,6 @@
 ---
 title: A queued message carries the model it will run on, and its row says so
-status: blocked
+status: done
 depends: []
 layer: src/blocks.ts
 refs:
@@ -51,3 +51,9 @@ A message waiting in the host's queue keeps the model the host recorded for it, 
 ## Resume
 
 Blocked 2026-09-20: waits on a `@textui/chat` release carrying a model slot on the queued block, which is the `/github/textui` change and the version bump.
+
+Unblocked and done 2026-09-30, against textui linked from `/github/textui` (`.dev/link-textui.sh`).
+`@textui/chat`'s queued block has an optional `model`, drawn muted beside the message; `QueuedMessage.model` is read through `selection()`, and the fake carries it through `say`, `queue`, `drain` and `reply`.
+Tests: `test/smoke.test.tsx` (the queued row names the composer's model), `test/reconnect.test.ts` (a snapshot with and without a model), `test/fake.test.ts` (the queued turn starts on its model), and `packages/chat/test/transcript.test.tsx` in textui.
+The fake's second turn stops at a confirmation, so its test reads the started turn, not a finished one.
+Left: `package.json` moves to the textui release that carries the field; until then this builds only against the linked textui.

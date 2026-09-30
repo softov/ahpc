@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { HostConnection, HostEvent } from './connection.js';
 import type {
   Agent, Answer, Automation, Changeset, ChangesetOperation, ChangesetScope, ChatInputRequest, ContentRef, Customization, FileContent, FileEdit,
-  ModelRow, PendingInput, QueuedMessage, ResourceEntry, ResponsePart, SessionConfig, SessionDetail, SessionSummary,
+  ModelRow, ModelSelection, PendingInput, QueuedMessage, ResourceEntry, ResponsePart, SessionConfig, SessionDetail, SessionSummary,
   SessionUri, TerminalState, ToolCall, Turn,
 } from './types.js';
 import { SessionFlag } from './types.js';
@@ -1201,7 +1201,7 @@ export function fakeHost(): FakeHost {
     const rest = waiting.slice(1);
     queues.set(uri, rest);
     emit(uri, { type: 'queued', messages: rest });
-    reply(uri, next.text);
+    reply(uri, next.text, next.model);
   }
 
   function finish(uri: SessionUri, closing: string, options: { failed?: boolean; changes?: Changeset } = {}): void {
@@ -1239,9 +1239,11 @@ export function fakeHost(): FakeHost {
    * the only thing that renders a system notification, and none of that is
    * exercised by a script that always says the same paragraph.
    */
-  function reply(uri: SessionUri, said: string): void {
+  function reply(uri: SessionUri, said: string, chosen?: ModelSelection): void {
     const userTurn: Turn = { id: nextId('u'), role: 'user', message: said, parts: [], state: 'complete', at: AT };
-    const model = { id: models.get(uri) ?? 'claude-opus-5' };
+    // The model the message named, as a host starts a turn on; the session's
+    // own when it named none.
+    const model: ModelSelection = chosen ?? { id: models.get(uri) ?? 'claude-opus-5' };
     const agentTurn: Turn = {
       id: nextId('a'), role: 'agent', parts: [], state: 'running', model, at: AT,
       // What a host that reports usage sends: the counts, the model it billed
@@ -1856,10 +1858,10 @@ export function fakeHost(): FakeHost {
     },
 
     // Sending clears the draft, which is what the host does.
-    say: (uri, text) => { drafts.delete(uri); reply(uri, text); },
+    say: (uri, text, model) => { drafts.delete(uri); reply(uri, text, model); },
 
-    queue: (uri, text) => {
-      const waiting = [...(queues.get(uri) ?? []), { id: nextId('q'), text }];
+    queue: (uri, text, model) => {
+      const waiting = [...(queues.get(uri) ?? []), { id: nextId('q'), text, ...(model ? { model } : {}) }];
       queues.set(uri, waiting);
       emit(uri, { type: 'queued', messages: waiting });
       // Idle already: the protocol says a host consumes a queued message

@@ -504,6 +504,30 @@ describe('the first snapshot is not sent before the conversation is in it', () =
     await host.close();
   });
 
+  it('keeps the model a queued message was sent with, and none where it was sent without', async () => {
+    const { host, scripted } = await connect();
+    scripted.states.set(SESSION, { defaultChat: CHAT, chats: [] });
+    scripted.states.set(CHAT, {
+      turns: [turn(1)],
+      queuedMessages: [
+        { id: 'q1', message: { text: 'next', model: { id: 'm', config: { thinking: 'high' } } } },
+        { id: 'q2', message: { text: 'after' } },
+      ],
+    });
+
+    const first = await new Promise<HostEvent>((resolve) => {
+      const view = host.subscribe(SESSION as never, (event) => {
+        if (event.type === 'snapshot') { resolve(event); view.close(); }
+      });
+    });
+
+    expect(first.type === 'snapshot' && first.queued).toEqual([
+      { id: 'q1', text: 'next', model: { id: 'm', config: { thinking: 'high' } } },
+      { id: 'q2', text: 'after' },
+    ]);
+    await host.close();
+  });
+
   it('still answers for a session that has no chat to wait for', async () => {
     const { host, scripted } = await connect();
     scripted.states.set(SESSION, { chats: [] });

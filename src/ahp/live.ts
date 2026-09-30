@@ -1413,7 +1413,8 @@ function customizations(value: unknown): Customization[] {
 function queued(chat: Bag): QueuedMessage[] {
   return list(chat.queuedMessages).map((entry) => {
     const found = bag(entry);
-    return { id: str(found.id) ?? '', text: str(bag(found.message).text) ?? '' };
+    const model = selection(bag(found.message).model);
+    return { id: str(found.id) ?? '', text: str(bag(found.message).text) ?? '', ...(model ? { model } : {}) };
   }).filter((message) => message.id !== '');
 }
 

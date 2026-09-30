@@ -12,7 +12,7 @@ import { SessionFlag } from '../src/ahp/types.js';
 import { CLIPBOARD_PATH, layoutMarkdown, wrapRuns } from '@textui/core';
 import { toBlocks } from '../src/blocks.js';
 import {
-  CHATS, CHAT_URI, DRAFT, HOST_ERROR, INPUT, INPUT_STATUS, MODEL_CONFIG, OPEN, OPEN_TERMINAL, PROVIDER, QUEUE,
+  CHATS, CHAT_URI, DRAFT, HOST_ERROR, INPUT, INPUT_STATUS, MODEL, MODEL_CONFIG, OPEN, OPEN_TERMINAL, PROVIDER, QUEUE,
   QUIT_WINDOW_MS, SELECTED, SETTINGS, TERMINALS, SIDEBAR, TURNS, UPDATE_NOTICE, WORKSPACE, openSession, writeSessions,
 } from '../src/state.js';
 import type { InputStatus } from '../src/state.js';
@@ -643,6 +643,13 @@ describe('the composer', () => {
     const running = (m.t.store.get<Turn[]>(TURNS) ?? []).filter((turn) => turn.state === 'running');
     expect(running).toHaveLength(1);
     expect(m.t.hasText('queued')).toBe(true);
+    // It keeps the model it was sent with, and its row says which.
+    const chosen = m.t.store.get<string>(MODEL);
+    expect(chosen).toBeTruthy();
+    const [waiting] = m.t.store.get<{ model?: { id: string } }[]>(QUEUE) ?? [];
+    expect(waiting?.model?.id).toBe(chosen);
+    const row = m.t.lines().find((line) => line.includes('and another thing')) ?? '';
+    expect(row).toContain(chosen as string);
     await m.t.unmount();
   });
 

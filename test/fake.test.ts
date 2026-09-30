@@ -186,6 +186,21 @@ it('starts a turn dispatched as an action, the same as one said', async () => {
   watch.close();
 });
 
+it('starts a queued message on the model it was queued with', async () => {
+  const host = fakeHost();
+  const uri = (await host.listSessions())[0]?.resource ?? '';
+  const seen: HostEvent[] = [];
+  const watch = host.subscribe(uri, (event) => seen.push(event));
+  host.say(uri, 'what changed?');
+  host.queue(uri, 'and what broke?', { id: 'claude-sonnet-5', config: { thinkingLevel: 'low' } });
+  await host.flush?.();
+  // Started, not finished: this script stops its second turn at a question.
+  const started = seen.flatMap((event) => (event.type === 'turnStarted' && event.turn.role === 'agent' ? [event.turn] : []));
+  expect(started.map((turn) => turn.model?.id)).toEqual(['claude-opus-5', 'claude-sonnet-5']);
+  expect(started.at(-1)?.model).toEqual({ id: 'claude-sonnet-5', config: { thinkingLevel: 'low' } });
+  watch.close();
+});
+
 it('advertises different verbs per scope, and refuses one it did not', async () => {
   const host = fakeHost();
   const tree = await host.changes(WITH_CHANGES, `${WITH_CHANGES}/changeset/uncommitted`);
