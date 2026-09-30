@@ -1580,15 +1580,100 @@ export const NewAutomationScreen: (props: Record<string, never>) => RenderOutput
       ...modelQuestions.map((property) => ({ property, value: modelConfig[property.key] ?? property.default ?? '', model: true })),
       ...questions.map((property) => ({ property, value: settings[property.key] ?? property.default ?? '', model: false })),
     ];
-    // One label column for the whole form, wide enough for the host's first
-    // question in each settings row, so every field's text starts in the same
-    // column and no question is cut to an ellipsis.
-    const labels = Math.min(16, Math.max(10, ...asked
-      .filter((_, index) => index % perRow === 0)
-      .map(({ property }) => property.title.length + 1)));
+    // Harness and model are the grid's first two cells, the host's questions
+    // the rest. Each column's labels are as wide as its longest, so every
+    // value in a column starts in the same place and no label is cut short;
+    // the first column also holds the form's own labels, Name and Prompt.
+    const titles = ['Harness', 'Model', ...asked.map(({ property }) => property.title)];
+    const labelsAt = Array.from({ length: perRow }, (_, column) => Math.min(16, Math.max(
+      column === 0 ? 10 : 0,
+      ...titles.filter((_, index) => index % perRow === column).map((title) => title.length + 1),
+    )));
+    const labels = labelsAt[0] as number;
     const answer = (key: string, value: string, isModel: boolean): void => {
       if (isModel) setModelConfig((was) => ({ ...was, [key]: value }));
       else setSettings((was) => ({ ...was, [key]: value }));
+    };
+
+    // One cell of the grid: harness, model, then the questions; past the
+    // last, an empty cell that keeps a short final row on the same columns.
+    const cell = (index: number, labelWidth: number): unknown => {
+      if (index === 0) return (
+        <Field name="harness" label="Harness" key="harness" labelWidth={labelWidth} flex={1} basis={0}>
+          <Select
+            options={[
+              ...(provider === '' ? [{ value: '', label: "The host's default" }] : []),
+              ...agents.map((one) => ({ value: one.provider, label: one.displayName })),
+            ]}
+            value={provider}
+            mode="floating"
+            onChange={(value: string) => {
+              if (value === provider) return;
+              setProvider(value);
+              // A model and its settings belong to a harness, and the
+              // host's questions are asked again for the new one.
+              setModel('');
+              setModelConfig({});
+              setSettings({});
+            }}
+          />
+        </Field>
+      );
+      if (index === 1) return (
+        <Field name="model" label="Model" key="model" labelWidth={labelWidth} flex={1} basis={0}>
+          <Select
+            options={[
+              { value: '', label: agent && agent.models.length === 0 ? 'No models' : 'Default' },
+              ...(agent?.models ?? []).map((one) => ({ value: one.id, label: one.displayName })),
+              // One the harness no longer lists is still what the
+              // automation says, so it is shown rather than dropped.
+              ...(model !== '' && !agent?.models.some((one) => one.id === model) ? [{ value: model, label: model }] : []),
+            ]}
+            value={model}
+            mode="floating"
+            onChange={(value: string) => {
+              if (value === model) return;
+              setModel(value);
+              setModelConfig({});
+            }}
+          />
+        </Field>
+      );
+      const question = asked[index - 2];
+      if (!question) return <Column key={`empty.${index}`} flex={1} basis={0} />;
+      const { property, value, model: isModel } = question;
+      return (
+        <Field
+          key={`${isModel ? 'model' : 'session'}.${property.key}`}
+          name={`${isModel ? 'model' : 'session'}.${property.key}`}
+          label={property.title}
+          labelWidth={labelWidth}
+          flex={1}
+          basis={0}
+        >
+          {property.values.length > 0 ? (
+            <Select
+              options={[
+                ...(value === '' ? [{ value: '', label: 'Default' }] : []),
+                ...property.values.map((one) => ({ value: one.value, label: one.label })),
+                ...(value !== '' && !property.values.some((one) => one.value === value) ? [{ value, label: value }] : []),
+              ]}
+              value={value}
+              mode="floating"
+              onChange={(next: string) => answer(property.key, next, isModel)}
+            />
+          ) : (
+            // A question whose answers the host lists only on
+            // asking, such as a branch: typed, since there is no
+            // list to open.
+            <TextInput
+              value={value}
+              placeholder={property.title.toLowerCase()}
+              onChange={(next: string) => answer(property.key, next, isModel)}
+            />
+          )}
+        </Field>
+      );
     };
 
     return (
@@ -1601,7 +1686,7 @@ export const NewAutomationScreen: (props: Record<string, never>) => RenderOutput
                 somebody who cannot scroll to it - this library's scroll view
                 does not follow focus, so there is nowhere to put the overflow. */}
             <Row gap={1}>
-              <Field name="title" label="Name" labelWidth={labels} required flex={2}>
+              <Field name="title" label="Name" labelWidth={labels} required flex={Math.max(1, perRow - 1)} basis={0}>
                 <TextInput
                   value={form.values.title}
                   autoFocus
@@ -1609,7 +1694,7 @@ export const NewAutomationScreen: (props: Record<string, never>) => RenderOutput
                   onChange={(value: string) => { form.setValue('title', value); form.touch('title'); }}
                 />
               </Field>
-              <Field name="directory" label="in" labelWidth={3} flex={2}>
+              <Field name="directory" label="in" labelWidth={3} flex={1} basis={0}>
                 <TextInput
                   value={form.values.directory}
                   placeholder="the host's default directory"
@@ -1617,79 +1702,11 @@ export const NewAutomationScreen: (props: Record<string, never>) => RenderOutput
                 />
               </Field>
             </Row>
-            <Row gap={1}>
-              <Field name="harness" label="Harness" labelWidth={labels} flex={2}>
-                <Select
-                  options={[
-                    ...(provider === '' ? [{ value: '', label: "The host's default" }] : []),
-                    ...agents.map((one) => ({ value: one.provider, label: one.displayName })),
-                  ]}
-                  value={provider}
-                  mode="floating"
-                  onChange={(value: string) => {
-                    if (value === provider) return;
-                    setProvider(value);
-                    // A model and its settings belong to a harness, and the
-                    // host's questions are asked again for the new one.
-                    setModel('');
-                    setModelConfig({});
-                    setSettings({});
-                  }}
-                />
-              </Field>
-              <Field name="model" label="Model" labelWidth={6} flex={2}>
-                <Select
-                  options={[
-                    { value: '', label: agent && agent.models.length === 0 ? 'No models' : 'Default' },
-                    ...(agent?.models ?? []).map((one) => ({ value: one.id, label: one.displayName })),
-                    // One the harness no longer lists is still what the
-                    // automation says, so it is shown rather than dropped.
-                    ...(model !== '' && !agent?.models.some((one) => one.id === model) ? [{ value: model, label: model }] : []),
-                  ]}
-                  value={model}
-                  mode="floating"
-                  onChange={(value: string) => {
-                    if (value === model) return;
-                    setModel(value);
-                    setModelConfig({});
-                  }}
-                />
-              </Field>
-            </Row>
-            {/* The host's own questions and the model's, in the host's words. */}
-            {Array.from({ length: Math.ceil(asked.length / perRow) }, (_, index) => (
-              <Row gap={1} key={`settings.${index}`}>
-                {asked.slice(index * perRow, index * perRow + perRow).map(({ property, value, model: isModel }, at) => (
-                  <Field
-                    key={`${isModel ? 'model' : 'session'}.${property.key}`}
-                    name={`${isModel ? 'model' : 'session'}.${property.key}`}
-                    label={property.title}
-                    labelWidth={at === 0 ? labels : Math.min(16, property.title.length + 1)}
-                    flex={1}
-                  >
-                    {property.values.length > 0 ? (
-                      <Select
-                        options={[
-                          ...(value === '' ? [{ value: '', label: 'Default' }] : []),
-                          ...property.values.map((one) => ({ value: one.value, label: one.label })),
-                          ...(value !== '' && !property.values.some((one) => one.value === value) ? [{ value, label: value }] : []),
-                        ]}
-                        value={value}
-                        mode="floating"
-                        onChange={(next: string) => answer(property.key, next, isModel)}
-                      />
-                    ) : (
-                      // A question whose answers the host lists only on
-                      // asking, such as a branch: typed, since there is no
-                      // list to open.
-                      <TextInput
-                        value={value}
-                        placeholder={property.title.toLowerCase()}
-                        onChange={(next: string) => answer(property.key, next, isModel)}
-                      />
-                    )}
-                  </Field>
-                ))}
+            {/* Harness, model and the host's own questions, in the host's
+                words, as one grid: equal columns, one label width each. */}
+            {Array.from({ length: Math.ceil(titles.length / perRow) }, (_, row) => (
+              <Row gap={1} key={`grid.${row}`}>
+                {Array.from({ length: perRow }, (_, column) => cell(row * perRow + column, labelsAt[column] as number))}
               </Row>
             ))}
             {/* The prompt every run's session opens with, so a paragraph
