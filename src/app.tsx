@@ -18,6 +18,7 @@ import {
   SPLIT_AT, SPLIT_DEFAULT, QUIT_ARMED, STATUS, TERMINAL_LIST, UPDATE_NOTICE, WORKSPACE, boodFloor, openSession, workspaceName,
 } from './state.js';
 import type { HostState, InputStatus } from './state.js';
+import { registerMessages } from './i18n/index.js';
 import { decodeStatus } from './ahp/status.js';
 import {
   AutomationsScreen, ChangesScreen, ChatScreen, FilesScreen, HostsScreen, McpScreen, NewAutomationScreen, NewSessionScreen, SessionsScreen, TerminalScreen,
@@ -511,6 +512,8 @@ export interface ChatOptions {
 
 export function registerChat(app: TextUIApp, options: ChatOptions = {}): Disposable {
   const bag = createBag();
+  // First: a command's title is read as it registers.
+  for (const bundle of registerMessages(app)) bag.add(bundle);
   if (options.builtins !== false) bag.add(registerBuiltins(app));
 
   const host = options.host ?? fakeHost();
