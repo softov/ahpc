@@ -23,8 +23,9 @@ Reference: [00-screen.md](screen/00-screen.md)
 | [06 - An automation is read before it is run, and the changes screen follows the session](screen/06-automations-read-before-run/plan.md) | high | built 2026-09-26 ([implemented.md](screen/06-automations-read-before-run/implemented.md)) | - | - |
 | [07 - Moving between terminals from the keyboard](screen/07-moving-between-terminals/plan.md) | medium | built 2026-09-26 ([implemented.md](screen/07-moving-between-terminals/implemented.md)) | - | - |
 | [08 - The client speaks English, Portuguese or Spanish, and its commands are typed noun.verb](screen/08-english-portuguese-or-spanish/plan.md) | medium | active 2026-09-30, every task done, awaiting review | a `@textui/*` release carrying `t(key, values, fallback)` and the chrome keys | - |
+| [09 - A commit asks for its message, a pull request is prepared in a form, and what the host sends back is shown](screen/09-git-changes-take-their-arguments/plan.md) | high | planned 2026-09-30 | - | - |
 
-Next free number in `screen`: `09`.
+Next free number in `screen`: `10`.
 
 ## ahp
 
