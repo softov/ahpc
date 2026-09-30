@@ -43,7 +43,7 @@ async function run(host: ReturnType<typeof fakeHost>, t: Harness): Promise<void>
 describe('reaching the usage screen', () => {
   it('opens from the palette command', async () => {
     const { t } = await mounted();
-    await t.app.execute('go.usage');
+    await t.app.execute('usage.show');
     for (let i = 0; i < 8; i++) await t.settle();
     expect(t.app.screens.current()?.id).toBe('usage');
     await t.unmount();
@@ -68,7 +68,7 @@ describe('what a session has spent', () => {
     const { t, host } = await mounted();
     t.app.services.require(CONTROLLER).send('hello');
     await run(host, t);
-    await t.app.execute('go.usage');
+    await t.app.execute('usage.show');
     for (let i = 0; i < 8; i++) await t.settle();
 
     // The model the turn billed to, from the fixture's own catalogue.
@@ -84,7 +84,7 @@ describe('what a session has spent', () => {
     const { t, host } = await mounted();
     t.app.services.require(CONTROLLER).send('hello');
     await run(host, t);
-    await t.app.execute('go.usage');
+    await t.app.execute('usage.show');
     for (let i = 0; i < 8; i++) await t.settle();
 
     // 12,400 prompt tokens against the 1,000,000 the opus row advertises.
@@ -96,7 +96,7 @@ describe('what a session has spent', () => {
     const { t, host } = await mounted();
     t.app.services.require(CONTROLLER).send('hello');
     await run(host, t);
-    await t.app.execute('go.usage');
+    await t.app.execute('usage.show');
     for (let i = 0; i < 8; i++) await t.settle();
 
     // The fixture reports 1.25 against the session even though the single row
@@ -109,7 +109,7 @@ describe('what a session has spent', () => {
 describe('a host that reports nothing', () => {
   it('says so per turn and draws no context line', async () => {
     const { t } = await mounted();
-    await t.app.execute('go.usage');
+    await t.app.execute('usage.show');
     for (let i = 0; i < 8; i++) await t.settle();
 
     // The seeded turns carry no usage at all.

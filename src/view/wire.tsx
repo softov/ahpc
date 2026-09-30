@@ -274,7 +274,7 @@ export function registerWire(app: TextUIApp, options: WireOptions): Disposable {
     run: () => app.focus.focus('wire.filter'),
   }));
   bag.add(app.commands.register({
-    id: 'wire.openFrame',
+    id: 'frame.open',
     title: 'Open the frame',
     category: 'Wire',
     description: 'Read the frame under the highlight',
@@ -282,7 +282,7 @@ export function registerWire(app: TextUIApp, options: WireOptions): Disposable {
     run: () => { app.store.set(WIRE_FRAME, true); app.focus.focus('wire.frame'); },
   }));
   bag.add(app.commands.register({
-    id: 'wire.closeFrame',
+    id: 'frame.close',
     title: 'Back to the list',
     category: 'Wire',
     description: 'Put the frame away',
@@ -292,9 +292,9 @@ export function registerWire(app: TextUIApp, options: WireOptions): Disposable {
   for (const binding of [
     { keys: 'f', commandId: 'wire.follow', scopeId: WIRE_SCOPE },
     { keys: 'ctrl+f', commandId: 'wire.filter' },
-    { keys: 'right', commandId: 'wire.openFrame', scopeId: WIRE_SCOPE },
-    { keys: 'left', commandId: 'wire.closeFrame', scopeId: WIRE_SCOPE },
-    { keys: 'escape', commandId: 'wire.closeFrame', scopeId: WIRE_SCOPE },
+    { keys: 'right', commandId: 'frame.open', scopeId: WIRE_SCOPE },
+    { keys: 'left', commandId: 'frame.close', scopeId: WIRE_SCOPE },
+    { keys: 'escape', commandId: 'frame.close', scopeId: WIRE_SCOPE },
   ]) bag.add(app.keybindings.register(binding));
 
   // The file, folded in as it grows. Kept to the newest `KEPT`, and the

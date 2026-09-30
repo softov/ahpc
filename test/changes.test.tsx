@@ -31,7 +31,7 @@ async function changes(): Promise<Harness> {
   for (let i = 0; i < 8; i++) await t.settle();
   t.app.services.require(CONTROLLER).open(CHANGED);
   for (let i = 0; i < 8; i++) await t.settle();
-  await t.app.execute('go.changes');
+  await t.app.execute('changes.show');
   for (let i = 0; i < 8; i++) await t.settle();
   return t;
 }
@@ -95,7 +95,7 @@ describe('the changeset', () => {
 
     t.app.screens.pop();
     for (let i = 0; i < 6; i++) await t.settle();
-    await t.app.execute('go.changes');
+    await t.app.execute('changes.show');
     for (let i = 0; i < 8; i++) await t.settle();
 
     expect(t.app.store.get<string>(OPEN_FILE) ?? null).toBe(null);
@@ -110,7 +110,7 @@ describe('the changeset', () => {
     for (let i = 0; i < 6; i++) await t.settle();
     t.app.services.require(CONTROLLER).open('ahp-session:/1f0a');
     for (let i = 0; i < 8; i++) await t.settle();
-    await t.app.execute('go.changes');
+    await t.app.execute('changes.show');
     for (let i = 0; i < 10; i++) await t.settle();
 
     // The scope chosen on the first session is a URI under that session, and

@@ -23,7 +23,7 @@ async function open(width = 90, height = 30, theme = 'dark') {
     onBoot: (app) => { registerChat(app, { host }); },
   });
   for (let i = 0; i < 8; i++) await t.settle();
-  await t.app.execute('go.automations');
+  await t.app.execute('automations.show');
   for (let i = 0; i < 10; i++) await t.settle();
   return { t, host };
 }
@@ -67,7 +67,7 @@ describe('the automations screen', () => {
 
     // The catalogue is the other half of this: a session that appeared with
     // nobody at the keyboard has to be tellable from one somebody typed.
-    await t.app.execute('go.sessions');
+    await t.app.execute('sessions.show');
     for (let i = 0; i < 10; i++) await t.settle();
     expect(t.hasText('by an automation')).toBe(true);
     await t.unmount();
@@ -114,7 +114,7 @@ describe('the automations screen', () => {
       onBoot: (app) => { registerChat(app, { host }); },
     });
     for (let i = 0; i < 8; i++) await t.settle();
-    await t.app.execute('go.automations');
+    await t.app.execute('automations.show');
     for (let i = 0; i < 10; i++) await t.settle();
 
     expect(t.hasText('Nothing to schedule here')).toBe(true);

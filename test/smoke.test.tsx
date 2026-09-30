@@ -61,7 +61,7 @@ async function open(size = SIZES[0] as { width: number; height: number }): Promi
  */
 async function catalogue(size?: { width: number; height: number }): Promise<Mounted> {
   const m = await open(size);
-  await m.t.app.execute('go.sessions');
+  await m.t.app.execute('sessions.show');
   for (let i = 0; i < 6; i++) await m.t.settle();
   return m;
 }
@@ -264,7 +264,7 @@ describe('when the agent is waiting', () => {
 
   it('says so when there is nothing to approve, rather than nothing at all', async () => {
     const m = await idle();
-    // The palette offers `chat.approve` and a key is bound to it, so this is
+    // The palette offers `tool.approve` and a key is bound to it, so this is
     // reachable with no block up at all - and it used to return silently,
     // which is a command that does nothing and says nothing about it.
     m.t.app.services.require(CONTROLLER).approve();
@@ -535,7 +535,7 @@ describe('the slash menu', () => {
    * A slash command of ours is ours.
    *
    * The menu listed the client's own commands and then sent whatever was
-   * typed down the session channel, so `/go.sessions` went to the agent as a
+   * typed down the session channel, so `/sessions.show` went to the agent as a
    * message - the one place it could not possibly mean anything. Only a slash
    * the menu does not match is the agent's.
    */
@@ -549,19 +549,19 @@ describe('the slash menu', () => {
   };
 
   it('walks the completions with the arrow keys', async () => {
-    const m = await composing('/go');
+    const m = await composing('/session.');
     // The first row is marked; down moves the mark to the second.
-    const marked = (): string => m.t.lines().find((line) => line.includes('\u25b8 /go')) ?? '';
+    const marked = (): string => m.t.lines().find((line) => line.includes('\u25b8 /session.')) ?? '';
     const first = marked();
-    expect(first).toContain('/go.back');
+    expect(first).toContain('/session.');
 
-    // *A* second row, not a named one. Which command sits under `/go.back` is
+    // *A* second row, not a named one. Which command sits under the first is
     // whatever has been registered, and a test that pinned it would fail every
-    // time a screen is added - which is not what this is checking.
+    // time a command is added - which is not what this is checking.
     m.t.press('down');
     for (let i = 0; i < 4; i++) await m.t.settle();
     const second = marked();
-    expect(second).toContain('/go.');
+    expect(second).toContain('/session.');
     expect(second).not.toBe(first);
 
     m.t.press('up');
@@ -571,7 +571,7 @@ describe('the slash menu', () => {
   });
 
   it('runs the chosen command instead of sending it', async () => {
-    const m = await composing('/go.sessions');
+    const m = await composing('/sessions.show');
     const before = turnsIn(m);
 
     m.t.press('enter');
@@ -585,8 +585,8 @@ describe('the slash menu', () => {
   });
 
   it('runs the row that was clicked', async () => {
-    const m = await composing('/go.sessions');
-    const row = m.t.lines().findIndex((line) => line.includes('/go.sessions'));
+    const m = await composing('/sessions.show');
+    const row = m.t.lines().findIndex((line) => line.includes('/sessions.show'));
     expect(row).toBeGreaterThan(-1);
 
     const before = turnsIn(m);
@@ -601,7 +601,7 @@ describe('the slash menu', () => {
   it('sends a slash it does not know, because that one is the agent\'s', async () => {
     const m = await composing('/compact');
     // Nothing of ours matched, so there is no menu to choose from.
-    expect(m.t.hasText('/go.back')).toBe(false);
+    expect(m.t.hasText('/screen.back')).toBe(false);
     const before = turnsIn(m);
 
     m.t.press('enter');
@@ -836,7 +836,7 @@ describe('the catalogue', () => {
 
   it('focuses the filter by name, which is what a key needs to exist', async () => {
     const { t } = await catalogue();
-    await t.app.execute('session.filter');
+    await t.app.execute('sessions.filter');
     await t.settle();
     expect(t.app.focus.focused()).toBe('chat.filter');
 
@@ -852,7 +852,7 @@ describe('the catalogue', () => {
   it('hides archived sessions, and says so', async () => {
     const { t } = await catalogue();
     expect(t.hasText('Old build script')).toBe(false);
-    await t.app.execute('session.toggleArchived');
+    await t.app.execute('archived.show');
     for (let i = 0; i < 4; i++) await t.settle();
     expect(t.hasText('Old build script')).toBe(true);
     await t.unmount();
@@ -868,7 +868,7 @@ describe('the catalogue', () => {
    */
   it('puts the pull request and its state beside the branch', async () => {
     const { t } = await catalogue({ width: 140, height: 30 });
-    await t.app.execute('session.toggleArchived');
+    await t.app.execute('archived.show');
     for (let i = 0; i < 4; i++) await t.settle();
     expect(t.hasText('cleanup/compile-script #412 merged')).toBe(true);
     await t.unmount();
@@ -975,7 +975,7 @@ describe('the catalogue', () => {
       onBoot: (app) => { registerChat(app, { host, splitAt: 80 }); },
     });
     for (let i = 0; i < 8; i++) await t.settle();
-    await t.app.execute('go.sessions');
+    await t.app.execute('sessions.show');
     for (let i = 0; i < 6; i++) await t.settle();
 
     expect(t.hasText('ahp-chat:/1f0a')).toBe(true);
@@ -984,7 +984,7 @@ describe('the catalogue', () => {
 
   it('leaves left and right to the filter box while it has the keyboard', async () => {
     const { t } = await catalogue();
-    await t.app.execute('session.filter');
+    await t.app.execute('sessions.filter');
     await t.settle();
     t.type('brb');
     for (let i = 0; i < 4; i++) await t.settle();
@@ -1147,7 +1147,7 @@ describe('what a session actually is', () => {
     const { t } = await catalogue();
     t.app.store.set(SELECTED, 'ahp-session:/6b21');
     // At this width the pane is a drawer, so it has to be pulled out first.
-    await t.app.execute('session.openDetails');
+    await t.app.execute('session.showDetails');
     for (let i = 0; i < 6; i++) await t.settle();
 
     // A session is not a conversation: it holds chats, and the chat URI is
@@ -1174,7 +1174,7 @@ describe('what a session actually is', () => {
   it('reads the branch under either name a host uses for it', async () => {
     const { t } = await catalogue({ width: 140, height: 30 });
     t.app.store.set(SELECTED, 'ahp-session:/6b21');
-    await t.app.execute('session.openDetails');
+    await t.app.execute('session.showDetails');
     for (let i = 0; i < 6; i++) await t.settle();
 
     expect(t.hasText('main')).toBe(true);
@@ -1193,7 +1193,7 @@ describe('what a session actually is', () => {
   it('says which thinking levels the model it ran on accepts', async () => {
     const { t } = await catalogue({ width: 140, height: 30 });
     t.app.store.set(SELECTED, 'ahp-session:/6b21');
-    await t.app.execute('session.openDetails');
+    await t.app.execute('session.showDetails');
     for (let i = 0; i < 6; i++) await t.settle();
 
     // The host's own title for its own property, alongside the settings it
@@ -1239,7 +1239,7 @@ describe('what a session actually is', () => {
   it('names the property in full on a narrow terminal too', async () => {
     const { t } = await catalogue({ width: 100, height: 30 });
     t.app.store.set(SELECTED, 'ahp-session:/6b21');
-    await t.app.execute('session.openDetails');
+    await t.app.execute('session.showDetails');
     for (let i = 0; i < 6; i++) await t.settle();
 
     expect(t.hasText('Thinking Level')).toBe(true);
@@ -1276,7 +1276,7 @@ describe('what a session actually is', () => {
   it('draws the pane alone while it is out on a narrow terminal', async () => {
     const { t } = await catalogue();
     t.app.store.set(SELECTED, SEEDED);
-    await t.app.execute('session.openDetails');
+    await t.app.execute('session.showDetails');
     for (let i = 0; i < 6; i++) await t.settle();
 
     // The list is gone and the pane has the whole width, so the workspace
@@ -1284,7 +1284,7 @@ describe('what a session actually is', () => {
     expect(t.hasText('Sessions')).toBe(false);
     expect(t.hasText('/brb_main/src/brb_framework')).toBe(true);
 
-    await t.app.execute('session.closeDetails');
+    await t.app.execute('session.hideDetails');
     for (let i = 0; i < 6; i++) await t.settle();
     expect(t.app.focus.focused()).toBe('chat.sessions');
     expect(t.hasText('Kqueue events on Li')).toBe(true);
@@ -1304,7 +1304,7 @@ describe('what a session actually is', () => {
       onBoot: (app) => { registerChat(app, { host, splitAt: 60 }); },
     });
     for (let i = 0; i < 8; i++) await t.settle();
-    await t.app.execute('go.sessions');
+    await t.app.execute('sessions.show');
     for (let i = 0; i < 6; i++) await t.settle();
     t.app.store.set(SELECTED, SEEDED);
     t.focus('chat.sessions');
@@ -1325,7 +1325,7 @@ describe('what a session actually is', () => {
   it('copies the value under the cursor', async () => {
     const { t } = await catalogue();
     t.app.store.set(SELECTED, 'ahp-session:/9c74');
-    await t.app.execute('session.openDetails');
+    await t.app.execute('session.showDetails');
     for (let i = 0; i < 6; i++) await t.settle();
 
     t.focus('chat.details');
@@ -1453,7 +1453,7 @@ describe('the composer is the front door', () => {
 
   it('takes a typed answer where the argument has no choices', async () => {
     const { t } = await open();
-    await t.app.execute('compose.workspace.path', { path: '/brb_main/src/brb_framework' });
+    await t.app.execute('workspace.type', { path: '/brb_main/src/brb_framework' });
     for (let i = 0; i < 6; i++) await t.settle();
     // The same overlay either way: an argument with choices is picked from and
     // one without is typed into, which is what makes a workspace list a later
@@ -1682,7 +1682,7 @@ describe('the composer is the front door', () => {
     await t.app.execute('compose.set.isolation', { value: 'worktree' });
     for (let i = 0; i < 10; i++) await t.settle();
     expect(bar()[1]).toContain('main');
-    await t.app.execute('compose.workspace.path', { path: '/brb_main/src/brb_backend' });
+    await t.app.execute('workspace.type', { path: '/brb_main/src/brb_backend' });
     for (let i = 0; i < 10; i++) await t.settle();
     // The branch checked out in the new directory, and the isolation back to
     // what the host offers first.
@@ -1693,7 +1693,7 @@ describe('the composer is the front door', () => {
     // What was about the harness stays answered.
     await t.app.execute('compose.set.permissionMode', { value: 'plan' });
     for (let i = 0; i < 10; i++) await t.settle();
-    await t.app.execute('compose.workspace.path', { path: '/github/textui' });
+    await t.app.execute('workspace.type', { path: '/github/textui' });
     for (let i = 0; i < 10; i++) await t.settle();
     expect(bar()[0]).toContain('Plan only');
     expect(t.store.get<Record<string, string>>(SETTINGS)?.branch).toBe('main');
@@ -1778,11 +1778,11 @@ describe('the composer is the front door', () => {
     // says otherwise, and which the host has never heard of.
     t.app.store.set(WORKSPACE, '/nowhere/on/the/host');
     for (let i = 0; i < 4; i++) await t.settle();
-    await t.app.execute('go.sessions');
+    await t.app.execute('sessions.show');
     for (let i = 0; i < 6; i++) await t.settle();
     await t.app.execute('session.new');
     for (let i = 0; i < 6; i++) await t.settle();
-    void t.app.execute('compose.workspace');
+    void t.app.execute('workspace.choose');
     for (let i = 0; i < 10; i++) await t.settle();
     expect(t.hasText('Use this folder')).toBe(true);
     expect(t.hasText('/nowhere/on/the/host')).toBe(false);
@@ -1855,7 +1855,7 @@ describe('when the host says no', () => {
       onBoot: (app) => { registerChat(app, { host }); },
     });
     for (let i = 0; i < 8; i++) await t.settle();
-    await t.app.execute('go.sessions');
+    await t.app.execute('sessions.show');
     for (let i = 0; i < 8; i++) await t.settle();
 
     // The pane asks about whatever is highlighted, so this fires on arrival
@@ -1937,7 +1937,7 @@ describe('the status bar', () => {
     // A surface is not remounted by navigating - that is what a surface is for
     // - so asking `screens.current()` during a render answers once and never
     // again, and the footer keeps offering the keys of the screen you left.
-    await m.t.app.execute('go.sessions');
+    await m.t.app.execute('sessions.show');
     for (let i = 0; i < 4; i++) await m.t.settle();
     expect(m.t.hasText('i write')).toBe(false);
     expect(m.t.hasText('n new')).toBe(true);
@@ -1977,7 +1977,7 @@ describe('leaving, after a session has been open', () => {
       },
     });
     for (let i = 0; i < 8; i++) await t.settle();
-    await t.app.execute('go.sessions');
+    await t.app.execute('sessions.show');
     for (let i = 0; i < 6; i++) await t.settle();
 
     // The seeded session is blocked, so its status is 24 and stays there. A
@@ -2140,7 +2140,7 @@ describe('on a terminal that can only do ASCII', () => {
    */
   it('draws the catalogue in ASCII as well', async () => {
     const t = await plain();
-    await t.app.execute('go.sessions');
+    await t.app.execute('sessions.show');
     for (let i = 0; i < 6; i++) await t.settle();
 
     expect(t.hasText('Kqueue events on Linux')).toBe(true);
@@ -2150,7 +2150,7 @@ describe('on a terminal that can only do ASCII', () => {
 
   it('names the pane keys with something a console can print', async () => {
     const t = await plain();
-    await t.app.execute('go.sessions');
+    await t.app.execute('sessions.show');
     for (let i = 0; i < 6; i++) await t.settle();
     // `←→ panes` is the hint on a terminal that can draw arrows. This is what
     // it degrades to, and the point is that it degrades at all: a hint row
@@ -2373,7 +2373,7 @@ describe('what the agent said, as markdown or as typed', () => {
   it('shows the characters that arrived once it is switched off', async () => {
     const m = await conversation(TALL);
     await run(m);
-    await m.t.app.execute('view.markdown');
+    await m.t.app.execute('markdown.toggle');
     for (let i = 0; i < 6; i++) await m.t.settle();
     expect(m.t.hasText('`#if 0`')).toBe(true);
     // The list marker too: raw is the characters that arrived, not markdown
@@ -2381,7 +2381,7 @@ describe('what the agent said, as markdown or as typed', () => {
     expect(m.t.hasText('- keep the FreeBSD path')).toBe(true);
 
     // And back, because it is one command and two states.
-    await m.t.app.execute('view.markdown');
+    await m.t.app.execute('markdown.toggle');
     for (let i = 0; i < 6; i++) await m.t.settle();
     expect(m.t.hasText('`#if 0`')).toBe(false);
     await m.t.unmount();
@@ -2879,7 +2879,7 @@ describe('a terminal', () => {
       for (let i = 0; i < 6; i++) await m.t.settle();
       expect(m.t.hasText('Terminals (3)')).toBe(true);
       expect(m.t.hasText('A command, and enter')).toBe(false);
-      expect(m.t.app.focus.focused()).toBe('terminal.list');
+      expect(m.t.app.focus.focused()).toBe('terminals.list');
 
       m.t.press('down');
       await m.t.settle();

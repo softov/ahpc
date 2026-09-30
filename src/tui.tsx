@@ -6,7 +6,7 @@ import {
 } from '@textui/terminal';
 import { registerChat } from './app.js';
 import { parseSessionLink } from './links.js';
-import { CONTROLLER } from './control.js';
+import { CONTROLLER, commandIdFor } from './control.js';
 import { connect, sink } from './connect.js';
 import { connectionToken, loadConfig } from './config.js';
 import { UPDATE_NOTICE, reportHostError } from './state.js';
@@ -81,7 +81,7 @@ interface Options {
    * Where the agent works.
    *
    * **A path on the host, not on this machine** - the same thing the
-   * `compose.workspace` command says, and the reason there is one flag rather
+   * `workspace.choose` command says, and the reason there is one flag rather
    * than two. It defaults to nothing at all: the host is somewhere else, its
    * filesystem is not this one, and a client that sent its own cwd would be
    * naming a directory that does not exist there.
@@ -416,7 +416,7 @@ export async function tui(argv: string[]): Promise<void> {
        * keyboard is indistinguishable from a config file that never loaded.
        */
       for (const [chord, id] of Object.entries(options.keys ?? {})) {
-        if (id !== null && !booted.commands.get(id)) {
+        if (id !== null && !booted.commands.get(commandIdFor(id))) {
           sink.report(`Config: ${chord} is bound to "${id}", which is not a command. Run 'ahpc config --json' for the ones there are.`);
         }
       }

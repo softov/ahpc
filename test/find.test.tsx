@@ -22,7 +22,7 @@ const inSession = async (width = 100, height = 30): Promise<Harness> => {
     onBoot: (app) => { registerChat(app, { host: fakeHost() }); },
   });
   for (let i = 0; i < 8; i += 1) await t.settle();
-  await t.app.execute('go.sessions');
+  await t.app.execute('sessions.show');
   for (let i = 0; i < 6; i += 1) await t.settle();
   await t.press('enter');
   for (let i = 0; i < 10; i += 1) await t.settle();

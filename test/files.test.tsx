@@ -28,7 +28,7 @@ async function files(): Promise<Harness> {
   for (let i = 0; i < 8; i++) await t.settle();
   t.app.services.require(CONTROLLER).open(CHANGED);
   for (let i = 0; i < 8; i++) await t.settle();
-  await t.app.execute('go.files');
+  await t.app.execute('files.show');
   for (let i = 0; i < 10; i++) await t.settle();
   return t;
 }
@@ -74,7 +74,7 @@ describe('browsing the host', () => {
     expect(t.hasText('app.tsx')).toBe(true);
     await t.press('escape');
     for (let i = 0; i < 8; i++) await t.settle();
-    await t.app.execute('go.files');
+    await t.app.execute('files.show');
     for (let i = 0; i < 10; i++) await t.settle();
     // A browser that reopens six directories deep is one nobody can tell from
     // a broken one.

@@ -1,6 +1,6 @@
 ---
 title: Command ids read noun.verb
-status: todo
+status: done
 depends: []
 layer: "ahpc screen"
 refs:
@@ -48,3 +48,7 @@ The table, from the scheme Softov chose on 2026-09-30 (plural to show, singular 
 
 ## Resume
 
+Done 2026-09-30.
+Every id in the table renamed in `src`, `test` and `docs`; `RENAMED` and `commandIdFor` in `src/control.ts` carry the old ids, read in `keys()` and in the startup check in `src/tui.tsx`.
+The focus id `terminal.list` shared the old command's name and was renamed with it.
+`test/keys.test.tsx` binds `go.sessions` and reaches the sessions screen; the slash walk test now types `/session.`, since no id starts `go.` any more.

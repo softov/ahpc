@@ -1321,7 +1321,7 @@ function commands(
        * it is now. A mascot that can only be turned off by quitting, editing
        * JSON and starting again is one somebody keeps off.
        */
-      id: 'bood.toggle',
+      id: 'creature.toggle',
       title: 'Show creature',
       category: 'View',
       slots: ['palette', 'config'],
@@ -1364,7 +1364,7 @@ function commands(
      * slash menu is found.
      */
     {
-      id: 'app.config',
+      id: 'config.show',
       title: 'Configure',
       category: 'View',
       description: 'Theme, layout and the rest of what this client decides',
@@ -1397,7 +1397,7 @@ function commands(
        * whose `when` passes where the reader is standing - a keymap listing
        * keys that do nothing here is a keymap that has to be second-guessed.
        */
-      id: 'help.keys',
+      id: 'keys.show',
       title: 'Show keys',
       category: 'View',
       description: 'Every key that does something here',
@@ -1421,7 +1421,7 @@ function commands(
       },
     },
     {
-      id: 'go.back',
+      id: 'screen.back',
       title: 'Go back',
       category: 'Screens',
       description: 'Return to the previous screen',
@@ -1448,12 +1448,12 @@ function commands(
       /*
        * The other half of what a host holds.
        *
-       * Not gated on a session being open, unlike `go.changes`: an automation
+       * Not gated on a session being open, unlike `changes.show`: an automation
        * belongs to the host and outlives every session it starts, so it is
        * reachable from anywhere - including from a client that has opened
        * nothing at all.
        */
-      id: 'go.automations',
+      id: 'automations.show',
       title: 'Show automations',
       category: 'Screens',
       description: 'What the host runs on its own, and when it next fires',
@@ -1521,7 +1521,7 @@ function commands(
       },
     },
     {
-      id: 'automation.remove',
+      id: 'automation.delete',
       title: 'Delete automation',
       category: 'Automation',
       description: 'Delete it and everything it has done',
@@ -1560,7 +1560,7 @@ function commands(
      * split the pane is the whole screen while it is out.
      */
     {
-      id: 'automation.openDetails',
+      id: 'automation.showDetails',
       title: 'Show automation details',
       category: 'Automation',
       description: 'Show what it says, where it runs and what it has done',
@@ -1572,7 +1572,7 @@ function commands(
       },
     },
     {
-      id: 'automation.closeDetails',
+      id: 'automation.hideDetails',
       title: 'Hide automation details',
       category: 'Automation',
       description: 'Hide the detail pane, and give the list the width',
@@ -1585,7 +1585,7 @@ function commands(
       },
     },
     {
-      id: 'go.sessions',
+      id: 'sessions.show',
       title: 'Show sessions',
       category: 'Screens',
       description: 'Every session on the host',
@@ -1603,7 +1603,7 @@ function commands(
        * typed is followed the same way, which is how a link from somewhere
        * else gets opened.
        */
-      id: 'chat.openLink',
+      id: 'link.open',
       title: 'Open a session link',
       category: 'Session',
       description: 'Follow an agent-host-session:// link in this transcript',
@@ -1625,7 +1625,7 @@ function commands(
       },
     },
     {
-      id: 'go.changes',
+      id: 'changes.show',
       title: 'Show changes',
       category: 'Screens',
       description: 'The files this session changed',
@@ -1643,7 +1643,7 @@ function commands(
        * is there are different questions, and a browser that only ever showed
        * the changed files would be a changeset with a worse name.
        */
-      id: 'go.files',
+      id: 'files.show',
       title: 'Show files',
       category: 'Screens',
       description: 'The project, as the host sees it',
@@ -1658,7 +1658,7 @@ function commands(
       },
     },
     {
-      id: 'go.skills',
+      id: 'skills.show',
       title: 'Show skills and commands',
       category: 'Screens',
       description: 'What plugins and directories gave this session',
@@ -1667,7 +1667,7 @@ function commands(
       run: () => app.screens.push('skills'),
     },
     {
-      id: 'go.mcp',
+      id: 'mcp.show',
       title: 'Show MCP servers',
       category: 'Screens',
       description: 'Which servers this session has, and whether they answered',
@@ -1676,7 +1676,7 @@ function commands(
       run: () => app.screens.push('mcp'),
     },
     {
-      id: 'go.usage',
+      id: 'usage.show',
       title: 'Show usage',
       category: 'Screens',
       description: 'Tokens, cost and the context window',
@@ -1830,7 +1830,7 @@ function commands(
       run: () => app.store.set(OPEN_FILE, null),
     },
     {
-      id: 'go.settings',
+      id: 'settings.show',
       title: 'Show session settings',
       category: 'Screens',
       description: 'The options the host offers for this session',
@@ -1839,7 +1839,7 @@ function commands(
       run: () => app.screens.push('settings'),
     },
     {
-      id: 'go.hosts',
+      id: 'hosts.show',
       title: 'Show hosts',
       category: 'Screens',
       description: 'Manage all hosts',
@@ -1861,7 +1861,7 @@ function commands(
      * screen shows you which one you are in.
      */
     {
-      id: 'view.markdown',
+      id: 'markdown.toggle',
       title: 'Render markdown',
       category: 'View',
       description: 'Draw what the agent said as markdown, or as it typed it',
@@ -1936,7 +1936,7 @@ function commands(
       },
     },
     {
-      id: 'view.theme',
+      id: 'theme.change',
       title: 'Change theme',
       category: 'View',
       description: 'Colors and shapes',
@@ -1966,7 +1966,7 @@ function commands(
       },
     },
     {
-      id: 'view.shell',
+      id: 'layout.change',
       title: 'Change layout',
       category: 'View',
       description: 'Where the panels and controls go',
@@ -1996,7 +1996,7 @@ function commands(
     // The composer's control row. Four questions about what the next message
     // will be sent as, each asked by the palette, anchored above its chip.
     {
-      id: 'compose.harness',
+      id: 'harness.choose',
       title: 'Choose harness',
       category: 'Compose',
       description: 'The agent that runs the session',
@@ -2021,7 +2021,7 @@ function commands(
       },
     },
     {
-      id: 'compose.model',
+      id: 'model.choose',
       title: 'Choose model',
       category: 'Compose',
       description: 'The model the agent uses',
@@ -2086,7 +2086,7 @@ function commands(
       },
     },
     {
-      id: 'chat.side',
+      id: 'sidechat.new',
       title: 'Side chat from this turn',
       category: 'Session',
       description: 'A new chat with this turn as context, without copying it in',
@@ -2242,7 +2242,7 @@ function commands(
       run: () => stepTerminal(-1),
     },
     {
-      id: 'terminal.list',
+      id: 'terminals.list',
       title: 'List terminals',
       category: 'Terminal',
       description: 'Every terminal on the host, and back to the one being read',
@@ -2265,7 +2265,7 @@ function commands(
       },
     },
     {
-      id: 'go.terminal',
+      id: 'terminals.show',
       title: 'Show terminals',
       category: 'Screens',
       description: 'The shells running on the host',
@@ -2273,7 +2273,7 @@ function commands(
       run: () => { app.screens.push('terminal'); },
     },
     {
-      id: 'compose.workspace',
+      id: 'workspace.choose',
       title: 'Choose workspace',
       category: 'Compose',
       description: 'Choose the directory the session works in, from the host\'s own',
@@ -2302,7 +2302,7 @@ function commands(
       },
     },
     {
-      id: 'compose.workspace.path',
+      id: 'workspace.type',
       title: 'Type workspace path',
       category: 'Compose',
       description: 'Type the directory the session works in',
@@ -2322,7 +2322,7 @@ function commands(
       },
     },
     {
-      id: 'compose.start',
+      id: 'session.start',
       title: 'Start session',
       category: 'Compose',
       slots: ['palette'],
@@ -2391,7 +2391,7 @@ function commands(
       },
     },
     {
-      id: 'session.refresh',
+      id: 'sessions.refresh',
       title: 'Refresh sessions',
       category: 'Session',
       description: 'Reload the list from the host',
@@ -2457,7 +2457,7 @@ function commands(
       },
     },
     {
-      id: 'session.toggleArchived',
+      id: 'archived.show',
       title: 'Show archived sessions',
       category: 'Session',
       description: 'List the sessions that have been put away',
@@ -2494,7 +2494,7 @@ function commands(
       },
     },
     {
-      id: 'chat.stop',
+      id: 'turn.stop',
       title: 'Stop turn',
       category: 'Chat',
       description: 'Stop the agent where it is',
@@ -2508,7 +2508,7 @@ function commands(
       run: () => controller.stop(),
     },
     {
-      id: 'chat.approve',
+      id: 'tool.approve',
       title: 'Approve tool call',
       category: 'Chat',
       description: 'Let the agent run what it is waiting on',
@@ -2519,7 +2519,7 @@ function commands(
       args: [{ name: 'option', type: 'string' as const }],
     },
     {
-      id: 'chat.deny',
+      id: 'tool.deny',
       title: 'Deny tool call',
       category: 'Chat',
       description: 'Refuse what the agent is waiting on',
@@ -2529,7 +2529,7 @@ function commands(
       run: () => controller.deny()
     },
     {
-      id: 'chat.send',
+      id: 'message.send',
       title: 'Send message',
       category: 'Chat',
       description: 'Send what is in the composer',
@@ -2540,7 +2540,7 @@ function commands(
       run: (args: Record<string, unknown>) => controller.send(String(args.text ?? '')),
     },
     {
-      id: 'chat.focusComposer',
+      id: 'composer.focus',
       title: 'Write a message',
       category: 'Chat',
       description: 'Focus the composer',
@@ -2609,7 +2609,7 @@ function commands(
       },
     },
     {
-      id: 'session.filter',
+      id: 'sessions.filter',
       title: 'Filter sessions',
       category: 'Session',
       description: 'Narrow the list as you type',
@@ -2636,7 +2636,7 @@ function commands(
      * had reached the filter box.
      */
     {
-      id: 'session.openDetails',
+      id: 'session.showDetails',
       title: 'Show session details',
       category: 'Session',
       description: 'Show the detail pane, and read it',
@@ -2650,7 +2650,7 @@ function commands(
       },
     },
     {
-      id: 'session.closeDetails',
+      id: 'session.hideDetails',
       title: 'Hide session details',
       category: 'Session',
       description: 'Hide the detail pane, and give the list the width',
@@ -2668,7 +2668,7 @@ function commands(
       },
     },
     {
-      id: 'chat.focusTranscript',
+      id: 'transcript.focus',
       title: 'Read the transcript',
       category: 'Chat',
       description: 'Focus the transcript',
@@ -2678,7 +2678,7 @@ function commands(
       run: () => app.focus.focus('chat.transcript'),
     },
     {
-      id: 'chat.clearQueue',
+      id: 'queue.clear',
       title: 'Drop queued messages',
       category: 'Chat',
       description: 'Forget the messages waiting to be sent',
@@ -2736,6 +2736,60 @@ interface Binding {
 }
 
 /**
+ * Command ids from before they were named noun.verb, to the ones that replaced them.
+ *
+ * A config file names ids in `keys`, and a chord bound under an old name
+ * still reaches its command.
+ */
+export const RENAMED: Readonly<Record<string, string>> = {
+  'go.automations': 'automations.show',
+  'go.sessions': 'sessions.show',
+  'go.changes': 'changes.show',
+  'go.files': 'files.show',
+  'go.skills': 'skills.show',
+  'go.mcp': 'mcp.show',
+  'go.usage': 'usage.show',
+  'go.settings': 'settings.show',
+  'go.hosts': 'hosts.show',
+  'go.terminal': 'terminals.show',
+  'go.back': 'screen.back',
+  'help.keys': 'keys.show',
+  'app.config': 'config.show',
+  'session.toggleArchived': 'archived.show',
+  'bood.toggle': 'creature.toggle',
+  'view.markdown': 'markdown.toggle',
+  'view.theme': 'theme.change',
+  'view.shell': 'layout.change',
+  'compose.harness': 'harness.choose',
+  'compose.model': 'model.choose',
+  'compose.workspace': 'workspace.choose',
+  'compose.workspace.path': 'workspace.type',
+  'compose.start': 'session.start',
+  'automation.remove': 'automation.delete',
+  'automation.openDetails': 'automation.showDetails',
+  'automation.closeDetails': 'automation.hideDetails',
+  'session.refresh': 'sessions.refresh',
+  'session.filter': 'sessions.filter',
+  'session.openDetails': 'session.showDetails',
+  'session.closeDetails': 'session.hideDetails',
+  'chat.openLink': 'link.open',
+  'chat.side': 'sidechat.new',
+  'chat.stop': 'turn.stop',
+  'chat.approve': 'tool.approve',
+  'chat.deny': 'tool.deny',
+  'chat.send': 'message.send',
+  'chat.focusComposer': 'composer.focus',
+  'chat.focusTranscript': 'transcript.focus',
+  'chat.clearQueue': 'queue.clear',
+  'terminal.list': 'terminals.list',
+  'wire.openFrame': 'frame.open',
+  'wire.closeFrame': 'frame.close',
+};
+
+/** The id a config file means, old name or new. */
+export const commandIdFor = (id: string): string => RENAMED[id] ?? id;
+
+/**
  * The defaults, with the config file's own bindings over them.
  *
  * Naming a chord replaces every default on it rather than adding to them: a
@@ -2751,7 +2805,7 @@ function keys(over?: Record<string, string | null>): Binding[] {
     ...defaults.filter((binding) => !named.has(binding.keys)),
     ...Object.entries(over)
       .filter((entry): entry is [string, string] => entry[1] !== null)
-      .map(([chord, commandId]) => ({ keys: chord, commandId })),
+      .map(([chord, commandId]) => ({ keys: chord, commandId: commandIdFor(commandId) })),
   ];
 }
 
@@ -2761,10 +2815,10 @@ function shipped(): Binding[] {
     // Global: nothing types these, so they are safe wherever focus is.
     { keys: 'ctrl+p', commandId: 'app.palette' },
     // Help, where every terminal application has put it.
-    { keys: 'f1', commandId: 'help.keys' },
+    { keys: 'f1', commandId: 'keys.show' },
     // `alt+g` rather than `ctrl+g`, which is the external editor's key in
     // every other agent CLI and is kept free for it here.
-    { keys: 'alt+g', commandId: 'bood.toggle' },
+    { keys: 'alt+g', commandId: 'creature.toggle' },
     // The key every other agent CLI opens an editor with, which is why the
     // creature moved off it.
     { keys: 'ctrl+g', commandId: 'editor.open' },
@@ -2772,7 +2826,7 @@ function shipped(): Binding[] {
     // matches has handled the key - whether or not the command it names then
     // declines to run - so a `when` that lives only on the command swallows
     // `ctrl+c` and it never reaches the one below that closes the application.
-    { keys: 'ctrl+c', commandId: 'chat.stop', when: `${SCREEN} == 'chat' && ${RUNNING}` },
+    { keys: 'ctrl+c', commandId: 'turn.stop', when: `${SCREEN} == 'chat' && ${RUNNING}` },
     /*
      * On the terminal screen, `ctrl+c` belongs to the shell.
      *
@@ -2795,21 +2849,21 @@ function shipped(): Binding[] {
     })),
     { keys: 'alt+right', commandId: 'terminal.next', when: `${SCREEN} == 'terminal'` },
     { keys: 'alt+left', commandId: 'terminal.previous', when: `${SCREEN} == 'terminal'` },
-    { keys: 'ctrl+l', commandId: 'terminal.list', when: `${SCREEN} == 'terminal'` },
+    { keys: 'ctrl+l', commandId: 'terminals.list', when: `${SCREEN} == 'terminal'` },
     // Tab goes between the command field and the tabs, and nowhere else.
     { keys: 'tab', commandId: 'terminal.focusSwitch', when: `${SCREEN} == 'terminal' && !${TERMINAL_LIST}` },
     { keys: 'shift+tab', commandId: 'terminal.focusSwitch', when: `${SCREEN} == 'terminal' && !${TERMINAL_LIST}` },
     // Everywhere else, after the two above: arm, and quit on the second.
     { keys: 'ctrl+c', commandId: 'app.interrupt' },
     { keys: 'ctrl+n', commandId: 'session.new' },
-    { keys: 'ctrl+r', commandId: 'session.refresh' },
+    { keys: 'ctrl+r', commandId: 'sessions.refresh' },
     /*
      * `alt+t`, for the reason `alt+m` is the markdown key: an alt chord
      * arrives as ESC then the letter, which survives SSH, tmux and a console
      * that has never heard of the kitty protocol. It also leaves `ctrl+t`
      * unclaimed, which is what the other agent CLIs spend on a todo list.
      */
-    { keys: 'alt+t', commandId: 'view.theme' },
+    { keys: 'alt+t', commandId: 'theme.change' },
     /*
      * Three, and `alt+m` is the one to reach for.
      *
@@ -2830,20 +2884,20 @@ function shipped(): Binding[] {
      * while the composer holds them - the same bargain `c`, `s` and `t`
      * already made on this screen.
      */
-    { keys: 'alt+m', commandId: 'view.markdown' },
-    { keys: 'ctrl+m', commandId: 'view.markdown' },
-    { keys: 'm', commandId: 'view.markdown', scopeId: CHAT_SCOPE },
-    { keys: 'escape', commandId: 'go.back' },
+    { keys: 'alt+m', commandId: 'markdown.toggle' },
+    { keys: 'ctrl+m', commandId: 'markdown.toggle' },
+    { keys: 'm', commandId: 'markdown.toggle', scopeId: CHAT_SCOPE },
+    { keys: 'escape', commandId: 'screen.back' },
 
     // The catalogue.
     { keys: 'n', commandId: 'session.new', scopeId: SESSIONS_SCOPE },
     // Back into the conversation it was just showing. Available only while
     // one is still open, which is until escape gives it up.
     { keys: 'f', commandId: 'session.reopen', scopeId: SESSIONS_SCOPE, when: `${OPEN}` },
-    { keys: 'r', commandId: 'session.refresh', scopeId: SESSIONS_SCOPE },
+    { keys: 'r', commandId: 'sessions.refresh', scopeId: SESSIONS_SCOPE },
     { keys: 'a', commandId: 'session.archive', scopeId: SESSIONS_SCOPE },
     { keys: 'u', commandId: 'session.read', scopeId: SESSIONS_SCOPE },
-    { keys: 'x', commandId: 'session.toggleArchived', scopeId: SESSIONS_SCOPE },
+    { keys: 'x', commandId: 'archived.show', scopeId: SESSIONS_SCOPE },
     { keys: 'd', commandId: 'session.dispose', scopeId: SESSIONS_SCOPE },
     // The key somebody reaches for without being told, beside the letter they
     // had to be. Both, because `delete` is the guess and `d` is what the
@@ -2861,7 +2915,7 @@ function shipped(): Binding[] {
      * names then declines to run, so the first of these two swallowed
      * `ctrl+f` on every screen and the second was never reached.
      */
-    { keys: 'ctrl+f', commandId: 'session.filter', when: `${SCREEN} == 'sessions'` },
+    { keys: 'ctrl+f', commandId: 'sessions.filter', when: `${SCREEN} == 'sessions'` },
     { keys: 'ctrl+f', commandId: 'chat.find', when: `${SCREEN} == 'chat'` },
     /*
      * Walking the matches, while the find box is up.
@@ -2884,14 +2938,14 @@ function shipped(): Binding[] {
     // Scoped, not global, and after the focused node has had its turn: while
     // the filter box has the keyboard these two are caret movement, and the
     // runtime offers the key there first.
-    { keys: 'right', commandId: 'session.openDetails', scopeId: SESSIONS_SCOPE },
-    { keys: 'left', commandId: 'session.closeDetails', scopeId: SESSIONS_SCOPE },
+    { keys: 'right', commandId: 'session.showDetails', scopeId: SESSIONS_SCOPE },
+    { keys: 'left', commandId: 'session.hideDetails', scopeId: SESSIONS_SCOPE },
 
     // The conversation. `i` is the one that gets you into the composer, and
     // out of it is escape - the pair that makes every other letter reachable.
-    { keys: 'c', commandId: 'go.changes', scopeId: CHAT_SCOPE },
-    { keys: 'f', commandId: 'go.files', scopeId: CHAT_SCOPE },
-    { keys: 'l', commandId: 'chat.openLink', scopeId: CHAT_SCOPE },
+    { keys: 'c', commandId: 'changes.show', scopeId: CHAT_SCOPE },
+    { keys: 'f', commandId: 'files.show', scopeId: CHAT_SCOPE },
+    { keys: 'l', commandId: 'link.open', scopeId: CHAT_SCOPE },
     /*
      * On the changes screen, and nowhere else.
      *
@@ -2914,17 +2968,17 @@ function shipped(): Binding[] {
     // is the list's own and opens the detail, so running one is a key of its
     // own and never the thing a stray enter does.
     { keys: 'r', commandId: 'automation.run', scopeId: AUTOMATIONS_SCOPE },
-    { keys: 'right', commandId: 'automation.openDetails', scopeId: AUTOMATIONS_SCOPE },
-    { keys: 'left', commandId: 'automation.closeDetails', scopeId: AUTOMATIONS_SCOPE },
+    { keys: 'right', commandId: 'automation.showDetails', scopeId: AUTOMATIONS_SCOPE },
+    { keys: 'left', commandId: 'automation.hideDetails', scopeId: AUTOMATIONS_SCOPE },
     { keys: 'n', commandId: 'automation.new', scopeId: AUTOMATIONS_SCOPE },
     { keys: 'e', commandId: 'automation.edit', scopeId: AUTOMATIONS_SCOPE },
     { keys: 'o', commandId: 'automation.toggle', scopeId: AUTOMATIONS_SCOPE },
-    { keys: 'd', commandId: 'automation.remove', scopeId: AUTOMATIONS_SCOPE },
-    { keys: 's', commandId: 'go.settings', scopeId: CHAT_SCOPE },
-    { keys: 't', commandId: 'chat.stop', scopeId: CHAT_SCOPE },
-    { keys: 'k', commandId: 'go.skills', scopeId: CHAT_SCOPE },
-    { keys: 'p', commandId: 'go.mcp', scopeId: CHAT_SCOPE },
-    { keys: 'u', commandId: 'go.usage', scopeId: CHAT_SCOPE },
+    { keys: 'd', commandId: 'automation.delete', scopeId: AUTOMATIONS_SCOPE },
+    { keys: 's', commandId: 'settings.show', scopeId: CHAT_SCOPE },
+    { keys: 't', commandId: 'turn.stop', scopeId: CHAT_SCOPE },
+    { keys: 'k', commandId: 'skills.show', scopeId: CHAT_SCOPE },
+    { keys: 'p', commandId: 'mcp.show', scopeId: CHAT_SCOPE },
+    { keys: 'u', commandId: 'usage.show', scopeId: CHAT_SCOPE },
 
     /**
      * An open file closes before the screen does.
@@ -2937,7 +2991,7 @@ function shipped(): Binding[] {
      * The clause is on the binding as well as on the command, for the reason
      * given above `ctrl+c`: a binding that matches has handled the key even
      * when the command declines, so an escape with no file open would be
-     * swallowed here and never reach `go.back`.
+     * swallowed here and never reach `screen.back`.
      */
     { keys: 'escape', commandId: 'changes.close', when: `${OPEN_FILE}`, priority: 10 },
   ];

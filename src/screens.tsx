@@ -575,14 +575,14 @@ function useComposerOptions(): ComposerOption[] {
       label: agent?.displayName ?? provider,
       // Fixed once the session exists: it is the process the conversation is
       // running in.
-      ...(open ? {} : { commandId: 'compose.harness' }),
+      ...(open ? {} : { commandId: 'harness.choose' }),
     },
     {
       id: 'model',
       icon: settingIcon(unicode, 'model'),
       label: models?.find((found) => found.id === model)?.displayName
         ?? (model || (models !== null && models.length === 0 ? 'no models' : 'default')),
-      ...(models !== null && models.length === 0 ? {} : { commandId: 'compose.model' }),
+      ...(models !== null && models.length === 0 ? {} : { commandId: 'model.choose' }),
     },
     /*
      * The chosen model's own questions.
@@ -616,7 +616,7 @@ function useComposerOptions(): ComposerOption[] {
       icon: settingIcon(unicode, 'workspace'),
       label: workspaceName(workspace ? `file://${workspace}` : undefined),
       where: true,
-      ...(open ? {} : { commandId: 'compose.workspace' }),
+      ...(open ? {} : { commandId: 'workspace.choose' }),
     },
     ...fromConfig.filter((option) => option.where)
       .sort((a, b) => WHERE.indexOf(a.id) - WHERE.indexOf(b.id)),
@@ -1153,10 +1153,10 @@ export const NewSessionScreen: (props: Record<string, never>) => RenderOutput =
               // nothing to navigate to, and the draft is still in the field.
               .catch((error: unknown) => controller.report(error));
           }}
-          onCancel={() => app.execute('go.sessions')}
+          onCancel={() => app.execute('sessions.show')}
           // Left off the front of the field, twice over, is the same thought as
           // escape: out of here, back to what already exists.
-          onLeave={() => app.execute('go.sessions')}
+          onLeave={() => app.execute('sessions.show')}
           onHistory={(direction: -1 | 1) => {
             const next = Math.max(0, Math.min(history.length, recall + direction));
             setRecall(next);
@@ -1925,7 +1925,7 @@ export const AutomationsScreen: (props: Record<string, never>) => RenderOutput =
           onSelect={(uri) => app.store.set(AUTOMATION_ROW, uri)}
           // Enter reads it. Running is `r`, so a stray enter never starts an
           // agent nobody asked for.
-          onOpen={(uri) => { app.store.set(AUTOMATION_ROW, uri); void app.execute('automation.openDetails'); }}
+          onOpen={(uri) => { app.store.set(AUTOMATION_ROW, uri); void app.execute('automation.showDetails'); }}
         />
       </Panel>
     );

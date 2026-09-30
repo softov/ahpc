@@ -101,7 +101,7 @@ export const TerminalView: (props: TerminalViewProps) => RenderOutput =
           <List
             items={items}
             flex={1}
-            focusId="terminal.list"
+            focusId="terminals.list"
             autoFocus
             {...(on ? { selectedId: on } : {})}
             onSelect={(uri: string) => setCursor(uri)}

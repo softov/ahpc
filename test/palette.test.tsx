@@ -14,7 +14,7 @@ import type { SessionUri } from '../src/ahp/types.js';
  * A command with no `when` is offered on every screen, and the ones that act
  * on a session, a selection or a pending question do nothing on the screens
  * that have none - which from the palette is indistinguishable from the
- * client being broken. `session.openDetails` was the one that showed it: the
+ * client being broken. `session.showDetails` was the one that showed it: the
  * detail pane belongs to the catalogue, and the command was offered on the
  * composer the client opens on.
  *
@@ -55,16 +55,16 @@ describe('the composer screen, which is where the client opens', () => {
 
     // There is a composer here, so these work.
     expect(ids).toContain('editor.open');
-    expect(ids).toContain('compose.model');
-    expect(ids).toContain('chat.focusComposer');
+    expect(ids).toContain('model.choose');
+    expect(ids).toContain('composer.focus');
 
     // There is no session, no transcript, no catalogue and nothing waiting.
-    expect(ids).not.toContain('chat.send');
-    expect(ids).not.toContain('chat.focusTranscript');
-    expect(ids).not.toContain('session.filter');
-    expect(ids).not.toContain('chat.approve');
-    expect(ids).not.toContain('chat.deny');
-    expect(ids).not.toContain('session.openDetails');
+    expect(ids).not.toContain('message.send');
+    expect(ids).not.toContain('transcript.focus');
+    expect(ids).not.toContain('sessions.filter');
+    expect(ids).not.toContain('tool.approve');
+    expect(ids).not.toContain('tool.deny');
+    expect(ids).not.toContain('session.showDetails');
     await m.t.unmount();
   });
 });
@@ -72,23 +72,23 @@ describe('the composer screen, which is where the client opens', () => {
 describe('the catalogue', () => {
   it('offers the filter, the detail pane and what acts on a row', async () => {
     const m = await open();
-    await m.t.app.commands.get('go.sessions')?.run({}, { app: m.t.app } as never);
+    await m.t.app.commands.get('sessions.show')?.run({}, { app: m.t.app } as never);
     for (let i = 0; i < 6; i += 1) await m.t.settle();
     expect(m.t.app.store.get<string>(SCREEN)).toBe('sessions');
     // A row is under the cursor as soon as the list has one.
     expect(m.t.app.store.get<string>(SELECTED)).toBeTruthy();
 
     const ids = offered(m.t);
-    expect(ids).toContain('session.filter');
-    expect(ids).toContain('session.openDetails');
-    expect(ids).toContain('session.closeDetails');
+    expect(ids).toContain('sessions.filter');
+    expect(ids).toContain('session.showDetails');
+    expect(ids).toContain('session.hideDetails');
     expect(ids).toContain('session.open');
     expect(ids).toContain('session.archive');
     expect(ids).toContain('session.read');
     expect(ids).toContain('session.dispose');
 
     // Still no transcript here.
-    expect(ids).not.toContain('chat.focusTranscript');
+    expect(ids).not.toContain('transcript.focus');
     await m.t.unmount();
   });
 });
@@ -101,15 +101,15 @@ describe('a session that is open', () => {
     for (let i = 0; i < 6; i += 1) await m.t.settle();
 
     const ids = offered(m.t);
-    expect(ids).toContain('chat.focusTranscript');
-    expect(ids).toContain('chat.send');
-    expect(ids).toContain('chat.focusComposer');
+    expect(ids).toContain('transcript.focus');
+    expect(ids).toContain('message.send');
+    expect(ids).toContain('composer.focus');
     expect(ids).toContain('editor.open');
     expect(ids).toContain('session.archive');
     expect(ids).toContain('session.dispose');
 
     // The detail pane is the catalogue's, and this is not it.
-    expect(ids).not.toContain('session.openDetails');
+    expect(ids).not.toContain('session.showDetails');
     await m.t.unmount();
   });
 
@@ -124,15 +124,15 @@ describe('a session that is open', () => {
     // The seeded session blocks on a confirmation, which is the state these
     // two exist for.
     expect(m.t.app.store.get(INPUT)).toBeTruthy();
-    expect(offered(m.t)).toContain('chat.approve');
-    expect(offered(m.t)).toContain('chat.deny');
+    expect(offered(m.t)).toContain('tool.approve');
+    expect(offered(m.t)).toContain('tool.deny');
 
     m.t.app.services.require(CONTROLLER).approve();
     await settle(m, 1);
     expect(m.t.app.store.get(INPUT)).toBeNull();
     // Answered, so there is nothing left to answer.
-    expect(offered(m.t)).not.toContain('chat.approve');
-    expect(offered(m.t)).not.toContain('chat.deny');
+    expect(offered(m.t)).not.toContain('tool.approve');
+    expect(offered(m.t)).not.toContain('tool.deny');
     await m.t.unmount();
   });
 });
@@ -148,16 +148,16 @@ describe('a session that is open', () => {
 describe('the archived switch reports its own state', () => {
   it('is checked in the palette when archived sessions are showing', async () => {
     const m = await open();
-    expect(m.t.app.commands.isChecked('session.toggleArchived')).toBe(false);
-    await m.t.app.execute('session.toggleArchived');
+    expect(m.t.app.commands.isChecked('archived.show')).toBe(false);
+    await m.t.app.execute('archived.show');
     await settle(m);
-    expect(m.t.app.commands.isChecked('session.toggleArchived')).toBe(true);
+    expect(m.t.app.commands.isChecked('archived.show')).toBe(true);
     await m.t.unmount();
   });
 
   it('counts what it is hiding, and says the other direction once it is on', async () => {
     const m = await open();
-    await m.t.app.execute('go.sessions');
+    await m.t.app.execute('sessions.show');
     await settle(m);
     // The fake host holds one archived session, so the row has something to
     // offer and says how much.

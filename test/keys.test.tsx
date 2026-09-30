@@ -58,6 +58,15 @@ describe('the config file can say what a key does', () => {
     await t.unmount();
   });
 
+  it('still reaches a command under the id it had before noun.verb', async () => {
+    // A config written against `go.sessions` binds what is now `sessions.show`.
+    const t = await running({ 'ctrl+y': 'go.sessions' });
+    await t.press('ctrl+y');
+    for (let i = 0; i < 4; i += 1) await t.settle();
+    expect(t.app.store.get<string>(SCREEN)).toBe('sessions');
+    await t.unmount();
+  });
+
   it('leaves every other default alone', async () => {
     const t = await running({ 'ctrl+y': 'session.new' });
     // Naming one chord is not a replacement for the table: `ctrl+n` still
@@ -131,9 +140,9 @@ describe('the editor command', () => {
 describe('config is the palette, over the commands that configure the client', () => {
   it('is a command, so a slash finds it instead of sending a message', async () => {
     const t = await running();
-    expect(t.app.commands.get('app.config')).toBeTruthy();
+    expect(t.app.commands.get('config.show')).toBeTruthy();
     // The slash menu matches on the id, which is how `/config` reaches it.
-    expect(t.app.commands.get('app.config')?.id).toContain('config');
+    expect(t.app.commands.get('config.show')?.id).toContain('config');
     await t.unmount();
   });
 
@@ -145,8 +154,8 @@ describe('config is the palette, over the commands that configure the client', (
     // A narrower list, or the slot is doing nothing.
     expect(config.length).toBeLessThan(all.length);
     const ids = config.map((one) => one.id);
-    expect(ids).toContain('view.theme');
-    expect(ids).toContain('view.shell');
+    expect(ids).toContain('theme.change');
+    expect(ids).toContain('layout.change');
     // Not a thing you configure: it acts on the session in front of you.
     expect(ids).not.toContain('session.dispose');
     await t.unmount();
@@ -156,7 +165,7 @@ describe('config is the palette, over the commands that configure the client', (
 /*
  * A command offered where it cannot work.
  *
- * `session.openDetails` shows the catalogue's detail pane. It was offered on
+ * `session.showDetails` shows the catalogue's detail pane. It was offered on
  * every screen and did nothing on all but one, which from the palette is
  * indistinguishable from the client being broken.
  */
@@ -168,15 +177,15 @@ describe('a command is offered where it works', () => {
     const t = await running();
     // The client opens on the composer, where there is no detail pane.
     expect(t.app.store.get<string>(SCREEN)).toBe('new');
-    expect(offered(t)).not.toContain('session.openDetails');
-    expect(offered(t)).not.toContain('session.closeDetails');
+    expect(offered(t)).not.toContain('session.showDetails');
+    expect(offered(t)).not.toContain('session.hideDetails');
 
-    await t.app.commands.get('go.sessions')?.run({}, { app: t.app } as never);
+    await t.app.commands.get('sessions.show')?.run({}, { app: t.app } as never);
     for (let i = 0; i < 4; i += 1) await t.settle();
     expect(t.app.store.get<string>(SCREEN)).toBe('sessions');
     // On the catalogue, where the pane is, both are there to be picked.
-    expect(offered(t)).toContain('session.openDetails');
-    expect(offered(t)).toContain('session.closeDetails');
+    expect(offered(t)).toContain('session.showDetails');
+    expect(offered(t)).toContain('session.hideDetails');
     await t.unmount();
   });
 });
@@ -197,16 +206,16 @@ describe('f1 opens the keymap', () => {
 
     // Bound, so it is in the panel - beside the chord that runs it.
     expect(screen).toContain('ctrl+p');
-    // `help.keys` is itself bound, which is how the panel names its own key.
+    // `keys.show` is itself bound, which is how the panel names its own key.
     expect(screen).toContain('f1');
     await t.unmount();
   });
 
   it('leaves out a command nothing is bound to', async () => {
-    // `app.config` ships without a chord of its own, so the keymap has no row
+    // `config.show` ships without a chord of its own, so the keymap has no row
     // for it while the command palette does.
     const t = await running();
-    expect(t.app.keybindings.forCommand('app.config')).toHaveLength(0);
+    expect(t.app.keybindings.forCommand('config.show')).toHaveLength(0);
     await t.press('f1');
     for (let i = 0; i < 4; i += 1) await t.settle();
     expect(t.lines().join('\n')).not.toContain('the rest of what this client decides');

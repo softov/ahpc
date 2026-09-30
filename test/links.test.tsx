@@ -86,7 +86,7 @@ describe('following a link on the screen', () => {
     t.app.store.set(TURNS, [
       { id: 't1', role: 'agent', parts: [{ kind: 'markdown', id: 'm', content: 'Continue in agent-host-session://copilotcli/9c74' }], state: 'complete', at: '' },
     ]);
-    await t.app.execute('chat.openLink', { link: 'agent-host-session://copilotcli/9c74' });
+    await t.app.execute('link.open', { link: 'agent-host-session://copilotcli/9c74' });
     for (let i = 0; i < 12; i++) await t.settle();
     expect(t.app.store.get<string>(OPEN)).toBe('ahp-session:/9c74');
     expect(t.hasText('Why does the composer eat q')).toBe(true);

@@ -149,11 +149,11 @@ describe('the wire screen', () => {
     for (let i = 0; i < 2; i++) await t.settle();
     // The list alone: the frame is a drawer at this width, and it is closed.
     expect(t.hasText('"channel"')).toBe(false);
-    await t.app.execute('wire.openFrame');
+    await t.app.execute('frame.open');
     for (let i = 0; i < 4; i++) await t.settle();
     expect(t.hasText('port the kqueue build')).toBe(true);
     expect(t.hasText('"channel": "ahp-session:/one"')).toBe(true);
-    await t.app.execute('wire.closeFrame');
+    await t.app.execute('frame.close');
     for (let i = 0; i < 4; i++) await t.settle();
     expect(t.hasText('6 frames')).toBe(true);
     await t.unmount();

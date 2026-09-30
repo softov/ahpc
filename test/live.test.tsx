@@ -36,7 +36,7 @@ async function quiet(t: Awaited<ReturnType<typeof open>>['t']): Promise<void> {
 describe('the catalogue keeps up', () => {
   it('shows a session that appeared while the list was on screen', async () => {
     const { t, host } = await open();
-    await t.app.execute('go.sessions');
+    await t.app.execute('sessions.show');
     for (let i = 0; i < 6; i++) await t.settle();
 
     const before = sessions(t.app.store).length;
@@ -51,7 +51,7 @@ describe('the catalogue keeps up', () => {
 
   it('picks up a change to a session it is not watching', async () => {
     const { t, host } = await open();
-    await t.app.execute('go.sessions');
+    await t.app.execute('sessions.show');
     for (let i = 0; i < 6; i++) await t.settle();
     expect(t.hasText('Split the transcript viewport')).toBe(true);
 
