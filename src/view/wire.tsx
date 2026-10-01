@@ -48,7 +48,12 @@ export const visibleRows = (rows: WireRow[], filter: string): WireRow[] => (filt
 const linesOf = (frame: unknown, i18n: I18n): string[] => {
   const text = typeof frame === 'string' ? frame : JSON.stringify(frame, null, 2) ?? '';
   const lines = text.split('\n');
-  return lines.length > 3000 ? [...lines.slice(0, 3000), i18n.t('views.wire.moreLines', { count: lines.length - 3000 })] : lines;
+  return lines.length > 3000
+    ? [...lines.slice(0, 3000), i18n.plural(lines.length - 3000, {
+      one: i18n.t('views.wire.moreLines.one'),
+      other: i18n.t('views.wire.moreLines.other'),
+    })]
+    : lines;
 };
 
 export interface WireListProps extends BoxProps {
@@ -138,11 +143,23 @@ export const WireScreen: (props: Record<string, never>) => RenderOutput =
         {...(open && wide ? { width: width - aside - 1 } : { flex: 1 })}
         meta={shown.length === rows.length
           ? following
-            ? i18n.t('views.wire.framesFollowing', { count: shown.length, bullet: theme.glyphs.bulletFilled })
-            : i18n.t('views.wire.frames', { count: shown.length })
+            ? i18n.plural(shown.length, {
+              one: i18n.t('views.wire.framesFollowing.one'),
+              other: i18n.t('views.wire.framesFollowing.other'),
+            }, { bullet: theme.glyphs.bulletFilled })
+            : i18n.plural(shown.length, {
+              one: i18n.t('views.wire.frames.one'),
+              other: i18n.t('views.wire.frames.other'),
+            })
           : following
-            ? i18n.t('views.wire.framesOfFollowing', { count: shown.length, total: rows.length, bullet: theme.glyphs.bulletFilled })
-            : i18n.t('views.wire.framesOf', { count: shown.length, total: rows.length })}
+            ? i18n.plural(rows.length, {
+              one: i18n.t('views.wire.framesOfFollowing.one'),
+              other: i18n.t('views.wire.framesOfFollowing.other'),
+            }, { shown: shown.length, total: rows.length, bullet: theme.glyphs.bulletFilled })
+            : i18n.plural(rows.length, {
+              one: i18n.t('views.wire.framesOf.one'),
+              other: i18n.t('views.wire.framesOf.other'),
+            }, { shown: shown.length, total: rows.length })}
       >
         <SearchBox
           value={filter}

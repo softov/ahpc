@@ -140,6 +140,19 @@ describe('the wire screen', () => {
     await t.unmount();
   });
 
+  it('says one frame when one is all there is, and one of six when a filter keeps one', async () => {
+    const one = await open(capture(CONVERSATION.slice(0, 1)), 120);
+    expect(one.hasText('1 frame')).toBe(true);
+    expect(one.hasText('1 frames')).toBe(false);
+    await one.unmount();
+
+    const kept = await open(capture(CONVERSATION), 120);
+    kept.app.store.set(WIRE_FILTER, 'port the kqueue build');
+    for (let i = 0; i < 4; i++) await kept.settle();
+    expect(kept.hasText('1 of 6 frames')).toBe(true);
+    await kept.unmount();
+  });
+
   it('stops following when told, and opens the frame under the highlight on a narrow screen', async () => {
     const t = await open(capture(CONVERSATION), 70);
     await t.app.execute('wire.follow');
