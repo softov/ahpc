@@ -120,7 +120,7 @@ export const views: Record<string, string> = {
   'views.blocks.running': 'rodando',
   'views.blocks.elapsed': '{seconds}s',
   'views.update.notice': '{name} {latest} está no npm, esta é {version}',
-  'views.app.name': 'Assistente',
+  'views.app.name': 'AHPC',
   'views.app.noHost': 'sem host',
   'views.app.help': 'ajuda',
   'views.app.commands': 'comandos',

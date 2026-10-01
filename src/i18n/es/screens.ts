@@ -82,7 +82,7 @@ export const screens: Record<string, string> = {
   'screens.automation.noModels': 'Sin modelos',
   'screens.automation.defaultChoice': 'Predeterminado',
   'screens.automation.editTitle': 'Editar {title}',
-  'screens.automation.newTitle': 'Una nueva automatización',
+  'screens.automation.newTitle': 'Nueva automatización',
   'screens.automation.namePlaceholder': 'Build nocturno del framework',
   'screens.automation.directoryPlaceholder': 'el directorio predeterminado del host',
   'screens.automation.promptPlaceholder': 'Revisa qué cambió hoy y lista lo que necesite a una persona',

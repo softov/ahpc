@@ -212,7 +212,7 @@ describe('writing a new automation', () => {
       const { t } = await open(width, height, theme);
       await t.app.execute('automation.new');
       for (let i = 0; i < 8; i++) await t.settle();
-      expect(t.hasText('A new automation')).toBe(true);
+      expect(t.hasText('New automation')).toBe(true);
       // Both halves of the choice are on screen: a schedule, or nothing and
       // run it by hand. The second is the line that changes as you type, so it
       // is the one that has to survive a narrow shell.

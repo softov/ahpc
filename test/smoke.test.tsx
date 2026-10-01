@@ -1266,7 +1266,7 @@ describe('what a session actually is', () => {
     it(`names the palette key at the header's right end, not in the footer, at ${width} columns`, async () => {
       const { t } = await catalogue({ width, height: 30 });
       const rows = t.text().split('\n');
-      const header = rows.findIndex((row) => row.includes('Assistant'));
+      const header = rows.findIndex((row) => row.includes('AHPC'));
       expect(rows[header]).toContain('ctrl+p commands');
       expect(rows[header]).toContain('f1 help');
       expect(rows.filter((row) => row.includes('ctrl+p'))).toHaveLength(1);
@@ -2315,7 +2315,7 @@ describe('the figure on an empty screen', () => {
    */
   it('keeps the header its own name unless the config says otherwise', async () => {
     const m = await conversation();
-    expect(m.t.hasText('Assistant')).toBe(true);
+    expect(m.t.hasText('AHPC')).toBe(true);
     await m.t.unmount();
   });
 
@@ -2330,13 +2330,13 @@ describe('the figure on an empty screen', () => {
     for (let i = 0; i < 8; i++) await t.settle();
 
     // No session yet, so there is nothing for the seven cells to be about.
-    expect(t.hasText('Assistant')).toBe(true);
+    expect(t.hasText('AHPC')).toBe(true);
 
     t.app.services.require(CONTROLLER).open(SEEDED);
     t.app.screens.push('chat');
     for (let i = 0; i < 6; i++) await t.settle();
 
-    expect(t.hasText('Assistant')).toBe(false);
+    expect(t.hasText('AHPC')).toBe(false);
     const name = t.app.store.get<string>(BOOD) as string;
     const inline = MOODS.map((mood) => drawCreature(name, mood, { form: 'inline' })[0] as string);
     expect(inline.some((row) => t.hasText(row))).toBe(true);
