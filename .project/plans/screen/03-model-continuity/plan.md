@@ -1,7 +1,7 @@
 ---
 title: The model a queued or reopened turn runs on
 domain: screen
-status: active
+status: built
 priority: medium
 created: 2026-09-19
 revalidated: 2026-09-30
@@ -115,16 +115,16 @@ No decision file is created by this plan; every choice it settles is recorded in
 
 ## Resume state
 
-- **Done so far:** task-02 done 2026-09-20; task-01 done 2026-09-30, against the linked textui.
-- **Next action:** Softov's review; then the `@textui/*` range in `package.json` moves to the release carrying the queued model, and the plan closes.
+- **Done so far:** every task; task-02 on 2026-09-20 and task-01 on 2026-09-30. See [implemented.md](implemented.md).
+- **Next action:** none.
 - **Open questions:** none.
 - **Watch out for:** `MODEL_CONFIG` is the composer's answers for the next message and not a record of the last one, which is why seeding it on open is right and why clearing it on a model change must stay.
 
 ## Final verification checklist
 
-- [ ] `test/smoke.test.tsx` asserts a queued message's model and a reopened session's `MODEL_CONFIG`.
-- [ ] `test/live.test.tsx` drives `queued()` and `detail()` from a scripted host.
-- [ ] `test/fake.test.ts` covers the fake's queue carrying the model into the next turn.
-- [ ] `npm test` green.
-- [ ] `npm run typecheck` green.
-- [ ] `plans/index.md` updated.
+- [x] `test/smoke.test.tsx` asserts a queued message's model, and the opened session's `MODEL_CONFIG` where the fixture records no answers.
+- [x] `test/reconnect.test.ts` drives `queued()` from a scripted host, and `test/live.test.tsx` drives `detail()`.
+- [x] `test/fake.test.ts` covers the fake's queue carrying the model into the next turn.
+- [x] `npm test` green (34 files, 652 tests).
+- [x] `npm run typecheck` green.
+- [x] `plans/index.md` updated.

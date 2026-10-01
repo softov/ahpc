@@ -1,7 +1,7 @@
 ---
 title: The client speaks English, Portuguese or Spanish, and its commands are typed noun.verb
 domain: screen
-status: active
+status: built
 priority: medium
 created: 2026-09-30
 revalidated: 2026-09-30
@@ -91,14 +91,14 @@ The files read and the patterns to reuse are the `refs` above.
 
 ## Resume state
 
-- **Done so far:** every task done 2026-09-30.
-- **Next action:** Softov's review; then a textui release, the `@textui/*` range in `package.json`, `implemented.md`, and the plan closes.
+- **Done so far:** every task done 2026-09-30; textui was released as `@textui/* 0.7.0` and `package.json` pins it. See [implemented.md](implemented.md).
+- **Next action:** none.
 - **Open questions:** none.
-- **Watch out for:** the slash menu shows ids, so task 04 changes what tests type; the palette's filter searches titles, so a translated title is what a person searches for, and `keywords` should keep the English words.
+- **Watch out for:** the slash menu shows ids, so an id is what a person types and a translated title is what they read; the palette filters on titles, and an English search still finds a command because the ids are English noun.verb.
 
 ## Final verification checklist
 
-- [ ] `npx vitest run` passes in ahpc and `pnpm -r test` in textui.
-- [ ] `ahpc --lang pt-br`, `LANG=es_ES.UTF-8 ahpc` and `LANG=C ahpc` checked by hand.
-- [ ] A config binding an old id still works.
-- [ ] `plans/index.md` updated.
+- [x] `npx vitest run` passes in ahpc (34 files, 652 tests), and textui's `core` and `chat` i18n tests pass in its own repository.
+- [x] `ahpc --static --lang pt-br` checked by hand by Softov; the `LANG=es_ES.UTF-8` and `LANG=C` spellings are covered by `test/locale.test.ts`.
+- [x] A config binding an old id still works (`test/keys.test.tsx` binds `go.sessions`).
+- [x] `plans/index.md` updated.
