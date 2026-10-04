@@ -2,11 +2,11 @@
   "version": "5",
   "specifiers": {
     "npm:@microsoft/agent-host-protocol@1": "1.0.0",
-    "npm:@textui/chat@0.8": "0.8.0",
-    "npm:@textui/core@0.8": "0.8.0",
-    "npm:@textui/terminal@0.8": "0.8.0",
-    "npm:@textui/testing@0.8": "0.8.0",
-    "npm:@textui/widgets@0.8": "0.8.0",
+    "npm:@textui/chat@0.9": "0.9.0",
+    "npm:@textui/core@0.9": "0.9.0",
+    "npm:@textui/terminal@0.9": "0.9.0",
+    "npm:@textui/testing@0.9": "0.9.0",
+    "npm:@textui/widgets@0.9": "0.9.0",
     "npm:@types/node@^22.10.2": "22.20.3",
     "npm:ajv-formats@^3.0.1": "3.0.1_ajv@8.20.0",
     "npm:ajv@^8.17.1": "8.20.0",
@@ -280,32 +280,32 @@
       "os": ["win32"],
       "cpu": ["x64"]
     },
-    "@textui/chat@0.8.0": {
-      "integrity": "sha512-buD2ph2ntcnu58V0CT9OczkTsvQVu5YUAr/QMmKm4qCbK94gMAVNnNpRg+gEFeCGzKvIMcxYVBUh/900i7/ikA==",
+    "@textui/chat@0.9.0": {
+      "integrity": "sha512-LM5SdTaV1zCnHsNVgJK4mjg+6WXpZvvtWSEqdMVrR4HCb9ZPuulL/wosgyh3jt518a6NsjhWI2YFBnKMEtBvUA==",
       "dependencies": [
         "@textui/core",
         "@textui/widgets"
       ]
     },
-    "@textui/core@0.8.0": {
-      "integrity": "sha512-TJ303XaUi2wcVMYOKqi7x6QrkhlamPTEAw0clPzh0qb1/qJJ00et+ac0//9NxlmO7x/MkNufvOfdWmWYZwc9yQ=="
+    "@textui/core@0.9.0": {
+      "integrity": "sha512-5b8P4Mtcu8yyzxZm9PT6Wt9g9BG4chuEmpTNW3sBR2Ji+8bzRil1E2pCxiZ6GeV/Vpa4Xw26Z3ynDDoBIIQ/GQ=="
     },
-    "@textui/terminal@0.8.0": {
-      "integrity": "sha512-k2vFeFnKFSqEFN1VIDSRuvsUQ1j9GBcNlZkmFKBpTJFgIAa+zMaciYViSLYp6PUbpAZiMuwyE4FtVm9pm74F0A==",
+    "@textui/terminal@0.9.0": {
+      "integrity": "sha512-xoPYXpVOgsYPMe8nGTNYvZNmf/mGlNFMWZch0SmiQvBL/rBPsJ8ujNlHIN4nct+otnz8H1rRrsC0rh3HllhhXg==",
       "dependencies": [
         "@textui/core"
       ]
     },
-    "@textui/testing@0.8.0": {
-      "integrity": "sha512-KapHXFuqsVssk47KK39ukjEXzNZe4KgjP9JrPmutN2wTzY7BCU5ncrsjDfGhMGgCB61uGTTKK9ZQsk9QLkzDRw==",
+    "@textui/testing@0.9.0": {
+      "integrity": "sha512-s6cTtkVLHqOwQjO0PLFydZXLm7clbbwkrcH5R9lrCNw10V8hW9WhqgXjBloI6fIX7+EH5dJQLUyc5riqGa2+vA==",
       "dependencies": [
         "@textui/core",
         "@textui/terminal",
         "@textui/widgets"
       ]
     },
-    "@textui/widgets@0.8.0": {
-      "integrity": "sha512-NF6DfzFwSugRbxYJmTWtE1kUuyQ9kNF6EnjYcwktcEkPvLDPjEJuKPPuNpu/8N+hGXASTEen2sMo8GS/+NznZw==",
+    "@textui/widgets@0.9.0": {
+      "integrity": "sha512-TQLfnLClU+0IIC9FAshLAJf8F25xQh64zN0JqLYkdiLEkTuNWJ4A2y5eYAlHBUT0WiHp9b4cJyZgAIdEWjWMDw==",
       "dependencies": [
         "@textui/core"
       ]
@@ -702,11 +702,11 @@
     "packageJson": {
       "dependencies": [
         "npm:@microsoft/agent-host-protocol@1",
-        "npm:@textui/chat@0.8",
-        "npm:@textui/core@0.8",
-        "npm:@textui/terminal@0.8",
-        "npm:@textui/testing@0.8",
-        "npm:@textui/widgets@0.8",
+        "npm:@textui/chat@0.9",
+        "npm:@textui/core@0.9",
+        "npm:@textui/terminal@0.9",
+        "npm:@textui/testing@0.9",
+        "npm:@textui/widgets@0.9",
         "npm:@types/node@^22.10.2",
         "npm:ajv-formats@^3.0.1",
         "npm:ajv@^8.17.1",
