@@ -193,18 +193,15 @@ describe('every frame this client sends is one the protocol declares', () => {
       found: { what: string; count: number }[];
     };
     /*
-     * One known exception, and it is a version skew rather than a defect.
+     * No exceptions, as of 1.0.0.
      *
-     * `authenticate` carries `expiresIn`, which `authentication.md` has four
-     * MUSTs about and which the *published* package does not declare - the
-     * specification repository is ahead of it. Named here rather than
-     * suppressed by pattern, so the day it publishes this line fails and
-     * somebody deletes it.
+     * There was one, and it stood here until this version: `authenticate`
+     * carries `expiresIn`, which `authentication.md` has four MUSTs about and
+     * which the 0.9.0 package did not declare, the specification repository
+     * being ahead of it. It was named rather than suppressed by pattern, so
+     * the day it published this line failed, and 1.0.0 is that day.
      */
-    const known = 'AuthenticateParams / undeclared key `expiresIn`';
-    const real = report.found.filter((one) => one.what !== known);
-    expect(real.map((one) => one.what)).toEqual([]);
-    expect(report.found.some((one) => one.what === known)).toBe(true);
+    expect(report.found.map((one) => one.what)).toEqual([]);
   });
 });
 

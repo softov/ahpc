@@ -41,6 +41,9 @@
        "$ref": "#/$defs/SessionChatUpdatedAction"
       },
       {
+       "$ref": "#/$defs/SessionChatsReorderedAction"
+      },
+      {
        "$ref": "#/$defs/SessionDefaultChatChangedAction"
       },
       {
@@ -90,6 +93,9 @@
       },
       {
        "$ref": "#/$defs/SessionMcpServerStopRequestedAction"
+      },
+      {
+       "$ref": "#/$defs/SessionMcpServerBackgroundRequestedAction"
       },
       {
        "$ref": "#/$defs/SessionIsReadChangedAction"
@@ -177,6 +183,24 @@
        "$ref": "#/$defs/ChatActivityChangedAction"
       },
       {
+       "$ref": "#/$defs/ChatBackgroundWorkSetAction"
+      },
+      {
+       "$ref": "#/$defs/ChatBackgroundWorkRemovedAction"
+      },
+      {
+       "$ref": "#/$defs/ChatMovableChangedAction"
+      },
+      {
+       "$ref": "#/$defs/ChatChangesetsChangedAction"
+      },
+      {
+       "$ref": "#/$defs/ChatCanvasesChangedAction"
+      },
+      {
+       "$ref": "#/$defs/CanvasStateChangedAction"
+      },
+      {
        "$ref": "#/$defs/ChatWorkingDirectorySetAction"
       },
       {
@@ -199,6 +223,12 @@
       },
       {
        "$ref": "#/$defs/ChatDraftChangedAction"
+      },
+      {
+       "$ref": "#/$defs/ChatIsReadChangedAction"
+      },
+      {
+       "$ref": "#/$defs/ChatIsArchivedChangedAction"
       },
       {
        "$ref": "#/$defs/ChatInputRequestedAction"
@@ -361,6 +391,7 @@
     "session/chatAdded",
     "session/chatRemoved",
     "session/chatUpdated",
+    "session/chatsReordered",
     "session/defaultChatChanged",
     "chat/turnStarted",
     "chat/delta",
@@ -379,6 +410,12 @@
     "chat/error",
     "chat/turnResume",
     "chat/activityChanged",
+    "chat/backgroundWorkSet",
+    "chat/backgroundWorkRemoved",
+    "chat/movableChanged",
+    "chat/changesetsChanged",
+    "chat/canvasesChanged",
+    "canvas/stateChanged",
     "chat/workingDirectorySet",
     "chat/workingDirectoryRemoved",
     "session/titleChanged",
@@ -396,6 +433,8 @@
     "chat/pendingMessageRemoved",
     "chat/queuedMessagesReordered",
     "chat/draftChanged",
+    "chat/isReadChanged",
+    "chat/isArchivedChanged",
     "chat/inputRequested",
     "chat/inputAnswerChanged",
     "chat/inputCompleted",
@@ -406,6 +445,7 @@
     "session/mcpServerStateChanged",
     "session/mcpServerStartRequested",
     "session/mcpServerStopRequested",
+    "session/mcpServerBackgroundRequested",
     "chat/truncated",
     "chat/turnsLoaded",
     "session/isReadChanged",
@@ -1431,6 +1471,9 @@
     "token": {
      "type": "string"
     },
+    "expiresIn": {
+     "type": "number"
+    },
     "scopes": {
      "type": "array",
      "items": {
@@ -1516,6 +1559,38 @@
     }
    ]
   },
+  "AutomationAfterDateCondition": {
+   "type": "object",
+   "properties": {
+    "kind": {
+     "const": "afterDate"
+    },
+    "date": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "kind",
+    "date"
+   ],
+   "additionalProperties": false
+  },
+  "AutomationAfterRunsCondition": {
+   "type": "object",
+   "properties": {
+    "kind": {
+     "const": "afterRuns"
+    },
+    "max": {
+     "type": "number"
+    }
+   },
+   "required": [
+    "kind",
+    "max"
+   ],
+   "additionalProperties": false
+  },
   "AutomationCancelledRunLifecycle": {
    "type": "object",
    "properties": {
@@ -1553,6 +1628,9 @@
     },
     "runHistoryLimit": {
      "type": "number"
+    },
+    "customizations": {
+     "$ref": "#/$defs/AutomationCustomizationsCapability"
     }
    },
    "additionalProperties": false
@@ -1609,6 +1687,11 @@
    ],
    "additionalProperties": false
   },
+  "AutomationCustomizationsCapability": {
+   "type": "object",
+   "properties": {},
+   "additionalProperties": false
+  },
   "AutomationDefinition": {
    "type": "object",
    "properties": {
@@ -1636,6 +1719,22 @@
        },
        {
         "$ref": "#/$defs/AutomationEventTrigger"
+       }
+      ]
+     }
+    },
+    "disableConditions": {
+     "type": "array",
+     "items": {
+      "discriminator": {
+       "propertyName": "kind"
+      },
+      "oneOf": [
+       {
+        "$ref": "#/$defs/AutomationAfterRunsCondition"
+       },
+       {
+        "$ref": "#/$defs/AutomationAfterDateCondition"
        }
       ]
      }
@@ -1685,12 +1784,47 @@
       ]
      }
     },
+    "disableConditions": {
+     "type": "array",
+     "items": {
+      "discriminator": {
+       "propertyName": "kind"
+      },
+      "oneOf": [
+       {
+        "$ref": "#/$defs/AutomationAfterRunsCondition"
+       },
+       {
+        "$ref": "#/$defs/AutomationAfterDateCondition"
+       }
+      ]
+     }
+    },
     "_meta": {
      "type": "object",
      "additionalProperties": true
     }
    },
    "additionalProperties": false
+  },
+  "AutomationDisableCondition": {
+   "discriminator": {
+    "propertyName": "kind"
+   },
+   "oneOf": [
+    {
+     "$ref": "#/$defs/AutomationAfterRunsCondition"
+    },
+    {
+     "$ref": "#/$defs/AutomationAfterDateCondition"
+    }
+   ]
+  },
+  "AutomationDisableConditionKind": {
+   "enum": [
+    "afterRuns",
+    "afterDate"
+   ]
   },
   "AutomationEntry": {
    "type": "object",
@@ -1703,6 +1837,9 @@
     },
     "nextRunAt": {
      "type": "string"
+    },
+    "runCount": {
+     "type": "number"
     },
     "runs": {
      "type": "array",
@@ -1721,6 +1858,12 @@
        "remove",
        "run"
       ]
+     }
+    },
+    "customizations": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/PluginCustomization"
      }
     },
     "createdAt": {
@@ -2280,6 +2423,12 @@
     "config": {
      "type": "object",
      "additionalProperties": true
+    },
+    "customizations": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/ClientPluginCustomization"
+     }
     }
    },
    "additionalProperties": false
@@ -2432,6 +2581,92 @@
    ],
    "additionalProperties": false
   },
+  "BackgroundShellWork": {
+   "type": "object",
+   "properties": {
+    "kind": {
+     "const": "shell"
+    },
+    "command": {
+     "type": "string"
+    },
+    "terminal": {
+     "type": "string"
+    },
+    "id": {
+     "type": "string"
+    },
+    "label": {
+     "type": "string"
+    },
+    "startedAt": {
+     "type": "string"
+    },
+    "_meta": {
+     "type": "object",
+     "additionalProperties": true
+    }
+   },
+   "required": [
+    "kind",
+    "command",
+    "id",
+    "label",
+    "startedAt"
+   ],
+   "additionalProperties": false
+  },
+  "BackgroundSubagentWork": {
+   "type": "object",
+   "properties": {
+    "kind": {
+     "const": "subagent"
+    },
+    "chat": {
+     "type": "string"
+    },
+    "id": {
+     "type": "string"
+    },
+    "label": {
+     "type": "string"
+    },
+    "startedAt": {
+     "type": "string"
+    },
+    "_meta": {
+     "type": "object",
+     "additionalProperties": true
+    }
+   },
+   "required": [
+    "kind",
+    "chat",
+    "id",
+    "label",
+    "startedAt"
+   ],
+   "additionalProperties": false
+  },
+  "BackgroundWork": {
+   "discriminator": {
+    "propertyName": "kind"
+   },
+   "oneOf": [
+    {
+     "$ref": "#/$defs/BackgroundShellWork"
+    },
+    {
+     "$ref": "#/$defs/BackgroundSubagentWork"
+    }
+   ]
+  },
+  "BackgroundWorkKind": {
+   "enum": [
+    "shell",
+    "subagent"
+   ]
+  },
   "BaseParams": {
    "type": "object",
    "properties": {
@@ -2445,6 +2680,82 @@
    },
    "required": [
     "channel"
+   ],
+   "additionalProperties": false
+  },
+  "CanvasAction": {
+   "type": "object",
+   "properties": {
+    "type": {
+     "const": "canvas/stateChanged"
+    },
+    "canvas": {
+     "$ref": "#/$defs/CanvasState"
+    }
+   },
+   "required": [
+    "type",
+    "canvas"
+   ],
+   "additionalProperties": false
+  },
+  "CanvasReference": {
+   "type": "object",
+   "properties": {
+    "resource": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "resource"
+   ],
+   "additionalProperties": false
+  },
+  "CanvasState": {
+   "type": "object",
+   "properties": {
+    "instanceId": {
+     "type": "string"
+    },
+    "extensionId": {
+     "type": "string"
+    },
+    "extensionName": {
+     "type": "string"
+    },
+    "canvasId": {
+     "type": "string"
+    },
+    "title": {
+     "type": "string"
+    },
+    "status": {
+     "type": "string"
+    },
+    "url": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "instanceId",
+    "extensionId",
+    "canvasId"
+   ],
+   "additionalProperties": false
+  },
+  "CanvasStateChangedAction": {
+   "type": "object",
+   "properties": {
+    "type": {
+     "const": "canvas/stateChanged"
+    },
+    "canvas": {
+     "$ref": "#/$defs/CanvasState"
+    }
+   },
+   "required": [
+    "type",
+    "canvas"
    ],
    "additionalProperties": false
   },
@@ -2840,6 +3151,7 @@
     "status": {
      "enum": [
       "computing",
+      "recomputing",
       "ready",
       "error"
      ]
@@ -2869,6 +3181,7 @@
   "ChangesetStatus": {
    "enum": [
     "computing",
+    "recomputing",
     "ready",
     "error"
    ]
@@ -2882,6 +3195,7 @@
     "status": {
      "enum": [
       "computing",
+      "recomputing",
       "ready",
       "error"
      ]
@@ -2919,6 +3233,84 @@
     },
     "activity": {
      "type": "string"
+    }
+   },
+   "required": [
+    "type"
+   ],
+   "additionalProperties": false
+  },
+  "ChatBackgroundWorkRemovedAction": {
+   "type": "object",
+   "properties": {
+    "type": {
+     "const": "chat/backgroundWorkRemoved"
+    },
+    "id": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "type",
+    "id"
+   ],
+   "additionalProperties": false
+  },
+  "ChatBackgroundWorkSetAction": {
+   "type": "object",
+   "properties": {
+    "type": {
+     "const": "chat/backgroundWorkSet"
+    },
+    "work": {
+     "discriminator": {
+      "propertyName": "kind"
+     },
+     "oneOf": [
+      {
+       "$ref": "#/$defs/BackgroundShellWork"
+      },
+      {
+       "$ref": "#/$defs/BackgroundSubagentWork"
+      }
+     ]
+    }
+   },
+   "required": [
+    "type",
+    "work"
+   ],
+   "additionalProperties": false
+  },
+  "ChatCanvasesChangedAction": {
+   "type": "object",
+   "properties": {
+    "type": {
+     "const": "chat/canvasesChanged"
+    },
+    "canvases": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/CanvasReference"
+     }
+    }
+   },
+   "required": [
+    "type"
+   ],
+   "additionalProperties": false
+  },
+  "ChatChangesetsChangedAction": {
+   "type": "object",
+   "properties": {
+    "type": {
+     "const": "chat/changesetsChanged"
+    },
+    "changesets": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Changeset"
+     }
     }
    },
    "required": [
@@ -3580,6 +3972,104 @@
     "hidden"
    ]
   },
+  "ChatIsArchivedChangedAction": {
+   "type": "object",
+   "properties": {
+    "type": {
+     "const": "chat/isArchivedChanged"
+    },
+    "isArchived": {
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "type",
+    "isArchived"
+   ],
+   "additionalProperties": false
+  },
+  "ChatIsReadChangedAction": {
+   "type": "object",
+   "properties": {
+    "type": {
+     "const": "chat/isReadChanged"
+    },
+    "isRead": {
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "type",
+    "isRead"
+   ],
+   "additionalProperties": false
+  },
+  "ChatMovableChangedAction": {
+   "type": "object",
+   "properties": {
+    "type": {
+     "const": "chat/movableChanged"
+    },
+    "movable": {
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "type",
+    "movable"
+   ],
+   "additionalProperties": false
+  },
+  "ChatMoveDestination": {
+   "discriminator": {
+    "propertyName": "kind"
+   },
+   "oneOf": [
+    {
+     "$ref": "#/$defs/ChatMoveToSessionDestination"
+    },
+    {
+     "$ref": "#/$defs/ChatMoveToNewSessionDestination"
+    }
+   ]
+  },
+  "ChatMoveDestinationKind": {
+   "enum": [
+    "session",
+    "newSession"
+   ]
+  },
+  "ChatMoveToNewSessionDestination": {
+   "type": "object",
+   "properties": {
+    "kind": {
+     "const": "newSession"
+    }
+   },
+   "required": [
+    "kind"
+   ],
+   "additionalProperties": false
+  },
+  "ChatMoveToSessionDestination": {
+   "type": "object",
+   "properties": {
+    "kind": {
+     "const": "session"
+    },
+    "session": {
+     "type": "string"
+    },
+    "after": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "kind",
+    "session"
+   ],
+   "additionalProperties": false
+  },
   "ChatOrigin": {
    "discriminator": {
     "propertyName": "kind"
@@ -3860,6 +4350,9 @@
     "modifiedAt": {
      "type": "string"
     },
+    "changes": {
+     "$ref": "#/$defs/ChangesSummary"
+    },
     "origin": {
      "discriminator": {
       "propertyName": "kind"
@@ -3942,6 +4435,9 @@
       }
      ]
     },
+    "movable": {
+     "type": "boolean"
+    },
     "interactivity": {
      "enum": [
       "full",
@@ -3953,6 +4449,34 @@
      "type": "array",
      "items": {
       "type": "string"
+     }
+    },
+    "changesets": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Changeset"
+     }
+    },
+    "backgroundWork": {
+     "type": "array",
+     "items": {
+      "discriminator": {
+       "propertyName": "kind"
+      },
+      "oneOf": [
+       {
+        "$ref": "#/$defs/BackgroundShellWork"
+       },
+       {
+        "$ref": "#/$defs/BackgroundSubagentWork"
+       }
+      ]
+     }
+    },
+    "canvases": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/CanvasReference"
      }
     },
     "turns": {
@@ -4018,6 +4542,9 @@
     "modifiedAt": {
      "type": "string"
     },
+    "changes": {
+     "$ref": "#/$defs/ChangesSummary"
+    },
     "origin": {
      "discriminator": {
       "propertyName": "kind"
@@ -4099,6 +4626,9 @@
        "additionalProperties": false
       }
      ]
+    },
+    "movable": {
+     "type": "boolean"
     },
     "interactivity": {
      "enum": [
@@ -4529,19 +5059,7 @@
      ]
     },
     "edits": {
-     "type": "object",
-     "properties": {
-      "items": {
-       "type": "array",
-       "items": {
-        "$ref": "#/$defs/FileEdit"
-       }
-      }
-     },
-     "required": [
-      "items"
-     ],
-     "additionalProperties": false
+     "$ref": "#/$defs/FileEditCollection"
     },
     "editable": {
      "type": "boolean"
@@ -4927,6 +5445,7 @@
    ],
    "additionalProperties": false
   },
+  "ClientCanvasAction": false,
   "ClientCapabilities": {
    "type": "object",
    "properties": {
@@ -5019,6 +5538,12 @@
     },
     {
      "$ref": "#/$defs/ChatDraftChangedAction"
+    },
+    {
+     "$ref": "#/$defs/ChatIsReadChangedAction"
+    },
+    {
+     "$ref": "#/$defs/ChatIsArchivedChangedAction"
     },
     {
      "$ref": "#/$defs/ChatInputAnswerChangedAction"
@@ -5339,6 +5864,9 @@
      "$ref": "#/$defs/SessionMcpServerStopRequestedAction"
     },
     {
+     "$ref": "#/$defs/SessionMcpServerBackgroundRequestedAction"
+    },
+    {
      "$ref": "#/$defs/SessionIsReadChangedAction"
     },
     {
@@ -5488,6 +6016,22 @@
       },
       "result": {
        "type": "null"
+      }
+     },
+     "required": [
+      "params",
+      "result"
+     ],
+     "additionalProperties": false
+    },
+    "moveChat": {
+     "type": "object",
+     "properties": {
+      "params": {
+       "$ref": "#/$defs/MoveChatParams"
+      },
+      "result": {
+       "$ref": "#/$defs/MoveChatResult"
       }
      },
      "required": [
@@ -5873,6 +6417,7 @@
     "createSession",
     "disposeSession",
     "createChat",
+    "moveChat",
     "disposeChat",
     "createTerminal",
     "disposeTerminal",
@@ -6044,6 +6589,12 @@
     },
     "items": {
      "$ref": "#/$defs/ConfigPropertySchema"
+    },
+    "minItems": {
+     "type": "number"
+    },
+    "maxItems": {
+     "type": "number"
     },
     "properties": {
      "type": "object",
@@ -6679,6 +7230,9 @@
        "$ref": "#/$defs/SessionChatUpdatedAction"
       },
       {
+       "$ref": "#/$defs/SessionChatsReorderedAction"
+      },
+      {
        "$ref": "#/$defs/SessionDefaultChatChangedAction"
       },
       {
@@ -6728,6 +7282,9 @@
       },
       {
        "$ref": "#/$defs/SessionMcpServerStopRequestedAction"
+      },
+      {
+       "$ref": "#/$defs/SessionMcpServerBackgroundRequestedAction"
       },
       {
        "$ref": "#/$defs/SessionIsReadChangedAction"
@@ -6815,6 +7372,24 @@
        "$ref": "#/$defs/ChatActivityChangedAction"
       },
       {
+       "$ref": "#/$defs/ChatBackgroundWorkSetAction"
+      },
+      {
+       "$ref": "#/$defs/ChatBackgroundWorkRemovedAction"
+      },
+      {
+       "$ref": "#/$defs/ChatMovableChangedAction"
+      },
+      {
+       "$ref": "#/$defs/ChatChangesetsChangedAction"
+      },
+      {
+       "$ref": "#/$defs/ChatCanvasesChangedAction"
+      },
+      {
+       "$ref": "#/$defs/CanvasStateChangedAction"
+      },
+      {
        "$ref": "#/$defs/ChatWorkingDirectorySetAction"
       },
       {
@@ -6837,6 +7412,12 @@
       },
       {
        "$ref": "#/$defs/ChatDraftChangedAction"
+      },
+      {
+       "$ref": "#/$defs/ChatIsReadChangedAction"
+      },
+      {
+       "$ref": "#/$defs/ChatIsArchivedChangedAction"
       },
       {
        "$ref": "#/$defs/ChatInputRequestedAction"
@@ -7111,50 +7692,58 @@
    "type": "object",
    "properties": {
     "before": {
-     "type": "object",
-     "properties": {
-      "uri": {
-       "type": "string"
-      },
-      "content": {
-       "$ref": "#/$defs/ContentRef"
-      }
-     },
-     "required": [
-      "uri",
-      "content"
-     ],
-     "additionalProperties": false
+     "$ref": "#/$defs/FileEditSide"
     },
     "after": {
-     "type": "object",
-     "properties": {
-      "uri": {
-       "type": "string"
-      },
-      "content": {
-       "$ref": "#/$defs/ContentRef"
-      }
-     },
-     "required": [
-      "uri",
-      "content"
-     ],
-     "additionalProperties": false
+     "$ref": "#/$defs/FileEditSide"
     },
     "diff": {
-     "type": "object",
-     "properties": {
-      "added": {
-       "type": "number"
-      },
-      "removed": {
-       "type": "number"
-      }
-     },
-     "additionalProperties": false
+     "$ref": "#/$defs/FileEditDiffStats"
     }
    },
+   "additionalProperties": false
+  },
+  "FileEditCollection": {
+   "type": "object",
+   "properties": {
+    "items": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/FileEdit"
+     }
+    }
+   },
+   "required": [
+    "items"
+   ],
+   "additionalProperties": false
+  },
+  "FileEditDiffStats": {
+   "type": "object",
+   "properties": {
+    "added": {
+     "type": "number"
+    },
+    "removed": {
+     "type": "number"
+    }
+   },
+   "additionalProperties": false
+  },
+  "FileEditSide": {
+   "type": "object",
+   "properties": {
+    "uri": {
+     "type": "string"
+    },
+    "content": {
+     "$ref": "#/$defs/ContentRef"
+    }
+   },
+   "required": [
+    "uri",
+    "content"
+   ],
    "additionalProperties": false
   },
   "ForkChatSource": {
@@ -7973,6 +8562,9 @@
    "properties": {
     "kind": {
      "const": "starting"
+    },
+    "blocking": {
+     "type": "boolean"
     }
    },
    "required": [
@@ -8336,6 +8928,48 @@
    ],
    "additionalProperties": false
   },
+  "MoveChatParams": {
+   "type": "object",
+   "properties": {
+    "channel": {
+     "type": "string"
+    },
+    "destination": {
+     "discriminator": {
+      "propertyName": "kind"
+     },
+     "oneOf": [
+      {
+       "$ref": "#/$defs/ChatMoveToSessionDestination"
+      },
+      {
+       "$ref": "#/$defs/ChatMoveToNewSessionDestination"
+      }
+     ]
+    },
+    "_meta": {
+     "type": "object",
+     "additionalProperties": true
+    }
+   },
+   "required": [
+    "channel",
+    "destination"
+   ],
+   "additionalProperties": false
+  },
+  "MoveChatResult": {
+   "type": "object",
+   "properties": {
+    "session": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "session"
+   ],
+   "additionalProperties": false
+  },
   "MultipleChatsCapability": {
    "type": "object",
    "properties": {
@@ -8457,6 +9091,9 @@
     "modifiedAt": {
      "type": "string"
     },
+    "changes": {
+     "$ref": "#/$defs/ChangesSummary"
+    },
     "origin": {
      "discriminator": {
       "propertyName": "kind"
@@ -8538,6 +9175,9 @@
        "additionalProperties": false
       }
      ]
+    },
+    "movable": {
+     "type": "boolean"
     },
     "interactivity": {
      "enum": [
@@ -9283,6 +9923,30 @@
       },
       "params": {
        "$ref": "#/$defs/CreateChatParams"
+      }
+     },
+     "required": [
+      "jsonrpc",
+      "id",
+      "method",
+      "params"
+     ],
+     "additionalProperties": false
+    },
+    {
+     "type": "object",
+     "properties": {
+      "jsonrpc": {
+       "const": "2.0"
+      },
+      "id": {
+       "type": "number"
+      },
+      "method": {
+       "const": "moveChat"
+      },
+      "params": {
+       "$ref": "#/$defs/MoveChatParams"
       }
      },
      "required": [
@@ -10226,6 +10890,26 @@
       },
       "result": {
        "type": "null"
+      }
+     },
+     "required": [
+      "jsonrpc",
+      "id",
+      "result"
+     ],
+     "additionalProperties": false
+    },
+    {
+     "type": "object",
+     "properties": {
+      "jsonrpc": {
+       "const": "2.0"
+      },
+      "id": {
+       "type": "number"
+      },
+      "result": {
+       "$ref": "#/$defs/MoveChatResult"
       }
      },
      "required": [
@@ -11883,6 +12567,22 @@
     }
    ]
   },
+  "ServerCanvasAction": {
+   "type": "object",
+   "properties": {
+    "type": {
+     "const": "canvas/stateChanged"
+    },
+    "canvas": {
+     "$ref": "#/$defs/CanvasState"
+    }
+   },
+   "required": [
+    "type",
+    "canvas"
+   ],
+   "additionalProperties": false
+  },
   "ServerChangesetAction": {
    "discriminator": {
     "propertyName": "type"
@@ -11945,6 +12645,21 @@
     },
     {
      "$ref": "#/$defs/ChatActivityChangedAction"
+    },
+    {
+     "$ref": "#/$defs/ChatBackgroundWorkSetAction"
+    },
+    {
+     "$ref": "#/$defs/ChatBackgroundWorkRemovedAction"
+    },
+    {
+     "$ref": "#/$defs/ChatMovableChangedAction"
+    },
+    {
+     "$ref": "#/$defs/ChatChangesetsChangedAction"
+    },
+    {
+     "$ref": "#/$defs/ChatCanvasesChangedAction"
     },
     {
      "$ref": "#/$defs/ChatUsageAction"
@@ -12328,6 +13043,9 @@
      "$ref": "#/$defs/SessionChatUpdatedAction"
     },
     {
+     "$ref": "#/$defs/SessionChatsReorderedAction"
+    },
+    {
      "$ref": "#/$defs/SessionDefaultChatChangedAction"
     },
     {
@@ -12408,6 +13126,9 @@
      "$ref": "#/$defs/SessionChatUpdatedAction"
     },
     {
+     "$ref": "#/$defs/SessionChatsReorderedAction"
+    },
+    {
      "$ref": "#/$defs/SessionDefaultChatChangedAction"
     },
     {
@@ -12457,6 +13178,9 @@
     },
     {
      "$ref": "#/$defs/SessionMcpServerStopRequestedAction"
+    },
+    {
+     "$ref": "#/$defs/SessionMcpServerBackgroundRequestedAction"
     },
     {
      "$ref": "#/$defs/SessionIsReadChangedAction"
@@ -12643,6 +13367,143 @@
    ],
    "additionalProperties": false
   },
+  "SessionChatsReorderedAction": {
+   "type": "object",
+   "properties": {
+    "type": {
+     "const": "session/chatsReordered"
+    },
+    "chats": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    }
+   },
+   "required": [
+    "type",
+    "chats"
+   ],
+   "additionalProperties": false
+  },
+  "SessionChatSummary": {
+   "type": "object",
+   "properties": {
+    "resource": {
+     "type": "string"
+    },
+    "title": {
+     "type": "string"
+    },
+    "origin": {
+     "discriminator": {
+      "propertyName": "kind"
+     },
+     "oneOf": [
+      {
+       "type": "object",
+       "properties": {
+        "kind": {
+         "const": "user"
+        }
+       },
+       "required": [
+        "kind"
+       ],
+       "additionalProperties": false
+      },
+      {
+       "type": "object",
+       "properties": {
+        "kind": {
+         "const": "fork"
+        },
+        "chat": {
+         "type": "string"
+        },
+        "turnId": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "kind",
+        "chat",
+        "turnId"
+       ],
+       "additionalProperties": false
+      },
+      {
+       "type": "object",
+       "properties": {
+        "kind": {
+         "const": "sideChat"
+        },
+        "chat": {
+         "type": "string"
+        },
+        "turnId": {
+         "type": "string"
+        },
+        "selection": {
+         "$ref": "#/$defs/SideChatSelection"
+        }
+       },
+       "required": [
+        "kind",
+        "chat",
+        "turnId"
+       ],
+       "additionalProperties": false
+      },
+      {
+       "type": "object",
+       "properties": {
+        "kind": {
+         "const": "tool"
+        },
+        "chat": {
+         "type": "string"
+        },
+        "toolCallId": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "kind",
+        "chat",
+        "toolCallId"
+       ],
+       "additionalProperties": false
+      }
+     ]
+    },
+    "interactivity": {
+     "enum": [
+      "full",
+      "read-only",
+      "hidden"
+     ]
+    },
+    "status": {
+     "enum": [
+      1,
+      2,
+      8,
+      24,
+      32,
+      64
+     ]
+    },
+    "changes": {
+     "$ref": "#/$defs/ChangesSummary"
+    }
+   },
+   "required": [
+    "resource",
+    "title"
+   ],
+   "additionalProperties": false
+  },
   "SessionChatUpdatedAction": {
    "type": "object",
    "properties": {
@@ -12795,6 +13656,12 @@
     },
     "items": {
      "$ref": "#/$defs/ConfigPropertySchema"
+    },
+    "minItems": {
+     "type": "number"
+    },
+    "maxItems": {
+     "type": "number"
     },
     "properties": {
      "type": "object",
@@ -13179,6 +14046,22 @@
     "ready",
     "failed"
    ]
+  },
+  "SessionMcpServerBackgroundRequestedAction": {
+   "type": "object",
+   "properties": {
+    "type": {
+     "const": "session/mcpServerBackgroundRequested"
+    },
+    "id": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "type",
+    "id"
+   ],
+   "additionalProperties": false
   },
   "SessionMcpServerStartRequestedAction": {
    "type": "object",
@@ -13593,6 +14476,15 @@
      "type": "object",
      "additionalProperties": true
     },
+    "chats": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SessionChatSummary"
+     }
+    },
+    "defaultChat": {
+     "type": "string"
+    },
     "provider": {
      "type": "string"
     },
@@ -13970,6 +14862,9 @@
        "$ref": "#/$defs/ChatState"
       },
       {
+       "$ref": "#/$defs/CanvasState"
+      },
+      {
        "$ref": "#/$defs/AutomationState"
       },
       {
@@ -14021,6 +14916,9 @@
      "$ref": "#/$defs/SessionChatUpdatedAction"
     },
     {
+     "$ref": "#/$defs/SessionChatsReorderedAction"
+    },
+    {
      "$ref": "#/$defs/SessionDefaultChatChangedAction"
     },
     {
@@ -14070,6 +14968,9 @@
     },
     {
      "$ref": "#/$defs/SessionMcpServerStopRequestedAction"
+    },
+    {
+     "$ref": "#/$defs/SessionMcpServerBackgroundRequestedAction"
     },
     {
      "$ref": "#/$defs/SessionIsReadChangedAction"
@@ -14157,6 +15058,24 @@
      "$ref": "#/$defs/ChatActivityChangedAction"
     },
     {
+     "$ref": "#/$defs/ChatBackgroundWorkSetAction"
+    },
+    {
+     "$ref": "#/$defs/ChatBackgroundWorkRemovedAction"
+    },
+    {
+     "$ref": "#/$defs/ChatMovableChangedAction"
+    },
+    {
+     "$ref": "#/$defs/ChatChangesetsChangedAction"
+    },
+    {
+     "$ref": "#/$defs/ChatCanvasesChangedAction"
+    },
+    {
+     "$ref": "#/$defs/CanvasStateChangedAction"
+    },
+    {
      "$ref": "#/$defs/ChatWorkingDirectorySetAction"
     },
     {
@@ -14179,6 +15098,12 @@
     },
     {
      "$ref": "#/$defs/ChatDraftChangedAction"
+    },
+    {
+     "$ref": "#/$defs/ChatIsReadChangedAction"
+    },
+    {
+     "$ref": "#/$defs/ChatIsArchivedChangedAction"
     },
     {
      "$ref": "#/$defs/ChatInputRequestedAction"
@@ -15524,19 +16449,7 @@
      ]
     },
     "edits": {
-     "type": "object",
-     "properties": {
-      "items": {
-       "type": "array",
-       "items": {
-        "$ref": "#/$defs/FileEdit"
-       }
-      }
-     },
-     "required": [
-      "items"
-     ],
-     "additionalProperties": false
+     "$ref": "#/$defs/FileEditCollection"
     },
     "editable": {
      "type": "boolean"
@@ -16341,48 +17254,13 @@
      "const": "fileEdit"
     },
     "before": {
-     "type": "object",
-     "properties": {
-      "uri": {
-       "type": "string"
-      },
-      "content": {
-       "$ref": "#/$defs/ContentRef"
-      }
-     },
-     "required": [
-      "uri",
-      "content"
-     ],
-     "additionalProperties": false
+     "$ref": "#/$defs/FileEditSide"
     },
     "after": {
-     "type": "object",
-     "properties": {
-      "uri": {
-       "type": "string"
-      },
-      "content": {
-       "$ref": "#/$defs/ContentRef"
-      }
-     },
-     "required": [
-      "uri",
-      "content"
-     ],
-     "additionalProperties": false
+     "$ref": "#/$defs/FileEditSide"
     },
     "diff": {
-     "type": "object",
-     "properties": {
-      "added": {
-       "type": "number"
-      },
-      "removed": {
-       "type": "number"
-      }
-     },
-     "additionalProperties": false
+     "$ref": "#/$defs/FileEditDiffStats"
     }
    },
    "required": [

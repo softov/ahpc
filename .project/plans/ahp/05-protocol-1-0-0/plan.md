@@ -48,7 +48,7 @@ ahpc installs protocol 1.0.0 and offers it first, so against ahpd it runs at 1.0
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - Take 1.0.0 and offer it first](task-01-take-1-0-0.md) | todo | - |
+| [01 - Take 1.0.0 and offer it first](task-01-take-1-0-0.md) | implemented | - |
 
 ## Risks and tradeoffs
 

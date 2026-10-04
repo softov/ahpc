@@ -53,7 +53,7 @@
     "wire": "node tools/validate.mjs"
   },
   "dependencies": {
-    "@microsoft/agent-host-protocol": "^0.9.0",
+    "@microsoft/agent-host-protocol": "^1.0.0",
     "@textui/chat": "^0.8.0",
     "@textui/core": "^0.8.0",
     "@textui/terminal": "^0.8.0",

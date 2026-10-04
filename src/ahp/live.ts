@@ -9,7 +9,7 @@ import type {
   Agent, Answer, Automation, AutomationRun, Changeset, ChangesetOperation, ChangesetOperationTarget, Completion, ConfigProperty, ContentRef, Customization, CustomizationKind,
   TerminalRow, TerminalState,
   FileContent, FileEdit, McpState, PendingInput, QueuedMessage, Question, QuestionKind,
-  ModelRow, ModelSelection, ResponsePart, SessionConfig, SessionDetail, SessionSummary, SessionUri, ToolCall,
+  ModelRow, ModelSelection, ResponsePart, SessionConfig, SessionDetail, SessionSummary, SessionUri, ToolCall, ChatOrigin, ChatState,
   ToolCallStatus, Turn, TurnUsage,
 } from './types.js';
 import { SessionFlag } from './types.js';
@@ -36,7 +36,7 @@ import { SessionFlag } from './types.js';
  * npm install @microsoft/agent-host-protocol
  * ```
  *
- * Written against protocol 0.9.0, from the package's own `src/types/`. What it
+ * Written against protocol 1.0.0, from the package's own `src/types/`. What it
  * speaks is the subset this client needs: `initialize`, `listSessions`,
  * `subscribe`, `createSession`, `disposeSession`, `resolveSessionConfig`, and
  * the seven client-dispatchable actions that drive and answer a turn.
@@ -189,22 +189,25 @@ function isRpcRefusal(error: unknown): boolean {
  * Versions to offer at `initialize`, most preferred first.
  *
  * A host picks the highest entry it also speaks, so this is a preference
- * rather than a floor. `0.9.0` is the newest published and the version the
- * package below is built from; the two behind it are what an older host
- * answers with, and every command used here is stable across all three.
+ * rather than a floor. `1.0.0` is the newest published and the version the
+ * package below is built from; the three behind it are what an older host
+ * answers with, and every command used here is stable across all four.
  *
- * `1.0.0` was here for two weeks, first. VS Code's host vendors the protocol
- * from its repository and for that long carried a `1.0.0` that never reached
- * the repository's `main`; it accepted `^1.0.0` and refused every `0.x` with
- * `-32005`, so offering it was the only way in. It has since resynced to the
- * published `0.9.0`. Offering a version the installed types do not describe is
- * the wrong kind of forward-compatibility - a host that took it could answer
- * in a shape nothing here has heard of - so it came out the day no host
- * needed it.
+ * `1.0.0` was offered for two weeks and then withdrawn, and is back for a
+ * better reason. The first one was never published: VS Code's host vendors
+ * the protocol from its repository and carried a `1.0.0` that had not reached
+ * the repository's `main`, so offering a version the installed types did not
+ * describe was the wrong kind of forward-compatibility. `1.0.0` is published
+ * now and the package is built from it, so the types and the offer agree.
+ *
+ * What `1.0.0` adds is not drawn yet - a chat's own read and archived bits,
+ * `moveChat`, background work. None of it changes what is sent here, so
+ * answering at `1.0.0` costs a host nothing and is what the newer host is
+ * for.
  *
  * This list is load-bearing, because there is no fallback behind it.
  */
-const VERSIONS = ['0.9.0', '0.8.0', '0.7.0'];
+const VERSIONS = ['1.0.0', '0.9.0', '0.8.0', '0.7.0'];
 
 const ROOT = 'ahp-root://';
 const AUTOMATIONS = 'ahp-automations://';
@@ -1009,6 +1012,35 @@ function summary(value: unknown): SessionSummary {
       }
       : {}),
   };
+}
+
+/**
+ * How a chat says it came into existence, and nothing else.
+ *
+ * A kind this client does not know is left off rather than drawn as one it
+ * does: `ChatOriginKind` is declared `@nonexhaustive`, so a host adding a kind
+ * is expected, and a reader that guessed would name a chat's origin wrongly.
+ * The same rule the session summary keeps.
+ */
+function originOf(value: unknown): ChatOrigin | undefined {
+  const found = bag(value);
+  const kind = str(found.kind);
+  if (kind === 'user') return { kind: 'user' };
+  if (kind === 'fork' || kind === 'sideChat') {
+    const chat = str(found.chat);
+    const turnId = str(found.turnId);
+    // Half an origin identifies nothing, and the turn it forked at is the
+    // half that cannot be guessed.
+    if (!chat || !turnId) return undefined;
+    return { kind, chat, turnId };
+  }
+  if (kind === 'tool') {
+    const chat = str(found.chat);
+    const toolCallId = str(found.toolCallId);
+    if (!chat || !toolCallId) return undefined;
+    return { kind: 'tool', chat, toolCallId };
+  }
+  return undefined;
 }
 
 /** One run, flattened out of its lifecycle and its origin. */
@@ -2616,6 +2648,31 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
       });
       return chat;
     },
+
+    /*
+     * The chat's own channel, read without a session.
+     *
+     * A chat is addressed by its URI and the host carries its state there, so
+     * the read is the same read `subscribe` does and the session is simply not
+     * asked for. A chat a tool spawned is the case that needs it: its session
+     * is real, but a reader who was handed the chat URI has not opened that
+     * session and must not have to.
+     */
+    chat: async (chatUri): Promise<ChatState> => {
+      const state = bag(await snapshotOf(chatUri));
+      const all = transcript(state);
+      const active = all.find((found) => found.state === 'running');
+      return {
+        resource: str(state.resource) ?? '',
+        title: str(state.title) ?? 'Untitled chat',
+        status: typeof state.status === 'number' ? state.status : SessionFlag.Idle,
+        ...(originOf(state.origin) ? { origin: originOf(state.origin) as ChatOrigin } : {}),
+        turns: all.filter((found) => found !== active),
+        ...(active ? { active } : {}),
+      };
+    },
+
+    loadOlderChatTurns: (chatUri) => loadOlder(chatUri, chatUri),
 
     disposeChat: async (chat) => {
       await client.request('disposeChat', { channel: chat });

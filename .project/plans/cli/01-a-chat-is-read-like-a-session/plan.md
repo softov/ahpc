@@ -56,8 +56,8 @@ any command -> RpcError -> Fault(`<message> (<code>)`) -> stderr, exit 1
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - chat show and chat history](task-01-chat-show-and-history.md) | todo | - |
-| [02 - A refusal is a sentence](task-02-a-refusal-is-a-sentence.md) | todo | - |
+| [01 - chat show and chat history](task-01-chat-show-and-history.md) | implemented | - |
+| [02 - A refusal is a sentence](task-02-a-refusal-is-a-sentence.md) | implemented | - |
 
 ## Risks and tradeoffs
 

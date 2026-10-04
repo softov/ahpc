@@ -4,7 +4,7 @@
 [![npm](https://img.shields.io/npm/v/%40softov%2Fahpc)](https://www.npmjs.com/package/@softov/ahpc)
 ![license MIT](https://img.shields.io/badge/license-MIT-blue)
 ![node >=22](https://img.shields.io/badge/node-%3E%3D22-5fa04e)
-![Agent Host Protocol 0.9.0](https://img.shields.io/badge/AHP-0.9.0-0b7285)
+![Agent Host Protocol 1.0.0](https://img.shields.io/badge/AHP-1.0.0-0b7285)
 ![built with TextUI](https://img.shields.io/badge/built%20with-TextUI-7048e8)
 
 A terminal client for the [Agent Host Protocol](https://microsoft.github.io/agent-host-protocol/).
@@ -318,6 +318,7 @@ Precedence: a flag overrides an environment variable, which overrides the file.
 | `AHPC_TOKEN_<RESOURCE>` | A token for one protected resource |
 | `--config-file` | Read this file instead |
 | `--no-update-check`, `updateCheck: false` | Never ask npm whether a newer version exists. See below |
+| `AHPC_DEBUG=1` | Print the stack under a refusal, for a bug report |
 
 `ahpc config` prints the file path and the values in force. It works without a host, which is what you need when the host is the problem.
 

@@ -19,7 +19,7 @@ import type { Group } from '../mcp/tools.js';
 import { SERVER } from '../mcp/serve.js';
 import { stdio } from '../mcp/stdio.js';
 import { serve as serveHttp } from '../mcp/http.js';
-import type { Answer, ModelSelection, SessionUri, Turn } from '../ahp/types.js';
+import type { Answer, ChatOrigin, ModelSelection, SessionUri, Turn } from '../ahp/types.js';
 import { detectLocale } from '../i18n/locale.js';
 
 export const HELP = `ahpc - drive an agent host from a shell
@@ -58,6 +58,8 @@ Answering
 Chats
   chat list <uri>              the conversations in a session         [--json]
   chat new <uri> [text]        another one beside it
+  chat show <chatUri>          what the host says about one  [--full] [--json]
+  chat history <chatUri>       its turns               [--all] [--full] [--json]
   chat rm <chatUri>            close one
 
 The harness
@@ -323,6 +325,25 @@ const snapshot = async (host: HostConnection, uri: SessionUri): Promise<Extract<
   const event = await until(host, uri, (e) => e.type === 'snapshot', { timeoutSeconds: 30 });
   return event?.type === 'snapshot' ? event : undefined;
 };
+
+/**
+ * A conversation, as `session history` and `chat history` both print it.
+ *
+ * Shared rather than repeated, because the two answer the same question about
+ * two things that are the same kind of thing - and a reader who had learned to
+ * scan one would have to learn the other, and the two would drift the way two
+ * copies of a format always do.
+ */
+function printTurns(turns: Turn[], wants: boolean, full: boolean): number {
+  if (wants || full) { json(turns); return 0; }
+  for (const turn of turns) {
+    line(`${turn.role === 'user' ? '›' : '‹'} ${turn.role}  ${ago(turn.at)}  ${turn.state}`);
+    const text = turn.role === 'user' ? (turn.message ?? '') : spoken(turn);
+    if (text) line(`  ${text.replace(/\n/g, '\n  ')}`);
+    line();
+  }
+  return 0;
+}
 
 /**
  * One command, and then the process is done.
@@ -787,7 +808,21 @@ export async function cli(command: string, rest: string[]): Promise<number> {
      * the act may already have done something before it was refused.
      */
     const refusal = authRequiredOf(error);
-    if (refusal === null) throw error;
+    if (refusal === null) {
+      /*
+       * Every other refusal is the host saying no, and it is said the same way:
+       * its own words, with the code beside them. The code is the half a bug
+       * report needs and the half nobody remembers, and without this a refusal
+       * reaches the top as an `RpcError` and prints four lines of stack.
+       *
+       * An error with no code is not the host refusing anything - it is this
+       * client going wrong - and keeps its stack, which is what tells the two
+       * apart once there is no stack.
+       */
+      const code = (error as { code?: unknown } | null)?.code;
+      if (typeof code !== 'number') throw error;
+      throw new Fault(`${error instanceof Error ? error.message : String(error)} (${code})`);
+    }
     const one = askFor(refusal);
     throw new Fault(one === null ? failureWords(error) : needsToken(one.resource, one.name));
   }
@@ -898,15 +933,7 @@ async function sessions(host: HostConnection, args: Args, wants: boolean): Promi
       }
       const shot = await snapshot(host, uri);
       if (!shot) throw new Fault('The host sent no snapshot for that session.');
-      const all = [...shot.turns, ...(shot.active ? [shot.active] : [])];
-      if (wants || args.has('--full')) { json(all); return 0; }
-      for (const turn of all) {
-        line(`${turn.role === 'user' ? '›' : '‹'} ${turn.role}  ${ago(turn.at)}  ${turn.state}`);
-        const text = turn.role === 'user' ? (turn.message ?? '') : spoken(turn);
-        if (text) line(`  ${text.replace(/\n/g, '\n  ')}`);
-        line();
-      }
-      return 0;
+      return printTurns([...shot.turns, ...(shot.active ? [shot.active] : [])], wants, args.has('--full'));
     }
     case 'customizations': {
       const found = await host.customizations(uri);
@@ -1045,7 +1072,59 @@ async function chats(host: HostConnection, args: Args, wants: boolean): Promise<
     return 0;
   }
   if (verb === 'rm') { await host.disposeChat(uri); line(`Closed ${uri}.`); return 0; }
+
+  /*
+   * A chat, read the way a session is read.
+   *
+   * These two take a *chat* URI where `list` above takes a session's, and that
+   * is the difference between the questions: `list` asks what a session holds,
+   * and these ask about one conversation. A subagent's chat is the reason the
+   * split matters - nobody opened the session it hangs off, and a reader handed
+   * the chat URI must not have to go looking for a session first.
+   */
+  if (verb === 'show' || verb === 'history') {
+    // The same bargain as `session history`, asked of the chat's own channel
+    // rather than a session's: bounded, and read again afterwards because what
+    // was fetched arrives on the channel rather than in a return value.
+    if (verb === 'history' && args.has('--all')) {
+      for (let page = 0; page < PAGES; page += 1) {
+        if (!await host.loadOlderChatTurns(uri)) break;
+      }
+    }
+    const shot = await host.chat(uri);
+    /*
+     * A host that answered with something that is not a chat state.
+     *
+     * Reported rather than printed as an empty row, because a row of blanks and
+     * a chat with nothing in it look identical and only one of them is true.
+     */
+    if (shot.resource === '') throw new Fault('The host sent no chat state for that chat.');
+    const all = [...shot.turns, ...(shot.active ? [shot.active] : [])];
+
+    if (verb === 'show') {
+      if (wants || args.has('--full')) { json(shot); return 0; }
+      table([
+        ['Chat', shot.resource],
+        ['Title', shot.title],
+        ['Status', mark(shot.status)],
+        ['Origin', originLine(shot.origin)],
+        ['Turns', String(all.length)],
+      ].filter(([, value]) => value !== ''));
+      return 0;
+    }
+    return printTurns(all, wants, args.has('--full'));
+  }
   throw new Fault(`No 'chat ${verb}'. Try 'ahpc help'.`);
+}
+
+/** A chat's origin, as a row a person can read. */
+function originLine(origin: ChatOrigin | undefined): string {
+  if (!origin) return '';
+  if (origin.kind === 'user') return 'user';
+  // For every other kind the chat it came from is what makes this one
+  // identifiable, and the turn or the call is what makes that chat findable.
+  if (origin.kind === 'tool') return `tool  ${origin.chat}  ${origin.toolCallId}`;
+  return `${origin.kind}  ${origin.chat}  ${origin.turnId}`;
 }
 
 /**

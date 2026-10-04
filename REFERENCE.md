@@ -26,6 +26,13 @@ how the gap is closed here: a strict JSON Schema generated from the package's
 own declarations, `npm run wire -- <capture>` over a recording, and
 `test/conformance.test.ts` over the frames a run just produced.
 
+A chat is read from its own channel, without a session around it, so the
+`ChatState` the `specification/chat-channel` page above describes is what
+`ahpc chat show` prints - the `origin` in particular, which is how a chat a
+tool spawned names the chat and the tool call that made it. `ChatState` and
+`ChatOrigin` are field by field in the package's own declarations, which is
+where `src/ahp/types.ts` takes them from.
+
 ## The reference host
 
 VS Code is the other implementation of this protocol, and the only one to check

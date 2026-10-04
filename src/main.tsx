@@ -52,14 +52,20 @@ else if (first !== undefined) {
   }
   catch (error) {
     // A `Fault` is a sentence written for the person who typed the command;
-    // anything else is this client going wrong, and hiding its stack would
-    // make that indistinguishable from the first kind.
+    // anything else is this client going wrong.
     if (error instanceof Fault) {
       process.stderr.write(`${error.message}\n`);
       process.exitCode = 1;
     }
     else {
-      process.stderr.write(`${error instanceof Error ? error.stack ?? error.message : String(error)}\n`);
+      /*
+       * Anything reaching here is this client going wrong rather than the host
+       * refusing, so what a person gets is the sentence and the stack is kept
+       * for a bug report: `AHPC_DEBUG=1 ahpc …` prints both.
+       */
+      const said = error instanceof Error ? error.message : String(error);
+      const stack = process.env.AHPC_DEBUG === '1' && error instanceof Error ? error.stack : undefined;
+      process.stderr.write(`${stack ?? said}\n`);
       process.exitCode = 1;
     }
   }

@@ -435,6 +435,41 @@ export type ChatSource =
   | { kind: 'fork'; chat: string; turnId: string }
   | { kind: 'sideChat'; chat: string; turnId: string };
 
+/**
+ * How a chat came into existence, as the host now reports it.
+ *
+ * The protocol's own `ChatOrigin`, read rather than reduced to what a person
+ * typed: a chat a person opened says `user` and nothing else, while a chat a
+ * tool spawned names the chat it came from and the call that spawned it - which
+ * is the whole of what identifies a conversation nobody typed into, and the
+ * only way back to the one that did.
+ */
+export type ChatOrigin =
+  | { kind: 'user' }
+  | { kind: 'fork'; chat: string; turnId: string }
+  | { kind: 'sideChat'; chat: string; turnId: string }
+  | { kind: 'tool'; chat: string; toolCallId: string };
+
+/**
+ * One chat, read on its own.
+ *
+ * A chat has a channel carrying it, so nothing here needs a session - which is
+ * the point: a subagent's chat has a session somewhere, but a person reading
+ * it has never opened that session and has no reason to.
+ */
+export interface ChatState {
+  resource: string;
+  title: string;
+  /** The `SessionStatus` bitset, as a number, exactly as a session row carries it. */
+  status: number;
+  /** What started it. Absent where the host reported no origin at all. */
+  origin?: ChatOrigin;
+  /** The turns already loaded, oldest first. How many is the host's business. */
+  turns: Turn[];
+  /** The turn running now. Not in `turns`, and only while one is. */
+  active?: Turn;
+}
+
 export interface ModelSelection {
   id: string;
   /** Answers by property key, in the host's own vocabulary. */

@@ -1,12 +1,12 @@
 {
   "version": "5",
   "specifiers": {
-    "npm:@microsoft/agent-host-protocol@0.9": "0.9.0",
-    "npm:@textui/chat@~0.6.1": "0.6.1",
-    "npm:@textui/core@~0.6.1": "0.6.1",
-    "npm:@textui/terminal@~0.6.1": "0.6.1",
-    "npm:@textui/testing@~0.6.1": "0.6.1",
-    "npm:@textui/widgets@~0.6.1": "0.6.1",
+    "npm:@microsoft/agent-host-protocol@1": "1.0.0",
+    "npm:@textui/chat@0.8": "0.8.0",
+    "npm:@textui/core@0.8": "0.8.0",
+    "npm:@textui/terminal@0.8": "0.8.0",
+    "npm:@textui/testing@0.8": "0.8.0",
+    "npm:@textui/widgets@0.8": "0.8.0",
     "npm:@types/node@^22.10.2": "22.20.3",
     "npm:ajv-formats@^3.0.1": "3.0.1_ajv@8.20.0",
     "npm:ajv@^8.17.1": "8.20.0",
@@ -147,8 +147,8 @@
     "@jridgewell/sourcemap-codec@1.6.0": {
       "integrity": "sha512-T7jf+5zgsZHwNJ4lvQ7/aezbyk0nNX+zJVWpmHA7VYsEx7a7qr5Rg5IbtJFqkgze5Y2sruq1RUY8Q837Od7iFw=="
     },
-    "@microsoft/agent-host-protocol@0.9.0": {
-      "integrity": "sha512-XY6zOqLSqlNianiWbEpZkzKRB2AKwcDPk9yAbp+afxyxhWzTfpJKy+03T5rIipJDnqf45rXiJ5JV/dzUA8JHLw=="
+    "@microsoft/agent-host-protocol@1.0.0": {
+      "integrity": "sha512-swjikGoqZ/bv3Mn4vkkLzwpmS/j9tV7Aas7ruD2a/R3KVsUlokwCJNSET57mdsmZLMnrawDaCr/ctufbpjE4iA=="
     },
     "@napi-rs/lzma-linux-x64-gnu@1.5.1": {
       "integrity": "sha512-oTXEIha4SsuXdTA4Iyskj0kpdx2yVXdhd75c2v3xGrHFfVMsbhTPZU/nMPL4sWKo4pBHm3aucLaqGlF696dTyQ==",
@@ -280,32 +280,32 @@
       "os": ["win32"],
       "cpu": ["x64"]
     },
-    "@textui/chat@0.6.1": {
-      "integrity": "sha512-9aPpB7KVazK+Y1i0xuUcAYF3EUX0lzeF3pSX6aQbzAPYd79iNYSohi+nhZCEw92a3/FzRDaBuO7CgVaGw8iTHQ==",
+    "@textui/chat@0.8.0": {
+      "integrity": "sha512-buD2ph2ntcnu58V0CT9OczkTsvQVu5YUAr/QMmKm4qCbK94gMAVNnNpRg+gEFeCGzKvIMcxYVBUh/900i7/ikA==",
       "dependencies": [
         "@textui/core",
         "@textui/widgets"
       ]
     },
-    "@textui/core@0.6.1": {
-      "integrity": "sha512-FuBY63CU7oJKE75Q/gBu8TBd4n1RfCOo13W/vGTStdpcTbfdebiUgVHM/KgO1UHAj99SR9K36Y4HfTMKaD5B3A=="
+    "@textui/core@0.8.0": {
+      "integrity": "sha512-TJ303XaUi2wcVMYOKqi7x6QrkhlamPTEAw0clPzh0qb1/qJJ00et+ac0//9NxlmO7x/MkNufvOfdWmWYZwc9yQ=="
     },
-    "@textui/terminal@0.6.1": {
-      "integrity": "sha512-VfMphbc8SDGIuVR7puZ6YXXRWRtFDNc530xRskHOJXwGWoyyDQKXMzUazkQiIHLh9AqzxeWCY0EPsv75dQEQ5A==",
+    "@textui/terminal@0.8.0": {
+      "integrity": "sha512-k2vFeFnKFSqEFN1VIDSRuvsUQ1j9GBcNlZkmFKBpTJFgIAa+zMaciYViSLYp6PUbpAZiMuwyE4FtVm9pm74F0A==",
       "dependencies": [
         "@textui/core"
       ]
     },
-    "@textui/testing@0.6.1": {
-      "integrity": "sha512-Cg7Dgei/lhgJbnsW1GWNVCmS1cW2W0cUKu0zTeBFxl20S6siEVERssw5HuJP1XlCpbpDEZs0jQaLzeDJb18+3w==",
+    "@textui/testing@0.8.0": {
+      "integrity": "sha512-KapHXFuqsVssk47KK39ukjEXzNZe4KgjP9JrPmutN2wTzY7BCU5ncrsjDfGhMGgCB61uGTTKK9ZQsk9QLkzDRw==",
       "dependencies": [
         "@textui/core",
         "@textui/terminal",
         "@textui/widgets"
       ]
     },
-    "@textui/widgets@0.6.1": {
-      "integrity": "sha512-bRUHTHn1r86gw0JOVSU8DC0o/+oRQ9Cc82uhjTOm9vD0BkDoO6BY+oi+CvIBGOEu6KkBxaNGVm9kS4uBFz+zJQ==",
+    "@textui/widgets@0.8.0": {
+      "integrity": "sha512-NF6DfzFwSugRbxYJmTWtE1kUuyQ9kNF6EnjYcwktcEkPvLDPjEJuKPPuNpu/8N+hGXASTEen2sMo8GS/+NznZw==",
       "dependencies": [
         "@textui/core"
       ]
@@ -701,12 +701,12 @@
   "workspace": {
     "packageJson": {
       "dependencies": [
-        "npm:@microsoft/agent-host-protocol@0.9",
-        "npm:@textui/chat@~0.6.1",
-        "npm:@textui/core@~0.6.1",
-        "npm:@textui/terminal@~0.6.1",
-        "npm:@textui/testing@~0.6.1",
-        "npm:@textui/widgets@~0.6.1",
+        "npm:@microsoft/agent-host-protocol@1",
+        "npm:@textui/chat@0.8",
+        "npm:@textui/core@0.8",
+        "npm:@textui/terminal@0.8",
+        "npm:@textui/testing@0.8",
+        "npm:@textui/widgets@0.8",
         "npm:@types/node@^22.10.2",
         "npm:ajv-formats@^3.0.1",
         "npm:ajv@^8.17.1",

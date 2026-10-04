@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { HostConnection, HostEvent } from './connection.js';
 import type {
-  Agent, Answer, Automation, Changeset, ChangesetOperation, ChangesetScope, ChatInputRequest, ContentRef, Customization, FileContent, FileEdit,
+  Agent, Answer, Automation, Changeset, ChangesetOperation, ChangesetScope, ChatInputRequest, ChatOrigin, ChatState, ContentRef, Customization, FileContent, FileEdit,
   ModelRow, ModelSelection, PendingInput, QueuedMessage, ResourceEntry, ResponsePart, SessionConfig, SessionDetail, SessionSummary,
   SessionUri, TerminalState, ToolCall, Turn,
 } from './types.js';
@@ -282,7 +282,7 @@ export function fakeHost(): FakeHost {
    * session where the two are the same thing. A second chat is its own
    * conversation with nothing in it, which is what a second chat is.
    */
-  const extra = new Map<string, { session: SessionUri; title: string; turns: Turn[]; watchers: Set<(event: HostEvent) => void> }>();
+  const extra = new Map<string, { session: SessionUri; title: string; origin?: ChatOrigin; turns: Turn[]; watchers: Set<(event: HostEvent) => void> }>();
   /** The scripted shells, by terminal URI. */
   const shells = new Map<string, Shell>();
   const shellState = (uri: string, held: Shell): TerminalState => ({
@@ -313,6 +313,21 @@ export function fakeHost(): FakeHost {
       ...(own ? [{ resource: own, title: summaries.get(uri)?.title ?? 'Chat' }] : []),
       ...[...extra].filter(([, held]) => held.session === uri).map(([resource, held]) => ({ resource, title: held.title })),
     ];
+  };
+
+  /**
+   * The session a chat belongs to, and nothing for a chat this host has not got.
+   *
+   * The two are stored under different keys - a session's own conversation
+   * under the session, and every other under its chat URI - so anything handed a
+   * chat URI has to walk back to the session to find the turns. Asking for them
+   * by chat URI alone is what made a fork copy nothing.
+   */
+  const sessionOfChat = (chat: string): SessionUri | undefined => {
+    const held = extra.get(chat);
+    if (held) return held.session;
+    for (const [session, own] of chats) if (own === chat) return session;
+    return undefined;
   };
 
   /**
@@ -1622,6 +1637,17 @@ export function fakeHost(): FakeHost {
     },
 
     disposeSession: async (uri) => {
+      /*
+       * Said rather than swallowed.
+       *
+       * A real host answers `-32001` for a session it does not have, and the
+       * silence that used to stand here reported a close that did not take: the
+       * session was already gone, and a person who typed `session rm` on a
+       * mistyped URI was told it was disposed.
+       */
+      if (!summaries.has(uri)) {
+        throw Object.assign(new Error(`No session at ${uri}`), { code: -32001 });
+      }
       summaries.delete(uri);
       moved();
       turns.delete(uri);
@@ -1767,13 +1793,16 @@ export function fakeHost(): FakeHost {
       // side chat carries the context without copying it into what a person
       // reads. A fixture that treated them alike would let a screen ship that
       // could not tell them apart either.
-      const from = source === undefined ? [] : (turns.get(source.chat as SessionUri) ?? extra.get(source.chat)?.turns ?? []);
+      const from = source === undefined ? [] : (turns.get(sessionOfChat(source.chat) ?? '') ?? extra.get(source.chat)?.turns ?? []);
       const carried = source?.kind === 'fork'
         ? [...from.slice(0, Math.max(1, from.findIndex((one) => one.id === source.turnId) + 1))]
         : [];
       extra.set(chat, {
         session: uri,
         title: source?.kind === 'sideChat' ? 'Side chat' : 'Chat',
+        // What started it, kept so `chat show` has an origin to print. The
+        // host reports one back; here it is the one that was asked for.
+        ...(source ? { origin: source as ChatOrigin } : {}),
         turns: carried.map((one) => ({ ...one })),
         watchers: new Set(),
       });
@@ -1794,6 +1823,62 @@ export function fakeHost(): FakeHost {
       }
       extra.delete(chat);
       emit(held.session, { type: 'chats', items: chatsOf(held.session), defaultChat: chats.get(held.session) ?? '' });
+    },
+
+    /*
+     * One chat, read by its own URI.
+     *
+     * The script keeps a session's first conversation under the session's key
+     * and every other under its chat URI, so this walks both rather than
+     * pretending the two are one map.
+     */
+    chat: async (chatUri): Promise<ChatState> => {
+      const held = extra.get(chatUri);
+      if (held) {
+        return {
+          resource: chatUri,
+          title: held.title,
+          status: statusOf(held.session),
+          ...(held.origin ? { origin: held.origin } : {}),
+          turns: held.turns,
+        };
+      }
+      const session = sessionOfChat(chatUri);
+      if (session !== undefined) {
+        const running = active.get(session);
+        return {
+          resource: chatUri,
+          title: summaries.get(session)?.title ?? 'Chat',
+          status: statusOf(session),
+          turns: turns.get(session) ?? [],
+          ...(running ? { active: running } : {}),
+        };
+      }
+      // The refusal, as the live host's is: a channel that would not open
+      // leaves no state behind, and the caller says so. Throwing here instead
+      // would give one word for it against a socket and a stack against the
+      // script, which is the same mistake twice.
+      return { resource: '', title: '', status: SessionFlag.Idle, turns: [] };
+    },
+
+    /*
+     * Older turns for a chat read on its own.
+     *
+     * A chat opened after its session is seeded whole, so there is never a page
+     * behind it to fetch; saying so is the answer, and the loop that asked
+     * stops on it rather than walking to a bound.
+     */
+    loadOlderChatTurns: async (chatUri) => {
+      const behind = older.get(chatUri) ?? [];
+      if (behind.length === 0) return false;
+      const page = behind.splice(-PAGE);
+      const held = extra.get(chatUri);
+      if (held) held.turns.unshift(...page);
+      else {
+        const session = sessionOfChat(chatUri);
+        if (session !== undefined) turns.set(session, [...page, ...(turns.get(session) ?? [])]);
+      }
+      return behind.length > 0;
     },
 
     subscribe: (uri, observer, wanted) => {

@@ -1,6 +1,6 @@
 import type {
   Agent, Answer, Automation, AutomationRun, Changeset, Completion, ContentRef, Customization, FileContent, PendingInput, QueuedMessage,
-  ChangesetOperationTarget, ChangesetScope, ChatSource, ModelSelection, ResourceEntry, SessionConfig, SessionDetail, SessionSummary, SessionUri, TerminalRow, TerminalState,
+  ChangesetOperationTarget, ChangesetScope, ChatSource, ChatState, ModelSelection, ResourceEntry, SessionConfig, SessionDetail, SessionSummary, SessionUri, TerminalRow, TerminalState,
   ToolCall, Turn,
 } from './types.js';
 
@@ -107,6 +107,26 @@ export interface HostConnection {
    * `createChat` MUST NOT be called at all.
    */
   createChat(uri: SessionUri, first?: string, source?: ChatSource): Promise<string>;
+
+  /**
+   * Read one chat, without the session around it.
+   *
+   * `subscribe` needs a session to hang the chat off, and a chat nobody typed
+   * into does not have one a reader has ever opened - a subagent's is reached
+   * by its own URI or not at all. The chat's channel carries it, so the URI is
+   * the whole of what is needed.
+   */
+  chat(uri: string): Promise<ChatState>;
+
+  /**
+   * Pull the page of history before the turns a chat already holds.
+   *
+   * `loadOlderTurns` for a chat read on its own, and the same bargain: the host
+   * inserts what it fetched into the chat's state and answers only whether
+   * there is more behind it.
+   */
+  loadOlderChatTurns(uri: string): Promise<boolean>;
+
 
   /**
    * The terminals the host is running.
