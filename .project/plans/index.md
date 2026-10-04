@@ -37,10 +37,22 @@ Reference: [00-ahp.md](ahp/00-ahp.md)
 | [02 - Push a token before the host refuses, and look for one before asking](ahp/02-a-token-before-the-host-refuses/plan.md) | high | built 2026-09-26 ([implemented.md](ahp/02-a-token-before-the-host-refuses/implemented.md)) | ahp/01 for the prompt and the retry it hangs off | - |
 | [03 - Read the connection token from the file the host keeps it in](ahp/03-a-connection-token-from-a-file/plan.md) | medium | built 2026-09-24 ([implemented.md](ahp/03-a-connection-token-from-a-file/implemented.md)) | - | - |
 | [04 - Keep resource tokens out of recordings, and keep a dismissed sign-in prompt dismissed](ahp/04-no-token-on-disk-and-no-prompt-from-a-tick/plan.md) | high | built 2026-09-26 ([implemented.md](ahp/04-no-token-on-disk-and-no-prompt-from-a-tick/implemented.md)) | - | - |
+| [05 - ahpc speaks protocol 1.0.0](ahp/05-protocol-1-0-0/plan.md) | high | planned 2026-10-04; task 01 todo | - | - |
 
-Next free number in `ahp`: `05`.
+Next free number in `ahp`: `06`.
+
+## cli
+
+Reference: [00-cli.md](cli/00-cli.md)
+
+| Plan | Priority | Status | Requires | Blocks |
+| --- | --- | --- | --- | --- |
+| [01 - A chat is read like a session, and a refusal is printed as a sentence](cli/01-a-chat-is-read-like-a-session/plan.md) | high | planned 2026-10-04; tasks 01-02 todo | - | - |
+| [02 - The wire is proxied, checked, counted, followed by channel and compared, from ahpc](cli/02-the-wire-is-proxied-and-analysed/plan.md) | high | planned 2026-10-04; tasks 01-07 todo | - | ahpd documentation/02 |
+
+Next free number in `cli`: `03`.
 
 ## Later domains (no plans yet)
 
-`cli` (`src/cli`) · `mcp` (`src/mcp`) · `documentation`.
-Ideas: [the tool server](../ideas/the-tool-server.md), [deliberate duplication](../ideas/deliberate-duplication.md), [artifacts and references on screen](../ideas/artifacts-and-references.md), [subagent rows](../ideas/subagent-rows.md), [finding a host without being told](../ideas/finding-a-host-without-being-told.md).
+`mcp` (`src/mcp`) · `documentation`.
+Ideas: [the tool server](../ideas/the-tool-server.md), [deliberate duplication](../ideas/deliberate-duplication.md), [artifacts and references on screen](../ideas/artifacts-and-references.md), [subagent rows](../ideas/subagent-rows.md), [finding a host without being told](../ideas/finding-a-host-without-being-told.md), [what protocol 1.0.0 adds](../ideas/what-protocol-1-0-0-adds.md).
