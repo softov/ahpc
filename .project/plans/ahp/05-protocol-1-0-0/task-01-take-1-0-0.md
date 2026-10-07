@@ -1,6 +1,6 @@
 ---
 title: Take 1.0.0 and offer it first
-status: implemented
+status: done
 depends: []
 layer: "ahp"
 refs:

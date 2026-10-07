@@ -1,7 +1,7 @@
 ---
 title: ahpc speaks protocol 1.0.0
 domain: ahp
-status: planned
+status: built
 priority: high
 created: 2026-10-04
 revalidated: 2026-10-04
@@ -48,7 +48,7 @@ ahpc installs protocol 1.0.0 and offers it first, so against ahpd it runs at 1.0
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - Take 1.0.0 and offer it first](task-01-take-1-0-0.md) | implemented | - |
+| [01 - Take 1.0.0 and offer it first](task-01-take-1-0-0.md) | done | - |
 
 ## Risks and tradeoffs
 
@@ -56,10 +56,11 @@ ahpc installs protocol 1.0.0 and offers it first, so against ahpd it runs at 1.0
 
 ## Resume state
 
-- **Next:** task 01.
+- **Done so far:** built 2026-10-07; see [implemented.md](implemented.md). Task 01 done, shipped in `32f177c` and verified on 2026-10-07.
+- **Next action:** none.
 
 ## Final verification checklist
 
-- [ ] Against ahpd, `initialize` answers `protocolVersion: "1.0.0"` (seen with `--wire`).
-- [ ] `npm test`, `npx tsc --noEmit` pass; `tools/ahp.strict.schema.json` regenerated.
-- [ ] `plans/index.md` updated.
+- [x] Against ahpd, the connection runs at 1.0.0: an ahpd 0.10.0 host logged it as "speaking 1.0.0".
+- [x] `npm test`, `npx tsc --noEmit` pass; `tools/ahp.strict.schema.json` regenerated.
+- [x] `plans/index.md` updated.
