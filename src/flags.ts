@@ -54,6 +54,9 @@ export const SWITCHES: ReadonlySet<string> = new Set([
   '--create-only', '--recursive', '--fail-if-exists', '--follow', '--force',
   // What this client serves back to the host.
   '--publish-writable',
+  // What the host is told this client trusts, which is the `--cwd` or `--path`
+  // on the same line rather than a value of its own.
+  '--trust',
   // Output shape, on the two commands that offer a second one.
   '--operations', '--markdown',
   // Asking rather than doing, and agreeing in advance.

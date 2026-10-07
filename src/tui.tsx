@@ -97,6 +97,14 @@ interface Options {
   publish?: string;
   /** Whether the host may write into it. Read-only otherwise. */
   publishWritable?: boolean;
+  /**
+   * Folders on *this* machine the host may treat as trusted.
+   *
+   * The config file's list, and `--path` when the run also said `--trust`.
+   * Built in `tui`, where the file is read, because `--trust` is not a list
+   * of its own: it is the folder this run names.
+   */
+  trust?: string[];
   /** A file every frame is appended to, both directions, as JSON lines. */
   wire?: string;
   /** Ask npm, in the background, whether a newer version exists. */
@@ -121,6 +129,9 @@ Where the agent works
   --path <dir>          A path on the host, not on this machine. The host
                         has to serve it, and says so if it does not.
                         Left out, the host decides.
+  --trust               Tell the host this folder is trusted, on top of the
+                        ones the config file lists under "trust". A trusted
+                        folder loads the project's own files.
 
 What this client serves back
   --publish <dir>       Serve this directory to the host under
@@ -217,6 +228,10 @@ export function parse(argv: string[]): Options {
       case '--connection-token-file': options.tokenFile = String(argv[++i]); break;
       case '--config-file': options.configFile = String(argv[++i]); break;
       case '--path': options.path = String(argv[++i]); break;
+      // Read below rather than here: `--trust` is not a folder of its own,
+      // it is the `--path` this run names, and the config file's list is
+      // added to it where the file has been read.
+      case '--trust': break;
       case '--publish': options.publish = String(argv[++i]); break;
       case '--publish-writable': options.publishWritable = true; break;
       case '--wire': options.wire = String(argv[++i]); break;
@@ -366,6 +381,14 @@ export async function tui(argv: string[]): Promise<void> {
   if (file.boodFloat !== undefined && !argv.includes('--bood')) options.boodFloat = file.boodFloat;
   if (file.keys) options.keys = file.keys;
   if (file.updateCheck === false && !argv.includes('--no-update-check')) options.updateCheck = false;
+  /*
+   * What the host is told this client trusts: the file's list, and the folder
+   * this run works in when it also said `--trust`. A workspace picked on the
+   * screen afterwards is neither, so it is not trusted until it is written
+   * into the file.
+   */
+  const trust = [...(file.trust ?? []), ...(argv.includes('--trust') && options.path ? [options.path] : [])];
+  if (trust.length > 0) options.trust = trust;
   if (options.help) {
     process.stdout.write(USAGE);
     return;

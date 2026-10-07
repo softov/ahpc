@@ -122,7 +122,7 @@ When a tool call is waiting: `a` approves, `d` denies, `1`-`9` pick an offered o
 |---|---|---|
 | `session list` | List sessions, newest first | `--archived` `--json` |
 | `session show <uri>` | Session details | `--full` `--json` |
-| `session new` | Create a new session | `--agent` `--cwd` `--set k=v` `--json` |
+| `session new` | Create a new session | `--agent` `--cwd` `--trust` `--set k=v` `--json` |
 | `session rm <uri>` | Delete a session | |
 | `session read <uri>` | Mark as read | `--unread` |
 | `session archive <uri>` | Archive a session | `--undo` |
@@ -138,7 +138,7 @@ When a tool call is waiting: `a` approves, `d` denies, `1`-`9` pick an offered o
 | Command | | |
 |---|---|---|
 | `prompt <uri> <text>` | Send a prompt and stream the reply | `--model` `--json` |
-| `exec <text>` | Run one prompt in a throwaway session | `--agent` `--cwd` `--model` `--json` |
+| `exec <text>` | Run one prompt in a throwaway session | `--agent` `--cwd` `--trust` `--model` `--json` |
 | `cancel <uri>` | Cancel the running turn | |
 | `queue <uri> <text>` | Queue a prompt behind the running turn | `--model` |
 | `unqueue <uri> <id>` | Remove a queued prompt | |
@@ -195,7 +195,7 @@ Writes are guarded by the file's etag unless you pass `--force`, so two clients 
 | Command | | |
 |---|---|---|
 | `terminal list` | List running terminals | `--json` |
-| `terminal new` | Open a shell | `--cwd` `--name` |
+| `terminal new` | Open a shell | `--cwd` `--trust` `--name` |
 | `terminal rm <uri>` | Close a terminal | |
 | `terminal send <uri> <text>` | Send input to a terminal | |
 | `terminal watch <uri>` | Follow a terminal's output | `--timeout` |
@@ -317,10 +317,32 @@ Precedence: a flag overrides an environment variable, which overrides the file.
 | `--token`, `AHPC_TOKEN` | A bearer token for it |
 | `AHPC_TOKEN_<RESOURCE>` | A token for one protected resource |
 | `--config-file` | Read this file instead |
+| `trust` | Folders the host may load project files from. See below |
 | `--no-update-check`, `updateCheck: false` | Never ask npm whether a newer version exists. See below |
 | `AHPC_DEBUG=1` | Print the stack under a refusal, for a bug report |
 
 `ahpc config` prints the file path and the values in force. It works without a host, which is what you need when the host is the problem.
+
+### Trusted folders
+
+A trusted folder is one the host may load the project's own files from. In an untrusted folder a session loads none of them, and the host refuses an ACP agent there.
+
+`trust` lists the folders to trust, and every connection sends the list to the host:
+
+```json
+{ "trust": ["~/work/api", "/github/ahpc"] }
+```
+
+A folder is written as a path on the machine `ahpc` runs on, and a leading `~` is your home folder. `--trust` adds the folder a command names with `--cwd` to the list, for that one run:
+
+```sh
+ahpc session new --cwd /github/ahpc --trust
+ahpc exec "run the tests" --cwd /github/ahpc --trust
+```
+
+The screen takes `--trust` the same way, for the folder its `--path` names. A workspace picked on the screen afterwards is not trusted until the config file lists it.
+
+A parent folder trusts every folder under it, so `/github` trusts `/github/ahpc` and every other project below it.
 
 ### Knowing when it is old
 

@@ -18,6 +18,15 @@ export interface Config {
    * key is safe in a file people share and back up, which `token` is not.
    */
   connectionTokenFile?: string;
+  /**
+   * The folders this client tells the host it trusts.
+   *
+   * A session started in one of them loads the project's own files, and an
+   * ACP agent runs there. Written as paths, one per entry; a leading `~` is
+   * the home folder. A parent folder trusts every folder under it, so this
+   * list is worth keeping narrow.
+   */
+  trust?: string[];
   /** The theme to open on. */
   theme?: string;
   /** The language to read in: `en`, `pt-br` or `es`. `--lang` wins over it. */

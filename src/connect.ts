@@ -4,6 +4,7 @@ import { MissingProtocolPackage, liveHost } from './ahp/live.js';
 import { fakeHost } from './ahp/fake.js';
 import { publish } from './ahp/publish.js';
 import { pushTokens } from './ahp/tokens.js';
+import { pushTrust, trustedUris } from './ahp/trust.js';
 import type { HostConnection } from './ahp/connection.js';
 import type { AuthAsk } from './ahp/auth.js';
 
@@ -36,6 +37,14 @@ export interface Where {
   publish?: string;
   /** Whether the published directory may be written to. Read-only otherwise. */
   publishWritable?: boolean;
+  /**
+   * Folders on *this* machine the host may treat as trusted.
+   *
+   * Written as paths, not URIs; `trustedUris` resolves and encodes them. Sent
+   * on every connection, because the host keeps trust per connection. Absent
+   * or empty sends nothing, which is what a host trusts anyway.
+   */
+  trust?: string[];
   /** A file every frame is appended to, both directions, as JSON lines. */
   wire?: string;
 }
@@ -119,9 +128,19 @@ export async function connect(options: Where): Promise<HostConnection & { pump?(
         ? { publish: publish({ root: options.publish, ...(options.publishWritable ? { writable: true } : {}) }) }
         : {}),
       onState: (state) => { if (state === 'offline') sink.report('The host stopped answering'); },
-      // Every declared resource this run has a token for, pushed on every
-      // connection: the host drops what it holds when a socket closes.
-      onConnected: (host) => pushTokens(host),
+      /*
+       * What the host is told on every connection, in the order it is told.
+       *
+       * Credentials first, because a host that wants one is a host that will
+       * refuse the next thing asked of it; the trusted folders after, because
+       * they decide what a session started here may load. Both are per
+       * connection - the host drops what it holds when a socket closes - so
+       * both are sent again after every reconnect.
+       */
+      onConnected: async (host) => {
+        await pushTokens(host);
+        await pushTrust(host, trustedUris(options.trust ?? []));
+      },
     });
   }
   catch (error) {

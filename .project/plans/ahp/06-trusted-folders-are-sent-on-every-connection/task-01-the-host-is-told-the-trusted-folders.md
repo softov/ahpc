@@ -1,6 +1,6 @@
 ---
 title: The host is told the trusted folders on every connection
-status: todo
+status: implemented
 depends: []
 layer: "ahp, cli, screen"
 refs:
@@ -47,4 +47,17 @@ On every connection, ahpc sends `root/configChanged` with the trusted folders, a
 - Run `npm run typecheck` and `npm test`. Both pass.
 
 ## Resume
+
+All eight steps are built, and `test/trust.test.ts` holds all seven named cases plus one more.
+
+Three things the plan did not name, each forced by something already in the tree:
+
+- `src/flags.ts` gained `--trust` in `SWITCHES`. `test/cli.test.ts` fails any flag the CLI reads or the screen parses that the one vocabulary does not hold, so the flag cannot exist without it.
+- The screen's `USAGE` gained a `--trust` block. A parser that accepts a flag and a help that omits it is a defect, and task 02's README table is not the screen's help.
+- `where` became exported as `where(rest: string[])`, so a test can build the trusted list without a live socket. It mirrors the exported `needsToken`.
+
+Two readings the plan left open, both taken literally:
+
+- The refusal of step 6 sits in `cli()`, not in `where()`. `where()` can only throw `Fault`, which exits 1, and the step wants 2.
+- The screen does not refuse `--trust` without `--path`. Step 8 asks for the addition to the list and names no refusal, so the screen trusts the config file's list alone in that run.
 

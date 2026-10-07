@@ -29,7 +29,8 @@ export const HELP = `ahpc - drive an agent host from a shell
 Sessions
   session list                 the catalogue, newest first   [--archived] [--json]
   session show <uri>           what the host says about one  [--full] [--json]
-  session new                  start one   [--agent P] [--cwd DIR] [--set k=v]… [--json]
+  session new                  start one   [--agent P] [--cwd DIR] [--trust]
+                               [--set k=v]… [--json]
   session rm <uri>             dispose it
   session history <uri>        its turns               [--all] [--full] [--json]
   session config <uri>         the schema and what is in force        [--json]
@@ -44,7 +45,8 @@ Sessions
 Turns
   prompt <uri> <text>          say it and stream the answer  [--model M] [--json]
   exec <text>                  a session, one turn, and dispose it
-                                       [--agent P] [--cwd DIR] [--model M] [--json]
+                               [--agent P] [--cwd DIR] [--trust]
+                               [--model M] [--json]
   cancel <uri>                 stop the running turn
   queue <uri> <text>           say it after the one running  [--model M]
   unqueue <uri> <id>           take it back
@@ -112,7 +114,7 @@ Signing in
 
 Terminals
   terminal list                what is running                        [--json]
-  terminal new                 open a shell        [--cwd DIR] [--name N]
+  terminal new                 open a shell  [--cwd DIR] [--trust] [--name N]
   terminal rm <uri>            kill it
   terminal send <uri> <text>   type into it
   terminal watch <uri>         follow its output   [--timeout S]
@@ -229,8 +231,12 @@ export class Fault extends Error {}
  * In that order because each is more deliberate than the next. A flag is this
  * invocation, an environment variable is this shell, and a file is every
  * invocation until somebody edits it - so the narrower answer wins.
+ *
+ * The trusted folders are built here too, because they are read from the same
+ * two places: the config file, and the directory this command names.
  */
-const where = (args: Args): Where => {
+export const where = (rest: string[]): Where => {
+  const args = new Args(rest);
   const file = loadConfig('ahpc', args.value('--config-file'));
   const host = args.value('--host') ?? process.env.AHPC_HOST ?? file.host;
   let token: string | undefined;
@@ -251,6 +257,19 @@ const where = (args: Args): Where => {
     // write into it. Both off unless asked for.
     ...(args.value('--publish') ? { publish: args.value('--publish') as string } : {}),
     ...(args.has('--publish-writable') ? { publishWritable: true } : {}),
+    /*
+     * The folders the host may treat as trusted.
+     *
+     * The config file's list is always in it. The directory this command runs
+     * in joins it only when the same command said `--trust`, because `--cwd`
+     * alone is where the agent works rather than a folder anybody has said is
+     * safe to load - a client pointed at a directory by mistake must not hand
+     * its project files over on the way.
+     */
+    trust: [
+      ...(file.trust ?? []),
+      ...(args.has('--trust') && args.value('--cwd') ? [args.value('--cwd') as string] : []),
+    ],
     ...(args.value('--wire') ? { wire: args.value('--wire') as string } : {}),
   };
 };
@@ -403,7 +422,18 @@ export async function cli(command: string, rest: string[]): Promise<number> {
     return 0;
   }
 
-  const host = await connect(where(args));
+  /*
+   * A folder is trusted for one run only when the command names it, so
+   * `--trust` on its own is a wish with no folder in it. Refused before any
+   * connection, and with the exit code a usage mistake gets everywhere else
+   * here.
+   */
+  if (args.has('--trust') && args.value('--cwd') === undefined) {
+    process.stderr.write('--trust needs --cwd, the folder to trust.\n');
+    return 2;
+  }
+
+  const host = await connect(where(rest));
   try {
     /*
      * A link where a URI is wanted.
