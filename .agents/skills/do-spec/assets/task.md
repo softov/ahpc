@@ -19,7 +19,7 @@ refs:
 
 ## Steps
 
-1. <Concrete step; names the symbol, the file, the decision number it applies.>
+1. <Concrete step on one line; names the symbol, the file, the decision it applies.>
 2. <...>
 
 ## Validation

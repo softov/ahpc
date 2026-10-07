@@ -6,6 +6,12 @@ revalidated: <YYYY-MM-DD>
 
 <One paragraph: what this domain is and which packages implement it.>
 
+## Glossary
+
+| Term | Meaning |
+| --- | --- |
+| <term> | <the one thing this word names in this domain> |
+
 ## Packages
 
 - [`code://packages/<package>`](../../../packages/<package>) - <what it is; its entry point; its contracts file>.
