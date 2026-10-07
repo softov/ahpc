@@ -50,8 +50,9 @@ Reference: [00-cli.md](cli/00-cli.md)
 | --- | --- | --- | --- | --- |
 | [01 - A chat is read like a session, and a refusal is printed as a sentence](cli/01-a-chat-is-read-like-a-session/plan.md) | high | planned 2026-10-04; tasks 01-02 todo | - | - |
 | [02 - The wire is proxied, checked, counted, followed by channel and compared, from ahpc](cli/02-the-wire-is-proxied-and-analysed/plan.md) | high | planned 2026-10-04; tasks 01-07 todo | - | ahpd documentation/02 |
+| [03 - A failed turn says why](cli/03-a-failed-turn-says-why/plan.md) | high | planned 2026-10-07; task 01 todo | - | - |
 
-Next free number in `cli`: `03`.
+Next free number in `cli`: `04`.
 
 ## Later domains (no plans yet)
 
