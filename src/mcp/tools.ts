@@ -22,7 +22,7 @@
 import type { HostConnection } from '../ahp/connection.js';
 import { SessionFlag } from '../ahp/types.js';
 import type { Answer, SessionUri, TerminalState, Turn } from '../ahp/types.js';
-import { spoken, turn as runTurn, until } from '../wait.js';
+import { failure, spoken, turn as runTurn, until } from '../wait.js';
 
 /** As much of JSON Schema as a tool's arguments need. */
 export interface Schema {
@@ -86,21 +86,31 @@ const uriOf = (input: Record<string, unknown>): SessionUri => {
   return found as SessionUri;
 };
 
-/** A turn as an answer rather than a tree of parts, which is what a model reads. */
-const said = (one: Turn): Record<string, unknown> => ({
-  id: one.id,
-  role: one.role,
-  state: one.state,
-  at: one.at,
-  ...(one.message === undefined ? {} : { message: one.message }),
-  text: spoken(one),
-  tools: one.parts
-    .filter((part) => part.kind === 'toolCall')
-    .map((part) => (part.kind === 'toolCall'
-      ? { id: part.call.id, name: part.call.name, status: part.call.status }
-      : null))
-    .filter((one_) => one_ !== null),
-});
+/**
+ * A turn as an answer rather than a tree of parts, which is what a model reads.
+ *
+ * `error` is the last reason the host gave for a turn it could not finish.
+ * `text` cannot carry it - an error part is not markdown, so `spoken` drops
+ * it - and a caller given only `text` has a turn that stops with no cause.
+ */
+const said = (one: Turn): Record<string, unknown> => {
+  const failed = failure(one);
+  return {
+    id: one.id,
+    role: one.role,
+    state: one.state,
+    at: one.at,
+    ...(one.message === undefined ? {} : { message: one.message }),
+    text: spoken(one),
+    ...(failed.length === 0 ? {} : { error: failed[failed.length - 1] }),
+    tools: one.parts
+      .filter((part) => part.kind === 'toolCall')
+      .map((part) => (part.kind === 'toolCall'
+        ? { id: part.call.id, name: part.call.name, status: part.call.status }
+        : null))
+      .filter((one_) => one_ !== null),
+  };
+};
 
 /** The URI a resource tool was given, which is a `file://` on the host rather than a local path. */
 const pathOf = (input: Record<string, unknown>, key = 'path'): string => {

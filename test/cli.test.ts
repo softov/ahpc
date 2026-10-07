@@ -13,6 +13,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { RpcError } from '@microsoft/agent-host-protocol/client';
 import { parse } from '../src/tui.js';
 import { SWITCHES, commandIn } from '../src/flags.js';
 
@@ -365,6 +366,52 @@ describe('a refusal the host sent, and a mistake that was ours', () => {
     // One line, so the sentence is the whole of what a person reads. The code
     // is in it because a bug report needs it and nobody remembers it.
     expect((said as Error).message.split('\n')).toHaveLength(1);
+  });
+
+  it('strips the SDK wrapper, so the code is said once', async () => {
+    /*
+     * What the SDK hands a caller is not what the host said.
+     *
+     * `RpcError` formats its own message as `RPC error -32001: <the host's
+     * words>`, so a refusal that arrived over the wire reaches this path with
+     * the client's wrapper already in front of it. The code is written at the
+     * end, and printing the message as it stands puts it there twice.
+     *
+     * The error is the SDK's own class rather than a hand-made lookalike, so
+     * the wrapper under test is the one a live run gets.
+     */
+    vi.resetModules();
+    vi.doMock('../src/connect.js', async (importOriginal) => {
+      const real = await importOriginal<typeof import('../src/connect.js')>();
+      const { fakeHost } = await import('../src/ahp/fake.js');
+      return {
+        ...real,
+        connect: async () => ({
+          ...fakeHost(),
+          disposeSession: async (uri: string) => { throw new RpcError(-32001, `No agent for session ${uri}`); },
+        }),
+      };
+    });
+
+    const home = mkdtempSync(join(tmpdir(), 'ahpc-fault-'));
+    const had = { XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME, AHPC_HOST: process.env.AHPC_HOST };
+    process.env.XDG_CONFIG_HOME = home;
+    delete process.env.AHPC_HOST;
+    try {
+      const { cli, Fault } = await import('../src/cli/main.js');
+      const said = await cli('session', ['rm', 'ahp-session:/not-a-session'])
+        .then(() => null, (error: unknown) => error);
+      expect(said).toBeInstanceOf(Fault);
+      // The host's words, then the code once. `RPC error -32001: ` is the
+      // client's own dressing around them and is not part of the sentence.
+      expect((said as Error).message).toBe('No agent for session ahp-session:/not-a-session (-32001)');
+    }
+    finally {
+      for (const [key, value] of Object.entries(had)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+      rmSync(home, { recursive: true, force: true });
+      vi.doUnmock('../src/connect.js');
+      vi.resetModules();
+    }
   });
 
   it('leaves an error with no code alone, so a bug still looks like a bug', async () => {

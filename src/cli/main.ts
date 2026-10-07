@@ -2,7 +2,7 @@
 
 import { readFile } from 'node:fs/promises';
 import { connect } from '../connect.js';
-import { askFor, authRequiredOf, failureWords } from '../ahp/auth.js';
+import { askFor, authRequiredOf, failureWords, hostWords } from '../ahp/auth.js';
 import { tokenVariable } from '../ahp/tokens.js';
 import { configPath, connectionToken, loadConfig } from '../config.js';
 import { checkingUpdates, readUpdate, updateNotice } from '../update.js';
@@ -13,7 +13,8 @@ import type { HostConnection, HostEvent } from '../ahp/connection.js';
 import { operate } from '../ahp/operate.js';
 import { SWITCHES } from '../flags.js';
 import { parseSessionLink, sessionOfLink } from '../links.js';
-import { spoken, turn as runTurn, until } from '../wait.js';
+import { decodeStatus } from '../ahp/status.js';
+import { failure, spoken, turn as runTurn, until } from '../wait.js';
 import { GROUPS, served } from '../mcp/tools.js';
 import type { Group } from '../mcp/tools.js';
 import { SERVER } from '../mcp/serve.js';
@@ -343,6 +344,21 @@ const PAGES = 100;
 const snapshot = async (host: HostConnection, uri: SessionUri): Promise<Extract<HostEvent, { type: 'snapshot' }> | undefined> => {
   const event = await until(host, uri, (e) => e.type === 'snapshot', { timeoutSeconds: 30 });
   return event?.type === 'snapshot' ? event : undefined;
+};
+
+/**
+ * The last reason the host gave for a session that stopped.
+ *
+ * `detail` carries no turns, so this reads them, and the latest one wins: a
+ * session may have failed more than once and what a person wants is where it
+ * stands now. Empty where the host named no reason, which is a status with
+ * nothing under it rather than a row saying nothing.
+ */
+const lastFailure = async (host: HostConnection, uri: SessionUri): Promise<string> => {
+  const shot = await snapshot(host, uri);
+  const turns = [...(shot?.turns ?? []), ...(shot?.active ? [shot.active] : [])];
+  const messages = turns.flatMap((turn) => failure(turn));
+  return messages[messages.length - 1] ?? '';
 };
 
 /**
@@ -851,7 +867,15 @@ export async function cli(command: string, rest: string[]): Promise<number> {
        */
       const code = (error as { code?: unknown } | null)?.code;
       if (typeof code !== 'number') throw error;
-      throw new Fault(`${error instanceof Error ? error.message : String(error)} (${code})`);
+      /*
+       * The code is written at the end, so it comes off the front first: an
+       * `RpcError` from the SDK has already put its own `RPC error -32001: `
+       * there, and that is the client's wrapper rather than the host's words.
+       * Left on, the sentence names the code twice and reads as one error
+       * nested in another.
+       */
+      const said = error instanceof Error ? error.message : String(error);
+      throw new Fault(`${hostWords(said)} (${code})`);
     }
     const one = askFor(refusal);
     throw new Fault(one === null ? failureWords(error) : needsToken(one.resource, one.name));
@@ -919,10 +943,22 @@ async function sessions(host: HostConnection, args: Args, wants: boolean): Promi
       const detail = await host.detail(uri);
       if (args.has('--full') || wants) { json(detail); return 0; }
       const row = (await host.listSessions()).find((s) => s.resource === uri);
+      /*
+       * Why it failed, under the status that says it did.
+       *
+       * The status is a word; the reason is a sentence only the turns hold,
+       * and `detail` carries none of them. Read only when the status is
+       * `error`, so a command a person runs to look at a session does not
+       * subscribe to one that is fine.
+       */
+      const stopped = row !== undefined && decodeStatus(row.status).activity === 'error'
+        ? await lastFailure(host, uri)
+        : '';
       table([
         ['Session', uri],
         ['Title', row?.title ?? ''],
         ['Status', row ? mark(row.status) : ''],
+        ['Error', stopped],
         ['Project', row ? [project(row), branch(row)].filter(Boolean).join('  ') : ''],
         ['Workspace', (row?.workingDirectories ?? []).map((d) => d.replace(/^file:\/\//, '')).join(', ')],
         ['Chat', detail.chat ?? ''],
@@ -1478,6 +1514,17 @@ async function turns(host: HostConnection, command: string, args: Args, wants: b
       }),
     });
     if (!wants && printed) line();
+    /*
+     * Why the turn stopped, where a person reads it.
+     *
+     * The host's own sentence, with nothing added to it. On stderr rather
+     * than stdout, so a pipe still reads only the answer. Not suppressed
+     * under `--json` the way the stream above is: `--json` owns stdout, and
+     * stderr is a second place a caller may read.
+     */
+    for (const message of answer === undefined ? [] : failure(answer)) {
+      process.stderr.write(`${message}\n`);
+    }
     return answer;
   };
 

@@ -1219,13 +1219,23 @@ export function fakeHost(): FakeHost {
     reply(uri, next.text, next.model);
   }
 
-  function finish(uri: SessionUri, closing: string, options: { failed?: boolean; changes?: Changeset } = {}): void {
+  function finish(uri: SessionUri, closing: string, options: { failed?: boolean; changes?: Changeset; error?: string } = {}): void {
     if (closing) prose(uri, 'markdown', closing);
     script.push(() => {
       const turn = active.get(uri);
       if (!turn) return;
       turn.state = options.failed ? 'failed' : 'complete';
       turn.elapsedMs = 18_200;
+      /*
+       * Why it failed, as a part rather than as the state alone.
+       *
+       * A `failed` turn says only that it stopped. What the host said went
+       * wrong is an `error` part, and a client that reads only the state has
+       * nothing to show a person.
+       */
+      if (options.error !== undefined) {
+        turn.parts.push({ kind: 'error', id: nextId('e'), message: options.error, resumable: true });
+      }
       turns.get(uri)?.push(turn);
       active.delete(uri);
       if (options.failed) failed.add(uri); else failed.delete(uri);
@@ -1360,7 +1370,10 @@ export function fakeHost(): FakeHost {
           input: 'ssh buildbox -p 22 make -f Makefile.linux',
           intention: 'Build on the FreeBSD box',
         }, { status: 'failed', outcome: 'Exited 255', exitCode: 255, output: 'ssh: connect to host build.example.com port 22: Connection timed out' });
-        finish(uri, 'The box did not answer on 22. That is the tunnel, not the build - nothing was compiled, so nothing is broken.', { failed: true });
+        finish(uri, 'The box did not answer on 22. That is the tunnel, not the build - nothing was compiled, so nothing is broken.', {
+          failed: true,
+          error: 'The turn failed: the tool call to buildbox timed out.',
+        });
         return;
 
       default:

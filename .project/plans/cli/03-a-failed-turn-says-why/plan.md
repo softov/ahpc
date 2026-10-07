@@ -1,7 +1,7 @@
 ---
 title: A failed turn says why
 domain: cli
-status: planned
+status: built
 priority: high
 created: 2026-10-07
 revalidated: 2026-10-07
@@ -52,7 +52,7 @@ host chat/error -> live.ts error part -> Turn.parts -> spoken() drops it -> prom
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - A failed turn prints its error](task-01-a-failed-turn-prints-its-error.md) | todo | - |
+| [01 - A failed turn prints its error](task-01-a-failed-turn-prints-its-error.md) | done | - |
 
 ## Risks and tradeoffs
 
@@ -60,15 +60,15 @@ host chat/error -> live.ts error part -> Turn.parts -> spoken() drops it -> prom
 
 ## Resume state
 
-- **Done so far:** nothing.
-- **Next action:** [task-01-a-failed-turn-prints-its-error.md](task-01-a-failed-turn-prints-its-error.md).
+- **Done so far:** task 01, on 2026-10-07. `failure(turn)` exists in `src/wait.ts`. `prompt` and `exec` write each error part's message on stderr and keep exit code 1. `said` in the tool server carries `error`. `session show` draws an `Error` row. The scripted `fail` turn ends in an error part. `test/failure.test.ts` holds five cases. See [implemented.md](implemented.md).
+- **Next action:** none.
 - **Open questions:** none.
-- **Watch out for:** the fake host in `src/ahp/fake.ts` must answer a turn with an error part. Without it, the test cannot show the bug.
+- **Watch out for:** the prompt test replaces `../src/connect.js` with a host it pumps itself, because a shell run drives no pump. Any later case that runs `cli()` for a turn needs the same. Nothing else is outstanding.
 
 ## Final verification checklist
 
-- [ ] A test: `prompt` against the fake host, whose turn ends in an error part, writes the message to stderr and returns 1.
-- [ ] A test: `said()` carries `error` for that turn.
-- [ ] A test: `session show` prints the `Error` row.
-- [ ] The repo's typecheck and test commands pass.
-- [ ] `plans/index.md` updated.
+- [x] A test: `prompt` against the fake host, whose turn ends in an error part, writes the message to stderr and returns 1.
+- [x] A test: `said()` carries `error` for that turn.
+- [x] A test: `session show` prints the `Error` row.
+- [x] The repo's typecheck and test commands pass.
+- [x] `plans/index.md` updated.

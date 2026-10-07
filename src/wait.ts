@@ -60,11 +60,29 @@ export function until(
   });
 }
 
-/** A turn, as a line of prose rather than a tree of parts. */
+/**
+ * A turn, as a line of prose rather than a tree of parts.
+ *
+ * The answer only. A turn that failed carries the reason as an `error` part
+ * and this drops it, which is right here and wrong for anybody who has to
+ * report the failure - `failure` is what they read instead.
+ */
 export const spoken = (turn: Turn): string => turn.parts
   .map((part) => (part.kind === 'markdown' ? part.content : ''))
   .join('')
   .trim();
+
+/**
+ * Why a turn failed, in the host's own words, one message per error part.
+ *
+ * Empty for a turn that did not fail, which is the common case. A part that
+ * says nothing is left out rather than reported as an empty line: the host
+ * said there was a failure and named no reason, and a blank sentence is worse
+ * than the absence of one.
+ */
+export const failure = (turn: Turn): string[] => turn.parts.flatMap((part) => (
+  part.kind === 'error' && part.message !== '' ? [part.message] : []
+));
 
 /** What a caller wants told while a turn is running, and how long to wait. */
 export interface TurnOptions {

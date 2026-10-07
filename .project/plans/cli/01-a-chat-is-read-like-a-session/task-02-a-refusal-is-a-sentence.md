@@ -1,6 +1,6 @@
 ---
 title: A refusal is printed as a sentence
-status: implemented
+status: done
 depends: []
 layer: "cli"
 refs:
@@ -47,4 +47,18 @@ The entry point is driven by importing `src/main.tsx` rather than by running the
 `npm run typecheck` clean, `test/cli.test.ts` 27 passing, `npm test` 668 of 669 - the one failure is `test/smoke.test.tsx:1625` and is the same pre-existing one as in task 01.
 
 Both of the plan's final verification lines that need a real ahpd are unrun: there is no host to point this at. The first two checklist items are checked here instead, against the script.
+
+**Fixed on 2026-10-07, from this task's review.**
+
+The branch that step 1 added printed `error.message` as it stood.
+An error from the SDK has already put `RPC error -32001: ` in front of the host's words, and the code is written at the end as well.
+So `session rm` on a session the host did not have read `RPC error -32001: No agent for session ahp-session:/not-a-session (-32001)`, naming the code twice.
+
+The message now goes through `hostWords` of [`code://src/ahp/auth.ts`](../../../../src/ahp/auth.ts) before the code is added, which is the strip the `-32007` branch already used.
+
+The case that stood here could not see it.
+The script throws a bare `Error` carrying a code, and the wrapper is the client's rather than the host's.
+A refusal only arrives dressed that way over a real connection.
+The new case throws the SDK's own `RpcError` and asserts the exact line `No agent for session ahp-session:/not-a-session (-32001)`.
+`test/cli.test.ts` now holds 28 cases, and all pass.
 

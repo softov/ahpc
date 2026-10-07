@@ -1,6 +1,6 @@
 ---
 title: chat show and chat history read one chat
-status: implemented
+status: done
 depends: []
 layer: "cli"
 refs:

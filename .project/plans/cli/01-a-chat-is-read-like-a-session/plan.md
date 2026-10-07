@@ -1,7 +1,7 @@
 ---
 title: A chat is read like a session, and a refusal is printed as a sentence
 domain: cli
-status: planned
+status: built
 priority: high
 created: 2026-10-04
 revalidated: 2026-10-04
@@ -56,8 +56,8 @@ any command -> RpcError -> Fault(`<message> (<code>)`) -> stderr, exit 1
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - chat show and chat history](task-01-chat-show-and-history.md) | implemented | - |
-| [02 - A refusal is a sentence](task-02-a-refusal-is-a-sentence.md) | implemented | - |
+| [01 - chat show and chat history](task-01-chat-show-and-history.md) | done | - |
+| [02 - A refusal is a sentence](task-02-a-refusal-is-a-sentence.md) | done | - |
 
 ## Risks and tradeoffs
 
@@ -65,11 +65,12 @@ any command -> RpcError -> Fault(`<message> (<code>)`) -> stderr, exit 1
 
 ## Resume state
 
-- **Next:** task 01.
+- **Done so far:** tasks 01 and 02, on 2026-10-07. See [implemented.md](implemented.md).
+- **Next action:** none.
 
 ## Final verification checklist
 
-- [ ] Against ahpd: `ahpc chat history` on a subagent chat prints its turn; `chat show` prints its title and origin.
-- [ ] `ahpc session rm claude:/00000000-0000-0000-0000-000000000000` prints one line with `-32001`.
-- [ ] `npm test`, `npx tsc --noEmit` pass.
-- [ ] `plans/index.md` updated.
+- [ ] Against ahpd: `ahpc chat history` on a subagent chat prints its turn; `chat show` prints its title and origin. `chat show` checked on a session chat on 2026-10-07; no subagent chat was open.
+- [x] `ahpc session rm claude:/00000000-0000-0000-0000-000000000000` prints one line with `-32001`.
+- [x] `npm test`, `npx tsc --noEmit` pass.
+- [x] `plans/index.md` updated.
