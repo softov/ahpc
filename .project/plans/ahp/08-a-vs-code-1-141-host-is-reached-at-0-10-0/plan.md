@@ -1,7 +1,7 @@
 ---
 title: A VS Code 1.141 host is reached at 0.10.0
 domain: ahp
-status: planned
+status: built
 priority: high
 created: 2026-10-09
 revalidated: 2026-10-09
@@ -49,7 +49,7 @@ The files read and the patterns to reuse are the `refs` above, each with its not
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - ahpc offers 0.10.0](task-01-ahpc-offers-0-10-0.md) | doing | - |
+| [01 - ahpc offers 0.10.0](task-01-ahpc-offers-0-10-0.md) | done | - |
 
 ## Risks and tradeoffs
 
@@ -57,8 +57,8 @@ The files read and the patterns to reuse are the `refs` above, each with its not
 
 ## Resume state
 
-- **Done so far:** nothing.
-- **Next action:** [task-01-ahpc-offers-0-10-0.md](task-01-ahpc-offers-0-10-0.md).
+- **Done so far:** task 01 is done. Merged 2026-10-09 as 356852c. [implemented.md](implemented.md) lists the files.
+- **Next action:** none.
 - **Open questions:** none.
 - **Watch out for:** `VERSIONS` is in preference order. `0.10.0` goes after `1.0.0`, so a host that speaks both answers `1.0.0`.
 

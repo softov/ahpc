@@ -1,6 +1,6 @@
 ---
 title: ahpc offers 0.10.0
-status: doing
+status: done
 depends: []
 layer: ahp
 refs:
