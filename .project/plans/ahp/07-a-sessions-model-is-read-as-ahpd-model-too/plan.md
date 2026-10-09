@@ -1,7 +1,7 @@
 ---
 title: A session's model is read as ahpd.model too
 domain: ahp
-status: planned
+status: active
 priority: high
 created: 2026-10-09
 revalidated: 2026-10-09
@@ -44,7 +44,7 @@ ahpc finds a session's model on a host that sends `_meta['ahpd.model']` and on o
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - The model is read under both names](task-01-the-model-is-read-under-both-names.md) | todo | - |
+| [01 - The model is read under both names](task-01-the-model-is-read-under-both-names.md) | implemented | - |
 
 ## Risks and tradeoffs
 
@@ -52,12 +52,13 @@ ahpc finds a session's model on a host that sends `_meta['ahpd.model']` and on o
 
 ## Resume state
 
-- **Done so far:** nothing.
-- **Next action:** [task-01-the-model-is-read-under-both-names.md](task-01-the-model-is-read-under-both-names.md).
+- **Done so far:** task 01. `src/ahp/live.ts` reads `_meta['ahpd.model']` first, then `_meta.model`, then `state.model`, and the comment above the read names all three. `test/reconnect.test.ts` holds one case per name and one with both. See [implemented.md](implemented.md).
+- **Next action:** none. The plan holds one task, and it is implemented.
 - **Open questions:** none.
-- **Watch out for:** do not touch `_meta.cost`.
+- **Watch out for:** the run against a host that has renamed the key. ahpd `host/43` task 03 does that rename. It waits on this plan.
 
 ## Final verification checklist
 
-- [ ] `npm run typecheck`, `npm run build` and `npm test` pass.
-- [ ] `plans/index.md` updated.
+- [x] `npm run typecheck`, `npm run build` and `npm test` run clean, except for the one case this worktree fails at its baseline.
+- [ ] Against a host that renamed the key, the session's model is read from `ahpd.model`. Needs that host, so it is Softov's.
+- [x] `plans/index.md` updated.

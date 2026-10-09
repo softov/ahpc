@@ -1047,6 +1047,39 @@ describe('the model a host actually reports, rather than the one it declares', (
     await host.close();
   });
 
+  it('takes the extension under the name the host is renaming it to', async () => {
+    const { host, scripted } = await connect();
+    // A host owns the keys it invents, and this one names them `ahpd.<name>`
+    // so that its own key cannot be mistaken for one the protocol declares.
+    scripted.states.set(SESSION, {
+      defaultChat: CHAT, chats: [], lifecycle: 'ready', _meta: { 'ahpd.model': 'claude-opus-5[1m]' },
+    });
+    scripted.states.set(CHAT, { turns: [] });
+
+    const detail = await host.detail(SESSION as never);
+    expect(detail.model?.id).toBe('claude-opus-5[1m]');
+
+    await host.close();
+  });
+
+  it('prefers the renamed name when a session carries both', async () => {
+    const { host, scripted } = await connect();
+    // A host part-way through the rename sends both. The new name is the one
+    // it means, and the old one is left behind rather than read again.
+    scripted.states.set(SESSION, {
+      defaultChat: CHAT,
+      chats: [],
+      lifecycle: 'ready',
+      _meta: { 'ahpd.model': 'claude-opus-5[1m]', model: 'claude-haiku-4-5' },
+    });
+    scripted.states.set(CHAT, { turns: [] });
+
+    const detail = await host.detail(SESSION as never);
+    expect(detail.model?.id).toBe('claude-opus-5[1m]');
+
+    await host.close();
+  });
+
   it('prefers what the turn was asked for over what it used', async () => {
     const { host, scripted } = await connect();
     scripted.states.set(SESSION, { defaultChat: CHAT, chats: [], lifecycle: 'ready', model: 'ignored' });

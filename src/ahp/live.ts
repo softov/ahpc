@@ -3209,18 +3209,23 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
        * does not have - including that the next host to send it means the
        * same thing.
        *
-       * Both spellings, and both for good. `_meta` is where an extension
-       * belongs and the host that sends this one is moving it there; the bare
-       * field is what every copy of that host already deployed still sends,
-       * and reading only the new name would break against all of them to save
-       * one `??`.
+       * Three spellings, and all three for good. The host that sends this
+       * extension is renaming it to `ahpd.model`, which is where a key it
+       * owns belongs; `_meta.model` is what every copy of that host already
+       * deployed sends; and the bare `state.model` is what the oldest ones
+       * send. Read the newest name first, and read all of them, because a
+       * copy in the field is one whose name nobody here can change.
        */
       const ran = [...list(talking.turns), talking.activeTurn]
         .map(bag)
         .reverse()
         .map((found) => selection(bag(found.message).model, found.usage))
         .find((found) => found !== undefined);
-      const last = ran?.id ?? str(bag(state._meta).model) ?? str(state.model);
+      const meta = bag(state._meta);
+      const last = ran?.id
+        ?? str(meta['ahpd.model'])
+        ?? str(meta.model)
+        ?? str(state.model);
 
       return {
         resource: uri,
