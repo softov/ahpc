@@ -49,7 +49,7 @@ The files read and the patterns to reuse are the `refs` above, each with its not
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - ahpc offers 0.10.0](task-01-ahpc-offers-0-10-0.md) | todo | - |
+| [01 - ahpc offers 0.10.0](task-01-ahpc-offers-0-10-0.md) | doing | - |
 
 ## Risks and tradeoffs
 

@@ -190,8 +190,9 @@ function isRpcRefusal(error: unknown): boolean {
  *
  * A host picks the highest entry it also speaks, so this is a preference
  * rather than a floor. `1.0.0` is the newest published and the version the
- * package below is built from; the three behind it are what an older host
- * answers with, and every command used here is stable across all four.
+ * package below is built from; the three published ones behind it are what an
+ * older host answers with, and every command used here is stable across all
+ * of them.
  *
  * `1.0.0` was offered for two weeks and then withdrawn, and is back for a
  * better reason. The first one was never published: VS Code's host vendors
@@ -205,9 +206,14 @@ function isRpcRefusal(error: unknown): boolean {
  * answering at `1.0.0` costs a host nothing and is what the newer host is
  * for.
  *
+ * `0.10.0` is what VS Code 1.141's host answers, and it accepts nothing else.
+ * It is VS Code's own number, never published, with the wire contract of
+ * `1.0.0` plus canvas actions this client does not read, so it is read as
+ * `1.0.0`. It sits after `1.0.0` so that a host speaking both answers `1.0.0`.
+ *
  * This list is load-bearing, because there is no fallback behind it.
  */
-const VERSIONS = ['1.0.0', '0.9.0', '0.8.0', '0.7.0'];
+const VERSIONS = ['1.0.0', '0.10.0', '0.9.0', '0.8.0', '0.7.0'];
 
 const ROOT = 'ahp-root://';
 const AUTOMATIONS = 'ahp-automations://';

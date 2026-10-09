@@ -1131,6 +1131,60 @@ describe('the handshake asks for what it needs in one round trip', () => {
     await host.close();
   });
 
+  it('offers `1.0.0` first and `0.10.0` right behind it', async () => {
+    const { host, scripted } = await connect();
+    await settle();
+
+    const hello = scripted.asked.find((frame) => frame.method === 'initialize');
+    expect(hello?.params?.protocolVersions).toEqual(['1.0.0', '0.10.0', '0.9.0', '0.8.0', '0.7.0']);
+
+    await host.close();
+  });
+
+  it('loads the session list from a host that answers `0.10.0`', async () => {
+    // VS Code 1.141's host, which accepts `^0.10.0` and nothing else.
+    const { host, scripted } = await connect((one) => { one.protocolVersion = '0.10.0'; });
+    scripted.catalogue = [{
+      resource: SESSION,
+      provider: 'claude',
+      title: 'Session',
+      status: 1,
+      workingDirectories: ['file:///tmp'],
+      createdAt: new Date().toISOString(),
+      modifiedAt: new Date().toISOString(),
+    }];
+
+    expect(host.state()).toBe('connected');
+    const rows = await host.listSessions();
+    expect(rows.length).toBe(1);
+
+    await host.close();
+  });
+
+  it('carries on past the canvas actions a `0.10.0` host sends', async () => {
+    const { host, scripted, read } = await connect((one) => { one.protocolVersion = '0.10.0'; });
+    scripted.states.set(SESSION, { defaultChat: CHAT, chats: [] });
+    scripted.states.set(CHAT, { turns: [] });
+    const reader = read();
+    await settle();
+
+    const canvas = 'ahp-canvas:/c1';
+    await scripted.act(CHAT, { type: 'chat/canvasesChanged', canvases: [{ resource: canvas }] });
+    await scripted.act(canvas, {
+      type: 'canvas/stateChanged',
+      canvas: { instanceId: 'i1', extensionId: 'ext', canvasId: 'board' },
+    });
+    await scripted.act(CHAT, { type: 'chat/draftChanged', draft: { text: 'still here' } });
+    await settle();
+
+    expect(reader.seen.filter((event) => event.type === 'error')).toEqual([]);
+    expect(reader.view()?.draft).toBe('still here');
+    expect(host.state()).toBe('connected');
+
+    reader.close();
+    await host.close();
+  });
+
   /**
    * The three variables `locale()` reads, set together and restored together.
    *

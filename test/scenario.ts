@@ -50,6 +50,8 @@ export class Scripted {
   readonly refuse = new Map<string, string>();
   /** The catalogue this host answers `listSessions` from, in pages of fifty. */
   catalogue: Record<string, unknown>[] = [];
+  /** The version `initialize` answers with. */
+  protocolVersion = '0.9.0';
   /** Whether `initialize` advertises the automations capability. */
   automations = false;
   /** Turns this host is holding behind the window, oldest last. */
@@ -277,7 +279,7 @@ export class Scripted {
       jsonrpc: '2.0',
       id,
       result: {
-        protocolVersion: '0.9.0',
+        protocolVersion: this.protocolVersion,
         serverSeq: this.seq,
         snapshots: this.opening.map((channel) => ({
           resource: channel,
@@ -362,7 +364,7 @@ export class Scripted {
       const asked = (message.params?.initialSubscriptions as string[] | undefined) ?? [];
       this.opening = asked;
       await reply({
-        protocolVersion: '0.9.0',
+        protocolVersion: this.protocolVersion,
         serverSeq: this.seq,
         snapshots: asked.map((channel) => ({
           resource: channel,
