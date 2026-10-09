@@ -1,6 +1,6 @@
 ---
 title: The model is read under both names
-status: implemented
+status: done
 depends: []
 layer: "ahp"
 refs:

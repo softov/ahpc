@@ -1,7 +1,7 @@
 ---
 title: A session's model is read as ahpd.model too
 domain: ahp
-status: active
+status: built
 priority: high
 created: 2026-10-09
 revalidated: 2026-10-09
@@ -44,7 +44,7 @@ ahpc finds a session's model on a host that sends `_meta['ahpd.model']` and on o
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - The model is read under both names](task-01-the-model-is-read-under-both-names.md) | implemented | - |
+| [01 - The model is read under both names](task-01-the-model-is-read-under-both-names.md) | done | - |
 
 ## Risks and tradeoffs
 
@@ -52,7 +52,7 @@ ahpc finds a session's model on a host that sends `_meta['ahpd.model']` and on o
 
 ## Resume state
 
-- **Done so far:** task 01. `src/ahp/live.ts` reads `_meta['ahpd.model']` first, then `_meta.model`, then `state.model`, and the comment above the read names all three. `test/reconnect.test.ts` holds one case per name and one with both. See [implemented.md](implemented.md).
+- **Done so far:** task 01, merged 2026-10-09 as a13ec65;. `src/ahp/live.ts` reads `_meta['ahpd.model']` first, then `_meta.model`, then `state.model`, and the comment above the read names all three. `test/reconnect.test.ts` holds one case per name and one with both. See [implemented.md](implemented.md).
 - **Next action:** none. The plan holds one task, and it is implemented.
 - **Open questions:** none.
 - **Watch out for:** the run against a host that has renamed the key. ahpd `host/43` task 03 does that rename. It waits on this plan.
