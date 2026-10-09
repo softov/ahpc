@@ -40,8 +40,9 @@ Reference: [00-ahp.md](ahp/00-ahp.md)
 | [05 - ahpc speaks protocol 1.0.0](ahp/05-protocol-1-0-0/plan.md) | high | built 2026-10-07 ([implemented.md](ahp/05-protocol-1-0-0/implemented.md)) | - | - |
 | [06 - Trusted folders are sent to the host on every connection](ahp/06-trusted-folders-are-sent-on-every-connection/plan.md) | high | active 2026-10-07; tasks 01-02 implemented, reviewed, awaiting a run against ahpd ([implemented.md](ahp/06-trusted-folders-are-sent-on-every-connection/implemented.md)) | - | - |
 | [07 - A session's model is read as ahpd.model too](ahp/07-a-sessions-model-is-read-as-ahpd-model-too/plan.md) | high | built 2026-10-09 ([implemented.md](ahp/07-a-sessions-model-is-read-as-ahpd-model-too/implemented.md)); a13ec65 | - | ahpd `host/43 p4` task 03 |
+| [08 - A VS Code 1.141 host is reached at 0.10.0](ahp/08-a-vs-code-1-141-host-is-reached-at-0-10-0/plan.md) | high | planned 2026-10-09 | - | - |
 
-Next free number in `ahp`: `08`.
+Next free number in `ahp`: `09`.
 
 ## cli
 
