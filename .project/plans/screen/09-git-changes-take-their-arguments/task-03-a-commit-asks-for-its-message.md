@@ -14,7 +14,8 @@ refs:
 ## Objective
 
 Choosing `commit` opens a prompt filled with the session title.
-Its message says how many staged files it takes, or that it takes every change when nothing is staged, and carries the host's confirmation when the host sent one.
+Its message says how many staged files it takes, or that it takes every change when nothing is staged.
+It also carries the host's confirmation when the host sent one.
 Submitting commits with that message under `_meta['ahp.commit'].message`; escape does nothing.
 
 ## Files

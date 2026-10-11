@@ -12,7 +12,8 @@ refs:
 
 ## Objective
 
-A file row carries `staged` and `unstaged` from the file's `_meta`, and the changes list marks a staged file, so a person can see what a commit will take.
+A file row carries `staged` and `unstaged` from the file's `_meta`.
+The changes list marks a staged file, so a person can see what a commit will take.
 
 ## Files
 
@@ -23,12 +24,15 @@ A file row carries `staged` and `unstaged` from the file's `_meta`, and the chan
 
 ## Steps
 
-1. Read the two flags; a host that says nothing leaves both unset, and nothing is drawn.
+1. Read the two flags. When a host says nothing, leave both unset and draw nothing.
 2. Draw the mark in the row's existing status column, keeping the row one line.
 
 ## Validation
 
-- `test/changes.test.tsx` - a staged file is marked, an unstaged one is not, and one that is both is told apart.
+- `test/changes.test.tsx`:
+  - The list marks a staged file.
+  - It leaves an unstaged file bare.
+  - A file that is both gets a different mark.
 - Checked at 60 and 100 columns.
 
 ## Resume

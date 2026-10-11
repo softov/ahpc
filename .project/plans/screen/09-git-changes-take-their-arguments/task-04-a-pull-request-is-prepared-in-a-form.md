@@ -15,7 +15,9 @@ refs:
 
 ## Objective
 
-Choosing `create-pr` runs `prepare-pull-request`, then opens a modal form with the title, a description text area and a draft switch, filled from the draft, and the branches and repository shown read-only.
+Choosing `create-pr` runs `prepare-pull-request`, then opens a modal form filled from the draft.
+The form has the title, a description text area and a draft switch.
+It shows the branches and the repository read-only.
 Submitting runs `create-pr` with `_meta['vscode.pullRequest']` carrying title, description, draft and the draft's `context` as `expectedContext`, unchanged.
 `prepare-pull-request` is not listed when `create-pr` is; a host that offers only `create-pr` gets the form empty.
 
@@ -34,7 +36,11 @@ Submitting runs `create-pr` with `_meta['vscode.pullRequest']` carrying title, d
 
 ## Validation
 
-- `test/changes.test.tsx` - the form opens on the fake draft; submitting records `expectedContext` equal to the draft's `context`; `prepare-pull-request` is absent from the palette and the verb row when `create-pr` is offered; escape runs nothing.
+- `test/changes.test.tsx`:
+  - The form opens on the fake draft.
+  - Submitting records `expectedContext` equal to the draft's `context`.
+  - The palette and the verb row do not show `prepare-pull-request` when the host offers `create-pr`.
+  - Escape runs nothing.
 - Checked at 60 and 100 columns.
 
 ## Resume

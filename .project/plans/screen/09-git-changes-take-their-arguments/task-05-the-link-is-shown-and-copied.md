@@ -13,7 +13,8 @@ refs:
 
 ## Objective
 
-An external follow-up is drawn on the status row as an OSC 8 link, with a line saying it was copied, and is written to the clipboard.
+The status row draws an external follow-up as an OSC 8 link, with a word saying it was copied.
+The link also goes to the clipboard.
 A follow-up this client cannot read is reported as "the host sent something back", not dropped.
 Leaving the session clears it.
 
@@ -31,7 +32,9 @@ Leaving the session clears it.
 
 ## Validation
 
-- `test/changes.test.tsx` - after `create-pr` on the fake host the status row shows the link and the clipboard holds it; opening another session clears it.
+- `test/changes.test.tsx`:
+  - After `create-pr` on the fake host, the status row shows the link and the clipboard holds it.
+  - Opening another session clears it.
 - Checked by hand in a terminal with OSC 8 and one without.
 
 ## Resume

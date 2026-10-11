@@ -33,9 +33,13 @@ refs:
 
 ## Goal
 
-Committing from the changes screen asks for the message first, says how many staged files the commit takes, and shows the host's warning in the same place.
-Creating a pull request first asks the host to prepare it, then opens a form on the title, description and branches the host suggested, and creates it with what the person kept or changed.
-When the host answers with a link, such as the pull request it opened, the status row shows it as a link and it is on the clipboard.
+Committing from the changes screen asks for the message first.
+The ask says how many staged files the commit takes, and shows the host's warning in the same place.
+Creating a pull request first asks the host to prepare it.
+Then a form opens on the title, description and branches that the host suggested.
+The pull request is created with what the person kept or changed.
+When the host answers with a link, such as the pull request it opened, the status row shows the link.
+The link is also on the clipboard.
 The shell does the same through flags.
 This is what ahpapp already does, in the terminal.
 
@@ -85,10 +89,17 @@ x -> app.ask(changes.run) -> palette: the verbs offered
 
 ## Proposed architecture
 
-- **Data flow** - `invoke(changeset, operationId, target, meta)` answers `{ message?, followUp? }`; `src/ahp/followup.ts` reads a follow-up into a draft or an external link, with no textui in it, so the screen and the shell share it.
+- **Data flow** - `invoke(changeset, operationId, target, meta)` answers `{ message?, followUp? }`.
+  `src/ahp/followup.ts` reads a follow-up into a draft or an external link.
+  It has no textui in it, so the screen and the shell share it.
 - **Event flow** - `changes.run` looks at the operation id: `commit` and `create-pr` ask first, everything else runs as today.
-- **State flow** - a new store key holds the last link, beside `HOST_ERROR`, and the status row draws it; `forgetChanges` clears it with the rest of the changes state.
-- **Layer responsibilities** - `src/ahp/`: the wire, the decode, the fake host · `src/control.ts`: the asks · `src/screens.tsx` and `src/app.tsx`: the form, the row mark, the status row · `src/cli/main.ts`: the flags.
+- **State flow** - a new store key beside `HOST_ERROR` holds the last link, and the status row draws it.
+  `forgetChanges` clears it with the rest of the changes state.
+- **Layer responsibilities**:
+  - `src/ahp/`: the wire, the decode, the fake host.
+  - `src/control.ts`: the asks.
+  - `src/screens.tsx` and `src/app.tsx`: the form, the row mark, the status row.
+  - `src/cli/main.ts`: the flags.
 - **Source-of-truth files** - [`code://src/ahp/operate.ts`](../../../../src/ahp/operate.ts), [`code://src/control.ts`](../../../../src/control.ts)
 
 ## Tasks
@@ -100,20 +111,23 @@ x -> app.ask(changes.run) -> palette: the verbs offered
 | [03 - a commit asks for its message](task-03-a-commit-asks-for-its-message.md) | implemented | 01, 02 |
 | [04 - a pull request is prepared, then read in a form](task-04-a-pull-request-is-prepared-in-a-form.md) | implemented | 01 |
 | [05 - the link the host sends back is shown and copied](task-05-the-link-is-shown-and-copied.md) | implemented | 01 |
-| [06 - the shell takes the same arguments](task-06-the-shell-takes-the-same-arguments.md) | todo | 01, 04 |
+| [06 - the shell takes the same arguments](task-06-the-shell-takes-the-same-arguments.md) | implemented | 01, 04 |
 
 ## Risks and tradeoffs
 
-- The screen names two host verbs, `commit` and `create-pr`, which the rest of the screen never does; a host with other ids for them gets today's behaviour, no worse.
+- The screen names two host verbs, `commit` and `create-pr`, which the rest of the screen never does.
+  A host with other ids for them gets today's behaviour, no worse.
 - ahpc and ahpd share no package, so the follow-up decode is written again here rather than imported from ahpapp or ahpd.
 - A terminal without OSC 8 shows the link as text; the clipboard write is what still makes it usable there.
 
 ## Resume state
 
-- **Done so far:** tasks 01, 02, 03, 04 and 05.
-- **Next action:** [task-06-the-shell-takes-the-same-arguments.md](task-06-the-shell-takes-the-same-arguments.md).
+- **Done so far:** tasks 01 to 06.
+- **Next action:** the hand checks in the checklist below, then review.
 - **Open questions:** none.
-- **Watch out for:** `x` now goes through `app.ask`, so `changes.run` is reached with an `operation` argument from the palette; any new store key on the changes screen must be reset in `forgetChanges`.
+- **Watch out for:**
+  - `x` now goes through `app.ask`, so `changes.run` gets an `operation` argument from the palette.
+  - `forgetChanges` must reset any new store key on the changes screen.
 
 ## Final verification checklist
 

@@ -1,6 +1,6 @@
 ---
 title: The shell takes the same arguments
-status: todo
+status: implemented
 depends: [task-01-an-operation-carries-its-arguments.md, task-04-a-pull-request-is-prepared-in-a-form.md]
 layer: "cli"
 refs:
@@ -25,12 +25,17 @@ refs:
 ## Steps
 
 1. Reuse task 01's `commitMeta` and `createPrMeta`; the shell does no decoding of its own.
-2. With no `--title` and no draft title, stop with a sentence saying `--title` is needed.
+2. With no `--title` and no draft title, stop with a sentence that asks for `--title`.
 
 ## Validation
 
-- `test/cli.test.ts` - `--message` is recorded; `create-pr` records `expectedContext` from the fake draft; the link is printed; `--json` carries `followUp`.
+- `test/cli.test.ts`:
+  - The host records the `--message`.
+  - `create-pr` records `expectedContext` from the fake draft.
+  - The shell prints the link.
+  - `--json` carries `followUp`.
 - `npx vitest run` passes.
 
 ## Resume
 
+Implemented. The usage text has two new lines under `changes`, and `--draft` is in `SWITCHES`.

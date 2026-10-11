@@ -30,12 +30,17 @@ One module reads a follow-up into a pull request draft, an external link, or "so
 ## Steps
 
 1. Widen the contract and its two implementations, keeping every caller compiling with the new argument optional.
-2. Write `followup.ts` against the reference host's shapes: percent-encoded and `;base64` data URIs, a draft only when it has a title and a `context`.
+2. Write `followup.ts` against the reference host's shapes: percent-encoded and `;base64` data URIs.
+   Accept a draft only when it has a title and a `context`.
 3. Give the fake host the two pull request verbs if it lacks them, with a confirmation on neither.
 
 ## Validation
 
-- `test/followup.test.ts` - a percent-encoded and a base64 draft decode; an external link is not a draft; a draft without `context` is not a draft; a non-JSON data URI is unreadable.
+- `test/followup.test.ts`:
+  - A percent-encoded draft and a base64 draft decode.
+  - An external link is not a draft.
+  - A draft without `context` is not a draft.
+  - A non-JSON data URI is unreadable.
 - `test/changes.test.tsx` - the fake host records the `_meta` an invocation carried.
 - `npm run typecheck` and `npx vitest run` pass.
 

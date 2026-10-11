@@ -11,6 +11,9 @@ import type { Where } from '../connect.js';
 import { ago, archived, branch, json, line, mark, project, table } from './render.js';
 import type { HostConnection, HostEvent } from '../ahp/connection.js';
 import { operate } from '../ahp/operate.js';
+import {
+  CREATE_PULL_REQUEST, EMPTY_DRAFT, PREPARE_PULL_REQUEST, commitMeta, createPrMeta, externalLink, pullRequestDraft,
+} from '../ahp/followup.js';
 import { SWITCHES } from '../flags.js';
 import { parseSessionLink, sessionOfLink } from '../links.js';
 import { decodeStatus } from '../ahp/status.js';
@@ -79,6 +82,8 @@ Changes and files
                                [--reviewed f] [--unreviewed f]
                                [--operations]           what may be done to it
                                [--run id] [--file f] [--yes]      do one of them
+                               [--message m]            for commit
+                               [--title t] [--body b] [--draft]  for create-pr
                                [--list] every changeset it offers
                                [--scope <name>] one of them, e.g. turn
                                [--turnId <id>] what a chosen scope still needs
@@ -758,6 +763,37 @@ export async function cli(command: string, rest: string[]): Promise<number> {
           if (one.confirmation !== undefined && !args.has('--yes')) {
             throw new Fault(`${one.confirmation}\nPass --yes to go ahead.`);
           }
+          /*
+           * A shell says what it is about to do and does it.
+           *
+           * `--yes` has already been required for anything the host called
+           * destructive, so the person has said so once; making them say it
+           * twice for the *permission* would be asking about the plumbing
+           * rather than about the act. What is not silent is the fact that
+           * access was taken, which is printed.
+           */
+          const ask = (request: { uri: string }): boolean => {
+            line(`Asking ${request.uri} for write access.`);
+            return true;
+          };
+
+          // A commit's message, and a pull request's form: an empty message
+          // is not sent, and the host commits under the session's title.
+          let meta: Record<string, unknown> | undefined;
+          const message = args.value('--message')?.trim();
+          if (running === 'commit' && message) meta = commitMeta(message);
+          if (running === CREATE_PULL_REQUEST) {
+            // The host's draft first, when it writes one, and what was given
+            // over it. Its `context` goes back as it arrived.
+            const prepares = (set.operations ?? []).some((op) => op.id === PREPARE_PULL_REQUEST && op.status !== 'disabled');
+            const draft = prepares
+              ? pullRequestDraft((await operate(host, target, PREPARE_PULL_REQUEST, { ask })).followUp) ?? EMPTY_DRAFT
+              : EMPTY_DRAFT;
+            const title = (args.value('--title') ?? draft.title).trim();
+            if (title === '') throw new Fault('A pull request needs a title. Pass --title.');
+            meta = createPrMeta({ ...draft, title, description: args.value('--body') ?? draft.description }, args.has('--draft'));
+          }
+
           const done = await operate(host, target, running, {
             ...(needsFile || file !== undefined
               ? {
@@ -767,23 +803,16 @@ export async function cli(command: string, rest: string[]): Promise<number> {
                 },
               }
               : {}),
-            /*
-             * A shell says what it is about to do and does it.
-             *
-             * `--yes` has already been required for anything the host called
-             * destructive, so the person has said so once; making them say it
-             * twice for the *permission* would be asking about the plumbing
-             * rather than about the act. What is not silent is the fact that
-             * access was taken, which is printed.
-             */
-            ask: (request) => {
-              line(`Asking ${request.uri} for write access.`);
-              return true;
-            },
+            ...(meta ? { meta } : {}),
+            ask,
           });
           await host.flush?.();
           if (wants) { json(done); break; }
           line(done.message ?? `${one.label} done.`);
+          // The link the host answered with, such as the pull request it
+          // opened, unless its sentence already said it.
+          const link = externalLink(done.followUp);
+          if (link !== null && done.message?.includes(link) !== true) line(link);
           break;
         }
 

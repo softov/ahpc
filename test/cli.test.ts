@@ -584,3 +584,97 @@ describe('the connection token, and the file the host keeps it in', () => {
     expect(usage).toContain('--connection-token-file');
   });
 });
+
+/*
+ * A changeset verb with its arguments, from the shell.
+ *
+ * Against one scripted host kept across the run, so what it was invoked with
+ * can be read back. `uncommitted` is the scope that offers `commit` and the
+ * pull request pair.
+ */
+describe('ahpc changes --run, with the arguments a verb takes', () => {
+  const SESSION = 'ahp-session:/4e18';
+  const TREE = ['changes', SESSION, '--scope', 'uncommitted'];
+
+  type Host = import('../src/ahp/fake.js').FakeHost;
+  const run = async (rest: string[], shape?: (host: Host) => void): Promise<{ out: string; host: Host }> => {
+    const { fakeHost } = await import('../src/ahp/fake.js');
+    const host = fakeHost();
+    shape?.(host);
+    vi.resetModules();
+    vi.doMock('../src/connect.js', async (importOriginal) => {
+      const real = await importOriginal<typeof import('../src/connect.js')>();
+      return { ...real, connect: async () => host };
+    });
+    const home = mkdtempSync(join(tmpdir(), 'ahpc-run-'));
+    const had = { XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME, AHPC_HOST: process.env.AHPC_HOST };
+    process.env.XDG_CONFIG_HOME = home;
+    delete process.env.AHPC_HOST;
+    let out = '';
+    const write = process.stdout.write.bind(process.stdout);
+    process.stdout.write = ((chunk: string | Uint8Array) => { out += String(chunk); return true; }) as typeof process.stdout.write;
+    try {
+      const { cli } = await import('../src/cli/main.js');
+      const [command, ...args] = [...TREE, ...rest];
+      await cli(command as string, args);
+    }
+    finally {
+      process.stdout.write = write;
+      for (const [key, value] of Object.entries(had)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+      rmSync(home, { recursive: true, force: true });
+      vi.doUnmock('../src/connect.js');
+      vi.resetModules();
+    }
+    return { out, host };
+  };
+
+  it('commits with --message', async () => {
+    const { out, host } = await run(['--run', 'commit', '--message', 'Fix the Linux build']);
+    expect(host.invoked().at(-1)).toMatchObject({ operationId: 'commit', meta: { 'ahpd.commit': { message: 'Fix the Linux build' } } });
+    expect(out).toContain('Committed 1a2b3c4');
+  });
+
+  it('prepares the pull request first and sends its context back', async () => {
+    const { out, host } = await run(['--run', 'create-pr', '--title', 'Linux build', '--draft']);
+    expect(host.invoked().map((one) => one.operationId)).toEqual(['prepare-pull-request', 'create-pr']);
+    expect(host.invoked().at(-1)?.meta).toEqual({
+      'vscode.pullRequest': {
+        title: 'Linux build',
+        // Not given, so the host's draft keeps it.
+        description: 'Adds a Linux build script and its notes.',
+        draft: true,
+        expectedContext: {
+          repository: 'softov/brb_backend', branchName: 'agent/linux-build', baseBranchName: 'main', head: '1a2b3c4',
+        },
+      },
+    });
+    expect(out).toContain('https://github.com/softov/brb_backend/pull/7');
+  });
+
+  it('takes the draft\'s title when --title is not given, and --body over its description', async () => {
+    const { host } = await run(['--run', 'create-pr', '--body', 'Short.']);
+    expect(host.invoked().at(-1)?.meta).toMatchObject({
+      'vscode.pullRequest': { title: 'Build the framework on Linux', description: 'Short.', draft: false },
+    });
+  });
+
+  it('stops without a title when the host prepares none', async () => {
+    const said = await run(['--run', 'create-pr'], (host) => {
+      const read = host.changes.bind(host);
+      host.changes = async (uri, changeset) => {
+        const held = await read(uri, changeset);
+        return { ...held, operations: (held.operations ?? []).filter((one) => one.id !== 'prepare-pull-request') };
+      };
+    }).then(() => null, (error: unknown) => error as Error);
+    expect(said?.message).toBe('A pull request needs a title. Pass --title.');
+  });
+
+  it('carries the follow-up under --json', async () => {
+    const { out } = await run(['--run', 'create-pr', '--json']);
+    const said = JSON.parse(out.slice(out.indexOf('{'))) as { followUp?: { external?: boolean; content: { uri: string } } };
+    expect(said.followUp).toEqual({
+      content: { uri: 'https://github.com/softov/brb_backend/pull/7', contentType: 'text/html' },
+      external: true,
+    });
+  });
+});

@@ -61,6 +61,8 @@ export const SWITCHES: ReadonlySet<string> = new Set([
   '--operations', '--markdown',
   // Asking rather than doing, and agreeing in advance.
   '--list', '--yes',
+  // A pull request opened as a draft.
+  '--draft',
   // Which transport the tool server speaks. Neither takes a value, and the
   // ports it listens on are `--serve-host` and `--serve-port`, which do.
   '--stdio', '--http',
