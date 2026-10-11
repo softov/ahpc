@@ -56,6 +56,8 @@ click or Tab + Enter on an action button -> app.execute('changes.run', { operati
 | A scope that needs a turn is a disabled tab, labelled as today | (defaulted: the row already says the host offers it and this screen cannot reach it) | 01 |
 | A button runs `changes.run` with its operation id, so commit and create-pr open the prompt and the form as `x` does | (defaulted: one path for a verb, whatever starts it) | 02 |
 | A running or failed action keeps its state in the label | (defaulted: the row says it today) | 02 |
+| The arrows pick a scope, as the stock `Tabs` does, and Enter is not bound there | Softov, 2026-10-11, asked "On the scope tabs, how should the keyboard pick a tab?", answered "keep arrow pick" | 01 |
+| An arrow that stops at a disabled tab is proposed to textui, and this plan does not wait for it | Softov, 2026-10-11, asked "what should the textui note propose about a disabled tab?", answered "Arrows skip it" | 01 |
 | Tab order is the tabs, the buttons, then the list; the list still takes focus when the screen opens | (defaulted: the list is where a person reads first) | 01, 02 |
 
 ## Proposed architecture
@@ -70,7 +72,7 @@ click or Tab + Enter on an action button -> app.execute('changes.run', { operati
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - the scopes are tabs](task-01-the-scopes-are-tabs.md) | blocked | - |
+| [01 - the scopes are tabs](task-01-the-scopes-are-tabs.md) | implemented | - |
 | [02 - the actions are buttons](task-02-the-actions-are-buttons.md) | implemented | - |
 
 ## Risks and tradeoffs
@@ -81,17 +83,15 @@ click or Tab + Enter on an action button -> app.execute('changes.run', { operati
 
 ## Resume state
 
-- **Done so far:** task 02 is implemented, and task 01 is built and tested except for Enter on a tab.
-- **Next action:** answer the question below, then finish [task-01-the-scopes-are-tabs.md](task-01-the-scopes-are-tabs.md).
-- **Open questions:**
-  - The stock `Tabs` picks a scope with `left` and `right`, and Enter does nothing there.
-  - An arrow onto a disabled tab stops there and does not skip it.
-  - Does task 01 accept the arrows as its Tab path, or does `Tabs` in textui change first?
-- **Watch out for:** `changes.scope` clears `OPEN_FILE` when the scope moves, and a tab must do the same.
+- **Done so far:** tasks 01 and 02 are implemented and reviewed. See [implemented.md](implemented.md).
+- **Next action:** the hand check in a real terminal.
+- **Open questions:** none.
+- **Watch out for:** an arrow stops at a disabled tab until textui takes `roadmap/ideas/tabs-skip-a-disabled-tab.md`.
 
 ## Final verification checklist
 
-- [ ] `npm run typecheck` clean.
-- [ ] `npx vitest run` passes, with the new cases in `test/changes.test.tsx`.
-- [ ] By hand, in a real terminal at 60 and 100 columns: a click and Tab with Enter both pick a scope and run an action.
-- [ ] `plans/index.md` updated.
+- [x] `npm run typecheck` clean.
+- [x] `npx vitest run` passes, with the new cases in `test/changes.test.tsx`.
+- [ ] By hand, in a real terminal at 60 and 100 columns: a click picks a scope and runs an action.
+- [ ] By hand, at both widths: Tab with an arrow picks a scope, and Tab with Enter runs an action.
+- [x] `plans/index.md` updated.

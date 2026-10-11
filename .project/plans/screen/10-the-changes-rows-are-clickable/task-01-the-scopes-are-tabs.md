@@ -1,6 +1,6 @@
 ---
 title: The scopes are tabs
-status: blocked
+status: implemented
 depends: []
 layer: "screen"
 refs:
@@ -29,23 +29,14 @@ The scopes row is a stock `Tabs`, so a click or Tab with Enter picks a scope.
 ## Validation
 
 - A click on the second tab shows that scope's files and closes an open file.
-- Tab reaches the tabs, and Enter on one picks it.
+- Tab reaches the tabs, and `left` and `right` pick a scope.
 - A disabled tab does not move the scope.
 - `]` still moves to the next reachable scope.
 
 ## Resume
 
 The scopes row is a stock `Tabs`, and `chooseScope` in `src/control.ts` sets `CHANGE_AT` and clears `OPEN_FILE` for `changes.scope` and for the tabs.
-A click picks a scope, a disabled tab does not move it, and `]` and `r` work while the tabs have focus.
+A click picks a scope, and `right` picks the next one.
+A disabled tab does not move the scope, and `]` and `r` work while the tabs have focus.
 `test/changes.test.tsx` holds these cases at 100 and 60 columns.
-
-The second Validation line does not pass.
-Tab reaches the tabs, but the stock `Tabs` takes only `left` and `right`, so Enter does nothing there.
-The tab strip is one focus stop, and an arrow picks the next tab at once.
-The test checks Tab with `right` in place of Tab with Enter.
-
-An arrow onto a disabled tab also stops there and does not skip it.
-From `Uncommitted Changes`, `right` meets `This Turn (needs a turn)` and the scope does not move.
-The cause is in `Tabs`: the arrow handler calls `onChange` only when the next item is not disabled, and it does not look past it.
-
-The question is in the plan's Resume state.
+An arrow stops at a disabled tab and does not skip it, which is the stock `Tabs` and is proposed in textui as `roadmap/ideas/tabs-skip-a-disabled-tab.md`.
