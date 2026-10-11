@@ -1,7 +1,7 @@
 /** Running a changeset operation, including the part where the host says no. */
 
 import type { HostConnection } from './connection.js';
-import type { ChangesetOperationTarget } from './types.js';
+import type { ChangesetOperationTarget, Invoked } from './types.js';
 
 /**
  * A refusal that names the way out of itself.
@@ -42,6 +42,8 @@ export async function operate(
   operationId: string,
   options: {
     target?: ChangesetOperationTarget;
+    /** The operation's arguments, sent as `_meta` on the first try and on the retry. */
+    meta?: Record<string, unknown>;
     /**
      * Whether to go ahead and ask for the access the refusal named.
      *
@@ -51,12 +53,13 @@ export async function operate(
      */
     ask?(request: { uri: string; write?: boolean; read?: boolean }): Promise<boolean> | boolean;
   } = {},
-): Promise<{ message?: string }> {
+): Promise<Invoked> {
   if (!host.invoke) throw new Error('This host connection cannot run changeset operations.');
   const run = () => (host.invoke as NonNullable<HostConnection['invoke']>)(
     changeset,
     operationId,
     options.target,
+    options.meta,
   );
   try {
     return await run();

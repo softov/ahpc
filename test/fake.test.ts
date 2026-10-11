@@ -207,7 +207,7 @@ it('advertises different verbs per scope, and refuses one it did not', async () 
   const session = await host.changes(WITH_CHANGES, `${WITH_CHANGES}/changeset/session`);
   // The working tree can be committed and a conversation cannot; what a turn
   // changed can be put back because both sides of it were captured.
-  expect((tree.operations ?? []).map((one) => one.id)).toEqual(['commit', 'discard']);
+  expect((tree.operations ?? []).map((one) => one.id)).toEqual(['commit', 'discard', 'prepare-pull-request', 'create-pr']);
   expect((session.operations ?? []).map((one) => one.id)).toEqual(['revert']);
   // The advertised list is the access model, not a hint.
   await expect(host.invoke?.(`${WITH_CHANGES}/changeset/session`, 'commit'))

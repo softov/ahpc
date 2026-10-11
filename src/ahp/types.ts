@@ -390,6 +390,25 @@ export interface ChangesetOperationTarget {
 }
 
 /**
+ * What an operation sends back beside its message.
+ *
+ * The protocol says nothing about what `content` is. `external` is the host
+ * saying the person's own handler should open it, such as a pull request's
+ * page; otherwise it is something this client reads, such as a prepared
+ * pull request as a `data:application/json` URI.
+ */
+export interface FollowUp {
+  content: ContentRef;
+  external?: boolean;
+}
+
+/** What an invocation answered. A refusal is the rejection, not a field. */
+export interface Invoked {
+  message?: string;
+  followUp?: FollowUp;
+}
+
+/**
  * What `ahp-root://` advertises: the harnesses, and the models each offers.
  *
  * `models` is routinely empty, and that is a real answer rather than a

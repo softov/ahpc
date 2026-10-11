@@ -1,7 +1,7 @@
 ---
 title: A commit asks for its message, a pull request is prepared in a form, and what the host sends back is shown
 domain: screen
-status: planned
+status: active
 priority: high
 created: 2026-09-30
 revalidated: 2026-09-30
@@ -95,7 +95,7 @@ x -> app.ask(changes.run) -> palette: the verbs offered
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - an operation carries its arguments and brings back its answer](task-01-an-operation-carries-its-arguments.md) | todo | - |
+| [01 - an operation carries its arguments and brings back its answer](task-01-an-operation-carries-its-arguments.md) | implemented | - |
 | [02 - a file says whether it is staged](task-02-a-file-says-whether-it-is-staged.md) | todo | - |
 | [03 - a commit asks for its message](task-03-a-commit-asks-for-its-message.md) | todo | 01, 02 |
 | [04 - a pull request is prepared, then read in a form](task-04-a-pull-request-is-prepared-in-a-form.md) | todo | 01 |
@@ -110,8 +110,8 @@ x -> app.ask(changes.run) -> palette: the verbs offered
 
 ## Resume state
 
-- **Done so far:** nothing.
-- **Next action:** [task-01-an-operation-carries-its-arguments.md](task-01-an-operation-carries-its-arguments.md).
+- **Done so far:** task 01.
+- **Next action:** [task-02-a-file-says-whether-it-is-staged.md](task-02-a-file-says-whether-it-is-staged.md).
 - **Open questions:** none.
 - **Watch out for:** `x` now goes through `app.ask`, so `changes.run` is reached with an `operation` argument from the palette; any new store key on the changes screen must be reset in `forgetChanges`.
 

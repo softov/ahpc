@@ -4,6 +4,8 @@ import type { Harness } from '@textui/testing';
 import { registerChat } from '../src/app.js';
 import { CONTROLLER } from '../src/control.js';
 import { fakeHost } from '../src/ahp/fake.js';
+import type { FakeHost } from '../src/ahp/fake.js';
+import { operate } from '../src/ahp/operate.js';
 import { CHANGE_AT, OPEN_FILE } from '../src/state.js';
 
 /**
@@ -19,8 +21,7 @@ import { CHANGE_AT, OPEN_FILE } from '../src/state.js';
 /** The archived session, which is the one carrying a changeset. */
 const CHANGED = 'ahp-session:/4e18';
 
-async function changes(): Promise<Harness> {
-  const host = fakeHost();
+async function changes(host: FakeHost = fakeHost()): Promise<Harness> {
   const t = await renderApp({
     width: 100,
     height: 30,
@@ -280,5 +281,26 @@ describe('running one of the verbs from the screen', () => {
     // questions, and answering the first is not answering the second.
     expect(t.hasText('Let the host write?')).toBe(true);
     await t.unmount();
+  });
+});
+
+describe('an operation\'s arguments and its answer', () => {
+  const TREE = `${CHANGED}/changeset/uncommitted`;
+
+  it('records the _meta an invocation carried', async () => {
+    const host = fakeHost();
+    await operate(host, TREE, 'commit', { meta: { 'ahpd.commit': { message: 'Fix the build' } }, ask: () => true });
+    expect(host.invoked().at(-1)?.meta).toEqual({ 'ahpd.commit': { message: 'Fix the build' } });
+  });
+
+  it('answers the pull request pair with a draft and then a link', async () => {
+    const host = fakeHost();
+    const prepared = await operate(host, TREE, 'prepare-pull-request');
+    expect(prepared.followUp?.content.uri.startsWith('data:application/json,')).toBe(true);
+    const created = await operate(host, TREE, 'create-pr', { ask: () => true });
+    expect(created.followUp).toEqual({
+      content: { uri: 'https://github.com/softov/brb_backend/pull/7', contentType: 'text/html' },
+      external: true,
+    });
   });
 });

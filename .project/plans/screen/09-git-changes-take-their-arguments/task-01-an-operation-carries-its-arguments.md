@@ -1,6 +1,6 @@
 ---
 title: An operation carries its arguments and brings back its answer
-status: todo
+status: implemented
 depends: []
 layer: "ahp"
 refs:
@@ -41,3 +41,9 @@ One module reads a follow-up into a pull request draft, an external link, or "so
 
 ## Resume
 
+Implemented.
+`invoke` takes an optional `meta` and answers `Invoked`, which keeps `followUp`.
+`src/ahp/followup.ts` reads a follow-up; `test/followup.test.ts` holds its cases.
+The fake host offers `prepare-pull-request` and `create-pr` on the `uncommitted` changeset.
+The prepare needs no write grant on the fake, because it writes nothing.
+`commitMeta` writes `ahpd.commit`, not `ahp.commit`: the reference host reads only `ahpd.commit` since its commit cf12de4.

@@ -59,9 +59,9 @@ export interface FakeHost extends HostConnection {
    * Not on `HostConnection` for the same reason `dispatched` is not: a real
    * host does not hand a client back its own history. Here because the
    * interesting assertion is that an operation ran *after* the grant rather
-   * than despite the gate.
+   * than despite the gate. `meta` is the `_meta` the invocation carried.
    */
-  invoked(): { changeset: string; operationId: string; target?: unknown }[];
+  invoked(): { changeset: string; operationId: string; target?: unknown; meta?: Record<string, unknown> }[];
   /** Paths a watch is open on, so releasing one can be asserted. */
   watching(): string[];
   /**
@@ -424,7 +424,7 @@ export function fakeHost(): FakeHost {
   /** Resources this client has been granted write on, as a real host keeps them. */
   const granted = new Set<string>();
   /** Every operation actually run, so a test can assert the gate was passed rather than skipped. */
-  const invoked: { changeset: string; operationId: string; target?: unknown }[] = [];
+  const invoked: { changeset: string; operationId: string; target?: unknown; meta?: Record<string, unknown> }[] = [];
 
   /**
    * A changeset URI split back into the session and the scope.
@@ -695,11 +695,19 @@ export function fakeHost(): FakeHost {
         icon: 'discard',
         status: 'idle',
       };
+      // The reference host's pull request pair. Neither asks first, and the
+      // prepare writes nothing.
+      const PREPARE_PR: ChangesetOperation = {
+        id: 'prepare-pull-request', label: 'Prepare PR', scopes: ['changeset'], icon: 'git-pull-request-create', group: 'pull-request', status: 'idle',
+      };
+      const CREATE_PR: ChangesetOperation = {
+        id: 'create-pr', label: 'Create PR', scopes: ['changeset'], icon: 'git-pull-request-create', group: 'pull-request', status: 'idle',
+      };
       const per = new Map<string, Changeset>([
         ['session', { ...options.changes, operations: [REVERT] }],
         ['uncommitted', {
           status: 'complete',
-          operations: [COMMIT, DISCARD],
+          operations: [COMMIT, DISCARD, PREPARE_PR, CREATE_PR],
           files: [
             ...files,
             // Somebody else's edit, sitting in the tree beside the agent's.
@@ -2122,7 +2130,7 @@ export function fakeHost(): FakeHost {
      * fixture that always said yes would let a client be built that never
      * learned to ask.
      */
-    invoke: async (changeset, operationId, target) => {
+    invoke: async (changeset, operationId, target, meta) => {
       const at = scopeIn(changeset);
       const held = at && scoped.get(at.owner)?.get(at.scope);
       if (!at || !held) throw new Error(`${changeset} is not a changeset here`);
@@ -2135,13 +2143,40 @@ export function fakeHost(): FakeHost {
         throw Object.assign(new Error(`${operationId} cannot be invoked on a ${kind}`), { code: -32602 });
       }
       const wanted = target?.resource ?? (summaries.get(at.owner)?.workingDirectories[0] ?? '');
-      if (!granted.has(wanted)) {
+      // The prepare reads the repository and writes nothing, so it needs no grant.
+      if (operationId !== 'prepare-pull-request' && !granted.has(wanted)) {
         throw Object.assign(new Error(`Write access to ${wanted} has not been granted`), {
           code: -32009,
           data: { request: { channel: 'ahp-root://', uri: wanted, write: true } },
         });
       }
-      invoked.push({ changeset, operationId, ...(target ? { target } : {}) });
+      invoked.push({ changeset, operationId, ...(target ? { target } : {}), ...(meta ? { meta } : {}) });
+      /*
+       * The pull request pair, answered the way the reference host answers it.
+       *
+       * The prepare is a draft as a percent-encoded `data:application/json`
+       * follow-up, with a `context` the create must send back. The create is
+       * the request's page, as an external follow-up.
+       */
+      if (operationId === 'prepare-pull-request') {
+        const draft = {
+          title: 'Build the framework on Linux',
+          description: 'Adds a Linux build script and its notes.',
+          branchName: 'agent/linux-build',
+          baseBranchName: 'main',
+          repository: 'softov/brb_backend',
+          context: { repository: 'softov/brb_backend', branchName: 'agent/linux-build', baseBranchName: 'main', head: '1a2b3c4' },
+        };
+        return {
+          followUp: {
+            content: { uri: `data:application/json,${encodeURIComponent(JSON.stringify(draft))}`, contentType: 'application/json' },
+          },
+        };
+      }
+      if (operationId === 'create-pr') {
+        const url = 'https://github.com/softov/brb_backend/pull/7';
+        return { message: `Opened ${url}`, followUp: { content: { uri: url, contentType: 'text/html' }, external: true } };
+      }
       // What it did reaches every client through the changeset's own channel,
       // never through this answer.
       if (operationId === 'commit') {

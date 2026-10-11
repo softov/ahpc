@@ -8,7 +8,7 @@ import type { HostConnection, HostEvent } from './connection.js';
 import type {
   Agent, Answer, Automation, AutomationRun, Changeset, ChangesetOperation, ChangesetOperationTarget, Completion, ConfigProperty, ContentRef, Customization, CustomizationKind,
   TerminalRow, TerminalState,
-  FileContent, FileEdit, McpState, PendingInput, QueuedMessage, Question, QuestionKind,
+  FileContent, FileEdit, Invoked, McpState, PendingInput, QueuedMessage, Question, QuestionKind,
   ModelRow, ModelSelection, ResponsePart, SessionConfig, SessionDetail, SessionSummary, SessionUri, ToolCall, ChatOrigin, ChatState,
   ToolCallStatus, Turn, TurnUsage,
 } from './types.js';
@@ -1285,12 +1285,16 @@ function model(value: unknown): ModelRow {
 }
 
 /** What an invocation said for itself. Failure is the rejection, not a field. */
-function decodeInvoked(value: unknown): { message?: string } {
+function decodeInvoked(value: unknown): Invoked {
   const found = bag(value);
   // `message` may be a string or a `{ markdown }`, because the protocol's
   // `StringOrMarkdown` is either.
   const said = str(found.message) ?? str(bag(found.message).markdown);
-  return said !== undefined ? { message: said } : {};
+  const content = contentRef(bag(found.followUp).content);
+  return {
+    ...(said !== undefined ? { message: said } : {}),
+    ...(content ? { followUp: { content, ...(bag(found.followUp).external === true ? { external: true } : {}) } } : {}),
+  };
 }
 
 function changeset(value: unknown): Changeset {
@@ -3095,11 +3099,12 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
      * the screen and the shell can differ. `operate()` is where that lives, so
      * it happens the same way against this host and against the scripted one.
      */
-    invoke: async (changesetUri, operationId, target) => decodeInvoked(
+    invoke: async (changesetUri, operationId, target, meta) => decodeInvoked(
       await client.request('invokeChangesetOperation', {
         channel: changesetUri,
         operationId,
         ...(target ? { target } : {}),
+        ...(meta ? { _meta: meta } : {}),
       }),
     ),
 

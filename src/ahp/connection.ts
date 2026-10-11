@@ -1,6 +1,6 @@
 import type {
   Agent, Answer, Automation, AutomationRun, Changeset, Completion, ContentRef, Customization, FileContent, PendingInput, QueuedMessage,
-  ChangesetOperationTarget, ChangesetScope, ChatSource, ChatState, ModelSelection, ResourceEntry, SessionConfig, SessionDetail, SessionSummary, SessionUri, TerminalRow, TerminalState,
+  ChangesetOperationTarget, ChangesetScope, Invoked, ChatSource, ChatState, ModelSelection, ResourceEntry, SessionConfig, SessionDetail, SessionSummary, SessionUri, TerminalRow, TerminalState,
   ToolCall, Turn,
 } from './types.js';
 
@@ -381,8 +381,12 @@ export interface HostConnection {
    * `target` is omitted for a changeset-scoped operation and required for the
    * others. A host refuses an `operationId` it did not advertise, which is why
    * this takes one rather than an enum.
+   *
+   * `meta` is the operation's arguments, sent as the request's `_meta`: a
+   * commit's message, a pull request's title. The protocol has no other field
+   * for them. The answer keeps the host's `followUp` beside its message.
    */
-  invoke?(changeset: string, operationId: string, target?: ChangesetOperationTarget): Promise<{ message?: string }>;
+  invoke?(changeset: string, operationId: string, target?: ChangesetOperationTarget, meta?: Record<string, unknown>): Promise<Invoked>;
 
   /**
    * Ask to be allowed to write something.
