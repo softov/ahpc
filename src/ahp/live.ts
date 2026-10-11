@@ -1312,9 +1312,21 @@ function changeset(value: unknown): Changeset {
         ...(contentRef(bag(edit.before).content) ? { before: contentRef(bag(edit.before).content) as ContentRef } : {}),
         ...(contentRef(bag(edit.after).content) ? { after: contentRef(bag(edit.after).content) as ContentRef } : {}),
       };
+      /*
+       * Staging, under the host's own keys.
+       *
+       * The reference host sends `ahpd.staged` and `ahpd.unstaged`, and its
+       * older copies send `staged` and `unstaged`. The new name is read first,
+       * as `ahpd.model` is. Only `true` is kept: a host that says nothing
+       * draws no mark.
+       */
+      const meta = bag(bag(entry)._meta);
+      const flag = (name: string): boolean => (`ahpd.${name}` in meta ? meta[`ahpd.${name}`] : meta[name]) === true;
       return {
         uri: after ?? before ?? '',
         ...(bag(entry).reviewed === true ? { reviewed: true } : {}),
+        ...(flag('staged') ? { staged: true } : {}),
+        ...(flag('unstaged') ? { unstaged: true } : {}),
         ...(before ? { before } : {}),
         ...(after ? { after } : {}),
         diff: {

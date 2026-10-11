@@ -1,6 +1,6 @@
 ---
 title: A file says whether it is staged
-status: todo
+status: implemented
 depends: []
 layer: "ahp, screen"
 refs:
@@ -33,3 +33,5 @@ A file row carries `staged` and `unstaged` from the file's `_meta`, and the chan
 
 ## Resume
 
+Implemented. The reference host sends `_meta['ahpd.staged']` and `_meta['ahpd.unstaged']`, so `live.ts` reads those names first and the bare names second.
+The mark is drawn in `src/view/changes.tsx`, where `ChangesList` draws each row, in a one-cell column beside the kind icon.

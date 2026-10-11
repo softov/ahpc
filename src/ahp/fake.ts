@@ -709,11 +709,15 @@ export function fakeHost(): FakeHost {
           status: 'complete',
           operations: [COMMIT, DISCARD, PREPARE_PR, CREATE_PR],
           files: [
-            ...files,
+            // What git says of each: the first staged, the second staged and
+            // then changed again, the rest only in the tree.
+            ...files.map((file, at): FileEdit => (at === 0 ? { ...file, staged: true }
+              : at === 1 ? { ...file, staged: true, unstaged: true }
+                : { ...file, unstaged: true })),
             // Somebody else's edit, sitting in the tree beside the agent's.
             // What makes `uncommitted` worth a separate scope rather than a
             // second name for `session`.
-            edited(`${options.dir}/notes.todo`, null, 'check the kqueue patch against 10.1\n'),
+            { ...edited(`${options.dir}/notes.todo`, null, 'check the kqueue patch against 10.1\n'), unstaged: true },
           ],
         }],
       ]);

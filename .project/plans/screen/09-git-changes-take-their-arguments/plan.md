@@ -96,7 +96,7 @@ x -> app.ask(changes.run) -> palette: the verbs offered
 | Task | Status | Depends on |
 | --- | --- | --- |
 | [01 - an operation carries its arguments and brings back its answer](task-01-an-operation-carries-its-arguments.md) | implemented | - |
-| [02 - a file says whether it is staged](task-02-a-file-says-whether-it-is-staged.md) | todo | - |
+| [02 - a file says whether it is staged](task-02-a-file-says-whether-it-is-staged.md) | implemented | - |
 | [03 - a commit asks for its message](task-03-a-commit-asks-for-its-message.md) | todo | 01, 02 |
 | [04 - a pull request is prepared, then read in a form](task-04-a-pull-request-is-prepared-in-a-form.md) | todo | 01 |
 | [05 - the link the host sends back is shown and copied](task-05-the-link-is-shown-and-copied.md) | todo | 01 |
@@ -110,8 +110,8 @@ x -> app.ask(changes.run) -> palette: the verbs offered
 
 ## Resume state
 
-- **Done so far:** task 01.
-- **Next action:** [task-02-a-file-says-whether-it-is-staged.md](task-02-a-file-says-whether-it-is-staged.md).
+- **Done so far:** tasks 01 and 02.
+- **Next action:** [task-03-a-commit-asks-for-its-message.md](task-03-a-commit-asks-for-its-message.md).
 - **Open questions:** none.
 - **Watch out for:** `x` now goes through `app.ask`, so `changes.run` is reached with an `operation` argument from the palette; any new store key on the changes screen must be reset in `forgetChanges`.
 

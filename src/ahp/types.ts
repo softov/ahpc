@@ -310,6 +310,16 @@ export interface FileEdit {
    * megabytes it does not. So a row is cheap and opening one is a fetch.
    */
   content?: { before?: ContentRef; after?: ContentRef };
+  /**
+   * Whether git's index holds a change to it, and whether the tree holds one
+   * the index does not.
+   *
+   * From the file's `_meta`, which is where the host says it. Both can be
+   * true: a change staged and then changed again. Absent is a host that does
+   * not say, not "unstaged".
+   */
+  staged?: boolean;
+  unstaged?: boolean;
 }
 
 /**

@@ -234,6 +234,35 @@ describe('choosing which changeset, and ticking files off', () => {
   });
 });
 
+describe('what a commit will take', () => {
+  /** The row naming `name`, whatever else is on the screen. */
+  const row = (t: Harness, name: string): string => t.lines().find((line) => line.includes(name)) ?? '';
+  // Either glyph set: the full one, or the ASCII fallback.
+  const staged = (line: string) => line.includes('●') || /\*\s*[+\->]/.test(line);
+  const both = (line: string) => line.includes('◌') || /\+\s*[+\->]/.test(line);
+
+  it('marks a staged file, leaves an unstaged one bare, and tells apart one that is both', async () => {
+    const t = await changes();
+    await t.press(']');
+    for (let i = 0; i < 10; i++) await t.settle();
+    // The fixture stages the first file, stages and then changes the second,
+    // and leaves the rest in the tree.
+    expect(staged(row(t, 'compileLinux.sh'))).toBe(true);
+    expect(both(row(t, 'compileLinux.sh'))).toBe(false);
+    expect(both(row(t, 'README.linux.md'))).toBe(true);
+    expect(staged(row(t, 'README.linux.md'))).toBe(false);
+    expect(staged(row(t, 'notes.todo')) || both(row(t, 'notes.todo'))).toBe(false);
+    await t.unmount();
+  });
+
+  it('draws no mark where the host says nothing about staging', async () => {
+    const t = await changes();
+    // The session's own changeset carries no git state at all.
+    expect(t.hasText('●') || t.hasText('◌')).toBe(false);
+    await t.unmount();
+  });
+});
+
 describe('running one of the verbs from the screen', () => {
   it('shows the confirmation before invoking, which the protocol requires', async () => {
     const t = await changes();

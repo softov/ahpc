@@ -55,6 +55,9 @@ export const ChangesList: (props: ChangesListProps) => RenderOutput =
     }
 
     const byUri = new Map(changes.files.map((file) => [file.uri, file]));
+    // Only a host that reports staging gets the column; one that says nothing
+    // about it keeps the row as it was.
+    const staging = changes.files.some((file) => file.staged === true || file.unstaged === true);
 
     const items: ListItem[] = changes.files.map((file) => {
       const kind = !file.before ? 'new' : !file.after ? 'deleted' : 'edited';
@@ -87,6 +90,19 @@ export const ChangesList: (props: ChangesListProps) => RenderOutput =
                   shrink={0}
                 />
               ) : null}
+              {/* Staged, or staged and then changed again: what a commit
+                  takes, and what it takes only part of. */}
+              {staging ? (() => {
+                const file = byUri.get(item.id);
+                const staged = file?.staged === true;
+                return (
+                  <text
+                    content={!staged ? ' ' : file?.unstaged === true ? theme.glyphs.bulletHalf : theme.glyphs.bulletFilled}
+                    fg={(file?.unstaged === true ? 'warning' : 'success') as SemanticVariant}
+                    shrink={0}
+                  />
+                );
+              })() : null}
               <text
                 content={item.icon ?? ''}
                 {...(state.selected ? {} : { fg: item.tone })}
