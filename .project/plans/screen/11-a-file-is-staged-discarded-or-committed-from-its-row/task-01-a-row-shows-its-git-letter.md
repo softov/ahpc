@@ -1,6 +1,6 @@
 ---
 title: A row shows its git letter
-status: todo
+status: implemented
 depends: []
 layer: "screen"
 refs:
@@ -34,3 +34,15 @@ Each row on the changes screen shows its git status letter in place of `+`, `-` 
 - Each letter shows on a row of its kind.
 - The staged mark column shows as before.
 - At 60 columns a rename's label truncates and the list keeps its rows.
+
+## Resume
+
+`gitLetter(file, staging)` in `src/view/changes.tsx:32` gives M, A, D, R or U, and `LETTER_TONE` at line 40 gives the tone.
+The row's icon is the letter, at `src/view/changes.tsx:91`.
+A and U are `success`, D is `danger`, and R and M are `warning`.
+A rename reads `old -> new`, with both paths as a row shows a path.
+`staging` is the same flag that decides the staged mark column, so a host that reports no staging shows A for a new file.
+`test/changes.test.tsx:408` holds 5 cases.
+They check M, A and D on the session scope, and U, A and R on the working tree, at 100 and 60 columns.
+One more case checks the rename label.
+The two regexes in "what a commit will take" now match a letter after the staged mark.

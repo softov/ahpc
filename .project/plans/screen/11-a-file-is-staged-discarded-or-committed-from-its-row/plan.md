@@ -1,7 +1,7 @@
 ---
 title: A file is staged, unstaged, discarded or committed from its row, or with every file
 domain: screen
-status: planned
+status: active
 priority: high
 created: 2026-10-11
 revalidated: 2026-10-11
@@ -76,9 +76,9 @@ p -> changes.run('create-pr') -> the pull request form, as today
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - A row shows its git letter](task-01-a-row-shows-its-git-letter.md) | todo | - |
-| [02 - Keys run the operations](task-02-keys-run-the-operations.md) | todo | - |
-| [03 - A dialog asks this file or all files](task-03-a-dialog-asks-this-file-or-all-files.md) | todo | 02 |
+| [01 - A row shows its git letter](task-01-a-row-shows-its-git-letter.md) | implemented | - |
+| [02 - Keys run the operations](task-02-keys-run-the-operations.md) | implemented | - |
+| [03 - A dialog asks this file or all files](task-03-a-dialog-asks-this-file-or-all-files.md) | implemented | 02 |
 
 ## Risks and tradeoffs
 
@@ -89,13 +89,14 @@ p -> changes.run('create-pr') -> the pull request form, as today
 
 ## Resume state
 
-- **Done so far:** nothing.
-- **Next action:** Softov reviews the plan.
+- **Done so far:** tasks 01, 02 and 03 are implemented and await review. See [implemented.md](implemented.md).
+- **Next action:** the hand check against an ahpd with host/82, at 60 and 100 columns.
 - **Open questions:** none.
+- **Watch out for:** against an ahpd without host/82, stage, unstage and discard show This file only, and commit shows All files only.
 
 ## Final verification checklist
 
-- [ ] `npm run typecheck` clean.
-- [ ] `npx vitest run` passes, with the new cases in `test/changes.test.tsx`.
+- [x] `npm run typecheck` clean.
+- [x] `npx vitest run` passes, with the new cases in `test/changes.test.tsx`.
 - [ ] By hand against an ahpd with host/82, at 60 and 100 columns: each key opens the dialog with This file focused, and both targets work.
-- [ ] `plans/index.md` updated.
+- [x] `plans/index.md` updated.
