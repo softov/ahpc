@@ -1,6 +1,6 @@
 ---
 title: Docs
-status: implemented
+status: done
 depends: [task-01-the-host-is-told-the-trusted-folders.md]
 layer: "docs"
 refs:

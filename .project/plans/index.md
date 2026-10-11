@@ -38,7 +38,7 @@ Reference: [00-ahp.md](ahp/00-ahp.md)
 | [03 - Read the connection token from the file the host keeps it in](ahp/03-a-connection-token-from-a-file/plan.md) | medium | built 2026-09-24 ([implemented.md](ahp/03-a-connection-token-from-a-file/implemented.md)) | - | - |
 | [04 - Keep resource tokens out of recordings, and keep a dismissed sign-in prompt dismissed](ahp/04-no-token-on-disk-and-no-prompt-from-a-tick/plan.md) | high | built 2026-09-26 ([implemented.md](ahp/04-no-token-on-disk-and-no-prompt-from-a-tick/implemented.md)) | - | - |
 | [05 - ahpc speaks protocol 1.0.0](ahp/05-protocol-1-0-0/plan.md) | high | built 2026-10-07 ([implemented.md](ahp/05-protocol-1-0-0/implemented.md)) | - | - |
-| [06 - Trusted folders are sent to the host on every connection](ahp/06-trusted-folders-are-sent-on-every-connection/plan.md) | high | active 2026-10-07; tasks 01-02 implemented, reviewed, awaiting a run against ahpd ([implemented.md](ahp/06-trusted-folders-are-sent-on-every-connection/implemented.md)) | - | - |
+| [06 - Trusted folders are sent to the host on every connection](ahp/06-trusted-folders-are-sent-on-every-connection/plan.md) | high | built 2026-10-11 ([implemented.md](ahp/06-trusted-folders-are-sent-on-every-connection/implemented.md)) | - | - |
 | [07 - A session's model is read as ahpd.model too](ahp/07-a-sessions-model-is-read-as-ahpd-model-too/plan.md) | high | built 2026-10-09 ([implemented.md](ahp/07-a-sessions-model-is-read-as-ahpd-model-too/implemented.md)); a13ec65 | - | ahpd `host/43 p4` task 03 |
 | [08 - A VS Code 1.141 host is reached at 0.10.0](ahp/08-a-vs-code-1-141-host-is-reached-at-0-10-0/plan.md) | high | built 2026-10-09 ([implemented.md](ahp/08-a-vs-code-1-141-host-is-reached-at-0-10-0/implemented.md)); 356852c | - | - |
 

@@ -1,7 +1,7 @@
 ---
 title: Trusted folders are sent to the host on every connection
 domain: ahp
-status: active
+status: built
 priority: high
 created: 2026-10-07
 revalidated: 2026-10-07
@@ -88,8 +88,8 @@ export interface Config { /* ... */ trust?: string[] }
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - The host is told the trusted folders on every connection](task-01-the-host-is-told-the-trusted-folders.md) | implemented | - |
-| [02 - Docs](task-02-docs.md) | implemented | 01 |
+| [01 - The host is told the trusted folders on every connection](task-01-the-host-is-told-the-trusted-folders.md) | done | - |
+| [02 - Docs](task-02-docs.md) | done | 01 |
 
 ## Risks and tradeoffs
 
@@ -99,12 +99,12 @@ export interface Config { /* ... */ trust?: string[] }
 ## Resume state
 
 - **Done so far:** both tasks. `src/ahp/trust.ts` exists with `trustedUris` and `pushTrust`. `connect` calls `pushTrust` after `pushTokens` on every connection. The CLI and the screen build `Where.trust` from the config list, and add `--cwd` or `--path` when the run says `--trust`. `README.md` documents the key and the flag, and `test/trust.test.ts` holds eight cases. See [implemented.md](implemented.md).
-- **Next action:** none. The one checklist item left is the run against a live ahpd 0.10.0.
+- **Next action:** none. The plan is built.
 - **Open questions:** none.
 - **Watch out for:** the fake host never calls `onConnected`, so the trust tests use the scripted live host.
 
 ## Final verification checklist
 
 - [x] `npm run typecheck` and `npm test` pass.
-- [ ] Against ahpd 0.10.0, a Claude session in a folder from the list loads the project's `CLAUDE.md`. Needs a live host, so it is left to Softov.
+- [x] Against ahpd 0.10.0, a Claude session in a folder from the list loads the project's `CLAUDE.md`.
 - [x] `plans/index.md` updated.

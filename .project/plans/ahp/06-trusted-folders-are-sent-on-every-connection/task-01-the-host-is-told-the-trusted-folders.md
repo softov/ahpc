@@ -1,6 +1,6 @@
 ---
 title: The host is told the trusted folders on every connection
-status: implemented
+status: done
 depends: []
 layer: "ahp, cli, screen"
 refs:

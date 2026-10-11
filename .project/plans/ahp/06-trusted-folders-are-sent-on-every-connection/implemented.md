@@ -32,6 +32,7 @@ An empty list sends nothing.
 
 - `npm run typecheck` clean, `npm run build` clean.
 - `npm test` - 676 passed, 1 failed. The failure is `test/smoke.test.tsx > the composer is the front door > puts where the session runs on a row of its own, and asks only what the host asks`, which expects the composer chip to contain `ahpc`. The chip draws the last segment of the working directory, and this run is in the worktree `build-agents-8ab748de`. The case fails at the unmodified baseline in this worktree, and its subject is untouched by this plan.
+- 2026-10-11, against the local ahpd: `ahpc exec --agent claude --cwd <folder> --trust` loaded a marker from the folder's `CLAUDE.md`. The same run without `--trust` did not load it.
 - `node .agents/skills/do-spec/scripts/lint-prose.mjs .project/plans/ahp/06-trusted-folders-are-sent-on-every-connection` found nothing.
 
 ## Departures from the plan
@@ -42,5 +43,4 @@ An empty list sends nothing.
 
 ## Left for later
 
-- The run against a live ahpd 0.10.0, where a session in a listed folder loads the project's own `CLAUDE.md`. It needs a host, so it is Softov's to do. The plan's checklist records it as the one open item.
 - `createSession` still writes its folder as a plain `file://` URI with no encoding, while `trustedUris` encodes. The host compares folders rather than text, so the two spellings meet, as the plan's risks note.
