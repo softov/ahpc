@@ -16,7 +16,7 @@ import { toBlocks } from './blocks.js';
 import { chatMatches, linksIn, parseSessionLink, sessionOfLink } from './links.js';
 import { operate } from './ahp/operate.js';
 import {
-  CREATE_PULL_REQUEST, EMPTY_DRAFT, PREPARE_PULL_REQUEST, chosenOperations, commitMeta, createPrMeta, externalLink, pullRequestDraft,
+  ASKS_TARGET, CREATE_PULL_REQUEST, EMPTY_DRAFT, PREPARE_PULL_REQUEST, chosenOperations, commitMeta, createPrMeta, externalLink, pullRequestDraft,
 } from './ahp/followup.js';
 import type { PullRequestDraft } from './ahp/followup.js';
 import { attempt, failureWords } from './ahp/auth.js';
@@ -37,7 +37,7 @@ import {
   HOST, HOST_ERROR, HOST_LINK, INPUT, MODEL, MODEL_CONFIG, OPEN_TERMINAL, TERMINALS, TERMINAL_LIST,
   AUTOMATIONS, AUTOMATION_EDIT, AUTOMATION_ROW, AUTOMATION_SIDEBAR, AUTH_ASK,
   CHANGES as CHANGES_AT_PATH, CHANGE_AT, CHANGE_ROW, CHANGE_SCOPES, FILES_AT, FILES_OPEN,
-  OPEN, OPEN_FILE, PROVIDER, PULL_REQUEST, PULL_REQUEST_LAYER, MARKDOWN, QUEUE, QUIT_ARMED, QUIT_WINDOW_MS, RUNNING, SCREEN, SELECTED, SETTINGS, SIDEBAR,
+  OPEN, OPEN_FILE, PROVIDER, PULL_REQUEST, PULL_REQUEST_LAYER, TARGET_LAYER, MARKDOWN, QUEUE, QUIT_ARMED, QUIT_WINDOW_MS, RUNNING, SCREEN, SELECTED, SETTINGS, SIDEBAR,
   SPLIT_AT, SPLIT_DEFAULT, TURNS, WORKSPACE,
   applyEvent, inputRefused, openSession, pendingInput, queue, reportHostError, sendingInput, sessions, turns,
   writeSessions, writeStatus,
@@ -1341,6 +1341,45 @@ function commands(
   });
 
   /**
+   * Ask whether a verb acts on this file or on every file.
+   *
+   * The buttons are This file, All files and Cancel, in that order, and each
+   * shows only when `file` or `all` says it can: the stock dialog focuses its
+   * first action, so This file has the focus when it is there. `danger` is a
+   * host confirmation, which marks the verb destructive.
+   */
+  const askTarget = (ask: { title: string; message: string; file: boolean; all: boolean; danger: boolean }): Promise<'file' | 'all' | null> =>
+    new Promise((resolve) => {
+      let settled = false;
+      const finish = (value: 'file' | 'all' | null) => {
+        if (settled) return;
+        settled = true;
+        handle.dispose();
+        resolve(value);
+      };
+      const tone = ask.danger ? 'danger' : 'primary';
+      const handle = app.layers.open({
+        id: TARGET_LAYER,
+        layer: 'modal',
+        scrim: true,
+        trapFocus: true,
+        dismissOnEscape: true,
+        onClose: () => finish(null),
+        node: {
+          component: 'Dialog',
+          title: ask.title,
+          width: 56,
+          actions: [
+            ...(ask.file ? [{ id: 'file', label: app.i18n.t('commands.target.file'), tone, onPress: () => finish('file') }] : []),
+            ...(ask.all ? [{ id: 'all', label: app.i18n.t('commands.target.all'), tone, onPress: () => finish('all') }] : []),
+            { id: 'cancel', label: app.i18n.t('commands.target.cancel'), onPress: () => finish(null) },
+          ],
+          children: { component: 'text', content: ask.message, wrap: 'word' },
+        },
+      });
+    });
+
+  /**
    * Open the pull request form, and wait for it to be sent or put away.
    *
    * `null` is escape or cancel. The draft that comes back is what the form
@@ -1900,25 +1939,52 @@ function commands(
         const held = app.store.get<Changeset>(CHANGES_AT_PATH);
         const wanted = String(given?.operation ?? '');
         const operation = (held?.operations ?? []).find((one) => one.id === wanted);
-        if (!at || !operation) return;
+        // A key names its verb whether or not this changeset offers it, so a
+        // verb that is absent or disabled is a key that does nothing.
+        if (!at || !operation || operation.status === 'disabled') return;
         const row = app.store.get<string>(CHANGE_ROW) ?? '';
-        const onFile = !operation.scopes.includes('changeset');
-        if (onFile && !row) return;
+        let onFile = !operation.scopes.includes('changeset');
+
+        if (ASKS_TARGET.has(operation.id)) {
+          /*
+           * This file or all files, asked first.
+           *
+           * The dialog carries the host's confirmation, so a verb that has one
+           * is not asked again below.
+           */
+          const file = operation.scopes.includes('resource') && row !== '';
+          const all = operation.scopes.includes('changeset');
+          if (!file && !all) return;
+          const target = await askTarget({
+            title: operation.label,
+            message: operation.confirmation
+              ?? (file
+                ? app.i18n.t('commands.target.ask', { operation: operation.label, path: row.replace(/^file:\/\//, '') })
+                : app.i18n.t('commands.target.askAll', { operation: operation.label })),
+            file,
+            all,
+            danger: operation.confirmation !== undefined,
+          });
+          if (target === null) return;
+          onFile = target === 'file';
+        }
+        else if (onFile && !row) return;
 
         let meta: Record<string, unknown> | undefined;
         if (operation.id === 'commit') {
           /*
-           * A commit asks for its message, and the host's confirmation is
-           * shown in the same ask rather than in a second dialog before it.
-           * The host commits what is staged, or every change when nothing is.
+           * A commit asks for its message, and says what it takes: this file,
+           * or what is staged, or every change when nothing is.
            */
           const staged = (held?.files ?? []).filter((file) => file.staged === true).length;
-          const takes = staged > 0
-            ? app.i18n.plural(staged, { one: app.i18n.t('commands.commit.staged.one'), other: app.i18n.t('commands.commit.staged.other') })
-            : app.i18n.t('commands.commit.everything');
+          const takes = onFile
+            ? app.i18n.t('commands.commit.file')
+            : staged > 0
+              ? app.i18n.plural(staged, { one: app.i18n.t('commands.commit.staged.one'), other: app.i18n.t('commands.commit.staged.other') })
+              : app.i18n.t('commands.commit.everything');
           const message = await askText(app.layers, {
             title: operation.label,
-            message: operation.confirmation === undefined ? takes : `${takes} ${operation.confirmation}`,
+            message: takes,
             placeholder: app.i18n.t('commands.commit.placeholder'),
             initialValue: openSession(app.store)?.title ?? '',
           });
@@ -1952,7 +2018,7 @@ function commands(
           if (chosen === null) return;
           meta = createPrMeta(chosen.draft, chosen.isDraft);
         }
-        else if (operation.confirmation !== undefined) {
+        else if (operation.confirmation !== undefined && !ASKS_TARGET.has(operation.id)) {
           const yes = await confirm(app.layers, {
             title: operation.label,
             message: operation.confirmation,
@@ -3130,6 +3196,13 @@ function shipped(i18n: TextUIApp['i18n']): Binding[] {
     // argument, so the key opens the picker rather than committing to a verb -
     // which is right, because the verbs differ per changeset and per host.
     { keys: 'x', commandId: 'app.ask', args: { command: 'changes.run' }, scopeId: CHANGES_SCOPE },
+    // One key per verb. A verb the changeset does not offer, or has
+    // disabled, leaves its key inert; `changes.run` checks.
+    { keys: 's', commandId: 'changes.run', args: { operation: 'stage' }, scopeId: CHANGES_SCOPE },
+    { keys: 'u', commandId: 'changes.run', args: { operation: 'unstage' }, scopeId: CHANGES_SCOPE },
+    { keys: 'delete', commandId: 'changes.run', args: { operation: 'discard' }, scopeId: CHANGES_SCOPE },
+    { keys: 'c', commandId: 'changes.run', args: { operation: 'commit' }, scopeId: CHANGES_SCOPE },
+    { keys: 'p', commandId: 'changes.run', args: { operation: CREATE_PULL_REQUEST }, scopeId: CHANGES_SCOPE },
     // Scoped to the screen, so a letter is a letter everywhere else. `enter`
     // is the list's own and opens the detail, so running one is a key of its
     // own and never the thing a stray enter does.

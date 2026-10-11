@@ -75,6 +75,9 @@ export const PULL_REQUEST = '$/chat/conv/pullRequest' as BindingPath;
 
 /** The layer the pull request form is drawn on. */
 export const PULL_REQUEST_LAYER = 'pull-request';
+
+/** The layer id of the dialog that asks this file or all files. */
+export const TARGET_LAYER = 'changes-target';
 /**
  * Where the file browser is looking, and what it found.
  *

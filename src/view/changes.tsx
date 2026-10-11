@@ -2,7 +2,7 @@ import type { BoxProps, RenderOutput, SemanticVariant } from '@textui/core';
 import { defineComponent, useI18n, useTheme } from '@textui/core';
 import type { ListItem, ListItemState } from '@textui/widgets';
 import { Column, EmptyState, List, Marquee, Row } from '@textui/widgets';
-import type { Changeset } from '../ahp/types.js';
+import type { Changeset, FileEdit } from '../ahp/types.js';
 
 /**
  * What the session changed on disk.
@@ -19,6 +19,34 @@ import type { Changeset } from '../ahp/types.js';
  * hand-rolled cursor over a changeset of two hundred files is the mistake the
  * catalogue already made once.
  */
+
+/** A row's git status letter: modified, added, deleted, renamed or untracked. */
+export type GitLetter = 'M' | 'A' | 'D' | 'R' | 'U';
+
+/**
+ * The git status letter of one file.
+ *
+ * `staging` is whether the host reports staging on this changeset. Without
+ * it, a new file is A, because U and A differ only in `staged`.
+ */
+export function gitLetter(file: FileEdit, staging: boolean): GitLetter {
+  if (!file.before) return file.staged !== true && staging ? 'U' : 'A';
+  if (!file.after) return 'D';
+  if (file.before !== file.after) return 'R';
+  return 'M';
+}
+
+/** The tone of each letter. */
+const LETTER_TONE: Record<GitLetter, SemanticVariant> = {
+  A: 'success',
+  U: 'success',
+  D: 'danger',
+  R: 'warning',
+  M: 'warning',
+};
+
+/** A file URI as a row shows it. */
+const path = (uri: string): string => uri.replace(/^file:\/\//, '');
 
 export interface ChangesListProps extends BoxProps {
   changes: Changeset;
@@ -60,13 +88,13 @@ export const ChangesList: (props: ChangesListProps) => RenderOutput =
     const staging = changes.files.some((file) => file.staged === true || file.unstaged === true);
 
     const items: ListItem[] = changes.files.map((file) => {
-      const kind = !file.before ? 'new' : !file.after ? 'deleted' : 'edited';
+      const letter = gitLetter(file, staging);
       return {
         id: file.uri,
-        icon: kind === 'new' ? '+' : kind === 'deleted' ? '-' : theme.glyphs.chevronRight,
-        label: file.uri.replace(/^file:\/\//, ''),
+        icon: letter,
+        label: letter === 'R' ? `${path(file.before ?? '')} -> ${path(file.after ?? '')}` : path(file.uri),
         meta: `+${file.diff.added} -${file.diff.removed}`,
-        tone: (kind === 'new' ? 'success' : kind === 'deleted' ? 'danger' : 'muted') as SemanticVariant,
+        tone: LETTER_TONE[letter],
       };
     });
 

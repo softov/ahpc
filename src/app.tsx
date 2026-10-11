@@ -14,11 +14,13 @@ import { fakeHost } from './ahp/fake.js';
 import { hostResources } from './resources.js';
 import type { HostConnection } from './ahp/connection.js';
 import {
-  BOOD, BOOD_FLOAT, BOOD_FLOOR, BOOD_INLINE, FOCUS, HOST, HOST_ERROR, HOST_LINK, INPUT, INPUT_STATUS, OPEN, RUNNING, SCREEN,
+  BOOD, BOOD_FLOAT, BOOD_FLOOR, BOOD_INLINE, CHANGES, FOCUS, HOST, HOST_ERROR, HOST_LINK, INPUT, INPUT_STATUS, OPEN, RUNNING, SCREEN,
   SESSIONS,
   SPLIT_AT, SPLIT_DEFAULT, QUIT_ARMED, STATUS, TERMINAL_LIST, UPDATE_NOTICE, WORKSPACE, boodFloor, openSession, workspaceName,
 } from './state.js';
 import type { HostState, InputStatus } from './state.js';
+import type { Changeset } from './ahp/types.js';
+import { CREATE_PULL_REQUEST } from './ahp/followup.js';
 import { registerMessages } from './i18n/index.js';
 import { decodeStatus } from './ahp/status.js';
 import {
@@ -232,6 +234,17 @@ const Hints = defineComponent<BoxProps>('ChatHints', (props) => {
   // in and on the way out; the layers themselves are not something a
   // component can subscribe to.
   const inPanel = app.layers.entries().some((entry) => entry.trapFocus === true);
+  // The verbs the changeset on screen offers, so a verb key is hinted only
+  // where it runs something.
+  const changeset = useStoreValue<Changeset | null>(CHANGES, null);
+  const offered = new Set((changeset?.operations ?? []).filter((one) => one.status !== 'disabled').map((one) => one.id));
+  const verbs = [
+    { keys: 's', id: 'stage', label: i18n.t('views.app.hintStage') },
+    { keys: 'u', id: 'unstage', label: i18n.t('views.app.hintUnstage') },
+    { keys: 'del', id: 'discard', label: i18n.t('views.app.hintDiscard') },
+    { keys: 'c', id: 'commit', label: i18n.t('views.app.hintCommit') },
+    { keys: 'p', id: CREATE_PULL_REQUEST, label: i18n.t('views.app.hintPullRequest') },
+  ].filter((verb) => offered.has(verb.id)).map(({ keys, label }) => ({ keys, label }));
 
   // A question is not a confirmation, and the keys are not the same either.
   // Offering "a approve" over an elicitation is the same mistake as rendering
@@ -374,7 +387,7 @@ const Hints = defineComponent<BoxProps>('ChatHints', (props) => {
           // Only where they do something. A hint for a key that is inert on
           // this screen is worse than no hint.
           ...(screen === 'changes'
-            ? [{ keys: ']', label: i18n.t('views.app.hintChangeset') }, { keys: 'r', label: i18n.t('views.app.hintRead') }, { keys: 'x', label: i18n.t('views.app.hintDo') }]
+            ? [{ keys: ']', label: i18n.t('views.app.hintChangeset') }, { keys: 'r', label: i18n.t('views.app.hintRead') }, { keys: 'x', label: i18n.t('views.app.hintDo') }, ...verbs]
             : []),
           // Named only where they do something. `enter` opens the detail, so
           // running one has a key of its own.

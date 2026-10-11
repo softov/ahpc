@@ -128,6 +128,9 @@ export const PREPARE_PULL_REQUEST = 'prepare-pull-request';
 /** The verb that opens the pull request. */
 export const CREATE_PULL_REQUEST = 'create-pr';
 
+/** The verbs that ask whether they act on this file or on every file. */
+export const ASKS_TARGET: ReadonlySet<string> = new Set(['commit', 'discard', 'stage', 'unstage']);
+
 /**
  * The operations a person chooses from.
  *
