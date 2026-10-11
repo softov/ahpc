@@ -1,6 +1,6 @@
 ---
 title: The link the host sends back is shown and copied
-status: todo
+status: implemented
 depends: [task-01-an-operation-carries-its-arguments.md]
 layer: "screen"
 refs:
@@ -36,3 +36,6 @@ Leaving the session clears it.
 
 ## Resume
 
+Implemented. The link is held in `HOST_LINK` (`$/chat/host/link`) and drawn on the status row after a refusal and before the update notice.
+A draft that reaches the shared handler shows only its message, since the form reads the draft where it asks for one.
+The OSC 8 hand check is open.

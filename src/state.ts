@@ -195,6 +195,9 @@ export const SETTINGS = '$/chat/compose/settings' as BindingPath;
 /** What the host last refused, in the host's own words. Cleared by success. */
 export const HOST_ERROR = '$/chat/host/error' as BindingPath;
 
+/** The link the host last answered a changeset verb with, such as a pull request. */
+export const HOST_LINK = '$/chat/host/link' as BindingPath;
+
 /**
  * That a newer release of this client is on npm, as one sentence, or `null`.
  *

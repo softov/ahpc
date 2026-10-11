@@ -14,7 +14,7 @@ import { fakeHost } from './ahp/fake.js';
 import { hostResources } from './resources.js';
 import type { HostConnection } from './ahp/connection.js';
 import {
-  BOOD, BOOD_FLOAT, BOOD_FLOOR, BOOD_INLINE, FOCUS, HOST, HOST_ERROR, INPUT, INPUT_STATUS, OPEN, RUNNING, SCREEN,
+  BOOD, BOOD_FLOAT, BOOD_FLOOR, BOOD_INLINE, FOCUS, HOST, HOST_ERROR, HOST_LINK, INPUT, INPUT_STATUS, OPEN, RUNNING, SCREEN,
   SESSIONS,
   SPLIT_AT, SPLIT_DEFAULT, QUIT_ARMED, STATUS, TERMINAL_LIST, UPDATE_NOTICE, WORKSPACE, boodFloor, openSession, workspaceName,
 } from './state.js';
@@ -448,6 +448,9 @@ const Status = defineComponent<Record<string, never>>('ChatStatus', () => {
   // is about the key just pressed, and the hints are a chord away in the
   // palette.
   const notice = useStoreValue<string | null>(UPDATE_NOTICE, null) ?? null;
+  // The link a changeset verb answered with, after a refusal: it is already on
+  // the clipboard, and drawn as a link where the terminal can open one.
+  const link = useStoreValue<string | null>(HOST_LINK, null) ?? null;
   // Ahead of everything: it is about the key just pressed, and it is gone
   // again in under a second.
   const armed = useStoreValue<boolean>(QUIT_ARMED, false) ?? false;
@@ -457,6 +460,13 @@ const Status = defineComponent<Record<string, never>>('ChatStatus', () => {
         ? <text content={i18n.t('views.app.quitArmed')} fg="warning" bold flex={1} truncate="end" />
         : error
         ? <text content={error} fg="danger" flex={1} truncate="end" />
+        : link
+        ? (
+          <Row gap={1} flex={1}>
+            <text content={link} link={link} fg="accent" truncate="end" />
+            <text content={i18n.t('views.app.linkCopied')} fg="muted" shrink={0} />
+          </Row>
+        )
         : notice
           ? <text content={notice} fg="muted" flex={1} truncate="end" />
           : <Hints flex={1} />}

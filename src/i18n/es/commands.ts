@@ -189,6 +189,7 @@ export const commands: Record<string, string> = {
   'commands.pullRequest.draft': 'Borrador',
   'commands.pullRequest.cancel': 'Cancelar',
   'commands.pullRequest.titleNeeded': 'Un pull request necesita un título.',
+  'commands.followUpUnread': 'El host envió algo que este cliente no sabe mostrar.',
   'commands.noEditor': 'No hay $VISUAL ni $EDITOR definidos, así que no hay editor que abrir.',
   'commands.harnessArg': 'Qué agente ejecuta esto',
   'commands.modelArg': 'Sobre qué se ejecuta el próximo mensaje',

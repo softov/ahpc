@@ -5,7 +5,7 @@ import type {
   ServiceKey,
   TextUIApp,
 } from '@textui/core';
-import { createBag, serviceKey } from '@textui/core';
+import { createBag, serviceKey, writeClipboard } from '@textui/core';
 import { spawn } from 'node:child_process';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -16,7 +16,7 @@ import { toBlocks } from './blocks.js';
 import { chatMatches, linksIn, parseSessionLink, sessionOfLink } from './links.js';
 import { operate } from './ahp/operate.js';
 import {
-  CREATE_PULL_REQUEST, EMPTY_DRAFT, PREPARE_PULL_REQUEST, chosenOperations, commitMeta, createPrMeta, pullRequestDraft,
+  CREATE_PULL_REQUEST, EMPTY_DRAFT, PREPARE_PULL_REQUEST, chosenOperations, commitMeta, createPrMeta, externalLink, pullRequestDraft,
 } from './ahp/followup.js';
 import type { PullRequestDraft } from './ahp/followup.js';
 import { attempt, failureWords } from './ahp/auth.js';
@@ -34,7 +34,7 @@ import type { Invoked } from './ahp/types.js';
 import { SessionFlag } from './ahp/types.js';
 import {
   ARCHIVED, BOOD_FLOAT, CAN_ADD_CHAT, CAN_FORK, CAN_SIDE_CHAT, CHAT_URI, CHATS, CUSTOMIZATIONS, CURSOR, DRAFT, EXPANDED, FILTER, FIND, FINDING, FIND_AT, HAS_CHATS,
-  HOST, HOST_ERROR, INPUT, MODEL, MODEL_CONFIG, OPEN_TERMINAL, TERMINALS, TERMINAL_LIST,
+  HOST, HOST_ERROR, HOST_LINK, INPUT, MODEL, MODEL_CONFIG, OPEN_TERMINAL, TERMINALS, TERMINAL_LIST,
   AUTOMATIONS, AUTOMATION_EDIT, AUTOMATION_ROW, AUTOMATION_SIDEBAR, AUTH_ASK,
   CHANGES as CHANGES_AT_PATH, CHANGE_AT, CHANGE_ROW, CHANGE_SCOPES, FILES_AT, FILES_OPEN,
   OPEN, OPEN_FILE, PROVIDER, PULL_REQUEST, PULL_REQUEST_LAYER, MARKDOWN, QUEUE, QUIT_ARMED, QUIT_WINDOW_MS, RUNNING, SCREEN, SELECTED, SETTINGS, SIDEBAR,
@@ -598,6 +598,7 @@ export function createController(
     app.store.set(CHANGE_AT, '');
     app.store.set(CHANGE_ROW, '');
     app.store.set(PULL_REQUEST, null);
+    app.store.set(HOST_LINK, null);
     if (app.layers.entries().some((entry) => entry.id === PULL_REQUEST_LAYER)) app.layers.close(PULL_REQUEST_LAYER);
   };
 
@@ -1371,13 +1372,26 @@ function commands(
     });
 
   /**
-   * What the host answered a changeset verb with.
+   * What the host answered a changeset verb with, on the status row.
    *
-   * The host's own sentence about what it did, shown where a refusal would be.
-   * A silent success on a destructive verb reads as one that did not happen.
+   * A link goes on the row as a link and on the clipboard. A draft is read
+   * where it is asked for, so here only its message is shown. Otherwise the
+   * host's own sentence is shown where a refusal would be, because a silent
+   * success on a destructive verb reads as one that did not happen. A
+   * follow-up this client cannot read is said, not dropped.
    */
   const answered = (done: Invoked): void => {
-    if (done.message !== undefined) app.store.set(HOST_ERROR, done.message);
+    const link = externalLink(done.followUp);
+    if (link !== null) {
+      app.store.set(HOST_ERROR, null);
+      app.store.set(HOST_LINK, link);
+      writeClipboard(app.store, link, app.terminal);
+      return;
+    }
+    app.store.set(HOST_LINK, null);
+    const unread = done.followUp !== undefined && pullRequestDraft(done.followUp) === null;
+    const words = [done.message, unread ? app.i18n.t('commands.followUpUnread') : undefined].filter((one) => one !== undefined);
+    if (words.length > 0) app.store.set(HOST_ERROR, words.join(' '));
   };
 
   return [

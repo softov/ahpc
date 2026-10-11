@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { readClipboard } from '@textui/core';
 import { renderApp } from '@textui/testing';
 import type { Harness } from '@textui/testing';
 import { registerChat } from '../src/app.js';
@@ -6,7 +7,7 @@ import { CONTROLLER } from '../src/control.js';
 import { fakeHost } from '../src/ahp/fake.js';
 import type { FakeHost } from '../src/ahp/fake.js';
 import { operate } from '../src/ahp/operate.js';
-import { CHANGE_AT, OPEN_FILE } from '../src/state.js';
+import { CHANGE_AT, HOST_ERROR, HOST_LINK, OPEN_FILE } from '../src/state.js';
 
 /**
  * The changeset, and one file out of it.
@@ -492,6 +493,62 @@ describe('a pull request is prepared, then read in a form', () => {
     await t.press('x');
     for (let i = 0; i < 10; i++) await t.settle();
     expect(t.hasText('Prepare PR')).toBe(false);
+    await t.unmount();
+  });
+});
+
+describe('the link the host sends back', () => {
+  const PULL = 'https://github.com/softov/brb_backend/pull/7';
+
+  /** The working tree, with the pull request created through the form. */
+  async function created(): Promise<Harness> {
+    const t = await changes();
+    await t.press(']');
+    for (let i = 0; i < 10; i++) await t.settle();
+    void t.app.execute('changes.run', { operation: 'create-pr' });
+    for (let i = 0; i < 12; i++) await t.settle();
+    await t.press('enter');
+    for (let i = 0; i < 10; i++) await t.settle();
+    if (t.hasText('Let the host write?')) {
+      await t.press('enter');
+      for (let i = 0; i < 12; i++) await t.settle();
+    }
+    return t;
+  }
+
+  it('shows the link on the status row and puts it on the clipboard', async () => {
+    const t = await created();
+    expect(t.app.store.get(HOST_LINK)).toBe(PULL);
+    expect(t.hasText('pull/7')).toBe(true);
+    expect(t.hasText('copied')).toBe(true);
+    expect(readClipboard(t.app.store)).toBe(PULL);
+    await t.unmount();
+  });
+
+  it('is gone once another session is opened', async () => {
+    const t = await created();
+    t.app.services.require(CONTROLLER).open('ahp-session:/1f0a');
+    for (let i = 0; i < 10; i++) await t.settle();
+    expect(t.app.store.get(HOST_LINK) ?? null).toBeNull();
+    expect(t.hasText('copied')).toBe(false);
+    await t.unmount();
+  });
+
+  it('says so when the host sends back something it cannot read', async () => {
+    const host = fakeHost();
+    const invoke = host.invoke!.bind(host);
+    host.invoke = async (changeset, operationId, target, meta) => {
+      if (operationId === 'commit') return { followUp: { content: { uri: 'ahpd-blob:/x', contentType: 'image/png' } } };
+      return invoke(changeset, operationId, target, meta);
+    };
+    const t = await changes(host);
+    await t.press(']');
+    for (let i = 0; i < 10; i++) await t.settle();
+    void t.app.execute('changes.run', { operation: 'commit' });
+    for (let i = 0; i < 10; i++) await t.settle();
+    await t.press('enter');
+    for (let i = 0; i < 10; i++) await t.settle();
+    expect(t.app.store.get(HOST_ERROR)).toBe('The host sent something back that this client cannot show.');
     await t.unmount();
   });
 });

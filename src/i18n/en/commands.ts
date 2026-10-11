@@ -189,6 +189,7 @@ export const commands: Record<string, string> = {
   'commands.pullRequest.draft': 'Draft',
   'commands.pullRequest.cancel': 'Cancel',
   'commands.pullRequest.titleNeeded': 'A pull request needs a title.',
+  'commands.followUpUnread': 'The host sent something back that this client cannot show.',
   'commands.noEditor': 'No $VISUAL or $EDITOR is set, so there is no editor to open.',
   'commands.harnessArg': 'Which agent runs this',
   'commands.modelArg': 'What the next message runs on',

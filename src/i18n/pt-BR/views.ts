@@ -125,6 +125,7 @@ export const views: Record<string, string> = {
   'views.app.help': 'ajuda',
   'views.app.commands': 'comandos',
   'views.app.quitArmed': 'ctrl+c de novo para sair',
+  'views.app.linkCopied': 'copiado',
   'views.app.hintApprove': 'aprovar',
   'views.app.hintDeny': 'negar',
   'views.app.hintOption': 'opção',

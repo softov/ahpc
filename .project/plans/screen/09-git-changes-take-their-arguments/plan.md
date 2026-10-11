@@ -99,7 +99,7 @@ x -> app.ask(changes.run) -> palette: the verbs offered
 | [02 - a file says whether it is staged](task-02-a-file-says-whether-it-is-staged.md) | implemented | - |
 | [03 - a commit asks for its message](task-03-a-commit-asks-for-its-message.md) | implemented | 01, 02 |
 | [04 - a pull request is prepared, then read in a form](task-04-a-pull-request-is-prepared-in-a-form.md) | implemented | 01 |
-| [05 - the link the host sends back is shown and copied](task-05-the-link-is-shown-and-copied.md) | todo | 01 |
+| [05 - the link the host sends back is shown and copied](task-05-the-link-is-shown-and-copied.md) | implemented | 01 |
 | [06 - the shell takes the same arguments](task-06-the-shell-takes-the-same-arguments.md) | todo | 01, 04 |
 
 ## Risks and tradeoffs
@@ -110,8 +110,8 @@ x -> app.ask(changes.run) -> palette: the verbs offered
 
 ## Resume state
 
-- **Done so far:** tasks 01, 02, 03 and 04.
-- **Next action:** [task-05-the-link-is-shown-and-copied.md](task-05-the-link-is-shown-and-copied.md).
+- **Done so far:** tasks 01, 02, 03, 04 and 05.
+- **Next action:** [task-06-the-shell-takes-the-same-arguments.md](task-06-the-shell-takes-the-same-arguments.md).
 - **Open questions:** none.
 - **Watch out for:** `x` now goes through `app.ask`, so `changes.run` is reached with an `operation` argument from the palette; any new store key on the changes screen must be reset in `forgetChanges`.
 
