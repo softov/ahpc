@@ -3,6 +3,7 @@ import { createI18n } from '@textui/core';
 import type { ChatSession } from '@textui/chat';
 import type { HostEvent } from './ahp/connection.js';
 import type { AuthAsk } from './ahp/auth.js';
+import type { PullRequestDraft } from './ahp/followup.js';
 import type {
   Changeset, PendingInput, QueuedMessage, SessionSummary, SessionUri, Turn,
 } from './ahp/types.js';
@@ -60,6 +61,20 @@ export const CHANGE_SCOPES = '$/chat/conv/scopes' as BindingPath;
 export const CHANGE_AT = '$/chat/conv/scope' as BindingPath;
 /** The row the cursor is on, so a key can act on it. */
 export const CHANGE_ROW = '$/chat/conv/row' as BindingPath;
+
+/** The pull request form, while it is open: the verb's label and the draft it shows. */
+export interface PullRequestAsk {
+  label: string;
+  /** The host is still preparing the draft, and the form waits for it. */
+  preparing: boolean;
+  draft: PullRequestDraft;
+}
+
+/** The pull request form's state, or `null` when it is closed. */
+export const PULL_REQUEST = '$/chat/conv/pullRequest' as BindingPath;
+
+/** The layer the pull request form is drawn on. */
+export const PULL_REQUEST_LAYER = 'pull-request';
 /**
  * Where the file browser is looking, and what it found.
  *

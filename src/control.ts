@@ -15,7 +15,10 @@ import { findBlocks, valueIcon } from '@textui/chat';
 import { toBlocks } from './blocks.js';
 import { chatMatches, linksIn, parseSessionLink, sessionOfLink } from './links.js';
 import { operate } from './ahp/operate.js';
-import { commitMeta } from './ahp/followup.js';
+import {
+  CREATE_PULL_REQUEST, EMPTY_DRAFT, PREPARE_PULL_REQUEST, chosenOperations, commitMeta, createPrMeta, pullRequestDraft,
+} from './ahp/followup.js';
+import type { PullRequestDraft } from './ahp/followup.js';
 import { attempt, failureWords } from './ahp/auth.js';
 import { forget, remember, resolveToken } from './ahp/tokens.js';
 import type { AuthAsk } from './ahp/auth.js';
@@ -34,11 +37,12 @@ import {
   HOST, HOST_ERROR, INPUT, MODEL, MODEL_CONFIG, OPEN_TERMINAL, TERMINALS, TERMINAL_LIST,
   AUTOMATIONS, AUTOMATION_EDIT, AUTOMATION_ROW, AUTOMATION_SIDEBAR, AUTH_ASK,
   CHANGES as CHANGES_AT_PATH, CHANGE_AT, CHANGE_ROW, CHANGE_SCOPES, FILES_AT, FILES_OPEN,
-  OPEN, OPEN_FILE, PROVIDER, MARKDOWN, QUEUE, QUIT_ARMED, QUIT_WINDOW_MS, RUNNING, SCREEN, SELECTED, SETTINGS, SIDEBAR,
+  OPEN, OPEN_FILE, PROVIDER, PULL_REQUEST, PULL_REQUEST_LAYER, MARKDOWN, QUEUE, QUIT_ARMED, QUIT_WINDOW_MS, RUNNING, SCREEN, SELECTED, SETTINGS, SIDEBAR,
   SPLIT_AT, SPLIT_DEFAULT, TURNS, WORKSPACE,
   applyEvent, inputRefused, openSession, pendingInput, queue, reportHostError, sendingInput, sessions, turns,
   writeSessions, writeStatus,
 } from './state.js';
+import type { PullRequestAsk } from './state.js';
 
 /**
  * The control side: what the application can do, and what it does when the
@@ -593,6 +597,8 @@ export function createController(
     app.store.set(CHANGE_SCOPES, []);
     app.store.set(CHANGE_AT, '');
     app.store.set(CHANGE_ROW, '');
+    app.store.set(PULL_REQUEST, null);
+    if (app.layers.entries().some((entry) => entry.id === PULL_REQUEST_LAYER)) app.layers.close(PULL_REQUEST_LAYER);
   };
 
   /** One call to the host, run once more after a credential the host accepted. */
@@ -1317,6 +1323,53 @@ function commands(
     }));
   };
 
+  /** The question whether the host may write, for the verb named. */
+  const askWrite = (label: string) => (request: { uri: string }): Promise<boolean> => confirm(app.layers, {
+    title: app.i18n.t('commands.hostWrite.title'),
+    message: app.i18n.t('commands.hostWrite.message', { operation: label, path: request.uri.replace(/^file:\/\//, '') }),
+    confirmLabel: app.i18n.t('commands.hostWrite.confirm'),
+    cancelLabel: app.i18n.t('commands.hostWrite.cancel'),
+    tone: 'danger',
+  });
+
+  /**
+   * Open the pull request form, and wait for it to be sent or put away.
+   *
+   * `null` is escape or cancel. The draft that comes back is what the form
+   * holds, with the host's `context` carried through untouched.
+   */
+  const askPullRequest = (ask: PullRequestAsk): Promise<{ draft: PullRequestDraft; isDraft: boolean } | null> =>
+    new Promise((resolve) => {
+      let settled = false;
+      const finish = (value: { draft: PullRequestDraft; isDraft: boolean } | null): void => {
+        if (settled) return;
+        settled = true;
+        app.store.set(PULL_REQUEST, null);
+        if (app.layers.entries().some((entry) => entry.id === PULL_REQUEST_LAYER)) app.layers.close(PULL_REQUEST_LAYER);
+        resolve(value);
+      };
+      app.store.set(PULL_REQUEST, ask);
+      app.layers.open({
+        id: PULL_REQUEST_LAYER,
+        layer: 'modal',
+        scrim: true,
+        trapFocus: true,
+        dismissOnEscape: true,
+        onClose: () => finish(null),
+        node: {
+          component: 'PullRequestForm',
+          onSubmit: {
+            handler: (values: { title: string; description: string; isDraft: boolean }) => {
+              const held = app.store.get<PullRequestAsk | null>(PULL_REQUEST);
+              if (!held) return;
+              finish({ draft: { ...held.draft, title: values.title, description: values.description }, isDraft: values.isDraft });
+            },
+          },
+          onCancel: { handler: () => finish(null) },
+        },
+      });
+    });
+
   /**
    * What the host answered a changeset verb with.
    *
@@ -1818,7 +1871,7 @@ function commands(
         // more than it says.
         choices: () => {
           const held = app.store.get<Changeset>(CHANGES_AT_PATH);
-          return (held?.operations ?? [])
+          return chosenOperations(held?.operations ?? [])
             .filter((one) => one.status !== 'disabled')
             .map((one) => ({ value: one.id, label: one.label, description: one.description ?? '' }));
         },
@@ -1855,6 +1908,31 @@ function commands(
           // session's title.
           if (message.trim() !== '') meta = commitMeta(message.trim());
         }
+        else if (operation.id === CREATE_PULL_REQUEST) {
+          /*
+           * The form opens at once and waits for the host's draft, as the
+           * reference client does. A host with no prepare verb gets it empty.
+           */
+          const prepares = (held?.operations ?? []).some((one) => one.id === PREPARE_PULL_REQUEST && one.status !== 'disabled');
+          const answer = askPullRequest({ label: operation.label, preparing: prepares, draft: EMPTY_DRAFT });
+          if (prepares) {
+            try {
+              const prepared = await operate(connection, at, PREPARE_PULL_REQUEST, { ask: askWrite(operation.label) });
+              // Closed while it was preparing: nothing to fill.
+              if (app.store.get<PullRequestAsk | null>(PULL_REQUEST) === null) return;
+              app.store.set(PULL_REQUEST, { label: operation.label, preparing: false, draft: pullRequestDraft(prepared.followUp) ?? EMPTY_DRAFT });
+            }
+            catch (error) {
+              // A refused prepare closes the form and leaves the host's words.
+              if (app.layers.entries().some((entry) => entry.id === PULL_REQUEST_LAYER)) app.layers.close(PULL_REQUEST_LAYER);
+              controller.report(error);
+              return;
+            }
+          }
+          const chosen = await answer;
+          if (chosen === null) return;
+          meta = createPrMeta(chosen.draft, chosen.isDraft);
+        }
         else if (operation.confirmation !== undefined) {
           const yes = await confirm(app.layers, {
             title: operation.label,
@@ -1880,13 +1958,7 @@ function commands(
              * would be one where saying yes to a diff quietly hands over the
              * working tree.
              */
-            ask: (request: { uri: string }) => confirm(app.layers, {
-              title: app.i18n.t('commands.hostWrite.title'),
-              message: app.i18n.t('commands.hostWrite.message', { operation: operation.label, path: request.uri.replace(/^file:\/\//, '') }),
-              confirmLabel: app.i18n.t('commands.hostWrite.confirm'),
-              cancelLabel: app.i18n.t('commands.hostWrite.cancel'),
-              tone: 'danger',
-            }),
+            ask: askWrite(operation.label),
           });
           answered(done);
         }

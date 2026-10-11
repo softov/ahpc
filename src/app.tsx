@@ -23,7 +23,7 @@ import { registerMessages } from './i18n/index.js';
 import { decodeStatus } from './ahp/status.js';
 import {
   AutomationsScreen, ChangesScreen, ChatScreen, FilesScreen, HostsScreen, McpScreen, NewAutomationScreen, NewSessionScreen, SessionsScreen, TerminalScreen,
-  SettingsScreen, SkillsScreen, UsageScreen,
+  PullRequestForm, SettingsScreen, SkillsScreen, UsageScreen,
 } from './screens.js';
 import {
   ChatBubble, ChatComposer, ChatHitl, ChatTranscript, ConnectionBadge, ReasoningBlock, SEND_ID, SessionList, StreamingText,
@@ -563,6 +563,7 @@ export function registerChat(app: TextUIApp, options: ChatOptions = {}): Disposa
     ['UsageScreen', UsageScreen],
     ['BoodOverlay', BoodOverlay],
     ['SignInPrompt', SignInPrompt],
+    ['PullRequestForm', PullRequestForm],
     ['ChatHeader', Header],
     ['ChatStatus', Status],
     ['ChatHints', Hints],

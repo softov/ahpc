@@ -15,7 +15,7 @@
  * them in `packages/sdk/src/changes.ts`; ahpc shares no package with either.
  */
 
-import type { FollowUp } from './types.js';
+import type { ChangesetOperation, FollowUp } from './types.js';
 
 function bag(value: unknown): Record<string, unknown> {
   return typeof value === 'object' && value !== null ? value as Record<string, unknown> : {};
@@ -121,6 +121,23 @@ export const COMMIT_META = 'ahpd.commit';
 
 /** The `_meta` key the reference client puts a pull request's form under. */
 export const PULL_REQUEST_META = 'vscode.pullRequest';
+
+/** The verb that writes the pull request draft. */
+export const PREPARE_PULL_REQUEST = 'prepare-pull-request';
+
+/** The verb that opens the pull request. */
+export const CREATE_PULL_REQUEST = 'create-pr';
+
+/**
+ * The operations a person chooses from.
+ *
+ * `prepare-pull-request` is the first step of `create-pr` when both are
+ * offered, so it is not listed on its own then.
+ */
+export function chosenOperations(operations: readonly ChangesetOperation[]): ChangesetOperation[] {
+  const creates = operations.some((one) => one.id === CREATE_PULL_REQUEST);
+  return operations.filter((one) => !(creates && one.id === PREPARE_PULL_REQUEST));
+}
 
 /** The `_meta` a commit carries: its message. */
 export function commitMeta(message: string): Record<string, unknown> {

@@ -387,6 +387,115 @@ describe('a commit asks for its message', () => {
   });
 });
 
+describe('a pull request is prepared, then read in a form', () => {
+  async function tree(host: FakeHost = fakeHost(), width = 100): Promise<Harness> {
+    const t = await renderApp({
+      width,
+      height: 36,
+      shell: 'workbench',
+      theme: 'workbench',
+      onBoot: (app) => { registerChat(app, { host }); },
+    });
+    for (let i = 0; i < 8; i++) await t.settle();
+    t.app.services.require(CONTROLLER).open(CHANGED);
+    for (let i = 0; i < 8; i++) await t.settle();
+    await t.app.execute('changes.show');
+    for (let i = 0; i < 8; i++) await t.settle();
+    await t.press(']');
+    for (let i = 0; i < 10; i++) await t.settle();
+    return t;
+  }
+
+  it('opens on the draft the host prepared', async () => {
+    const host = fakeHost();
+    const t = await tree(host);
+    void t.app.execute('changes.run', { operation: 'create-pr' });
+    for (let i = 0; i < 12; i++) await t.settle();
+    expect(host.invoked().map((one) => one.operationId)).toEqual(['prepare-pull-request']);
+    expect(t.hasText('Build the framework on Linux')).toBe(true);
+    expect(t.hasText('Adds a Linux build script and its notes.')).toBe(true);
+    expect(t.hasText('agent/linux-build into main')).toBe(true);
+    expect(t.hasText('softov/brb_backend')).toBe(true);
+    await t.unmount();
+  });
+
+  it('fits at 60 columns', async () => {
+    const t = await tree(fakeHost(), 60);
+    void t.app.execute('changes.run', { operation: 'create-pr' });
+    for (let i = 0; i < 12; i++) await t.settle();
+    expect(t.hasText('Build the framework on Linux')).toBe(true);
+    expect(t.lines().every((line) => line.length <= 60)).toBe(true);
+    await t.unmount();
+  });
+
+  it('sends the draft\'s context back exactly as it arrived', async () => {
+    const host = fakeHost();
+    const t = await tree(host);
+    void t.app.execute('changes.run', { operation: 'create-pr' });
+    for (let i = 0; i < 12; i++) await t.settle();
+    // Enter in the title sends the form.
+    await t.press('enter');
+    for (let i = 0; i < 10; i++) await t.settle();
+    // The write grant, which is its own question.
+    if (t.hasText('Let the host write?')) {
+      await t.press('enter');
+      for (let i = 0; i < 12; i++) await t.settle();
+    }
+    const created = host.invoked().at(-1);
+    expect(created?.operationId).toBe('create-pr');
+    expect(created?.meta).toEqual({
+      'vscode.pullRequest': {
+        title: 'Build the framework on Linux',
+        description: 'Adds a Linux build script and its notes.',
+        draft: false,
+        expectedContext: {
+          repository: 'softov/brb_backend', branchName: 'agent/linux-build', baseBranchName: 'main', head: '1a2b3c4',
+        },
+      },
+    });
+    await t.unmount();
+  });
+
+  it('runs nothing more on escape', async () => {
+    const host = fakeHost();
+    const t = await tree(host);
+    void t.app.execute('changes.run', { operation: 'create-pr' });
+    for (let i = 0; i < 12; i++) await t.settle();
+    await t.press('escape');
+    for (let i = 0; i < 10; i++) await t.settle();
+    expect(host.invoked().map((one) => one.operationId)).toEqual(['prepare-pull-request']);
+    expect(t.hasText('Build the framework on Linux')).toBe(false);
+    await t.unmount();
+  });
+
+  it('closes the form when the host refuses to prepare, and keeps its words', async () => {
+    const host = fakeHost();
+    const invoke = host.invoke!.bind(host);
+    host.invoke = async (changeset, operationId, target, meta) => {
+      if (operationId === 'prepare-pull-request') throw Object.assign(new Error('There is no remote to open a pull request on.'), { code: -32603 });
+      return invoke(changeset, operationId, target, meta);
+    };
+    const t = await tree(host);
+    void t.app.execute('changes.run', { operation: 'create-pr' });
+    for (let i = 0; i < 12; i++) await t.settle();
+    expect(t.hasText('Title')).toBe(false);
+    expect(t.hasText('There is no remote')).toBe(true);
+    await t.unmount();
+  });
+
+  it('does not offer the prepare step on its own', async () => {
+    const t = await tree();
+    // The verb row.
+    expect(t.hasText('Create PR')).toBe(true);
+    expect(t.hasText('Prepare PR')).toBe(false);
+    // The palette's question.
+    await t.press('x');
+    for (let i = 0; i < 10; i++) await t.settle();
+    expect(t.hasText('Prepare PR')).toBe(false);
+    await t.unmount();
+  });
+});
+
 describe('an operation\'s arguments and its answer', () => {
   const TREE = `${CHANGED}/changeset/uncommitted`;
 

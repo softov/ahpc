@@ -1,6 +1,6 @@
 ---
 title: A pull request is prepared, then read in a form
-status: todo
+status: implemented
 depends: [task-01-an-operation-carries-its-arguments.md]
 layer: "screen"
 refs:
@@ -39,3 +39,6 @@ Submitting runs `create-pr` with `_meta['vscode.pullRequest']` carrying title, d
 
 ## Resume
 
+Implemented. The form is `PullRequestForm` in `src/screens.tsx`, drawn on a modal layer that `changes.run` opens.
+Its state is the `PULL_REQUEST` store key, which `forgetChanges` resets.
+The submit button is drawn by the form itself and not by `FormActions`, because `FormActions` cannot be turned off for an empty title.

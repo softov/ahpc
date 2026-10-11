@@ -15,7 +15,10 @@ import {
   useStoreValue,
   useTheme,
 } from '@textui/core';
-import { Badge, Column, Divider, EmptyState, Field, Form, FormActions, Marquee, Panel, RadioGroup, Row, SearchBox, Select, TextArea, TextInput, argumentOf, useForm } from '@textui/widgets';
+import {
+  Badge, Button, Column, Dialog, Divider, EmptyState, Field, Form, FormActions, Marquee, Panel, RadioGroup, Row, SearchBox, Select, Switch, TextArea, TextInput,
+  argumentOf, useForm,
+} from '@textui/widgets';
 import { PRESETS, presetFor, presetLabel, scheduleProblem, zoneIsKnownHere } from './schedule.js';
 import type { Preset } from './schedule.js';
 import {
@@ -23,13 +26,14 @@ import {
 } from './control.js';
 import { branchName, branchDrift, pullRequestLabel,
   ARCHIVED, AUTOMATIONS, AUTOMATION_EDIT, AUTOMATION_ROW, AUTOMATION_SIDEBAR, CHANGES, CUSTOMIZATIONS, DRAFT, EXPANDED, FILTER, FOCUS, HISTORY, HOST, INPUT,
-  CHANGE_AT, CHANGE_ROW, CHANGE_SCOPES, FILES_AT, FILES_ENTRIES, FILES_OPEN,
+  CHANGE_AT, CHANGE_ROW, CHANGE_SCOPES, PULL_REQUEST, FILES_AT, FILES_ENTRIES, FILES_OPEN,
   MODEL, MODEL_CONFIG, OPEN, OPEN_FILE, CHAT_URI, PROVIDER, QUEUE, SELECTED, SESSIONS, SETTINGS, SIDEBAR,
   CHATS, CURSOR, FIND, FINDING, FIND_AT, OPEN_TERMINAL, PRESENT, SPLIT_AT, SPLIT_DEFAULT, TERMINAL, TERMINALS, TERMINAL_LIST, TURNS, WORKSPACE,
   ANSWERS, INPUT_STATUS, MARKDOWN, boodFloorFor,
   hiddenSessions, openSession, sessionView, statusLabel, visibleSessions, workspaceName,
 } from './state.js';
-import type { HostState, InputStatus } from './state.js';
+import type { HostState, InputStatus, PullRequestAsk } from './state.js';
+import { chosenOperations } from './ahp/followup.js';
 import { toBlocks } from './blocks.js';
 import type {
   Agent, Answer, Automation, Changeset, ChangesetScope, Completion, ContentRef, Customization, FileContent, PendingInput, QueuedMessage, ResourceEntry,
@@ -1367,7 +1371,7 @@ export const ChangesScreen: (props: Record<string, never>) => RenderOutput =
         ) : null}
         {(changes.operations ?? []).length > 0 ? (
           <Row gap={2}>
-            {(changes.operations ?? []).map((operation) => (
+            {chosenOperations(changes.operations ?? []).map((operation) => (
               <text
                 key={operation.id}
                 content={operation.status === 'idle'
@@ -1387,6 +1391,109 @@ export const ChangesScreen: (props: Record<string, never>) => RenderOutput =
           flex={1}
         />
       </Panel>
+    );
+  });
+
+/** What the pull request form sends back. */
+export interface PullRequestValues {
+  title: string;
+  description: string;
+  isDraft: boolean;
+}
+
+export interface PullRequestFormProps {
+  onSubmit?(values: PullRequestValues): void;
+  onCancel?(): void;
+}
+
+/**
+ * The pull request `create-pr` opens, filled from the host's draft.
+ *
+ * A modal over the changes screen, keyed by `PULL_REQUEST` in the store: it
+ * opens at once saying it is preparing and fills in when the draft arrives.
+ * The branches and the repository are the host's, shown and not edited.
+ */
+export const PullRequestForm: (props: PullRequestFormProps) => RenderOutput =
+  defineComponent<PullRequestFormProps>('PullRequestForm', (props) => {
+    const i18n = useI18n();
+    const theme = useTheme();
+    const width = useSize().width;
+    const ask = useStoreValue<PullRequestAsk | null>(PULL_REQUEST, null) ?? null;
+
+    const form = useForm<{ title: string; description: string; isDraft: boolean }>({
+      initialValues: { title: ask?.draft.title ?? '', description: ask?.draft.description ?? '', isDraft: false },
+      validate: (values) => (values.title.trim() === '' ? { title: i18n.t('commands.pullRequest.titleNeeded') } : {}),
+      onSubmit: (values) => {
+        props.onSubmit?.({ title: values.title.trim(), description: values.description, isDraft: values.isDraft });
+      },
+    });
+
+    // The draft arrived: what the host wrote replaces the empty fields.
+    useEffect(() => {
+      if (ask && !ask.preparing) form.reset({ title: ask.draft.title, description: ask.draft.description, isDraft: false });
+    }, [ask?.preparing]);
+
+    if (ask === null) return null;
+
+    const labels = Math.max(
+      i18n.t('commands.pullRequest.title').length,
+      i18n.t('commands.pullRequest.description').length,
+      i18n.t('commands.pullRequest.draft').length,
+    ) + 1;
+    const { branchName, baseBranchName, repository } = ask.draft;
+    const blocked = ask.preparing || form.values.title.trim() === '';
+
+    return (
+      <Dialog title={ask.label} width={Math.max(40, Math.min(76, width - 4))}>
+        <Column gap={1}>
+          {ask.preparing ? (
+            <text content={i18n.t('commands.pullRequest.preparing', { ellipsis: theme.glyphs.ellipsis })} fg="warning" />
+          ) : null}
+          <Column gap={0}>
+            {branchName !== null && baseBranchName !== null ? (
+              <text content={i18n.t('commands.pullRequest.branches', { head: branchName, base: baseBranchName })} fg="muted" wrap="word" />
+            ) : null}
+            {repository !== null ? <text content={repository} fg="muted" /> : null}
+          </Column>
+          <Form form={form as never}>
+            <Field name="title" label={i18n.t('commands.pullRequest.title')} labelWidth={labels} required>
+              <TextInput
+                value={form.values.title}
+                autoFocus
+                disabled={ask.preparing}
+                onChange={(value: string) => { form.setValue('title', value); form.touch('title'); }}
+                onSubmit={() => { if (!blocked) void form.submit(); }}
+              />
+            </Field>
+            <Field name="description" label={i18n.t('commands.pullRequest.description')} labelWidth={labels}>
+              <TextArea
+                value={form.values.description}
+                maxRows={6}
+                disabled={ask.preparing}
+                padding={[0, theme.border === 'none' ? 1 : 2]}
+                onChange={(value: string) => { form.setValue('description', value); form.touch('description'); }}
+              />
+            </Field>
+            <Field name="isDraft" label={i18n.t('commands.pullRequest.draft')} labelWidth={labels}>
+              <Switch
+                value={form.values.isDraft}
+                disabled={ask.preparing}
+                onChange={(value: boolean) => form.setValue('isDraft', value)}
+              />
+            </Field>
+            <Row gap={1} justify="end">
+              <Button label={i18n.t('commands.pullRequest.cancel')} onPress={() => props.onCancel?.()} />
+              <Button
+                label={ask.label}
+                tone="primary"
+                variant="solid"
+                disabled={blocked}
+                onPress={() => { if (!blocked) void form.submit(); }}
+              />
+            </Row>
+          </Form>
+        </Column>
+      </Dialog>
     );
   });
 
