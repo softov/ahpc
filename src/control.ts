@@ -10,11 +10,12 @@ import { spawn } from 'node:child_process';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { confirm, pick } from '@textui/widgets';
+import { confirm, pick, prompt as askText } from '@textui/widgets';
 import { findBlocks, valueIcon } from '@textui/chat';
 import { toBlocks } from './blocks.js';
 import { chatMatches, linksIn, parseSessionLink, sessionOfLink } from './links.js';
 import { operate } from './ahp/operate.js';
+import { commitMeta } from './ahp/followup.js';
 import { attempt, failureWords } from './ahp/auth.js';
 import { forget, remember, resolveToken } from './ahp/tokens.js';
 import type { AuthAsk } from './ahp/auth.js';
@@ -26,6 +27,7 @@ import type {
   Agent, Answer, Automation, Changeset, ChangesetScope, ChatSource, Completion, ConfigProperty, ContentRef, Customization, FileContent, QueuedMessage, ResourceEntry, SessionConfig, SessionDetail,
   SessionUri, TerminalRow, Turn,
 } from './ahp/types.js';
+import type { Invoked } from './ahp/types.js';
 import { SessionFlag } from './ahp/types.js';
 import {
   ARCHIVED, BOOD_FLOAT, CAN_ADD_CHAT, CAN_FORK, CAN_SIDE_CHAT, CHAT_URI, CHATS, CUSTOMIZATIONS, CURSOR, DRAFT, EXPANDED, FILTER, FIND, FINDING, FIND_AT, HAS_CHATS,
@@ -34,7 +36,7 @@ import {
   CHANGES as CHANGES_AT_PATH, CHANGE_AT, CHANGE_ROW, CHANGE_SCOPES, FILES_AT, FILES_OPEN,
   OPEN, OPEN_FILE, PROVIDER, MARKDOWN, QUEUE, QUIT_ARMED, QUIT_WINDOW_MS, RUNNING, SCREEN, SELECTED, SETTINGS, SIDEBAR,
   SPLIT_AT, SPLIT_DEFAULT, TURNS, WORKSPACE,
-  applyEvent, inputRefused, pendingInput, queue, reportHostError, sendingInput, sessions, turns,
+  applyEvent, inputRefused, openSession, pendingInput, queue, reportHostError, sendingInput, sessions, turns,
   writeSessions, writeStatus,
 } from './state.js';
 
@@ -1315,6 +1317,16 @@ function commands(
     }));
   };
 
+  /**
+   * What the host answered a changeset verb with.
+   *
+   * The host's own sentence about what it did, shown where a refusal would be.
+   * A silent success on a destructive verb reads as one that did not happen.
+   */
+  const answered = (done: Invoked): void => {
+    if (done.message !== undefined) app.store.set(HOST_ERROR, done.message);
+  };
+
   return [
     {
       /**
@@ -1821,7 +1833,29 @@ function commands(
         const onFile = !operation.scopes.includes('changeset');
         if (onFile && !row) return;
 
-        if (operation.confirmation !== undefined) {
+        let meta: Record<string, unknown> | undefined;
+        if (operation.id === 'commit') {
+          /*
+           * A commit asks for its message, and the host's confirmation is
+           * shown in the same ask rather than in a second dialog before it.
+           * The host commits what is staged, or every change when nothing is.
+           */
+          const staged = (held?.files ?? []).filter((file) => file.staged === true).length;
+          const takes = staged > 0
+            ? app.i18n.plural(staged, { one: app.i18n.t('commands.commit.staged.one'), other: app.i18n.t('commands.commit.staged.other') })
+            : app.i18n.t('commands.commit.everything');
+          const message = await askText(app.layers, {
+            title: operation.label,
+            message: operation.confirmation === undefined ? takes : `${takes} ${operation.confirmation}`,
+            placeholder: app.i18n.t('commands.commit.placeholder'),
+            initialValue: openSession(app.store)?.title ?? '',
+          });
+          if (message === null) return;
+          // An empty message is not sent, and the host commits under the
+          // session's title.
+          if (message.trim() !== '') meta = commitMeta(message.trim());
+        }
+        else if (operation.confirmation !== undefined) {
           const yes = await confirm(app.layers, {
             title: operation.label,
             message: operation.confirmation,
@@ -1836,6 +1870,7 @@ function commands(
         try {
           const done = await operate(connection, at, wanted, {
             ...(onFile ? { target: { kind: 'resource' as const, resource: row } } : {}),
+            ...(meta ? { meta } : {}),
             /*
              * Asked here as well, and separately.
              *
@@ -1853,10 +1888,7 @@ function commands(
               tone: 'danger',
             }),
           });
-          // The host's own sentence about what it did, shown where a refusal
-          // would be. A silent success on a destructive verb reads as one that
-          // did not happen.
-          if (done.message !== undefined) app.store.set(HOST_ERROR, done.message);
+          answered(done);
         }
         catch (error) { controller.report(error); }
       },

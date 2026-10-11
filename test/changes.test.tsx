@@ -313,6 +313,80 @@ describe('running one of the verbs from the screen', () => {
   });
 });
 
+describe('a commit asks for its message', () => {
+  /** The working tree, where the fixture offers `commit`. */
+  async function tree(host: FakeHost = fakeHost()): Promise<Harness> {
+    const t = await changes(host);
+    await t.press(']');
+    for (let i = 0; i < 10; i++) await t.settle();
+    return t;
+  }
+
+  /** A fake host whose `commit` carries a confirmation, as the reference host's does. */
+  function confirming(): FakeHost {
+    const host = fakeHost();
+    const read = host.changes.bind(host);
+    host.changes = async (uri, changeset) => {
+      const held = await read(uri, changeset);
+      return {
+        ...held,
+        ...(held.operations ? {
+          operations: held.operations.map((one) => (one.id === 'commit' ? { ...one, confirmation: 'Commit 2 staged files?' } : one)),
+        } : {}),
+      };
+    };
+    return host;
+  }
+
+  it('opens on the session title and says how many staged files it takes', async () => {
+    const t = await tree();
+    void t.app.execute('changes.run', { operation: 'commit' });
+    for (let i = 0; i < 10; i++) await t.settle();
+    expect(t.hasText('Old build script cleanup')).toBe(true);
+    expect(t.hasText('Commits 2 staged files.')).toBe(true);
+    await t.unmount();
+  });
+
+  it('shows the host\'s confirmation in the same ask, not a second one', async () => {
+    const t = await tree(confirming());
+    void t.app.execute('changes.run', { operation: 'commit' });
+    for (let i = 0; i < 10; i++) await t.settle();
+    expect(t.hasText('Commit 2 staged files?')).toBe(true);
+    expect(t.hasText('Old build script cleanup')).toBe(true);
+    await t.unmount();
+  });
+
+  it('commits with the message typed', async () => {
+    const host = fakeHost();
+    const t = await tree(host);
+    void t.app.execute('changes.run', { operation: 'commit' });
+    for (let i = 0; i < 10; i++) await t.settle();
+    await t.press('enter');
+    for (let i = 0; i < 10; i++) await t.settle();
+    // The write grant, which is its own question.
+    await t.press('enter');
+    for (let i = 0; i < 12; i++) await t.settle();
+    expect(host.invoked().at(-1)).toMatchObject({
+      operationId: 'commit',
+      meta: { 'ahpd.commit': { message: 'Old build script cleanup' } },
+    });
+    expect(t.hasText('Committed 1a2b3c4')).toBe(true);
+    await t.unmount();
+  });
+
+  it('commits nothing on escape', async () => {
+    const host = fakeHost();
+    const t = await tree(host);
+    void t.app.execute('changes.run', { operation: 'commit' });
+    for (let i = 0; i < 10; i++) await t.settle();
+    await t.press('escape');
+    for (let i = 0; i < 10; i++) await t.settle();
+    expect(host.invoked()).toEqual([]);
+    expect(t.hasText('needs write access')).toBe(false);
+    await t.unmount();
+  });
+});
+
 describe('an operation\'s arguments and its answer', () => {
   const TREE = `${CHANGED}/changeset/uncommitted`;
 

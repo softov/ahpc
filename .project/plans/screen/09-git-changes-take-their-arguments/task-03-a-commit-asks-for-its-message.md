@@ -1,6 +1,6 @@
 ---
 title: A commit asks for its message
-status: todo
+status: implemented
 depends: [task-01-an-operation-carries-its-arguments.md, task-02-a-file-says-whether-it-is-staged.md]
 layer: "screen"
 refs:
@@ -36,3 +36,5 @@ Submitting commits with that message under `_meta['ahp.commit'].message`; escape
 
 ## Resume
 
+Implemented. The message goes under `_meta['ahpd.commit']`, the key the reference host reads, not `ahp.commit`.
+The answer goes through `answered` in `commands()`, which task 05 extends.
