@@ -298,6 +298,75 @@ describe('the scopes are tabs', () => {
   }
 });
 
+describe('the actions are buttons', () => {
+  /** The working tree, where the fixture offers commit and create-pr. */
+  async function tree(width: number): Promise<Harness> {
+    const t = await changes(fakeHost(), width);
+    await t.press(']');
+    for (let i = 0; i < 10; i++) await t.settle();
+    return t;
+  }
+
+  for (const width of [100, 60]) {
+    describe(`at ${width} columns`, () => {
+      it('opens the message prompt on a click on Commit', async () => {
+        const t = await tree(width);
+        t.clickOn(t.getByRole('button', { name: 'Commit' }));
+        for (let i = 0; i < 10; i++) await t.settle();
+        expect(t.hasText('Commits 2 staged files.')).toBe(true);
+        await t.unmount();
+      });
+
+      it('opens the form on a click on Create PR', async () => {
+        const t = await tree(width);
+        t.clickOn(t.getByRole('button', { name: 'Create PR' }));
+        for (let i = 0; i < 12; i++) await t.settle();
+        expect(t.hasText('Build the framework on Linux')).toBe(true);
+        await t.unmount();
+      });
+
+      it('reaches the buttons after the tabs, and runs one on Enter', async () => {
+        const t = await tree(width);
+        t.tab();
+        await t.settle();
+        expect(t.focused()?.component).toBe('Tabs');
+        t.tab();
+        await t.settle();
+        expect(t.focused()?.label).toBe('Commit');
+        await t.press('enter');
+        for (let i = 0; i < 10; i++) await t.settle();
+        expect(t.hasText('Commits 2 staged files.')).toBe(true);
+        await t.unmount();
+      });
+
+      it('keeps x working while a button has the keyboard', async () => {
+        const t = await tree(width);
+        t.tab();
+        t.tab();
+        await t.settle();
+        expect(t.focused()?.label).toBe('Commit');
+        const before = t.app.layers.entries().length;
+        await t.press('x');
+        for (let i = 0; i < 10; i++) await t.settle();
+        // The picker opens on the first verb, and Enter in it runs that one.
+        expect(t.app.layers.entries().length).toBe(before + 1);
+        expect(t.focused()?.label).not.toBe('Commit');
+        await t.press('enter');
+        for (let i = 0; i < 10; i++) await t.settle();
+        expect(t.hasText('Commits 2 staged files.')).toBe(true);
+        await t.unmount();
+      });
+
+      it('leaves the list its first row', async () => {
+        const t = await tree(width);
+        expect(t.hasText('compileLinux.sh')).toBe(true);
+        expect(t.lines().every((line) => line.length <= width)).toBe(true);
+        await t.unmount();
+      });
+    });
+  }
+});
+
 describe('what a commit will take', () => {
   /** The row naming `name`, whatever else is on the screen. */
   const row = (t: Harness, name: string): string => t.lines().find((line) => line.includes(name)) ?? '';

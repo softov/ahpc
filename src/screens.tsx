@@ -1366,12 +1366,16 @@ export const ChangesScreen: (props: Record<string, never>) => RenderOutput =
         {(changes.operations ?? []).length > 0 ? (
           <Row gap={2}>
             {chosenOperations(changes.operations ?? []).map((operation) => (
-              <text
+              <Button
                 key={operation.id}
-                content={operation.status === 'idle'
+                label={operation.status === 'idle'
                   ? operation.label
                   : `${operation.label} (${operation.status})`}
-                fg={operation.status === 'error' ? 'danger' : operation.status === 'idle' ? 'muted' : 'warning'}
+                size="sm"
+                tone={operation.status === 'error' ? 'danger' : operation.status === 'running' ? 'warning' : 'default'}
+                // The picker on `x` leaves out what the host disabled, and so does this.
+                disabled={operation.status === 'disabled'}
+                onPress={() => { void app.execute('changes.run', { operation: operation.id }); }}
               />
             ))}
           </Row>

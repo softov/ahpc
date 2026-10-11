@@ -71,7 +71,7 @@ click or Tab + Enter on an action button -> app.execute('changes.run', { operati
 | Task | Status | Depends on |
 | --- | --- | --- |
 | [01 - the scopes are tabs](task-01-the-scopes-are-tabs.md) | blocked | - |
-| [02 - the actions are buttons](task-02-the-actions-are-buttons.md) | todo | - |
+| [02 - the actions are buttons](task-02-the-actions-are-buttons.md) | implemented | - |
 
 ## Risks and tradeoffs
 
@@ -81,8 +81,8 @@ click or Tab + Enter on an action button -> app.execute('changes.run', { operati
 
 ## Resume state
 
-- **Done so far:** task 01 is built and tested, except for Enter on a tab.
-- **Next action:** [task-02-the-actions-are-buttons.md](task-02-the-actions-are-buttons.md); task 01 waits for the answer below.
+- **Done so far:** task 02 is implemented, and task 01 is built and tested except for Enter on a tab.
+- **Next action:** answer the question below, then finish [task-01-the-scopes-are-tabs.md](task-01-the-scopes-are-tabs.md).
 - **Open questions:**
   - The stock `Tabs` picks a scope with `left` and `right`, and Enter does nothing there.
   - An arrow onto a disabled tab stops there and does not skip it.

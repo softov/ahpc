@@ -1,6 +1,6 @@
 ---
 title: The actions are buttons
-status: todo
+status: implemented
 depends: []
 layer: "screen"
 refs:
@@ -34,3 +34,10 @@ The actions row is a row of stock `Button`s, so a click or Tab with Enter runs a
 - At 60 columns the list still shows its first row.
 
 ## Resume
+
+The actions row is a row of stock `Button`s with `size="sm"`, and a press runs `changes.run` with the operation id.
+The tone is `danger` for an error and `warning` while the operation runs.
+A button for an operation that the host disabled is disabled, because the picker on `x` leaves that operation out.
+`test/changes.test.tsx` holds a click on Commit and a click on Create PR, at 100 and 60 columns.
+It also holds Tab with Enter, `x` on a focused button and the list's first row, at both widths.
+The status word in a label such as `(running)` comes from the protocol and is not in the i18n catalogue, as before this task.

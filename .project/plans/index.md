@@ -24,7 +24,7 @@ Reference: [00-screen.md](screen/00-screen.md)
 | [07 - Moving between terminals from the keyboard](screen/07-moving-between-terminals/plan.md) | medium | built 2026-09-26 ([implemented.md](screen/07-moving-between-terminals/implemented.md)) | - | - |
 | [08 - The client speaks English, Portuguese or Spanish, and its commands are typed noun.verb](screen/08-english-portuguese-or-spanish/plan.md) | medium | built 2026-09-30 ([implemented.md](screen/08-english-portuguese-or-spanish/implemented.md)) | - | - |
 | [09 - A commit asks for its message, a pull request is prepared in a form, and what the host sends back is shown](screen/09-git-changes-take-their-arguments/plan.md) | high | active 2026-10-11; tasks 01-06 implemented, reviewed, awaiting the hand check against a GitHub remote ([implemented.md](screen/09-git-changes-take-their-arguments/implemented.md)) | - | - |
-| [10 - The scopes and actions on the changes screen are clicked or reached with Tab](screen/10-the-changes-rows-are-clickable/plan.md) | high | active 2026-10-11; task 01 blocked on Enter in the stock `Tabs` | - | - |
+| [10 - The scopes and actions on the changes screen are clicked or reached with Tab](screen/10-the-changes-rows-are-clickable/plan.md) | high | active 2026-10-11; task 02 implemented, task 01 blocked on Enter in the stock `Tabs` | - | - |
 
 Next free number in `screen`: `11`.
 
