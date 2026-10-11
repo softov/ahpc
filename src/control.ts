@@ -240,6 +240,13 @@ export const settingCommand = (key: string): string => `compose.set.${key}`;
 /** One per property of the chosen model's own schema. */
 export const modelCommand = (key: string): string => `compose.model.${key}`;
 
+/** Shows the changeset at `uriTemplate` and closes the file opened from another one. */
+export function chooseScope(store: TextUIApp['store'], uriTemplate: string): void {
+  store.set(CHANGE_AT, uriTemplate);
+  // The open file belongs to the changeset it came from.
+  store.set(OPEN_FILE, null);
+}
+
 /**
  * The two focus scopes, and why single-letter keys need them.
  *
@@ -1830,9 +1837,7 @@ function commands(
         const at = app.store.get<string>(CHANGE_AT) ?? '';
         const seen = offered.findIndex((scope) => scope.uriTemplate === at);
         const next = offered[(seen + 1) % offered.length];
-        app.store.set(CHANGE_AT, next?.uriTemplate ?? '');
-        // The open file belongs to the changeset it came from.
-        app.store.set(OPEN_FILE, null);
+        chooseScope(app.store, next?.uriTemplate ?? '');
       },
     },
     {

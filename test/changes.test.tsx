@@ -22,9 +22,9 @@ import { CHANGE_AT, HOST_ERROR, HOST_LINK, OPEN_FILE } from '../src/state.js';
 /** The archived session, which is the one carrying a changeset. */
 const CHANGED = 'ahp-session:/4e18';
 
-async function changes(host: FakeHost = fakeHost()): Promise<Harness> {
+async function changes(host: FakeHost = fakeHost(), width = 100): Promise<Harness> {
   const t = await renderApp({
-    width: 100,
+    width,
     height: 30,
     shell: 'workbench',
     theme: 'workbench',
@@ -233,6 +233,69 @@ describe('choosing which changeset, and ticking files off', () => {
     expect(t.hasText('□') || t.hasText('[ ]')).toBe(false);
     await t.unmount();
   });
+});
+
+describe('the scopes are tabs', () => {
+  const SESSION = `${CHANGED}/changeset/session`;
+  const TREE = `${CHANGED}/changeset/uncommitted`;
+
+  for (const width of [100, 60]) {
+    describe(`at ${width} columns`, () => {
+      it('picks a scope on a click, and closes the file open from the last one', async () => {
+        const t = await changes(fakeHost(), width);
+        // A file the list does not hold, so the list stays on screen with it set.
+        t.app.store.set(OPEN_FILE, 'file:///nothing/here.txt');
+        for (let i = 0; i < 6; i++) await t.settle();
+        expect(t.hasText('notes.todo')).toBe(false);
+        t.clickOn(t.getByRole('tab', { name: 'Uncommitted Changes' }));
+        for (let i = 0; i < 10; i++) await t.settle();
+        expect(t.app.store.get<string>(CHANGE_AT)).toBe(TREE);
+        expect(t.app.store.get<string>(OPEN_FILE) ?? null).toBe(null);
+        expect(t.hasText('notes.todo')).toBe(true);
+        await t.unmount();
+      });
+
+      it('reaches the tabs on Tab, and picks a scope with an arrow there', async () => {
+        const t = await changes(fakeHost(), width);
+        // The list has the keyboard when the screen opens.
+        expect(t.focused()?.component).toBe('List');
+        t.tab();
+        await t.settle();
+        expect(t.focused()?.component).toBe('Tabs');
+        t.press('right');
+        for (let i = 0; i < 10; i++) await t.settle();
+        expect(t.app.store.get<string>(CHANGE_AT)).toBe(TREE);
+        expect(t.hasText('notes.todo')).toBe(true);
+        await t.unmount();
+      });
+
+      it('does not move the scope on a tab that needs a turn', async () => {
+        const t = await changes(fakeHost(), width);
+        t.clickOn(t.getByRole('tab', { name: 'This Turn (needs a turn)' }));
+        for (let i = 0; i < 10; i++) await t.settle();
+        expect(t.app.store.get<string>(CHANGE_AT)).toBe(SESSION);
+        await t.unmount();
+      });
+
+      it('keeps ] and r working while a tab has the keyboard', async () => {
+        const t = await changes(fakeHost(), width);
+        t.tab();
+        await t.settle();
+        expect(t.focused()?.component).toBe('Tabs');
+        await t.press('r');
+        for (let i = 0; i < 10; i++) await t.settle();
+        expect(t.hasText('■') || t.hasText('[x]')).toBe(true);
+        await t.press(']');
+        for (let i = 0; i < 10; i++) await t.settle();
+        expect(t.app.store.get<string>(CHANGE_AT)).toBe(TREE);
+        // The next reachable one, past the two that need a turn.
+        await t.press(']');
+        for (let i = 0; i < 10; i++) await t.settle();
+        expect(t.app.store.get<string>(CHANGE_AT)).toBe(SESSION);
+        await t.unmount();
+      });
+    });
+  }
 });
 
 describe('what a commit will take', () => {

@@ -16,13 +16,13 @@ import {
   useTheme,
 } from '@textui/core';
 import {
-  Badge, Button, Column, Dialog, Divider, EmptyState, Field, Form, FormActions, Marquee, Panel, RadioGroup, Row, SearchBox, Select, Switch, TextArea, TextInput,
+  Badge, Button, Column, Dialog, Divider, EmptyState, Field, Form, FormActions, Marquee, Panel, RadioGroup, Row, SearchBox, Select, Switch, Tabs, TextArea, TextInput,
   argumentOf, useForm,
 } from '@textui/widgets';
 import { PRESETS, presetFor, presetLabel, scheduleProblem, zoneIsKnownHere } from './schedule.js';
 import type { Preset } from './schedule.js';
 import {
-  AUTOMATIONS_SCOPE, CHANGES_SCOPE, CHAT_SCOPE, CONTROLLER, MCP_SCOPE, SESSIONS_SCOPE, SKILLS_SCOPE, modelCommand, settingCommand,
+  AUTOMATIONS_SCOPE, CHANGES_SCOPE, CHAT_SCOPE, CONTROLLER, MCP_SCOPE, SESSIONS_SCOPE, SKILLS_SCOPE, chooseScope, modelCommand, settingCommand,
 } from './control.js';
 import { branchName, branchDrift, pullRequestLabel,
   ARCHIVED, AUTOMATIONS, AUTOMATION_EDIT, AUTOMATION_ROW, AUTOMATION_SIDEBAR, CHANGES, CUSTOMIZATIONS, DRAFT, EXPANDED, FILTER, FOCUS, HISTORY, HOST, INPUT,
@@ -1349,25 +1349,19 @@ export const ChangesScreen: (props: Record<string, never>) => RenderOutput =
     return (
       <Panel title={title} flex={1}>
         {scopes.length > 1 ? (
-          <Row gap={2}>
-            {scopes.map((scope) => {
-              const here = scope.uriTemplate === (chosen?.uriTemplate ?? '');
-              // A template with variables left in it is a question about a
-              // turn, and there is nothing on this screen to answer it from.
-              // Drawn anyway, dimmed: a scope the host offers and this screen
-              // cannot reach is worth saying, and silently dropping it is how
-              // somebody concludes their host does not have per-turn diffs.
-              const reachable = scope.variables.length === 0;
-              return (
-                <text
-                  key={scope.uriTemplate}
-                  content={reachable ? scope.label : i18n.t('screens.changes.needsTurn', { label: scope.label })}
-                  {...(here ? { fg: 'accent' as SemanticVariant, bold: true } : {})}
-                  {...(reachable ? {} : { fg: 'muted' as SemanticVariant })}
-                />
-              );
-            })}
-          </Row>
+          <Tabs
+            // A template with variables left in it is a question about a
+            // turn, and there is nothing on this screen to answer it from.
+            // Drawn anyway, disabled: a scope the host offers and this screen
+            // cannot reach is worth saying, and silently dropping it is how
+            // somebody concludes their host does not have per-turn diffs.
+            items={scopes.map((scope) => (scope.variables.length === 0
+              ? { id: scope.uriTemplate, label: scope.label }
+              : { id: scope.uriTemplate, label: i18n.t('screens.changes.needsTurn', { label: scope.label }), disabled: true }))}
+            activeId={chosen?.uriTemplate ?? ''}
+            onChange={(id: string) => chooseScope(app.store, id)}
+            gap={2}
+          />
         ) : null}
         {(changes.operations ?? []).length > 0 ? (
           <Row gap={2}>

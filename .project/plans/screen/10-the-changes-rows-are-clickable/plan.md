@@ -1,7 +1,7 @@
 ---
 title: The scopes and actions on the changes screen are clicked or reached with Tab
 domain: screen
-status: planned
+status: active
 priority: high
 created: 2026-10-11
 revalidated: 2026-10-11
@@ -70,7 +70,7 @@ click or Tab + Enter on an action button -> app.execute('changes.run', { operati
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - the scopes are tabs](task-01-the-scopes-are-tabs.md) | todo | - |
+| [01 - the scopes are tabs](task-01-the-scopes-are-tabs.md) | blocked | - |
 | [02 - the actions are buttons](task-02-the-actions-are-buttons.md) | todo | - |
 
 ## Risks and tradeoffs
@@ -81,9 +81,12 @@ click or Tab + Enter on an action button -> app.execute('changes.run', { operati
 
 ## Resume state
 
-- **Done so far:** nothing.
-- **Next action:** [task-01-the-scopes-are-tabs.md](task-01-the-scopes-are-tabs.md).
-- **Open questions:** none.
+- **Done so far:** task 01 is built and tested, except for Enter on a tab.
+- **Next action:** [task-02-the-actions-are-buttons.md](task-02-the-actions-are-buttons.md); task 01 waits for the answer below.
+- **Open questions:**
+  - The stock `Tabs` picks a scope with `left` and `right`, and Enter does nothing there.
+  - An arrow onto a disabled tab stops there and does not skip it.
+  - Does task 01 accept the arrows as its Tab path, or does `Tabs` in textui change first?
 - **Watch out for:** `changes.scope` clears `OPEN_FILE` when the scope moves, and a tab must do the same.
 
 ## Final verification checklist
