@@ -2,7 +2,7 @@
 title: A commit asks for its message, a pull request is prepared in a form, and what the host sends back is shown - implemented
 date: 2026-10-11
 refs:
-  - git://5f14825
+  - git://4e965fe
   - "[code://src/ahp/followup.ts](../../../../src/ahp/followup.ts)"
   - "[code://src/control.ts](../../../../src/control.ts)"
   - "[code://src/screens.tsx](../../../../src/screens.tsx)"
