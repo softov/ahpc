@@ -131,7 +131,7 @@ x -> app.ask(changes.run) -> palette: the verbs offered
 
 ## Final verification checklist
 
-- [ ] `npm run typecheck` clean.
+- [x] `npm run typecheck` clean.
 - [ ] `npx vitest run` passes, with the new cases in `test/changes.test.tsx` and the shell's tests.
 - [ ] Commit, prepare and create checked by hand against a host with a GitHub remote.
-- [ ] `plans/index.md` updated.
+- [x] `plans/index.md` updated.
