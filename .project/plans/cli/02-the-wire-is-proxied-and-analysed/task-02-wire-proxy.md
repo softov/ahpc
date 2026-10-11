@@ -1,6 +1,6 @@
 ---
 title: wire proxy records any client's traffic
-status: todo
+status: dropped
 depends: [task-01-one-reader.md]
 layer: "cli"
 refs:

@@ -1,6 +1,7 @@
 ---
 title: The recording proxy and the capture tools are ahpc commands, and ahpd keeps none
-status: accepted
+status: superseded
+superseded-by: decisions/ahpds-capture-scripts-stay-in-ahpd.md
 date: 2026-10-04
 refs:
   - "[code://src/wire.ts](../../src/wire.ts) - the capture reader `ahpc wire` draws from"

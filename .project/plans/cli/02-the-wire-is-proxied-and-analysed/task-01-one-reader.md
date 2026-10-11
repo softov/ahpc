@@ -1,6 +1,6 @@
 ---
 title: One reader for every capture shape
-status: todo
+status: dropped
 depends: []
 layer: "cli"
 refs:

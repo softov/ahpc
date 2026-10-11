@@ -1,6 +1,6 @@
 ---
 title: wire diff compares two captures
-status: todo
+status: dropped
 depends: [task-01-one-reader.md]
 layer: "cli"
 refs:

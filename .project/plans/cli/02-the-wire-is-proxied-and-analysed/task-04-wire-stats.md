@@ -1,6 +1,6 @@
 ---
 title: wire stats says what is in a capture
-status: todo
+status: dropped
 depends: [task-01-one-reader.md]
 layer: "cli"
 refs:

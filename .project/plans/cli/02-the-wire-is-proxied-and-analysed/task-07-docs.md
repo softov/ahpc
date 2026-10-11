@@ -1,6 +1,6 @@
 ---
 title: Help, REFERENCE.md and tools/README.md name the wire commands
-status: todo
+status: dropped
 depends: [task-02-wire-proxy.md, task-03-wire-check.md, task-04-wire-stats.md, task-05-wire-channel.md, task-06-wire-diff.md]
 layer: "docs"
 refs:

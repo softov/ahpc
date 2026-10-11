@@ -1,6 +1,6 @@
 ---
 title: wire check validates a capture against the strict schema
-status: todo
+status: dropped
 depends: [task-01-one-reader.md]
 layer: "cli"
 refs:

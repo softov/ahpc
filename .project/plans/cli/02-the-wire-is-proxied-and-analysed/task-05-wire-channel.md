@@ -1,6 +1,6 @@
 ---
 title: wire channel follows one session or chat
-status: todo
+status: dropped
 depends: [task-01-one-reader.md]
 layer: "cli"
 refs:

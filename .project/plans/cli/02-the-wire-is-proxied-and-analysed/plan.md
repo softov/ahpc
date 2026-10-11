@@ -1,7 +1,7 @@
 ---
 title: The wire is proxied, checked, counted, followed by channel and compared, from ahpc
 domain: cli
-status: planned
+status: dropped
 priority: high
 created: 2026-10-04
 revalidated: 2026-10-04
@@ -9,7 +9,7 @@ requires: []
 changes: []
 creates: []
 decisions:
-  - decisions/the-recording-proxy-is-ahpcs.md
+  - decisions/ahpds-capture-scripts-stay-in-ahpd.md
 refs:
   - "[code://src/wire.ts#L47-L54](../../../../src/wire.ts#L47-L54) - `parseWireLine`, which takes `{ at, from, frame }` lines only"
   - "[code://src/wire.ts#L64](../../../../src/wire.ts#L64) - `describer`, which pairs a response with its request"
@@ -43,7 +43,7 @@ ahpc wire <check|stats|channel|diff> F -> readCapture(F) -> WireLine[] -> descri
 
 | Decision | Task |
 | --- | --- |
-| [The recording proxy and the capture tools are ahpc commands, and ahpd keeps none](../../../decisions/the-recording-proxy-is-ahpcs.md) | 02, 03 |
+| [ahpd's capture scripts stay in ahpd until a client needs a tester](../../../decisions/ahpds-capture-scripts-stay-in-ahpd.md) | all |
 
 | What | Source | Task |
 | --- | --- | --- |
@@ -62,13 +62,13 @@ ahpc wire <check|stats|channel|diff> F -> readCapture(F) -> WireLine[] -> descri
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - One reader for every capture shape](task-01-one-reader.md) | todo | - |
-| [02 - wire proxy](task-02-wire-proxy.md) | todo | 01 |
-| [03 - wire check](task-03-wire-check.md) | todo | 01, ahpd host/43 p1 |
-| [04 - wire stats](task-04-wire-stats.md) | todo | 01 |
-| [05 - wire channel](task-05-wire-channel.md) | todo | 01 |
-| [06 - wire diff](task-06-wire-diff.md) | todo | 01 |
-| [07 - Help, REFERENCE.md and tools/README.md](task-07-docs.md) | todo | 02, 03, 04, 05, 06 |
+| [01 - One reader for every capture shape](task-01-one-reader.md) | dropped | - |
+| [02 - wire proxy](task-02-wire-proxy.md) | dropped | 01 |
+| [03 - wire check](task-03-wire-check.md) | dropped | 01, ahpd host/43 p1 |
+| [04 - wire stats](task-04-wire-stats.md) | dropped | 01 |
+| [05 - wire channel](task-05-wire-channel.md) | dropped | 01 |
+| [06 - wire diff](task-06-wire-diff.md) | dropped | 01 |
+| [07 - Help, REFERENCE.md and tools/README.md](task-07-docs.md) | dropped | 02, 03, 04, 05, 06 |
 
 ## Risks and tradeoffs
 
@@ -77,7 +77,7 @@ ahpc wire <check|stats|channel|diff> F -> readCapture(F) -> WireLine[] -> descri
 
 ## Resume state
 
-- **Next:** task 01.
+- **Next:** nothing; the plan is dropped and waits in [deferred.md](deferred.md).
 
 ## Final verification checklist
 
