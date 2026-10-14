@@ -172,9 +172,16 @@ it('records every dispatched action and carries out the ones it knows', async ()
   expect((again?.status ?? 0) & 32).toBe(0);
 });
 
+/*
+ * The idle session, rather than the first row: a session with a turn running
+ * refuses a turn, whichever way it is asked for, so the catalogue's first row
+ * is the wrong session to start one on.
+ */
+const IDLE = 'ahp-session:/9c74';
+
 it('starts a turn dispatched as an action, the same as one said', async () => {
   const host = fakeHost();
-  const uri = (await host.listSessions())[0]?.resource ?? '';
+  const uri = IDLE;
   const seen: HostEvent[] = [];
   const watch = host.subscribe(uri, (event) => seen.push(event));
   host.dispatch?.(uri, { type: 'chat/turnStarted', turnId: 't', message: { text: 'what changed?' } }, true);
@@ -188,7 +195,7 @@ it('starts a turn dispatched as an action, the same as one said', async () => {
 
 it('starts a queued message on the model it was queued with', async () => {
   const host = fakeHost();
-  const uri = (await host.listSessions())[0]?.resource ?? '';
+  const uri = IDLE;
   const seen: HostEvent[] = [];
   const watch = host.subscribe(uri, (event) => seen.push(event));
   host.say(uri, 'what changed?');
@@ -196,7 +203,10 @@ it('starts a queued message on the model it was queued with', async () => {
   await host.flush?.();
   // Started, not finished: this script stops its second turn at a question.
   const started = seen.flatMap((event) => (event.type === 'turnStarted' && event.turn.role === 'agent' ? [event.turn] : []));
-  expect(started.map((turn) => turn.model?.id)).toEqual(['claude-opus-5', 'claude-sonnet-5']);
+  // The session's own model for its own turns, then the one the queued message
+  // named: a queue that started the second turn on the session's own model is
+  // what this covers.
+  expect(started.map((turn) => turn.model?.id)).toEqual(['gpt-5', 'claude-sonnet-5']);
   expect(started.at(-1)?.model).toEqual({ id: 'claude-sonnet-5', config: { thinkingLevel: 'low' } });
   watch.close();
 });

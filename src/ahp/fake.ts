@@ -1277,6 +1277,20 @@ export function fakeHost(): FakeHost {
    * exercised by a script that always says the same paragraph.
    */
   function reply(uri: SessionUri, said: string, chosen?: ModelSelection): void {
+    /*
+     * A session that is in a turn does not start another.
+     *
+     * A host that took it would have two turns interleaved in one chat, which
+     * is the thing queueing exists to prevent - so the reference host refuses
+     * and keeps the turn that is running, and this refuses the same way. Both
+     * ways in come through here: a message said to the session, and a
+     * `chat/turnStarted` dispatched to it, which is the same thing asked for
+     * over the wire.
+     */
+    if (active.has(uri)) {
+      emit(uri, { type: 'error', message: 'A turn is running in this chat' });
+      return;
+    }
     const userTurn: Turn = { id: nextId('u'), role: 'user', message: said, parts: [], state: 'complete', at: AT };
     // The model the message named, as a host starts a turn on; the session's
     // own when it named none.
@@ -1988,6 +2002,24 @@ export function fakeHost(): FakeHost {
 
     // Sending clears the draft, which is what the host does.
     say: (uri, text, model) => { drafts.delete(uri); reply(uri, text, model); },
+
+    /*
+     * Into the turn that is running, which is the only one there is to steer.
+     *
+     * The text joins that turn where the agent's own words do, because a host
+     * hands a steering message to the running turn rather than starting one
+     * from it - so what is answered afterwards is that turn. With nothing
+     * running there is nothing to steer, and a host says so.
+     */
+    steer: (uri, text, model) => {
+      const running = active.get(uri);
+      if (!running) {
+        emit(uri, { type: 'error', message: 'No turn is running to steer in this session.' });
+        return;
+      }
+      if (model) running.model = model;
+      prose(uri, 'markdown', text);
+    },
 
     queue: (uri, text, model) => {
       const waiting = [...(queues.get(uri) ?? []), { id: nextId('q'), text, ...(model ? { model } : {}) }];

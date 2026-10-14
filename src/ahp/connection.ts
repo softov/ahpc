@@ -349,6 +349,14 @@ export interface HostConnection {
    * because nothing in a client is watching for the turn to end.
    */
   queue(uri: SessionUri, text: string, model?: ModelSelection): void;
+  /**
+   * Say it *into* the turn that is running.
+   *
+   * The turn takes it at its next step, so it steers what the agent is already
+   * doing rather than starting anything. A host with no turn running has
+   * nothing to steer and refuses, which is the caller's to read.
+   */
+  steer(uri: SessionUri, text: string, model?: ModelSelection): void;
   /** Take one back, while it is still waiting. */
   unqueue(uri: SessionUri, id: string): void;
 

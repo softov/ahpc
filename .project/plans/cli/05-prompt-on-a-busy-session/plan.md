@@ -1,7 +1,7 @@
 ---
 title: "`prompt` on a busy session refuses, queues or steers, and says when it stops waiting"
 domain: cli
-status: planned
+status: active
 priority: high
 created: 2026-10-14
 revalidated: 2026-10-14
@@ -71,8 +71,8 @@ prompt -> turn() -> until() subscribes -> host.say at once -> chat/turnStarted o
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - A busy session is refused, queued behind or steered](task-01-a-busy-session-is-refused-queued-or-steered.md) | todo | - |
-| [02 - A timeout says the turn still runs](task-02-a-timeout-says-the-turn-still-runs.md) | todo | - |
+| [01 - A busy session is refused, queued behind or steered](task-01-a-busy-session-is-refused-queued-or-steered.md) | implemented | - |
+| [02 - A timeout says the turn still runs](task-02-a-timeout-says-the-turn-still-runs.md) | implemented | - |
 
 ## Risks and tradeoffs
 
@@ -81,10 +81,12 @@ prompt -> turn() -> until() subscribes -> host.say at once -> chat/turnStarted o
 
 ## Resume state
 
-- **Done so far:** nothing.
-- **Next action:** [task-01-a-busy-session-is-refused-queued-or-steered.md](task-01-a-busy-session-is-refused-queued-or-steered.md).
+- **Done so far:** planned 2026-10-14. Tasks 01 and 02 are implemented on 2026-10-14: `turn` reads the session before it sends, and `prompt` takes `--queue` and `--steer`. The MCP `send_turn` tool takes `busy`, the seam and both hosts have `steer`, and a timeout writes its line on stderr.
+- **Next action:** review tasks 01 and 02, then the hand check against ahpd.
 - **Open questions:** none.
-- **Watch out for:** the scripted host sends events, not only snapshots. The busy check must read both vocabularies, as `turn` does now.
+- **Watch out for:** the scripted host sends events, not only snapshots, so the busy check reads both vocabularies.
+  `live.ts` never sends `turnComplete`, so a wait that watched only for one would hang against a real host.
+  The typed suite has one failure in `test/smoke.test.tsx` at this commit in this worktree, which is the composer chip drawing the worktree's own directory name.
 
 ## Final verification checklist
 

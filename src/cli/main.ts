@@ -17,7 +17,7 @@ import {
 import { SWITCHES } from '../flags.js';
 import { parseSessionLink, sessionOfLink } from '../links.js';
 import { decodeStatus } from '../ahp/status.js';
-import { failure, spoken, turn as runTurn, until } from '../wait.js';
+import { TurnRunning, failure, spoken, turn as runTurn, until } from '../wait.js';
 import { GROUPS, served } from '../mcp/tools.js';
 import type { Group } from '../mcp/tools.js';
 import { SERVER } from '../mcp/serve.js';
@@ -49,6 +49,7 @@ Sessions
 
 Turns
   prompt <uri> <text>          say it and stream the answer  [--model M] [--json]
+                               [--queue | --steer] where a turn is running
   exec <text>                  a session, one turn, and dispose it
                                [--agent P] [--cwd DIR] [--trust]
                                [--model M] [--json]
@@ -469,6 +470,18 @@ export async function cli(command: string, rest: string[]): Promise<number> {
       process.stderr.write(`--limit wants a positive whole number, not ${said}.\n`);
       return 2;
     }
+  }
+
+  /*
+   * Two answers to one question, and no way to mean both.
+   *
+   * A message goes behind a running turn or into it, never the two - so this
+   * is a mistake in the arguments rather than anything a host could answer,
+   * and it is refused the same way and in the same place as the rest of them.
+   */
+  if (args.has('--queue') && args.has('--steer')) {
+    process.stderr.write('--queue and --steer exclude each other.\n');
+    return 2;
   }
 
   const host = await connect(where(rest));
@@ -1565,6 +1578,9 @@ async function turns(host: HostConnection, command: string, args: Args, wants: b
    * second answer to the same question. So "what is new" is the part of the
    * running turn not yet printed, which is a length rather than an event.
    */
+  /** How long a turn is waited for before the caller is told it is still going. */
+  const waitSeconds = Number(args.value('--timeout') ?? 900);
+
   /*
    * Say something and wait for the answer, printing it as it arrives.
    *
@@ -1572,11 +1588,16 @@ async function turns(host: HostConnection, command: string, args: Args, wants: b
    * the part that is about a terminal. `--json` prints the finished turn
    * instead, so the stream is suppressed rather than interleaved with it.
    */
-  const run = async (uri: SessionUri, text: string): Promise<Turn | undefined> => {
+  const run = async (
+    uri: SessionUri,
+    text: string,
+    options: { busy?: 'queue' | 'steer' } = {},
+  ): Promise<Turn | undefined> => {
     let printed = false;
     const answer = await runTurn(host, uri, text, {
+      ...options,
       model: selected(args),
-      timeoutSeconds: Number(args.value('--timeout') ?? 900),
+      timeoutSeconds: waitSeconds,
       ...(wants ? {} : {
         onDelta: (part) => { printed = true; process.stdout.write(part); },
         // On stderr, so a pipe still gets only the answer while a person
@@ -1602,9 +1623,26 @@ async function turns(host: HostConnection, command: string, args: Args, wants: b
   switch (command) {
     case 'prompt': {
       const uri = needs(args, 0, 'a session URI') as SessionUri;
-      const turn = await run(uri, needs(args, 1, 'something to say'));
-      if (wants) json(turn ?? { state: 'timeout' });
-      return turn?.state === 'complete' ? 0 : 1;
+      const busy = args.has('--queue') ? 'queue' as const : args.has('--steer') ? 'steer' as const : undefined;
+      let answered: Turn | undefined;
+      try {
+        answered = await run(uri, needs(args, 1, 'something to say'), busy === undefined ? {} : { busy });
+      }
+      catch (error) {
+        if (!(error instanceof TurnRunning)) throw error;
+        process.stderr.write('A turn is running. Use --queue or --steer.\n');
+        return 1;
+      }
+      /*
+       * The turn outlived the wait, which a person has to be told - the run
+       * looked like any other one coming back. One line on stderr in every
+       * mode: `--json` owns stdout, and this is a second place a caller reads.
+       */
+      if (answered === undefined) {
+        process.stderr.write(`Stopped waiting after ${waitSeconds} seconds. The turn is still running.\n`);
+      }
+      if (wants) json(answered ?? { state: 'timeout' });
+      return answered?.state === 'complete' ? 0 : 1;
     }
     case 'exec': {
       const text = needs(args, 0, 'something to say');
