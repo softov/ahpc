@@ -30,3 +30,24 @@ The offset counts rows after the filters, on the client. It is not the protocol 
 - **ahpd's tool, later.** A `limit` on ahpd's `list_sessions` is an addition VS Code does not have, so it needs a decision. The other option is to keep parity and make the rows smaller.
 - **A default limit.** A default of 50 keeps a careless call small. It also changes the answer to a call with no arguments. The CLI keeps no default.
 - **Fewer fields.** One row of ahpd's tool carries git, GitHub and change counts. A `fields` option, or a short row by default, would cut the size without paging.
+
+## Upstream
+
+Checked on 2026-10-13 against AHP `cb6ba618` and VS Code `origin/main` `50559e744a1`.
+
+- **Sessions are paged in AHP already.** `listSessions` takes `PaginatedParams` and answers `nextCursor`, from AHP #275 and #295, both closed. An issue for session paging asks for what exists.
+- **VS Code does not use the pages.** `listSessions()` in `agentHostProtocolClient.ts` sends only `channel` and reads only `items`. The contract allows this: a client that ignores `nextCursor` gets the server's cap. The `list_sessions` tool in `sessionServerTools.ts` has no limit either.
+- **The automation catalogue is not paged.** `AutomationState.entries` comes whole in the snapshot of `ahp-automations://`. Only `fetchAutomationRuns` takes a cursor, for run history.
+- **AHP #521** asks for paged enumeration of resources in a folder, for file search. It is not about sessions or automations.
+
+So an AHP issue can ask only for the automation catalogue. On Softov's host that is three automations and about 8 KB, so the issue has no measured cost behind it yet.
+
+### A draft issue
+
+Title: Page the automation catalogue
+
+> `listSessions` pages since #295, and `fetchAutomationRuns` pages run history. The automation catalogue does not page. `AutomationState.entries` arrives whole in the snapshot of `ahp-automations://`, and each entry carries its full definition, prompt included.
+>
+> A client that wants a short list, such as a CLI table or an agent tool, still subscribes and takes every entry. On a host with many automations that is the same cost `listSessions` had before #295.
+>
+> Would a paged read fit next to the channel? For example a `listAutomations` command with `PaginatedParams`, which returns each entry without its prompt. Clients that want live state keep the channel as it is.
