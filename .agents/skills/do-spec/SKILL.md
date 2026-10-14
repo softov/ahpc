@@ -28,7 +28,7 @@ Start every file from its template in `assets/`; the template says what goes in 
 ## Conventions
 
 - Frontmatter on every file; `title` always. Slugs are kebab-case; only plans and tasks carry a number.
-- A path is an identity: nothing is moved or deleted; what no longer applies gets a `status`. A problem is the one exception: it is deleted once it becomes plan work.
+- A path is an identity: nothing is moved or deleted; what no longer applies gets a `status`. Two exceptions: a problem is deleted once it becomes plan work, and a superseded decision is deleted once the decision that replaces it names it.
 - Paths in frontmatter are relative to `.project/`, except a task's `depends`, which names sibling task files.
 - `refs` say where something is, never its state, one per line as `<uri> - <one line on why it is here>`. A ref is a URI: `code://<path>#L<n>-L<m>`, `npm://<package>@<range>`, `git://<sha|branch|tag>`, `tasker://<instance>:<project>#<id>`, `https://...`, `file://...`. A plan's files read and patterns to reuse are its refs; nothing lists them twice.
 - A `code://` ref is local code, so write it as a Markdown link. Keep the URI as the link text. Make the target the same path, relative to the file you are writing. In a decision at `.project/decisions/`, that is `[code://packages/papo/src/chat.ts#L51](../../packages/papo/src/chat.ts#L51)`. The text keeps the URI searchable and the target makes it clickable in a Markdown view. In a body, the same link reads better with the URI in a code span: ``[`code://<path>`](../../<path>)``.
@@ -59,7 +59,7 @@ It prints `file:line: rule` and exits 1 when it finds anything.
 
 - plan: `draft` `planned` `active` `built` `dropped`
 - task: `todo` `doing` `done` `blocked` `dropped`
-- decision: `proposed` `accepted` `deprecated` `superseded`
+- decision: `proposed` `accepted` `deprecated`
 - problem: `open` `mitigated`
 - rule: `active` `retired` · spec: `current` `retired`
 
@@ -70,8 +70,8 @@ A plan is a folder: `plan.md`, one task file per task, and two files whose prese
 - `implemented.md` exists when the plan is built: what exists now, what was verified, where it departed from the plan.
 - `deferred.md` exists when the plan set something aside: what waits, why, where it goes.
 
-`plan.md` is forward-action-only: the decision now and its source, never how it changed.
-Anything not in *Decisions locked in* is undecided; a fork met during a task means stop, ask, amend the table.
+`plan.md` is forward-action-only: each answer now and its source, never how it changed.
+Anything not in *Answers* is undecided; a fork met during a task means stop, ask, add a row.
 A task's status moves in its own file and in the plan's *Tasks* table, in the same change.
 The plan's *Resume state* and `index.md` move with it.
 A plan that spans more than two packages or about eight tasks is a parent whose *Tasks* table lists child plans (`<NN>-<slug>-p<N>-<slug>/`).
@@ -91,10 +91,12 @@ Then set `status: built`, correct the specs in `changes` and `creates`, and upda
 
 ## Decisions, rules, specs
 
-- A decision that replaces another is a new file with `supersedes`. The old one gets `status: superseded` and `superseded-by`, with its body untouched. Rules and specs that pointed at the old one move to the new one, unless the old rationale still holds.
-- Every decision is a file in `.project/decisions/` from the moment it is made; no file, no decision. A plan's *Decisions locked in* table only links them (`[<title>](../../../decisions/<slug>.md)`) and a row without a file is not a decision. The file names its source: the user's answer with the question quoted, or a `code://` line. When the writer chose, the source is `(defaulted: ...)`, and the user may erase it.
-- A decision records a choice a later reader would find strange: why it was made that way. It needs a fork (two options that both work, the rejected one named in `Options`), and it binds every later session. A choice anyone would make is not a decision, and neither is a fix, a gap against a reference, a spec requirement or scope. It is a task, with its source as a row in the plan's second table under *Decisions locked in* (`What | Source | Task`).
-- A problem is something wrong that nobody has decided what to do about: a defect, a limitation, an obstacle met while working. It is a file in `.project/problems/` while it is undecided, and it binds nothing. Once the fix is decided, it is plan work. The task carries the fix, the answer that chose it is a row in the plan's second table, and the problem file is deleted. A problem accepted as it is becomes a decision if the choice is strange, and is deleted either way. The aim is no problem files.
+- An answer is a row in the plan's *Answers* table (`What | Source | Task`): what was chosen, its source, and the task that builds it. The source is the user's words with the date, a `code://` line, or `(defaulted: ...)`, which the user may erase. Every answer starts as a row, and almost every answer stays one.
+- A decision is a file in `.project/decisions/` only for a choice that a later reader would undo because it looks wrong. It says why the choice was made that way, and names the option that lost in `Options`. The test before writing one: would someone who reads the code later reverse this? If not, it is a row.
+- A decision never says how a feature works. What a command does, its flags, its output and its errors go in the task, a spec or the docs. A choice anyone would make, a fix, a gap against a reference, a spec requirement and scope are rows, not decisions.
+- Propose a decision file to the user, and write it only when they agree. The *Answers* row then links it.
+- A decision that replaces another is a new file. Its `supersedes` names the old one, and a `git://<sha>` ref names the last commit that holds it. The old file is deleted. Rules and specs that pointed at the old one move to the new one.
+- A problem is something wrong that nobody has decided what to do about: a defect, a limitation, an obstacle met while working. It is a file in `.project/problems/` while it is undecided, and it binds nothing. Once the fix is decided, it is plan work. The task carries the fix, the answer that chose it is a row in the plan's *Answers* table, and the problem file is deleted. A problem accepted as it is becomes a decision if the choice is strange, and is deleted either way. The aim is no problem files.
 - Only the user writes rules. An agent never creates, edits or retires a rule; it tells the user when something looks like one.
 - A rule restating another is removed, not added. To retire one: `status: retired` and one line at the top saying why.
 - A spec is corrected in place when behaviour changes; if the change contradicts a listed decision, a new decision comes first.

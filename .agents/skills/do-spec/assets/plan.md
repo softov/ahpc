@@ -45,11 +45,11 @@ The files read and the patterns to reuse are the `refs` above, each with its not
 - <Missing contract, behaviour, validation, state, or test.>
 - `Not found: <thing> - searched <terms> in <paths>.`
 
-## Decisions locked in
+## Answers
 
-| # | Decision | Rationale / source |
+| What | Source | Task |
 | --- | --- | --- |
-| 1 | <decision> | <user's words with the date / [code://<path>#L<n>](../../../../<path>#L<n>) / `(defaulted: ...)`> |
+| <what was chosen> | <user's words with the date / [code://<path>#L<n>](../../../../<path>#L<n>) / `(defaulted: ...)`> | <NN> |
 
 ## Proposed architecture
 

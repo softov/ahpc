@@ -5,7 +5,7 @@ date: <YYYY-MM-DD>
 supersedes: decisions/<older-decision>.md
 refs:
   - "[code://<path>#L<n>](../../<path>#L<n>) - <the code the decision is about>"
-  - git://<sha> - <the change that made it>
+  - git://<sha> - <the last commit that holds the superseded decision>
   - https://<document> - <what it says>
 ---
 
