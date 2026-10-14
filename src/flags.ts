@@ -62,6 +62,9 @@ export const SWITCHES: ReadonlySet<string> = new Set([
   '--operations', '--markdown',
   // Asking rather than doing, and agreeing in advance.
   '--list', '--yes',
+  // Where a `prompt` goes where the session is already in a turn. Both take no
+  // value, and a positional after either is a word of what to say.
+  '--queue', '--steer',
   // A pull request opened as a draft.
   '--draft',
   // Which transport the tool server speaks. Neither takes a value, and the

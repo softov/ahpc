@@ -3034,6 +3034,26 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
       });
     },
 
+    /*
+     * The same action `queue` sends, under the other kind.
+     *
+     * One slot on the chat rather than a list, because a steering message is
+     * not waiting for anything: the host hands it to the turn that is running
+     * at its next step. A host with no turn to steer refuses it.
+     */
+    steer: (uri, text, model) => {
+      dispatch(uri, {
+        type: 'chat/pendingMessageSet',
+        kind: 'steering',
+        id: randomUUID(),
+        message: {
+          text,
+          origin: { kind: 'user' },
+          ...(model ? { model: selectionOf(model) } : {}),
+        },
+      });
+    },
+
     unqueue: (uri, id) => {
       dispatch(uri, { type: 'chat/pendingMessageRemoved', kind: 'queued', id });
     },

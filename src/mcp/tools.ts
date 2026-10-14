@@ -22,7 +22,7 @@
 import type { HostConnection } from '../ahp/connection.js';
 import { SessionFlag } from '../ahp/types.js';
 import type { Answer, SessionSummary, SessionUri, TerminalState, Turn } from '../ahp/types.js';
-import { failure, spoken, turn as runTurn, until } from '../wait.js';
+import { TurnRunning, failure, spoken, turn as runTurn, until } from '../wait.js';
 
 /** As much of JSON Schema as a tool's arguments need. */
 export interface Schema {
@@ -30,6 +30,8 @@ export interface Schema {
   properties: Record<string, {
     type: 'string' | 'number' | 'integer' | 'boolean' | 'object' | 'array';
     description?: string;
+    /** The words a string may be, where there are only a few. */
+    enum?: string[];
     items?: { type: string };
     additionalProperties?: boolean | { type: string };
   }>;
@@ -287,28 +289,44 @@ export const TOOLS: Tool[] = [
         text: { type: 'string', description: 'What to say.' },
         model: { type: 'string', description: 'A model id from list_agents. The session\'s own, if omitted.' },
         timeoutSeconds: { type: 'number', description: 'How long to wait. 900 by default.' },
+        busy: {
+          type: 'string',
+          enum: ['queue', 'steer'],
+          description: 'Where a turn is already running: queue this behind it, or steer it into that turn. A running turn is refused without this.',
+        },
       },
       required: ['session', 'text'],
       additionalProperties: false,
     },
     run: async (host, input, report) => {
       const model = text(input.model);
-      const answer = await runTurn(host, uriOf(input), text(input.text), {
-        ...(model === '' ? {} : { model: { id: model } as never }),
-        ...(typeof input.timeoutSeconds === 'number' ? { timeoutSeconds: input.timeoutSeconds } : {}),
-        /*
-         * What a caller watching this is told while it waits.
-         *
-         * The tool a session stopped on, not the reply as it is typed: MCP's
-         * progress carries a human-readable line and has no shape for partial
-         * result content, so the text still arrives whole at the end. What
-         * this fixes is an agent that looked frozen for a minute.
-         */
-        ...(report === undefined ? {} : {
-          onStep: (call) => report(call.name),
-          onWaiting: (call) => report(`waiting on ${call.name}`),
-        }),
-      });
+      const busy = input.busy === 'queue' || input.busy === 'steer' ? input.busy : undefined;
+      let answer: Turn | undefined;
+      try {
+        answer = await runTurn(host, uriOf(input), text(input.text), {
+          ...(busy === undefined ? {} : { busy }),
+          ...(model === '' ? {} : { model: { id: model } as never }),
+          ...(typeof input.timeoutSeconds === 'number' ? { timeoutSeconds: input.timeoutSeconds } : {}),
+          /*
+           * What a caller watching this is told while it waits.
+           *
+           * The tool a session stopped on, not the reply as it is typed: MCP's
+           * progress carries a human-readable line and has no shape for partial
+           * result content, so the text still arrives whole at the end. What
+           * this fixes is an agent that looked frozen for a minute.
+           */
+          ...(report === undefined ? {} : {
+            onStep: (call) => report(call.name),
+            onWaiting: (call) => report(`waiting on ${call.name}`),
+          }),
+        });
+      }
+      catch (error) {
+        // The way out of this in a shell is a flag and here it is an input, so
+        // the refusal names the one the caller reading it has.
+        if (!(error instanceof TurnRunning)) throw error;
+        throw new Error('A turn is running. Send busy as queue or steer to say what to do with it.');
+      }
       // Not an error: the turn is still running and the session is still
       // there, which is a different thing to tell a caller than a failure.
       return answer === undefined ? { state: 'timeout' } : said(answer);

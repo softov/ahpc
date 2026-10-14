@@ -84,10 +84,33 @@ export const failure = (turn: Turn): string[] => turn.parts.flatMap((part) => (
   part.kind === 'error' && part.message !== '' ? [part.message] : []
 ));
 
+/**
+ * A message arriving where a turn is already running.
+ *
+ * Thrown rather than answered as `undefined`, which means the wait ran out:
+ * a caller told "stopped waiting" here would be describing a wait that never
+ * began. The sentence is the plain fact, because what a caller can do about it
+ * differs - a shell names its flags, a tool names its input.
+ */
+export class TurnRunning extends Error {
+  constructor() {
+    super('A turn is running.');
+    this.name = 'TurnRunning';
+  }
+}
+
 /** What a caller wants told while a turn is running, and how long to wait. */
 export interface TurnOptions {
   model?: ModelSelection;
   timeoutSeconds?: number;
+  /**
+   * What to do where the session is already in a turn.
+   *
+   * `queue` sends the message behind it and waits for the turn that starts;
+   * `steer` sends it into that turn and waits for that one to end. Left out,
+   * a session in a turn is refused rather than sent to.
+   */
+  busy?: 'queue' | 'steer';
   /** Text the agent has said that the caller has not been given yet. */
   onDelta?(text: string): void;
   /** A tool call the agent is blocked on, said once per call. */
@@ -103,21 +126,50 @@ export interface TurnOptions {
 }
 
 /**
+ * What one event says about a turn running, or `undefined` where it says
+ * nothing about turns at all.
+ *
+ * Two vocabularies, because a host may speak either: `live.ts` rebuilds the
+ * whole view into a snapshot after every action, `fake.ts` sends what changed.
+ * `present` and `chats` come before both and name no turn, so neither is an
+ * answer to "is one running".
+ */
+const running = (event: HostEvent): { busy: boolean; id: string | undefined } | undefined => {
+  if (event.type === 'snapshot') {
+    return event.active === undefined ? { busy: false, id: undefined } : { busy: true, id: event.active.id };
+  }
+  if (event.type === 'turnStarted') return { busy: true, id: event.turn.id };
+  // A token or a tool call is a turn being written, without saying which.
+  if (event.type === 'delta' || event.type === 'toolCall') return { busy: true, id: undefined };
+  if (event.type === 'turnComplete') return { busy: false, id: undefined };
+  return undefined;
+};
+
+/**
  * Say something, and block until the turn it starts has finished.
  *
  * Subscribed before saying anything: the first snapshot is the baseline that
  * says which turns were already there, and one taken afterwards would count
  * the new turn among them.
  *
+ * The message waits for the first event that says what the session is doing,
+ * and is then said, queued or steered. Sent before that it could start a
+ * second turn on a session already in one, which is what a host answers by
+ * dropping the first turn - and the session's own state is the only thing
+ * that knows.
+ *
  * "Finished" is a turn of *ours* having ended - one that was not in the
  * baseline - rather than the last in the list, which is a different session's
  * answer when two people are talking in the same chat. A turn that stops to
  * ask a person something is not finished and is not this caller's to answer,
- * so the wait runs on until whoever is answering has.
+ * so the wait runs on until whoever is answering has. A message sent behind
+ * the running turn adds that turn's id to the baseline, and a steered one
+ * waits for that turn instead, since it starts none of its own.
  *
  * Answers `undefined` where the timeout ran out, which is a caller's to
  * report rather than to throw: the turn is still going and the session is
- * still there.
+ * still there. Throws `TurnRunning` where the session was in a turn and this
+ * caller named nothing to do about it, which is not a wait at all.
  */
 export async function turn(
   host: HostConnection,
@@ -131,6 +183,16 @@ export async function turn(
   let first = true;
   let noted: string | undefined;
   let answer: Turn | undefined;
+  /** Whether the message has gone, which waits for the first word on the session. */
+  let sent = false;
+  /** A session in a turn, where nothing was asked for and it is refused. */
+  let refused = false;
+  /** The turn the message was sent behind, which is not this caller's to read. */
+  let behind: string | undefined;
+  /** The turn a steering message went into, whose end is the answer. */
+  let steering: string | undefined;
+  /** The turn being streamed, so a change of turn starts its text over. */
+  let streaming: string | undefined;
   /** Tool calls already reported, so a snapshot rebuilt per token says each once. */
   const stepped = new Set<string>();
   const step = (call: { id: string; name: string }): void => {
@@ -140,6 +202,61 @@ export async function turn(
   };
 
   const finished = until(host, uri, (event) => {
+    /*
+     * The turns that were already there, taken from the first snapshot.
+     *
+     * Added to rather than replaced: the running turn's id is put in here
+     * where the message goes behind it, and a snapshot that replaced the set
+     * would drop it again - leaving that turn's end to be read as the answer.
+     */
+    if (event.type === 'snapshot' && first) {
+      first = false;
+      for (const one of event.turns) before.add(one.id);
+    }
+
+    /*
+     * Nothing is sent until the session has said what it is doing.
+     *
+     * An idle session is said to whatever was asked for, so the flags mean
+     * "where it is busy" rather than "always". A busy one is refused unless
+     * this caller said what to do, and then the message goes behind the turn
+     * or into it.
+     */
+    if (!sent) {
+      const state = running(event);
+      if (state !== undefined) {
+        sent = true;
+        if (!state.busy) host.say(uri, text, options.model);
+        else if (options.busy === undefined) { refused = true; return true; }
+        else if (options.busy === 'queue') {
+          // Its end is somebody else's answer, so its id joins the baseline.
+          if (state.id !== undefined) before.add(state.id);
+          behind = state.id;
+          host.queue(uri, text, options.model);
+        }
+        else {
+          steering = state.id;
+          host.steer(uri, text, options.model);
+        }
+      }
+    }
+
+    /*
+     * Nothing of the turn the message went behind is read.
+     *
+     * A queued message starts when that turn ends, so what happens in between
+     * belongs to somebody else's answer - printed, the two run together as one
+     * reply. Its end is what lifts this, and the two vocabularies say it
+     * differently: a `turnComplete` naming it, and a snapshot that has moved
+     * it out of the active turn.
+     */
+    if (behind !== undefined) {
+      if (event.type === 'turnComplete' && event.turn.id === behind) behind = undefined;
+      else if (event.type === 'snapshot'
+        && (event.active?.id !== behind || event.turns.some((one) => one.id === behind))) behind = undefined;
+      if (behind !== undefined) return false;
+    }
+
     /*
      * Two vocabularies, because a host may speak either.
      *
@@ -163,15 +280,23 @@ export async function turn(
       return false;
     }
     if (event.type === 'turnComplete') {
+      // A steered turn starts none of its own, so its end is the answer.
+      if (steering !== undefined) {
+        if (event.turn.id !== steering) return false;
+        answer = event.turn;
+        return true;
+      }
       if (before.has(event.turn.id)) return false;
       answer = event.turn;
       return true;
     }
     if (event.type !== 'snapshot') return false;
-    if (first) { first = false; before = new Set(event.turns.map((one) => one.id)); }
 
     if (event.active) {
       sawActive = true;
+      // A new turn starts its text over: a length kept from another turn would
+      // hide the beginning of this one.
+      if (event.active.id !== streaming) { streaming = event.active.id; given = 0; }
       const now = spoken(event.active);
       if (now.length > given) { options.onDelta?.(now.slice(given)); given = now.length; }
       for (const part of event.active.parts) {
@@ -194,7 +319,7 @@ export async function turn(
     return true;
   }, { ...(options.timeoutSeconds === undefined ? {} : { timeoutSeconds: options.timeoutSeconds }) });
 
-  host.say(uri, text, options.model);
   await finished;
+  if (refused) throw new TurnRunning();
   return answer;
 }
