@@ -25,6 +25,18 @@ export interface HostConnection {
 
   /** The catalogue. Deliberately thin - everything else is on the channel. */
   listSessions(): Promise<SessionSummary[]>;
+  /**
+   * One page of the catalogue, and the cursor the host gave for the next.
+   *
+   * A cursor is opaque, so it is passed back exactly as it arrived and never
+   * read here. A caller with neither a limit nor a cursor gets whatever single
+   * page the host chooses to answer with - which is not the whole catalogue,
+   * and is why `listSessions` above is the call that still walks to the end.
+   */
+  sessionPage(page: { limit?: number; cursor?: string }): Promise<{
+    rows: SessionSummary[];
+    nextCursor?: string;
+  }>;
   /** The harnesses the host advertises, and the models each offers. */
   agents(): Promise<Agent[]>;
   /**

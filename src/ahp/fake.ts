@@ -1518,6 +1518,25 @@ export function fakeHost(): FakeHost {
 
     listSessions: async () => { count('listSessions'); requireToken(); return [...summaries.values()]; },
 
+    /*
+     * One page, newest first, as `session list` draws the catalogue.
+     *
+     * The cursor is an index into the sorted rows rather than a mark the host
+     * hands out: this host is already holding every session, so the number
+     * read so far is the whole of what one page has to carry to the next.
+     * A limit the host does not have is answered with everything left, which
+     * is what a host that does not page does with one.
+     */
+    sessionPage: async ({ limit, cursor }) => {
+      count('listSessions');
+      requireToken();
+      const rows = [...summaries.values()].sort((a, b) => b.modifiedAt.localeCompare(a.modifiedAt));
+      const from = cursor === undefined ? 0 : Number(cursor);
+      const page = rows.slice(from, limit === undefined ? undefined : from + limit);
+      const next = from + page.length;
+      return { rows: page, ...(next < rows.length ? { nextCursor: String(next) } : {}) };
+    },
+
     agents: async (): Promise<Agent[]> => AGENTS,
 
     // Iterative, as a real host's is: what has been answered comes back

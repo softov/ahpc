@@ -2291,6 +2291,26 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
       return rows.map(summary);
     },
 
+    /*
+     * One request, one page.
+     *
+     * `limit` and `cursor` go on the wire as the caller gave them, and neither
+     * is sent when the caller has none - a `cursor: undefined` is a cursor the
+     * host would have to guess at. The `nextCursor` comes back unread, because
+     * it is the host's own and only the host can say what it means.
+     */
+    sessionPage: async ({ limit, cursor }) => {
+      const result = await client.request('listSessions', {
+        channel: ROOT,
+        ...(limit === undefined ? {} : { limit }),
+        ...(cursor === undefined ? {} : { cursor }),
+      });
+      return {
+        rows: list(result.items).map(summary),
+        ...(str(result.nextCursor) === undefined ? {} : { nextCursor: str(result.nextCursor) as string }),
+      };
+    },
+
     agents: async (): Promise<Agent[]> => list(mirror.root.agents).map((entry) => {
       const agent = bag(entry);
       return {
