@@ -54,6 +54,23 @@ describe('one flag vocabulary, read by everything that parses one', () => {
     expect(commandIn(['--force', 'nonsense'])).toBeUndefined();
   });
 
+  it('routes every command the CLI dispatches', async () => {
+    // The two switches over the command word: the host's own commands, and
+    // the turns. A word dispatched there and missing here opens the screen.
+    const source = await readFile('src/cli/main.ts', 'utf8');
+    const first = source.indexOf('switch (command) {');
+    const verbs = source.indexOf('switch (verb) {', first);
+    const turns = source.lastIndexOf('switch (command) {');
+    expect(first).toBeGreaterThan(-1);
+    expect(verbs).toBeGreaterThan(first);
+    expect(turns).toBeGreaterThan(verbs);
+    const arms = (from: number, to?: number): string[] =>
+      [...source.slice(from, to).matchAll(/^ {4,6}case '([a-z]+)'/gm)].map((one) => one[1] as string);
+    const dispatched = [...arms(first, verbs), ...arms(turns)];
+    expect(dispatched).toContain('automation');
+    expect(dispatched.filter((word) => commandIn([word]) !== word)).toEqual([]);
+  });
+
   it('agrees with the screen about every flag it parses', async () => {
     const source = await readFile('src/tui.tsx', 'utf8');
     const from = source.indexOf('export function parse');

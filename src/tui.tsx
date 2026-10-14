@@ -244,7 +244,10 @@ export function parse(argv: string[]): Options {
           process.stderr.write(`Unknown option ${argv[i]}. Try --help.\n`);
           process.exit(2);
         }
-        break;
+        // The screen takes no word of its own, so a bare one is a command
+        // `COMMANDS` does not know.
+        process.stderr.write(`Unknown command ${argv[i]}. 'ahpc help' lists them.\n`);
+        process.exit(2);
     }
   }
   return options;
