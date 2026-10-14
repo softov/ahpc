@@ -1,6 +1,6 @@
 ---
 title: session list and list_sessions take a limit and a cursor
-status: todo
+status: implemented
 depends: [task-01-a-host-connection-reads-one-page-of-sessions.md]
 layer: cli
 refs:
@@ -47,3 +47,22 @@ Without `--limit` or `--cursor`, both read the whole catalogue as today.
 - By hand against ahpd: `ahpc session list --limit 5`, then the printed cursor, prints the next five.
 
 ## Resume
+
+`ahpc session list` takes `--limit` and `--cursor`.
+It calls `sessionPage` when either is given and `listSessions` when neither is.
+The archived filter and the sort run on the page.
+The table ends with `More: --cursor <C>` when the host sent a cursor.
+Under `--json` a page is `{ sessions, nextCursor }` and the whole catalogue stays a plain array.
+The MCP `list_sessions` takes `limit` and `cursor` and answers the same two shapes.
+`test/cli.test.ts` holds six cases in `ahpc session list, a page at a time`, and `test/mcp.test.ts` holds four beside the session tools.
+
+What the plan did not know.
+The `Schema` type in `src/mcp/tools.ts` had no `integer` in its type union, so it gained one word.
+A `--limit` that is not a positive whole number is refused before the host is reached, next to the `--trust` refusal.
+That is where this codebase's usage mistakes exit 2.
+The task's Files list does not name `README.md`, and the Sessions table there gained `--limit` and `--cursor`, which is how `--trust` was added.
+A page can hold fewer rows than the limit once the filter has run.
+The last page says nothing about more only because the host sent no cursor, which is the decision on filters.
+An empty page that still has a cursor keeps the table and the `More:` line.
+It does not say `No sessions.`, so a cut list never reads as a whole one.
+`npm run typecheck` is clean, and the typed suite has the one `test/smoke.test.tsx` failure this worktree already had.

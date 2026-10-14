@@ -1,6 +1,6 @@
 ---
 title: a host connection reads one page of sessions
-status: todo
+status: implemented
 depends: []
 layer: ahp
 refs:
@@ -40,3 +40,18 @@ refs:
 - `npx vitest run` passes.
 
 ## Resume
+
+`HostConnection.sessionPage` exists, and the live and fake hosts each implement it.
+`listSessions` is unchanged.
+`test/session-page.test.ts` holds three cases against a host scripted frame by frame over an in-memory transport.
+They cover the rows and the cursor off the wire, the `limit` and `cursor` in the request, and no cursor when the host offered none.
+
+What the plan did not know.
+The fake host's five seeded sessions all carry the same `modifiedAt` (`AT`).
+Its "newest first" is therefore a stable sort over insertion order, and its cursor is an index into that order.
+The fake counts a `sessionPage` call under `listSessions` in `asked()`, because over the wire it is the same method.
+The live call sends neither `limit` nor `cursor` when the caller has neither.
+It leaves them off rather than sending one as `undefined`.
+`npm run typecheck` is clean.
+The typed suite has one failure in `test/smoke.test.tsx`, which is present at this commit in this worktree.
+The composer chip there draws the worktree's own directory name.
