@@ -56,8 +56,9 @@ Reference: [00-cli.md](cli/00-cli.md)
 | [02 - The wire is proxied, checked, counted, followed by channel and compared, from ahpc](cli/02-the-wire-is-proxied-and-analysed/plan.md) | high | dropped 2026-10-11 ([deferred.md](cli/02-the-wire-is-proxied-and-analysed/deferred.md)) | - | - |
 | [03 - A failed turn says why](cli/03-a-failed-turn-says-why/plan.md) | high | built 2026-10-07 ([implemented.md](cli/03-a-failed-turn-says-why/implemented.md)) | - | - |
 | [04 - A session list is read a page at a time](cli/04-a-session-list-is-read-a-page-at-a-time/plan.md) | medium | active 2026-10-13; tasks 01-02 implemented and reviewed; the hand check passed | - | - |
+| [05 - `prompt` on a busy session refuses, queues or steers, and says when it stops waiting](cli/05-prompt-on-a-busy-session/plan.md) | high | planned 2026-10-14 | - | - |
 
-Next free number in `cli`: `05`.
+Next free number in `cli`: `06`.
 
 ## Later domains (no plans yet)
 
