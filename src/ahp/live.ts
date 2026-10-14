@@ -1735,6 +1735,9 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
   const automationWatchers = new Set<() => void>();
   let automationState: Bag | null = null;
   let noAutomations: string | undefined;
+  /** Settled once the channel has answered, with its snapshot or a refusal. */
+  let automationsAnswered: () => void = () => {};
+  const automationsReady = new Promise<void>((settle) => { automationsAnswered = settle; });
   /*
    * Asked for only where the host said it had them.
    *
@@ -1747,10 +1750,15 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
    */
   if (hello.automations === undefined || hello.automations === null) {
     noAutomations = 'This host serves no automations.';
+    automationsAnswered();
   }
   else {
     channels.open(AUTOMATIONS, {
-      opened: (state) => { automationState = automationCatalogue(state); },
+      opened: (state) => {
+        automationState = automationCatalogue(state);
+        automationsAnswered();
+        for (const listener of automationWatchers) listener();
+      },
       event: (event) => {
         if (event.type !== 'action') return;
         // The host's own reducer. Two mutations is not eighty, but a second
@@ -1758,7 +1766,7 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
         automationState = bag(ahp.automationReducer(automationState, bag(event.params).action));
         for (const listener of automationWatchers) listener();
       },
-      refused: (message) => { noAutomations = message; },
+      refused: (message) => { noAutomations = message; automationsAnswered(); },
     });
   }
 
@@ -2391,6 +2399,8 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
     },
 
     automations: async () => {
+      // A read made before the snapshot arrives would answer an empty list.
+      await automationsReady;
       // The host's words, not ours. "Serves no automations" and "the daemon
       // has gone" want opposite things from a person.
       if (noAutomations !== undefined) throw new Error(noAutomations);
