@@ -23,7 +23,7 @@ import type { Group } from '../mcp/tools.js';
 import { SERVER } from '../mcp/serve.js';
 import { stdio } from '../mcp/stdio.js';
 import { serve as serveHttp } from '../mcp/http.js';
-import type { Answer, ChatOrigin, ModelSelection, SessionUri, Turn } from '../ahp/types.js';
+import type { Answer, ChatOrigin, ModelSelection, SessionSummary, SessionUri, Turn } from '../ahp/types.js';
 import { detectLocale } from '../i18n/locale.js';
 
 export const HELP = `ahpc - drive an agent host from a shell
@@ -32,6 +32,7 @@ export const HELP = `ahpc - drive an agent host from a shell
 
 Sessions
   session list                 the catalogue, newest first   [--archived] [--json]
+                               [--limit N] [--cursor C] reads one page
   session show <uri>           what the host says about one  [--full] [--json]
   session new                  start one   [--agent P] [--cwd DIR] [--trust]
                                [--set k=v]… [--json]
@@ -452,6 +453,22 @@ export async function cli(command: string, rest: string[]): Promise<number> {
   if (args.has('--trust') && args.value('--cwd') === undefined) {
     process.stderr.write('--trust needs --cwd, the folder to trust.\n');
     return 2;
+  }
+
+  /*
+   * A page size that is not a positive whole number is the same kind of
+   * mistake, refused the same way: before a host is reached, because no host
+   * can answer for a number this client cannot put on the wire. The cursor is
+   * left alone here - it is opaque, and only the host can say whether one is
+   * a cursor at all.
+   */
+  if (command === 'session' && args.positional(0) === 'list' && args.value('--limit') !== undefined) {
+    const said = args.value('--limit') as string;
+    const value = Number(said);
+    if (!Number.isInteger(value) || value < 1) {
+      process.stderr.write(`--limit wants a positive whole number, not ${said}.\n`);
+      return 2;
+    }
   }
 
   const host = await connect(where(rest));
@@ -936,13 +953,37 @@ async function sessions(host: HostConnection, args: Args, wants: boolean): Promi
   const uri = args.positional(1) as SessionUri | undefined;
 
   if (verb === 'list') {
-    const rows = (await host.listSessions())
+    /*
+     * One page when the caller named one, the whole catalogue when not.
+     *
+     * `sessionPage` answers with a single page of the host's own choosing, and
+     * a caller that asked for no page has nowhere to put the cursor that leads
+     * to the rest - so the two calls are not interchangeable, and this is where
+     * the choice between them is made.
+     */
+    const limit = args.value('--limit');
+    const cursor = args.value('--cursor');
+    const paged = limit !== undefined || cursor !== undefined;
+    const page: { rows: SessionSummary[]; nextCursor?: string } = paged
+      ? await host.sessionPage({
+        ...(limit === undefined ? {} : { limit: Number(limit) }),
+        ...(cursor === undefined ? {} : { cursor }),
+      })
+      : { rows: await host.listSessions() };
+    // The filter runs on the page, not across pages: the host's cursor cannot
+    // be walked back to the rows a filter dropped, so a short page is a short
+    // page and only a missing cursor says there is no more.
+    const rows = page.rows
       .filter((s) => args.has('--archived') || !archived(s.status))
       .sort((a, b) => b.modifiedAt.localeCompare(a.modifiedAt));
-    if (wants) { json(rows); return 0; }
+    if (wants) {
+      json(paged ? { sessions: rows, ...(page.nextCursor === undefined ? {} : { nextCursor: page.nextCursor }) } : rows);
+      return 0;
+    }
     // Empty is a sentence. An empty table is indistinguishable from a table
-    // that failed to draw.
-    if (rows.length === 0) { line('No sessions.'); return 0; }
+    // that failed to draw. A cut list is not empty though, and says what it is
+    // with the cursor line below rather than with that sentence.
+    if (rows.length === 0 && page.nextCursor === undefined) { line('No sessions.'); return 0; }
     table(rows.map((s) => [
       mark(s.status),
       s.title.slice(0, 44),
@@ -950,6 +991,7 @@ async function sessions(host: HostConnection, args: Args, wants: boolean): Promi
       ago(s.modifiedAt),
       s.resource,
     ]));
+    if (page.nextCursor !== undefined) line(`More: --cursor ${page.nextCursor}`);
     return 0;
   }
 

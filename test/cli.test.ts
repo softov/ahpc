@@ -695,3 +695,102 @@ describe('ahpc changes --run, with the arguments a verb takes', () => {
     });
   });
 });
+
+/*
+ * One page of the catalogue, from the shell.
+ *
+ * `connect` builds a host per invocation and chooses the script only when
+ * nothing named one, so the config directory is thrown away for the length of
+ * a run - the same reason the chat cases above do it. The script holds five
+ * sessions, one of them archived, and its cursor is the index of the first row
+ * of the next page.
+ */
+describe('ahpc session list, a page at a time', () => {
+  const run = async (rest: string[]): Promise<{ out: string; err: string; code: number }> => {
+    const home = mkdtempSync(join(tmpdir(), 'ahpc-page-'));
+    const had = { XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME, AHPC_HOST: process.env.AHPC_HOST };
+    process.env.XDG_CONFIG_HOME = home;
+    delete process.env.AHPC_HOST;
+    let out = '';
+    let err = '';
+    const write = process.stdout.write.bind(process.stdout);
+    const writeErr = process.stderr.write.bind(process.stderr);
+    process.stdout.write = ((chunk: string | Uint8Array) => { out += String(chunk); return true; }) as typeof process.stdout.write;
+    process.stderr.write = ((chunk: string | Uint8Array) => { err += String(chunk); return true; }) as typeof process.stderr.write;
+    try {
+      const { cli } = await import('../src/cli/main.js');
+      // Read after the call, not beside it: an object's fields are built in
+      // the order they are written, and `out` beside the await is empty.
+      const code = await cli('session', rest);
+      return { out, err, code };
+    }
+    finally {
+      process.stdout.write = write;
+      process.stderr.write = writeErr;
+      for (const [key, value] of Object.entries(had)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+      rmSync(home, { recursive: true, force: true });
+    }
+  };
+
+  /** The session rows of a table, which are the lines naming a session URI. */
+  const rows = (out: string): string[] => out.split('\n').filter((one) => one.includes('ahp-session:/'));
+
+  it('prints a page and the cursor that leads to the next', async () => {
+    const { out } = await run(['list', '--limit', '2']);
+    expect(rows(out)).toHaveLength(2);
+    expect(out).toContain('ahp-session:/1f0a');
+    expect(out).toContain('ahp-session:/6b21');
+    expect(out).toMatch(/More: --cursor \S+/);
+  });
+
+  it('reads the next page from the cursor the last one printed', async () => {
+    const first = await run(['list', '--limit', '2']);
+    const cursor = /More: --cursor (\S+)/.exec(first.out)?.[1];
+    expect(cursor).toBeDefined();
+    const next = await run(['list', '--limit', '2', '--cursor', cursor as string]);
+    expect(rows(next.out)).toHaveLength(2);
+    expect(next.out).toContain('ahp-session:/9c74');
+    expect(next.out).toContain('ahp-session:/2d55');
+    // The first page's rows are behind the cursor, not repeated after it.
+    expect(next.out).not.toContain('ahp-session:/1f0a');
+  });
+
+  it('says nothing about more when the host offered no cursor', async () => {
+    // The last page, and the archived session is dropped from it - so the two
+    // rows are fewer than the three asked for, and no cursor means complete.
+    const { out } = await run(['list', '--limit', '3', '--cursor', '2']);
+    expect(rows(out)).toHaveLength(2);
+    expect(out).not.toContain('More:');
+    expect(out).not.toContain('ahp-session:/4e18');
+  });
+
+  it('carries the page and its cursor under --json', async () => {
+    const said = JSON.parse((await run(['list', '--limit', '2', '--json'])).out) as {
+      sessions: { resource: string }[];
+      nextCursor?: string;
+    };
+    expect(said.sessions.map((one) => one.resource)).toEqual(['ahp-session:/1f0a', 'ahp-session:/6b21']);
+    expect(said.nextCursor).toBe('2');
+  });
+
+  it('keeps the page shape under --json on the last page', async () => {
+    const said = JSON.parse((await run(['list', '--limit', '3', '--cursor', '2', '--json'])).out) as {
+      sessions: { resource: string }[];
+      nextCursor?: string;
+    };
+    expect(said.sessions).toHaveLength(2);
+    expect(said.nextCursor).toBeUndefined();
+  });
+
+  it('reads the whole catalogue under --json when no page was asked for', async () => {
+    const said = JSON.parse((await run(['list', '--json'])).out) as { resource: string }[];
+    expect(Array.isArray(said)).toBe(true);
+    expect(said).toHaveLength(4);
+  });
+
+  it('refuses a limit that is not a positive number, before reaching a host', async () => {
+    const { code, err } = await run(['list', '--limit', '0']);
+    expect(code).toBe(2);
+    expect(err).toContain('--limit wants a positive whole number');
+  });
+});

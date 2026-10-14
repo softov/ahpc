@@ -120,7 +120,7 @@ When a tool call is waiting: `a` approves, `d` denies, `1`-`9` pick an offered o
 
 | Command | | |
 |---|---|---|
-| `session list` | List sessions, newest first | `--archived` `--json` |
+| `session list` | List sessions, newest first | `--archived` `--json` `--limit` `--cursor` |
 | `session show <uri>` | Session details | `--full` `--json` |
 | `session new` | Create a new session | `--agent` `--cwd` `--trust` `--set k=v` `--json` |
 | `session rm <uri>` | Delete a session | |

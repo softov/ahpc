@@ -21,14 +21,14 @@
 
 import type { HostConnection } from '../ahp/connection.js';
 import { SessionFlag } from '../ahp/types.js';
-import type { Answer, SessionUri, TerminalState, Turn } from '../ahp/types.js';
+import type { Answer, SessionSummary, SessionUri, TerminalState, Turn } from '../ahp/types.js';
 import { failure, spoken, turn as runTurn, until } from '../wait.js';
 
 /** As much of JSON Schema as a tool's arguments need. */
 export interface Schema {
   type: 'object';
   properties: Record<string, {
-    type: 'string' | 'number' | 'boolean' | 'object' | 'array';
+    type: 'string' | 'number' | 'integer' | 'boolean' | 'object' | 'array';
     description?: string;
     items?: { type: string };
     additionalProperties?: boolean | { type: string };
@@ -129,21 +129,38 @@ export const TOOLS: Tool[] = [
   {
     name: 'list_sessions',
     title: 'List sessions',
-    description: 'Every session on the connected host, newest first. Start here: every other session tool takes a session URI from this list.',
+    description: 'The sessions on the connected host, newest first. Start here: every other session tool takes a session URI from this list. Give a limit to read one page and take nextCursor from the answer.',
     readOnly: true,
     input: {
       type: 'object',
       properties: {
         archived: { type: 'boolean', description: 'Include archived sessions. Off by default.' },
+        limit: { type: 'integer', description: 'Read at most this many sessions. A positive whole number. Omit to read the whole catalogue.' },
+        cursor: { type: 'string', description: 'The nextCursor of the previous page. Omit to start from the newest session.' },
       },
       additionalProperties: false,
     },
     run: async (host, input) => {
-      const rows = await host.listSessions();
+      /*
+       * One page when either was given, the whole catalogue when neither was.
+       *
+       * Without them this is the call it always was, and `nextCursor` is the
+       * host's own word for where the next page starts - passed back to it
+       * unread, because a cursor is opaque by contract.
+       */
+      const limit = typeof input.limit === 'number' ? input.limit : undefined;
+      const cursor = typeof input.cursor === 'string' ? input.cursor : undefined;
+      const paged = limit !== undefined || cursor !== undefined;
+      const page: { rows: SessionSummary[]; nextCursor?: string } = paged
+        ? await host.sessionPage({
+          ...(limit === undefined ? {} : { limit }),
+          ...(cursor === undefined ? {} : { cursor }),
+        })
+        : { rows: await host.listSessions() };
       const wanted = input.archived === true
-        ? rows
-        : rows.filter((row) => (row.status & SessionFlag.IsArchived) === 0);
-      return wanted.map((row) => ({
+        ? page.rows
+        : page.rows.filter((row) => (row.status & SessionFlag.IsArchived) === 0);
+      const rows = wanted.map((row) => ({
         session: row.resource,
         title: row.title,
         provider: row.provider,
@@ -152,6 +169,9 @@ export const TOOLS: Tool[] = [
         workingDirectories: row.workingDirectories,
         ...(row.activity === undefined ? {} : { activity: row.activity }),
       }));
+      return paged
+        ? { sessions: rows, ...(page.nextCursor === undefined ? {} : { nextCursor: page.nextCursor }) }
+        : rows;
     },
   },
   {

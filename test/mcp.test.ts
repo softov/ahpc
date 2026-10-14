@@ -400,4 +400,47 @@ describe('the tools a session is driven with', () => {
     const rows = await named('list_sessions')!.run(host, {}) as { session: string }[];
     expect(rows.some((row) => row.session === made.session)).toBe(true);
   });
+
+  /*
+   * The catalogue a page at a time.
+   *
+   * A model that reads the whole list at once spends its window on rows it
+   * cannot use, so `list_sessions` takes the host's own `limit` and `cursor`
+   * and hands the next cursor back. The script holds five sessions, one of
+   * them archived, and its cursor is the index of the next page's first row.
+   */
+  const page = async (host: ReturnType<typeof fakeHost>, input: Record<string, unknown>): Promise<{
+    sessions: { session: string }[];
+    nextCursor?: string;
+  }> => await named('list_sessions')!.run(host, input) as { sessions: { session: string }[]; nextCursor?: string };
+
+  it('takes a limit and hands back the cursor for the next page', async () => {
+    const first = await page(fakeHost(), { limit: 2 });
+    expect(first.sessions.map((one) => one.session)).toEqual(['ahp-session:/1f0a', 'ahp-session:/6b21']);
+    expect(first.nextCursor).toBe('2');
+  });
+
+  it('reads the next page from that cursor, and stops at the last one', async () => {
+    const host = fakeHost();
+    const next = await page(host, { limit: 2, cursor: '2' });
+    expect(next.sessions.map((one) => one.session)).toEqual(['ahp-session:/9c74', 'ahp-session:/2d55']);
+    expect(next.nextCursor).toBe('4');
+    // The last page: the archived session is dropped from it, so it holds fewer
+    // rows than the limit, and no cursor is what says the list is complete.
+    const last = await page(host, { limit: 3, cursor: '2' });
+    expect(last.sessions.map((one) => one.session)).toEqual(['ahp-session:/9c74', 'ahp-session:/2d55']);
+    expect(last.nextCursor).toBeUndefined();
+  });
+
+  it('answers the plain list when neither a limit nor a cursor was given', async () => {
+    const rows = await named('list_sessions')!.run(fakeHost(), {}) as unknown[];
+    expect(Array.isArray(rows)).toBe(true);
+    expect(rows).toHaveLength(4);
+  });
+
+  it('describes the page it takes in its own schema', () => {
+    const input = named('list_sessions')!.input;
+    expect(input.properties.limit?.type).toBe('integer');
+    expect(input.properties.cursor?.type).toBe('string');
+  });
 });
