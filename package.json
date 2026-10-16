@@ -45,6 +45,9 @@
     "build:watch": "tsc -p tsconfig.json --watch",
     "dev": "npm run build && node dist/src/main.js",
     "dev:bun": "bun src/main.tsx",
+    "docs:dev": "npm run build && vitepress dev docs",
+    "docs:build": "npm run build && vitepress build docs",
+    "docs:preview": "vitepress preview docs",
     "prepack": "tsc -p tsconfig.build.json",
     "schema": "node tools/schema.mjs",
     "start": "node dist/src/main.js",
@@ -65,6 +68,7 @@
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
     "typescript": "^5.9.3",
+    "vitepress": "^1.6.4",
     "vitest": "^3.0.0"
   },
   "engines": {

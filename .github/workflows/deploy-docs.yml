@@ -1,0 +1,60 @@
+name: Docs
+
+# Builds docs/ as a VitePress site and publishes it to GitHub Pages, at
+# https://softov.github.io/ahpc/. Pages must have "GitHub Actions" as its
+# source.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      # The CLI and MCP tools pages are generated from these.
+      - 'src/cli/main.ts'
+      - 'src/mcp/tools.ts'
+      - '.github/workflows/deploy-docs.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time, and a deploy that has started runs to its end.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The whole history, so `lastUpdated` reads each page's real date.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Builds dist/src first: the reference pages read the built client.
+      - run: npm run docs:build
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: docs/.vitepress/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

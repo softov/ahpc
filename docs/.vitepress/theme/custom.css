@@ -1,0 +1,74 @@
+/*
+ * The ahpapp palette, from agenthostclient.com: GitHub Primer's dark theme
+ * with the blue accent #4c9aff. The light theme is Primer's light half, so
+ * the links take #0969da and the buttons #1f6feb, which white reads on.
+ * ahpd's site is teal; the clients are blue.
+ */
+
+:root {
+  --vp-c-brand-1: #0969da;
+  --vp-c-brand-2: #1f6feb;
+  --vp-c-brand-3: #1f6feb;
+  --vp-c-brand-soft: rgba(76, 154, 255, 0.14);
+
+  --ahpc-ok: #1a7f37;
+  --ahpc-wait: #9a6700;
+  --ahpc-fail: #cf222e;
+}
+
+.dark {
+  --vp-c-bg: #0d1117;
+  --vp-c-bg-alt: #010409;
+  --vp-c-bg-elv: #161b22;
+  --vp-c-bg-soft: #161b22;
+  --vp-c-text-1: #e6edf3;
+  --vp-c-text-2: #8b949e;
+  --vp-c-text-3: #6e7681;
+  --vp-c-divider: #21262d;
+  --vp-c-gutter: #010409;
+  --vp-c-border: #30363d;
+  --vp-c-default-soft: #21262d;
+  --vp-code-block-bg: #161b22;
+  --vp-nav-bg-color: #0d1117;
+  --vp-sidebar-bg-color: #010409;
+  --vp-button-alt-bg: #21262d;
+  --vp-button-alt-hover-bg: #30363d;
+  --vp-button-alt-active-bg: #484f58;
+
+  --vp-c-brand-1: #4c9aff;
+  --vp-c-brand-2: #79c0ff;
+  --vp-c-brand-3: #1f6feb;
+  --vp-c-brand-soft: rgba(76, 154, 255, 0.16);
+
+  --ahpc-ok: #3fb950;
+  --ahpc-wait: #e0a83c;
+  --ahpc-fail: #e5534b;
+}
+
+/* Inline code takes the app's code blue in the dark theme. */
+.dark .vp-doc :not(pre) > code {
+  color: #79c0ff;
+}
+
+/* The three states the app's session list shows: done, waiting on you, failed. */
+.ok { color: var(--ahpc-ok); }
+.wait { color: var(--ahpc-wait); }
+.fail { color: var(--ahpc-fail); }
+
+/* Every scroll bar, thin and in the palette's colours; blue on the sidebar's when hovered. */
+:root {
+  scrollbar-color: rgba(110, 118, 129, 0.45) transparent;
+}
+
+/* The width is not inherited, so each scroll container takes it. */
+* {
+  scrollbar-width: thin;
+}
+
+.dark {
+  scrollbar-color: #30363d transparent;
+}
+
+.VPSidebar:hover {
+  scrollbar-color: var(--vp-c-brand-1) transparent;
+}
