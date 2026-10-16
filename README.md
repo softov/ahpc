@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/softov/ahpc/actions/workflows/ci.yml/badge.svg)](https://github.com/softov/ahpc/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/%40softov%2Fahpc)](https://www.npmjs.com/package/@softov/ahpc)
+[![docs](https://img.shields.io/badge/docs-softov.github.io%2Fahpc-1f6feb)](https://softov.github.io/ahpc/)
 ![license MIT](https://img.shields.io/badge/license-MIT-blue)
 ![node >=22](https://img.shields.io/badge/node-%3E%3D22-5fa04e)
 ![Agent Host Protocol 1.0.0](https://img.shields.io/badge/AHP-1.0.0-0b7285)
@@ -17,6 +18,8 @@ Connect to an AHP host, manage sessions, and work with agents directly from your
 > You need an AHP-compatible host to connect to.
 
 The interface is built with [TextUI](https://github.com/softov/textui), a component toolkit for terminal applications.
+
+**[Read the documentation](https://softov.github.io/ahpc/)**
 
 ## Quick start
 
