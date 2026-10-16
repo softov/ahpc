@@ -92,7 +92,7 @@ Start `ahpc --host <url> mcp` as a stdio server. Add `--connection-token-file <p
 
 ## The tools
 
-Twelve tools are always served: sessions, turns, and answering. More come in groups, and each group is off until you ask for it with `--mcp-tools`:
+Thirteen tools are always served: sessions, turns, answering, and the list of automations. More come in groups, and each group is off until you ask for it with `--mcp-tools`:
 
 ```sh
 ahpc --host ws://127.0.0.1:9187 mcp --mcp-tools resources,changes
@@ -100,15 +100,17 @@ ahpc --host ws://127.0.0.1:9187 mcp --mcp-tools resources,changes
 
 | Group | Tools |
 | --- | --- |
-| (always) | `list_sessions` `show_session` `list_agents` `new_session` `dispose_session` `session_history` `send_turn` `queue_turn` `cancel_turn` `wait_for_attention` `confirm_tool_call` `answer_question` |
+| (always) | `list_sessions` `show_session` `list_agents` `new_session` `dispose_session` `session_history` `send_turn` `queue_turn` `cancel_turn` `wait_for_attention` `confirm_tool_call` `answer_question` `list_automations` |
 | `resources` | `list_directory` `read_file` `write_file` `make_directory` `delete_path` `move_path` `copy_path` |
 | `terminals` | `list_terminals` `new_terminal` `send_to_terminal` `read_terminal` `dispose_terminal` |
-| `automations` | `list_automations` `run_automation` `set_automation_enabled` `remove_automation` |
+| `automations` | `run_automation` `set_automation_enabled` `remove_automation` |
 | `changes` | `list_changesets` `show_changes` |
 
-The groups are off by default because a model reads every tool it is given. Twelve tools serve the common case, which is driving a session, better than thirty.
+The groups are off by default because a model reads every tool it is given. Thirteen tools serve the common case, which is driving a session, better than thirty.
 
-`--mcp-tools` takes a comma-separated list and can be repeated. Calling a tool from a group that is off is refused with the flag that turns it on.
+`--mcp-tools` takes a comma-separated list and can be repeated. `--mcp-tools all` turns on every group.
+
+A tool in a group that is off is not listed, so the server names the groups that are off in its `initialize` reply, as instructions for the model. Calling a tool from such a group is refused with the flag that turns it on.
 
 Each tool's arguments are in the [MCP tools](../reference/MCP-TOOLS.md) reference.
 

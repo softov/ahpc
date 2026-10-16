@@ -18,7 +18,7 @@ import { SWITCHES } from '../flags.js';
 import { parseSessionLink, sessionOfLink } from '../links.js';
 import { decodeStatus } from '../ahp/status.js';
 import { TurnRunning, failure, spoken, turn as runTurn, until } from '../wait.js';
-import { GROUPS, served } from '../mcp/tools.js';
+import { grouped, served } from '../mcp/tools.js';
 import type { Group } from '../mcp/tools.js';
 import { SERVER } from '../mcp/serve.js';
 import { stdio } from '../mcp/stdio.js';
@@ -146,7 +146,7 @@ Serving these sessions to something else
                                /mcp is MCP; /api/<tool> is plain JSON
   both take [--mcp-tools G,…]  extra tool groups to serve, on top of the
                                sessions ones: resources, terminals,
-                               automations, changes
+                               automations, changes, or all
 
 Anything else
   dispatch <uri> <type>        send one action verbatim  [--field k=v]… [--chat]
@@ -1291,11 +1291,7 @@ function wanted(args: Args): Group[] {
     .flatMap((one) => one.split(','))
     .map((one) => one.trim())
     .filter((one) => one !== '');
-  const strange = said.filter((one) => !(GROUPS as readonly string[]).includes(one));
-  if (strange.length > 0) {
-    throw new Fault(`No tool group called ${strange.join(', ')}. There is ${GROUPS.join(', ')}.`);
-  }
-  return said as Group[];
+  try { return grouped(said); } catch (error) { throw new Fault((error as Error).message); }
 }
 
 /** Everything under `terminal`. */

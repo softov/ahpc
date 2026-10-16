@@ -57,8 +57,9 @@ Reference: [00-cli.md](cli/00-cli.md)
 | [03 - A failed turn says why](cli/03-a-failed-turn-says-why/plan.md) | high | built 2026-10-07 ([implemented.md](cli/03-a-failed-turn-says-why/implemented.md)) | - | - |
 | [04 - A session list is read a page at a time](cli/04-a-session-list-is-read-a-page-at-a-time/plan.md) | medium | active 2026-10-13; tasks 01-02 implemented and reviewed; the hand check passed | - | - |
 | [05 - `prompt` on a busy session refuses, queues or steers, and says when it stops waiting](cli/05-prompt-on-a-busy-session/plan.md) | high | active 2026-10-14; tasks 01-02 implemented | - | - |
+| [06 - The automation list is served by default, the other groups are named, and all turns on every group](cli/06-mcp-tool-groups-are-found-and-all-is-one-word/plan.md) | medium | active 2026-10-16; tasks 01-02 implemented, awaiting review | - | - |
 
-Next free number in `cli`: `06`.
+Next free number in `cli`: `07`.
 
 ## Later domains (no plans yet)
 

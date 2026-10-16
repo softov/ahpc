@@ -15,7 +15,7 @@
  */
 
 import type { HostConnection } from '../ahp/connection.js';
-import { named, served } from './tools.js';
+import { named, served, unserved } from './tools.js';
 import { version } from '../version.js';
 
 /** The newest version of MCP this speaks, and what it answers an unknown one with. */
@@ -212,10 +212,12 @@ export async function answer(
      * the offer the client then accepts or drops.
      */
     const asked = bag(message.params).protocolVersion;
+    const off = unserved(options.groups);
     return ok({
       protocolVersion: typeof asked === 'string' && SPOKEN.includes(asked) ? asked : PROTOCOL,
       capabilities: { tools: { listChanged: false } },
       serverInfo: { name: options.name, version: options.version },
+      ...(off === undefined ? {} : { instructions: off }),
     });
   }
   if (method === 'ping') return ok({});

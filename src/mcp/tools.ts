@@ -15,8 +15,8 @@
  * Which tools: the ones that let an agent drive a session to completion, and
  * not the whole of what `ahpc` can do. A tool table is read by a model with
  * everything else it has been given, so forty of them is a worse server than
- * eleven. Files, terminals, automations and changesets are deliberately not
- * here; see ROADMAP.md.
+ * thirteen. Files, terminals, changesets and the automation verbs are in
+ * groups a caller asks for; see `Group`.
  */
 
 import type { HostConnection } from '../ahp/connection.js';
@@ -730,10 +730,12 @@ export const TOOLS: Tool[] = [
     },
   },
 
-  /* Scheduled work, which is the `automations` group. */
+  /*
+   * Scheduled work. The list is core, so an agent can see what the host runs
+   * without a flag; running and changing one is the `automations` group.
+   */
   {
     name: 'list_automations',
-    group: 'automations',
     title: 'List automations',
     description: 'What the host runs on a schedule, whether each is on, and when it next fires.',
     readOnly: true,
@@ -868,3 +870,29 @@ export const named = (name: string): Tool | undefined => TOOLS.find((one) => one
 /** The tools a server started with these groups serves. */
 export const served = (groups: readonly string[] = []): Tool[] =>
   TOOLS.filter((one) => one.group === undefined || groups.includes(one.group));
+
+/**
+ * The groups a list of names asks for, where `all` is every group.
+ *
+ * Throws on a name that is no group, with the names there are.
+ */
+export const grouped = (said: readonly string[]): Group[] => {
+  const strange = said.filter((one) => one !== 'all' && !(GROUPS as readonly string[]).includes(one));
+  if (strange.length > 0) {
+    throw new Error(`No tool group called ${strange.join(', ')}. There is ${GROUPS.join(', ')}, or all.`);
+  }
+  return said.includes('all') ? [...GROUPS] : said as Group[];
+};
+
+/**
+ * The sentence that tells a client which groups this server left out, or
+ * nothing when it serves them all.
+ *
+ * `tools/list` does not show a tool in a group that is off, so without this a
+ * model never learns the tool is one flag away.
+ */
+export const unserved = (groups: readonly string[] = []): string | undefined => {
+  const off = GROUPS.filter((one) => !groups.includes(one));
+  if (off.length === 0) return undefined;
+  return `Not served: the ${off.join(', ')} tools. Whoever starts ahpc can add them with --mcp-tools <group>, or --mcp-tools all.`;
+};

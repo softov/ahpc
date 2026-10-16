@@ -10,7 +10,7 @@
 
 import { afterEach, describe, expect, it } from 'vitest';
 import { fakeHost } from '../src/ahp/fake.js';
-import { GROUPS, TOOLS, named, served } from '../src/mcp/tools.js';
+import { GROUPS, TOOLS, grouped, named, served, unserved } from '../src/mcp/tools.js';
 import { PROTOCOL, SERVER, SPOKEN, answer, call } from '../src/mcp/serve.js';
 import { serve, type Serving } from '../src/mcp/http.js';
 
@@ -96,10 +96,36 @@ describe('the protocol', () => {
     const said = await ask({ jsonrpc: '2.0', id: 20, method: 'tools/list' });
     const names = (said?.result as { tools: { name: string }[] }).tools.map((one) => one.name);
     // The point of the groups: a model reads this table alongside everything
-    // else it was given, so the default is the twelve a session needs.
+    // else it was given, so the default is the thirteen a session needs.
     expect(names).toContain('send_turn');
     expect(names).not.toContain('read_file');
     expect(names.length).toBeLessThan(TOOLS.length);
+  });
+
+  it('serves the automation list without a group, and not the automation verbs', async () => {
+    const names = served().map((one) => one.name);
+    expect(names).toContain('list_automations');
+    expect(names).not.toContain('run_automation');
+    expect(names).toHaveLength(13);
+  });
+
+  it('names the groups that are off when a client connects', async () => {
+    const said = await ask({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} });
+    const instructions = (said?.result as { instructions?: string }).instructions;
+    for (const group of GROUPS) expect(instructions).toContain(group);
+    expect(instructions).toContain('--mcp-tools');
+    const host = fakeHost();
+    const all = await answer(host, { jsonrpc: '2.0', id: 1, method: 'initialize', params: {} },
+      { ...SERVER, groups: [...GROUPS] }) as { result: Record<string, unknown> };
+    expect(all.result.instructions).toBeUndefined();
+    expect(unserved(['resources'])).not.toContain('resources');
+  });
+
+  it('reads all as every group, and refuses a name that is no group', () => {
+    expect(grouped(['all'])).toEqual([...GROUPS]);
+    expect(grouped(['all', 'resources'])).toEqual([...GROUPS]);
+    expect(grouped(['terminals'])).toEqual(['terminals']);
+    expect(() => grouped(['files'])).toThrow(/No tool group called files/);
   });
 
   it('serves a group once it is asked for', async () => {

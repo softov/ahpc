@@ -30,7 +30,11 @@ The palette (`ctrl+p`) has **Show automations**. In the list:
 
 ## MCP tools
 
-Served with `--mcp-tools automations`.
+`list_automations` is always served:
+
+<McpTools names="list_automations" />
+
+Running and changing an automation needs `--mcp-tools automations`:
 
 <McpTools group="automations" />
 
