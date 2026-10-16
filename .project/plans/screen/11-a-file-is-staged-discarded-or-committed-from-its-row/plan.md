@@ -17,7 +17,7 @@ refs:
   - "[code://src/ahp/followup.ts#L126-L137](../../../../src/ahp/followup.ts#L126-L137) - `CREATE_PULL_REQUEST` and `chosenOperations`"
   - "[code://test/changes.test.tsx](../../../../test/changes.test.tsx) - the changes screen's tests, with the 60-column case"
   - npm://@textui/widgets - `Dialog` with `actions`, where the first action has the focus
-  - "file:///github/ahpd/.project/plans/host/82-a-file-or-the-whole-changeset-is-staged-discarded-or-committed/plan.md - the host side: the scopes and the rename"
+  - "file:///github/ahpd/.project/plans/host/82-a-file-or-changeset-is-staged-or-committed/plan.md - the host side: the scopes and the rename"
 ---
 
 ## Goal

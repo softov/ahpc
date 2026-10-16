@@ -12,7 +12,7 @@ decisions: []
 refs:
   - "[code://src/ahp/live.ts#L3218-L3223](../../../../src/ahp/live.ts#L3218-L3223) - the last model falls back to `_meta.model` on the session state"
   - "[code://test/reconnect.test.ts](../../../../test/reconnect.test.ts) - the tests that send `_meta.model`"
-  - "file:///github/ahpd/.project/plans/host/43-the-wire-is-the-protocols-p4-ahpds-own-meta-keys-say-ahpd/plan.md - ahpd renames every key it invents to `ahpd.<name>`; its task 03 waits on this plan"
+  - "file:///github/ahpd/.project/plans/host/43-p4-ahpds-own-meta-keys-say-ahpd/plan.md - ahpd renames every key it invents to `ahpd.<name>`; its task 03 waits on this plan"
 ---
 
 ## Goal
