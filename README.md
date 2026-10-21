@@ -19,6 +19,8 @@ Connect to an AHP host, manage sessions, and work with agents directly from your
 
 The interface is built with [TextUI](https://github.com/softov/textui), a component toolkit for terminal applications.
 
+![A session, its transcript and the facts about it](docs/img/transcript.svg)
+
 **[Read the documentation](https://softov.github.io/ahpc/)**
 
 ## Quick start
@@ -36,6 +38,10 @@ A scripted host is built in, so the screen runs with nothing else to set up:
 ```sh
 ahpc
 ```
+
+![The session list, with status and workspace for each](docs/img/sessions.svg)
+
+![Starting a session, and the questions the host asks first](docs/img/compose.svg)
 
 Point it at a real host:
 
