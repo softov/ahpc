@@ -3058,24 +3058,26 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
       dispatch(uri, { type: 'chat/pendingMessageRemoved', kind: 'queued', id });
     },
 
-    stopTurn: (uri) => {
-      void (async () => {
-        const chatUri = await chatOf(uri);
-        if (!chatUri) return;
-        // The id is read back rather than remembered: a turn somebody started
-        // in an editor is stoppable from here too, and its id is in the state.
-        const state = await snapshotOf(chatUri);
-        const active = bag(bag(state).activeTurn);
-        const turnId = str(active.id);
-        if (!turnId) return;
-        const started = Date.parse(str(active.startedAt) ?? '');
-        client.dispatch(chatUri, {
-          type: 'chat/turnCancelled',
-          turnId,
-          duration: Number.isNaN(started) ? 0 : Math.max(0, Date.now() - started),
-        });
-      })().catch((error: unknown) => options.onRefusal?.(uri, reason(error)));
-    },
+    stopTurn: (uri) => (async () => {
+      const chatUri = await chatOf(uri);
+      if (!chatUri) return false;
+      // The id is read back rather than remembered: a turn somebody started
+      // in an editor is stoppable from here too, and its id is in the state.
+      const state = await snapshotOf(chatUri);
+      const active = bag(bag(state).activeTurn);
+      const turnId = str(active.id);
+      if (!turnId) return false;
+      const started = Date.parse(str(active.startedAt) ?? '');
+      client.dispatch(chatUri, {
+        type: 'chat/turnCancelled',
+        turnId,
+        duration: Number.isNaN(started) ? 0 : Math.max(0, Date.now() - started),
+      });
+      return true;
+    })().catch((error: unknown) => {
+      options.onRefusal?.(uri, reason(error));
+      return false;
+    }),
 
     confirmToolCall: (uri, toolCallId, approved, optionId) => {
       dispatch(uri, approved

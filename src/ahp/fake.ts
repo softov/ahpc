@@ -2036,7 +2036,11 @@ export function fakeHost(): FakeHost {
       emit(uri, { type: 'queued', messages: waiting });
     },
 
-    stopTurn: stop,
+    stopTurn: async (uri) => {
+      const running = active.has(uri);
+      stop(uri);
+      return running;
+    },
 
     /*
      * Both answers land on the next step, not inside the call.

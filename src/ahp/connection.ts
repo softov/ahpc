@@ -338,7 +338,14 @@ export interface HostConnection {
    */
   setDraft(uri: SessionUri, text: string): void;
   say(uri: SessionUri, text: string, model?: ModelSelection): void;
-  stopTurn(uri: SessionUri): void;
+  /**
+   * Cancel the turn that is running.
+   *
+   * Resolves once the cancel is sent: `true`, or `false` when the session had
+   * no turn running, or could not be read and `onRefusal` was told why. It
+   * never rejects, so a screen that does not wait loses nothing by it.
+   */
+  stopTurn(uri: SessionUri): Promise<boolean>;
   /**
    * Say it *after* the turn that is running.
    *

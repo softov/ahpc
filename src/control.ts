@@ -946,7 +946,7 @@ export function createController(
 
     stop() {
       const uri = app.store.get<SessionUri>(OPEN);
-      if (uri) host.stopTurn(uri);
+      if (uri) void host.stopTurn(uri);
     },
 
     /*

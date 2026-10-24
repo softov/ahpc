@@ -32,6 +32,8 @@ A message sent while a turn runs is queued behind it.
 
 `prompt` on a session with a running turn is refused, unless you say what to do: `--queue` runs it after that turn, `--steer` sends it into that turn.
 
+`cancel` on a session with no running turn says so and exits 1.
+
 A script that drives a session without a person:
 
 ```sh

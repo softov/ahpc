@@ -1659,7 +1659,13 @@ async function turns(host: HostConnection, command: string, args: Args, wants: b
         await host.disposeSession(uri).catch(() => {});
       }
     }
-    case 'cancel': host.stopTurn(needs(args, 0, 'a session URI') as SessionUri); return 0;
+    case 'cancel': {
+      // Awaited, because the cancel is sent only once the running turn's id
+      // has been read back, and the connection closes when this returns.
+      if (await host.stopTurn(needs(args, 0, 'a session URI') as SessionUri)) return 0;
+      process.stderr.write('No turn is running.\n');
+      return 1;
+    }
     case 'queue': {
       const uri = needs(args, 0, 'a session URI') as SessionUri;
       host.queue(uri, needs(args, 1, 'something to say'), selected(args));

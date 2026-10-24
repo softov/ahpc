@@ -356,7 +356,7 @@ export const TOOLS: Tool[] = [
       required: ['session'],
       additionalProperties: false,
     },
-    run: async (host, input) => { host.stopTurn(uriOf(input)); return { cancelled: true }; },
+    run: async (host, input) => ({ cancelled: await host.stopTurn(uriOf(input)) }),
   },
   {
     name: 'wait_for_attention',
