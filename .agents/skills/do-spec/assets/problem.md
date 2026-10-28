@@ -4,7 +4,7 @@ status: open
 date: <YYYY-MM-DD>
 severity: <blocker | major | minor>
 blocks:
-  - plans/<domain>/<NN>-<slug>/task-<NN>-<slug>.md
+  - plans/<domain>/<id>-<slug>/task-<NN>-<slug>.md
 refs:
   - "[code://<path>#L<n>](../../<path>#L<n>) - <where it shows>"
   - git://<sha> - <the change that introduced it>

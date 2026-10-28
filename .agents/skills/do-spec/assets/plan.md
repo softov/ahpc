@@ -6,7 +6,7 @@ priority: medium
 created: <YYYY-MM-DD>
 revalidated: <YYYY-MM-DD>
 requires:
-  - plans/<domain>/<NN>-<slug>/plan.md
+  - plans/<domain>/<id>-<slug>/plan.md
 changes:
   - specs/<existing-spec>.md
 creates:
@@ -28,7 +28,7 @@ refs:
 
 ## Reconnaissance
 
-The files read and the patterns to reuse are the `refs` above, each with its note.
+The files read and the patterns to reuse are the `refs` in the frontmatter, each with its note.
 
 ### Searches performed
 
@@ -81,4 +81,3 @@ The files read and the patterns to reuse are the `refs` above, each with its not
 ## Final verification checklist
 
 - [ ] <check>
-- [ ] `plans/index.md` updated.
