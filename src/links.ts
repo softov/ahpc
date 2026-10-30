@@ -62,8 +62,8 @@ export const idOf = (uri: string): string => {
  * The row a link names.
  *
  * Matched on the id and the provider, whichever scheme the row is under: this
- * client starts a session as `<provider>:/`, another client may have started it
- * as `ahp-session:/`, and the link says neither.
+ * client starts a session as `ahp-session:/`, an older client or host may have
+ * started it as `<provider>:/`, and the link says neither.
  */
 export const sessionOfLink = (link: SessionLink, rows: SessionSummary[]): SessionSummary | undefined =>
   rows.find((row) => idOf(row.resource) === link.id && row.provider === link.provider)
