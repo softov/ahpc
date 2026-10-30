@@ -345,6 +345,18 @@ describe('when the agent is waiting', () => {
     await m.t.unmount();
   });
 
+  it('draws the reason the host gives for refusing an action the screen sent', async () => {
+    const m = await conversation();
+    const controller = m.t.app.services.require(CONTROLLER);
+
+    // The waiter takes the refusal, so the screen is the only one left to say it.
+    controller.unqueue('no-such-message');
+    await m.t.settle();
+
+    expect(m.t.store.get<string>(HOST_ERROR)).toBe('No message with that id is waiting.');
+    await m.t.unmount();
+  });
+
   it('renders a question as a question, with its choices', async () => {
     const m = await conversation();
     const controller = m.t.app.services.require(CONTROLLER);

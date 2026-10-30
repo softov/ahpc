@@ -74,12 +74,12 @@ host -> action envelope { origin, rejectionReason? } -> channels.deliver -> the 
 | A dispatch method resolves `{ refused?: string }` and never rejects, as `stopTurn` does. | `(defaulted: the shape stopTurn already has)` | 01 |
 | A dispatch matches its echo by `origin.clientSeq` from `client.dispatch`. | `(defaulted: the protocol's reconciliation rule)` | 01 |
 | A dispatch holds its channel open until the echo arrives. | `(defaulted: a host echoes to the channel's subscribers)` | 01 |
-| A dispatch with no echo after 10 seconds resolves `refused: "The host did not answer in 10 seconds."`. | `(defaulted: a command must end, and a silent host is not a yes)` | 01 |
+| A dispatch with no answer after 10 seconds resolves as applied. Only a rejection is a refusal. | Softov, 2026-10-30: "Silence is success" (ahpd sends nothing for terminal input or a flag already set, and the spec lets a host ignore an unknown channel) | 01 |
 | A refusal a waiter takes is not also sent to `onRefusal`. | `(defaulted: the claimed-or-reported pattern of refuse, and the double message of cancel)` | 01 |
 | `queue` resolves `{ id, refused? }`, and the CLI prints the id on stdout. | The brief, "Bugs in ahpc" | 02 |
 | A refused command prints the host's reason on stderr and exits 1. | The brief, "Bugs in ahpc" | 02 |
 | The MCP tools that dispatch return the refusal as a tool error. | `(defaulted: the tools and the shell share the seam and must agree)` | 02 |
-| The screen does not wait; it calls the methods with `void`. | `(defaulted: the screen already draws refusals through onRefusal)` | 02 |
+| The screen does not wait, and draws a refusal on its error line. | `(defaulted: the waiter takes the refusal, so onRefusal never sees it)` | 02 |
 | `cancel` prints one line when it cannot cancel. | The brief, "Bugs in ahpc" | 03 |
 | A `prompt` whose turn was cancelled prints "The turn was cancelled." on stderr and exits 1. | The brief, "Bugs in ahpc" | 03 |
 | The extra `failed` turn after a cancel is not in scope. | The brief says it is likely agent-claude, not ahpc | - |
@@ -102,7 +102,7 @@ host -> action envelope { origin, rejectionReason? } -> channels.deliver -> the 
 
 ## Risks and tradeoffs
 
-- A host that never echoes makes a command wait 10 seconds and fail - ahpd and VS Code echo each own action.
+- An action the host does not answer makes a command wait 10 seconds and exit 0, so a mistyped session URI also exits 0.
 - A waiter subscribes to a channel the command did not open - it releases the channel when the echo arrives.
 - Seven methods change their return type - the screen ignores the promise, so its behaviour stays the same.
 

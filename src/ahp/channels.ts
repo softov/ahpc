@@ -94,9 +94,12 @@ export interface Channels {
    *
    * The host echoes an accepted action to the channel's subscribers with the
    * `clientSeq` it was sent under, and an action it will not apply with the
-   * same origin and a reason. This is that answer, or a refusal naming the
-   * deadline when nothing came. It is registered synchronously, so a host that
-   * answers before the caller has returned still settles it.
+   * same origin and a reason. This is that answer, or an empty one when the
+   * deadline passes with nothing: a host may apply an action and say nothing,
+   * as ahpd does for terminal input and for a flag already set, and the spec
+   * lets a host ignore an action on a channel it does not have. Only a reason
+   * is a refusal. It is registered synchronously, so a host that answers
+   * before the caller has returned still settles it.
    */
   await(clientSeq: number, deadlineMs: number): Promise<Sent>;
   /** Start reading a connection's event stream. Ends when the stream does. */
@@ -538,7 +541,7 @@ export function openChannels(options: ChannelsOptions): Channels {
     await: (clientSeq, deadlineMs) => new Promise<Sent>((resolve) => {
       const timer = setTimeout(() => {
         waiting.delete(clientSeq);
-        resolve({ refused: `The host did not answer in ${Math.round(deadlineMs / 1000)} seconds.` });
+        resolve({});
       }, deadlineMs);
       waiting.set(clientSeq, (answer) => {
         clearTimeout(timer);
