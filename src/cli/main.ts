@@ -1625,6 +1625,11 @@ async function turns(host: HostConnection, command: string, args: Args, wants: b
     for (const message of answer === undefined ? [] : failure(answer)) {
       process.stderr.write(`${message}\n`);
     }
+    /*
+     * A cancelled turn leaves no error part behind, so `failure` has nothing
+     * to say about it and the run ended with a 1 that looked like a bug.
+     */
+    if (answer?.state === 'cancelled') process.stderr.write('The turn was cancelled.\n');
     return answer;
   };
 
@@ -1674,7 +1679,9 @@ async function turns(host: HostConnection, command: string, args: Args, wants: b
     case 'cancel': {
       // Awaited, because the cancel is sent only once the running turn's id
       // has been read back, and the connection closes when this returns.
-      if (await host.stopTurn(needs(args, 0, 'a session URI') as SessionUri)) return 0;
+      const stopped = await host.stopTurn(needs(args, 0, 'a session URI') as SessionUri);
+      if (stopped.refused !== undefined) return exitOf(stopped);
+      if (stopped.cancelled) return 0;
       process.stderr.write('No turn is running.\n');
       return 1;
     }

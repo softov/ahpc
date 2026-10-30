@@ -353,11 +353,12 @@ export interface HostConnection {
   /**
    * Cancel the turn that is running.
    *
-   * Resolves once the cancel is sent: `true`, or `false` when the session had
-   * no turn running, or could not be read and `onRefusal` was told why. It
+   * Resolves once the cancel is sent: whether one was running, or `refused`
+   * saying why it could not be sent. `cancelled` without `refused` is a
+   * session with no turn running, which is a state rather than a refusal. It
    * never rejects, so a screen that does not wait loses nothing by it.
    */
-  stopTurn(uri: SessionUri): Promise<boolean>;
+  stopTurn(uri: SessionUri): Promise<{ cancelled: boolean; refused?: string }>;
   /**
    * Say it *after* the turn that is running.
    *

@@ -946,7 +946,12 @@ export function createController(
 
     stop() {
       const uri = app.store.get<SessionUri>(OPEN);
-      if (uri) void host.stopTurn(uri);
+      if (!uri) return;
+      // The reason goes where `onRefusal` used to put it: a cancel that did
+      // not take looks exactly like one that did, and the turn carries on.
+      void host.stopTurn(uri).then((stopped) => {
+        if (stopped.refused !== undefined) failed(new Error(stopped.refused));
+      });
     },
 
     /*

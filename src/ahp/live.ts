@@ -3110,24 +3110,25 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
 
     stopTurn: (uri) => (async () => {
       const chatUri = await chatOf(uri);
-      if (!chatUri) return false;
+      if (!chatUri) {
+        return { cancelled: false, refused: channels.refusal(uri) ?? 'This session has no chat to stop a turn in.' };
+      }
       // The id is read back rather than remembered: a turn somebody started
       // in an editor is stoppable from here too, and its id is in the state.
       const state = await snapshotOf(chatUri);
       const active = bag(bag(state).activeTurn);
       const turnId = str(active.id);
-      if (!turnId) return false;
+      if (!turnId) return { cancelled: false };
       const started = Date.parse(str(active.startedAt) ?? '');
-      client.dispatch(chatUri, {
+      const answer = await sent(chatUri, {
         type: 'chat/turnCancelled',
         turnId,
         duration: Number.isNaN(started) ? 0 : Math.max(0, Date.now() - started),
       });
-      return true;
-    })().catch((error: unknown) => {
-      options.onRefusal?.(uri, reason(error));
-      return false;
-    }),
+      return answer.refused === undefined
+        ? { cancelled: true }
+        : { cancelled: false, refused: answer.refused };
+    })().catch((error: unknown) => ({ cancelled: false, refused: reason(error) })),
 
     confirmToolCall: (uri, toolCallId, approved, optionId) => answered(uri, approved
       ? {

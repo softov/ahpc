@@ -2053,7 +2053,7 @@ export function fakeHost(): FakeHost {
     stopTurn: async (uri) => {
       const running = active.has(uri);
       stop(uri);
-      return running;
+      return { cancelled: running };
     },
 
     /*
