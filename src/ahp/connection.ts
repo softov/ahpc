@@ -5,6 +5,18 @@ import type {
 } from './types.js';
 
 /**
+ * The host's answer to an action this client dispatched.
+ *
+ * `refused` is the host's own words for why it did not apply it; absent means
+ * it did. There is no third case: an action that could not be sent is a
+ * refusal too, because a caller that cannot tell silence from success has no
+ * way to report either.
+ */
+export interface Sent {
+  refused?: string;
+}
+
+/**
  * What a chat client needs from an agent host.
  *
  * A host is a *sessions server*: several clients watch and drive the same
@@ -70,14 +82,14 @@ export interface HostConnection {
     config?: Record<string, string>;
   }): Promise<SessionUri>;
   disposeSession(uri: SessionUri): Promise<void>;
-  setArchived(uri: SessionUri, archived: boolean): void;
+  setArchived(uri: SessionUri, archived: boolean): Promise<Sent>;
   /**
    * Mark read, or put the bold back.
    *
    * A client flag, not activity: `IsRead` says a person has looked since the
    * last change, and the host tells every other client that one of them has.
    */
-  setRead(uri: SessionUri, read: boolean): void;
+  setRead(uri: SessionUri, read: boolean): Promise<Sent>;
 
   /**
    * Subscribe to a session: a snapshot, then an ordered stream of what happens.
@@ -155,7 +167,7 @@ export interface HostConnection {
   /** Watch one: its state, and then everything that happens to it. */
   watchTerminal(uri: string, observer: (state: TerminalState) => void): { close(): void };
   /** Send input. Nothing comes back but what the shell says. */
-  writeTerminal(uri: string, data: string): void;
+  writeTerminal(uri: string, data: string): Promise<Sent>;
   /**
    * Tell the host how big this client is drawing the terminal.
    *
@@ -355,7 +367,7 @@ export interface HostConnection {
    * itself would be the only thing that could ever send it, and would not,
    * because nothing in a client is watching for the turn to end.
    */
-  queue(uri: SessionUri, text: string, model?: ModelSelection): void;
+  queue(uri: SessionUri, text: string, model?: ModelSelection): Promise<Sent & { id: string }>;
   /**
    * Say it *into* the turn that is running.
    *
@@ -365,12 +377,12 @@ export interface HostConnection {
    */
   steer(uri: SessionUri, text: string, model?: ModelSelection): void;
   /** Take one back, while it is still waiting. */
-  unqueue(uri: SessionUri, id: string): void;
+  unqueue(uri: SessionUri, id: string): Promise<Sent>;
 
   /** Answer a tool confirmation. */
-  confirmToolCall(uri: SessionUri, toolCallId: string, approved: boolean, optionId?: string): void;
+  confirmToolCall(uri: SessionUri, toolCallId: string, approved: boolean, optionId?: string): Promise<Sent>;
   /** Answer a question. An accept with no answers resumes the agent on none. */
-  completeInput(uri: SessionUri, requestId: string, accepted: boolean, answers: Record<string, Answer>): void;
+  completeInput(uri: SessionUri, requestId: string, accepted: boolean, answers: Record<string, Answer>): Promise<Sent>;
 
   /**
    * Which changesets this session offers.

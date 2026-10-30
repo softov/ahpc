@@ -31,6 +31,7 @@ vi.mock('../src/connect.js', async (importOriginal) => {
     ...real,
     connect: async () => {
       const made = await scripted((one) => {
+        one.echo = true;
         one.states.set(SESSION, { defaultChat: CHAT, chats: [{ resource: CHAT, title: 'Chat' }], status: 1 });
         one.states.set(CHAT, held.chat);
       });

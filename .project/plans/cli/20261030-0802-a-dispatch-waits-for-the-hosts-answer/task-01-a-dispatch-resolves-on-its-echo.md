@@ -1,6 +1,6 @@
 ---
 title: A dispatch resolves on its echo
-status: todo
+status: implemented
 depends: []
 layer: "ahp"
 refs:
@@ -52,3 +52,18 @@ The seven dispatch methods of `HostConnection` resolve `{ refused?: string }` on
 - `npm test` passes.
 
 ## Resume
+
+`Sent` is declared in `src/ahp/connection.ts:15` and is the answer of the seven methods: `setArchived` and `setRead` at `:85-93`, `writeTerminal` at `:170`, `queue`, `unqueue`, `confirmToolCall` and `completeInput` at `:370-385`.
+`openChannels` at `src/ahp/channels.ts:199` keeps `waiting`, a map from `clientSeq` to a resolver; `settle` and `answered` precede `rejected`, and `deliver` settles a waiter before it decides whether a rejection is reported, so a rejection a waiter takes is not sent to `onRejection` as well.
+`Channels.await(clientSeq, deadlineMs)` registers the waiter synchronously and resolves the refusal `The host did not answer in N seconds.` when the deadline passes; `detach` answers every waiter with `The connection went away before the host answered.` rather than leaving it to the deadline.
+`ANSWER_MS` is `10_000` at `src/ahp/live.ts:174`.
+`sent` at `src/ahp/live.ts:2052` holds the channel with the no-op `listening` consumer, dispatches, awaits the echo and releases; `answered` at `:2072` looks the session's chat up first and routes the four chat actions through it.
+`queue` makes the id before it sends and resolves `{ id, ...answer }`; `setArchived`, `setRead` and `writeTerminal` go through `sent` on their own channel.
+The fake host resolves at once and refuses an unknown id with `No message with that id is waiting.`, `No tool call with that id is waiting for an answer.` and `No question with that id is waiting for an answer.`.
+`Scripted` gained an opt-in `echo` and records the handshake's `clientId`; `test/oneshot.test.ts` turns it on, because each of its commands now waits on the answer.
+`test/dispatch.test.ts` holds the four cases in *Validation* against the registry, and one through the live client.
+
+Departures:
+
+- Step 6 changes `dispatch` to the waiting send; that helper is also `setDraft`, `say` and `steer`, and a draft is debounced on every keystroke, so waiting on it would hold a channel per keystroke and claim a `steer` refusal the screen needs. `dispatch` stays fire-and-forget for those three, and the waiting send is the separate `sent`/`answered` pair the seven use.
+- `inFlight` widened to `Set<Promise<unknown>>`, so `flush` waits for a waiting send too.

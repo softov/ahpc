@@ -96,7 +96,7 @@ host -> action envelope { origin, rejectionReason? } -> channels.deliver -> the 
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - A dispatch resolves on its echo](task-01-a-dispatch-resolves-on-its-echo.md) | todo | - |
+| [01 - A dispatch resolves on its echo](task-01-a-dispatch-resolves-on-its-echo.md) | implemented | - |
 | [02 - A command exits with the host's answer](task-02-a-command-exits-with-the-answer.md) | todo | 01 |
 | [03 - A cancel says one thing](task-03-a-cancel-says-one-thing.md) | todo | - |
 
@@ -108,11 +108,12 @@ host -> action envelope { origin, rejectionReason? } -> channels.deliver -> the 
 
 ## Resume state
 
-- **Done so far:** planned 2026-10-30.
-- **Next action:** [task-01-a-dispatch-resolves-on-its-echo.md](task-01-a-dispatch-resolves-on-its-echo.md).
+- **Done so far:** task 01 is implemented; tasks 02 and 03 are todo.
+- **Next action:** [task-02-a-command-exits-with-the-answer.md](task-02-a-command-exits-with-the-answer.md).
 - **Open questions:** none.
 - **Watch out for:** the chat dispatches go to the session's default chat, so the waiter holds the chat channel, not the session channel.
   `setRead` and `setArchived` go to the session channel.
+  The seven commands still return their exit code before they wait, and the `finally` in `cli()` calls `flush`, so task 02's awaits are what make the exit code the host's answer.
 
 ## Final verification checklist
 

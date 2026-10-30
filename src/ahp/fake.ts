@@ -1716,8 +1716,14 @@ export function fakeHost(): FakeHost {
       failed.delete(uri);
     },
 
-    setArchived: (uri, archived) => setFlag(uri, SessionFlag.IsArchived, archived),
-    setRead: (uri, read) => setFlag(uri, SessionFlag.IsRead, read),
+    setArchived: async (uri, archived) => {
+      setFlag(uri, SessionFlag.IsArchived, archived);
+      return {};
+    },
+    setRead: async (uri, read) => {
+      setFlag(uri, SessionFlag.IsRead, read);
+      return {};
+    },
 
     rename: (uri, title) => {
       const summary = summaries.get(uri);
@@ -1810,9 +1816,9 @@ export function fakeHost(): FakeHost {
       for (const watcher of held.watchers) watcher(shellState(uri, held));
     },
 
-    writeTerminal: (uri, data) => {
+    writeTerminal: async (uri, data) => {
       const held = shells.get(uri);
-      if (!held) return;
+      if (!held) return {};
       held.pending += data;
       // A line at a time, which is what a shell reading from a pipe does.
       for (;;) {
@@ -1823,6 +1829,7 @@ export function fakeHost(): FakeHost {
         held.output += `$ ${line}\n${SHELL[line] ?? `sh: ${line}: not found\n`}`;
       }
       for (const watcher of held.watchers) watcher(shellState(uri, held));
+      return {};
     },
 
     completions: async ({ text, offset }) => {
@@ -2021,19 +2028,26 @@ export function fakeHost(): FakeHost {
       prose(uri, 'markdown', text);
     },
 
-    queue: (uri, text, model) => {
-      const waiting = [...(queues.get(uri) ?? []), { id: nextId('q'), text, ...(model ? { model } : {}) }];
+    queue: async (uri, text, model) => {
+      const id = nextId('q');
+      const waiting = [...(queues.get(uri) ?? []), { id, text, ...(model ? { model } : {}) }];
       queues.set(uri, waiting);
       emit(uri, { type: 'queued', messages: waiting });
       // Idle already: the protocol says a host consumes a queued message
       // immediately rather than holding it for a turn that is not running.
       drain(uri);
+      return { id };
     },
 
-    unqueue: (uri, id) => {
-      const waiting = (queues.get(uri) ?? []).filter((message) => message.id !== id);
+    unqueue: async (uri, id) => {
+      const held = queues.get(uri) ?? [];
+      if (!held.some((message) => message.id === id)) {
+        return { refused: 'No message with that id is waiting.' };
+      }
+      const waiting = held.filter((message) => message.id !== id);
       queues.set(uri, waiting);
       emit(uri, { type: 'queued', messages: waiting });
+      return {};
     },
 
     stopTurn: async (uri) => {
@@ -2051,9 +2065,11 @@ export function fakeHost(): FakeHost {
      * is the whole of what a client has to draw - it is where "I pressed
      * Approve and nothing happened" lives - so the script has it too.
      */
-    confirmToolCall: (uri, toolCallId, approved) => {
+    confirmToolCall: async (uri, toolCallId, approved) => {
       const input = inputs.get(uri);
-      if (!input || input.kind !== 'toolConfirmation' || input.call.id !== toolCallId) return;
+      if (!input || input.kind !== 'toolConfirmation' || input.call.id !== toolCallId) {
+        return { refused: 'No tool call with that id is waiting for an answer.' };
+      }
       // At the front: whatever the script already holds comes after the
       // question is let go of, never before it.
       script.unshift(() => {
@@ -2062,17 +2078,21 @@ export function fakeHost(): FakeHost {
         touch(uri);
         afterApproval(uri, input.call, approved);
       });
+      return {};
     },
 
-    completeInput: (uri, requestId, accepted, answers) => {
+    completeInput: async (uri, requestId, accepted, answers) => {
       const input = inputs.get(uri);
-      if (!input || input.id !== requestId) return;
+      if (!input || input.id !== requestId) {
+        return { refused: 'No question with that id is waiting for an answer.' };
+      }
       script.unshift(() => {
         inputs.delete(uri);
         emit(uri, { type: 'inputResolved' });
         touch(uri);
         answered(uri, accepted, answers);
       });
+      return {};
     },
 
     /**
