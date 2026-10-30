@@ -1,6 +1,6 @@
 ---
 title: A command exits with the host's answer
-status: todo
+status: implemented
 depends: [task-01-a-dispatch-resolves-on-its-echo.md]
 layer: "cli, mcp, screen"
 refs:
@@ -51,3 +51,16 @@ The MCP tools that dispatch do the same.
 - By hand against ahpd: the checks in the plan's *Final verification checklist*.
 
 ## Resume
+
+`exitOf` at `src/cli/main.ts:397` is the one helper: it returns 0 when `refused` is absent, and otherwise writes the host's sentence to stderr and returns 1.
+`session read` and `session archive` use it at `:1068-1069`, `terminal send` at `:1334`, `queue` and `unqueue` at `:1681-1692`, `confirm` and `answer` at `:1743-1760`.
+`queue` prints the id with `line` or `{ id }` with `json`, and returns `exitOf` directly when the host refused, so a refusal prints no id.
+`applied` at `src/mcp/tools.ts:137` throws the refusal as an `Error`, which `serve.ts` already turns into `isError` content; `queue_turn` returns `{ queued: true, id }`, and `confirm_tool_call`, `answer_question` and `send_to_terminal` return their usual result when the host applied the action.
+`src/control.ts` calls all eight sites with `void`, so the screen still does not wait.
+`docs/subjects/TURNS.md` gains one paragraph after the `cancel` line: `queue` prints the id, and each command exits with the host's answer.
+`test/cli.test.ts` holds five cases against one scripted host held across the two calls of a test, because a queue lives on a host rather than in the command; `test/mcp.test.ts` holds the `queue_turn` id and the refused `confirm_tool_call`.
+
+Departures:
+
+- The task named the main.ts helper's behaviour rather than its name; it is `exitOf`, and the MCP one is `applied`, matching the verbs the surrounding helpers use.
+- `test/dispatch.test.ts` from task 01 is still untracked: this environment refuses `git add`, so a new file cannot be committed. It passes; it needs a commit from a shell where staging is permitted.
