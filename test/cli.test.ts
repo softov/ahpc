@@ -259,6 +259,14 @@ describe('ahpc chat, reading a conversation rather than listing one', () => {
     expect(out).toContain('libkqueue');
   });
 
+  it('prints what a turn spent under it, and nothing under a turn that reported none', async () => {
+    const out = await run(['history', CHAT]);
+    expect(out).toContain('  in 12400 · out 830 · cache 9600/1200 · reasoning 300 · 0.031 USD · context 65000/200000');
+    // One agent turn reported usage; the question and the running turn did not,
+    // and a line under either would be numbers the host never sent.
+    expect(out.match(/^ {2}in \d+/gm)).toHaveLength(1);
+  });
+
   it('carries the turns under --json and --full alike', async () => {
     for (const flag of ['--json', '--full']) {
       const said = JSON.parse(await run(['history', CHAT, flag])) as { id: string }[];

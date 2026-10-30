@@ -831,6 +831,20 @@ export function fakeHost(): FakeHost {
         model: { id: 'claude-opus-5' },
         at: AT,
         elapsedMs: 21_400,
+        // Everything a host that reports usage can say about a turn, so a
+        // reader that prints it has every part to print.
+        usage: {
+          inputTokens: 12_400,
+          outputTokens: 830,
+          cacheReadTokens: 9_600,
+          cacheWriteTokens: 1_200,
+          reasoningTokens: 300,
+          model: 'claude-opus-5',
+          cost: 0.42,
+          sessionCost: 1.25,
+          price: { amount: 0.031, currency: 'USD' },
+          context: { used: 65_000, size: 200_000 },
+        },
         parts: [
           { kind: 'reasoning', id: 'r1', content: 'The filter is registered, so the question is whether libkqueue implements it at all.' },
           { kind: 'markdown', id: 'm1', content: 'Short answer: **libkqueue**, not us.\n\nBoth `EVFILT_AIO` and `EVFILT_FS` are compiled out:' },

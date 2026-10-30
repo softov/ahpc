@@ -520,6 +520,10 @@ export interface TurnUsage {
   outputTokens?: number;
   /** Input tokens read from cache rather than sent. */
   cacheReadTokens?: number;
+  /** Input tokens written to the cache, from `_meta['ahpd.cacheWriteTokens']`. */
+  cacheWriteTokens?: number;
+  /** Tokens spent reasoning, from `_meta['ahpd.reasoningTokens']`. */
+  reasoningTokens?: number;
   /** The model the host billed, which may differ from what the turn asked for. */
   model?: string;
   /** What automatic routing resolved to, when the request went through Auto. */
@@ -528,6 +532,20 @@ export interface TurnUsage {
   cost?: number;
   /** The session's total cost in credits, from `_meta.copilotUsage.sessionTotalNanoAiu`. */
   sessionCost?: number;
+  /**
+   * How full the context window is, from `_meta['ahpd.context']`.
+   *
+   * The window and what it holds, not what the turn spent: a host that sends
+   * only this has counted no tokens for the turn.
+   */
+  context?: { used: number; size: number };
+  /**
+   * What the turn was priced at, from `_meta['ahpd.cost']`.
+   *
+   * Apart from `cost`, which is in credits: this one is money in a currency of
+   * its own, and one field cannot hold both a number and a unit.
+   */
+  price?: { amount: number; currency: string };
 }
 
 export interface ModelRow {

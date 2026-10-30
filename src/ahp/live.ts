@@ -1230,8 +1230,32 @@ function usage(value: unknown): TurnUsage | undefined {
   const inputTokens = typeof found.inputTokens === 'number' ? found.inputTokens : undefined;
   const outputTokens = typeof found.outputTokens === 'number' ? found.outputTokens : undefined;
   const cacheReadTokens = typeof found.cacheReadTokens === 'number' ? found.cacheReadTokens : undefined;
+  const cacheWriteTokens = typeof meta['ahpd.cacheWriteTokens'] === 'number' ? meta['ahpd.cacheWriteTokens'] : undefined;
+  const reasoningTokens = typeof meta['ahpd.reasoningTokens'] === 'number' ? meta['ahpd.reasoningTokens'] : undefined;
   const model = str(found.model);
   const resolvedModel = str(bag(meta.autoModeResolved).chosenModel);
+  /*
+   * The window a host reports as `{ used, size }`.
+   *
+   * Both halves or neither: half a window is not a window, and a `used` with
+   * no size would draw a fraction whose denominator nobody sent.
+   */
+  const held = bag(meta['ahpd.context']);
+  const context = typeof held.used === 'number' && typeof held.size === 'number'
+    ? { used: held.used, size: held.size }
+    : undefined;
+  /*
+   * A price that names its currency, beside the credits above.
+   *
+   * `cost` is one unit, so ahpd's `{ amount, currency }` goes in `price` and
+   * keeps its own: a reader that printed the amount alone would be stating a
+   * number in a currency it never read.
+   */
+  const quoted = bag(meta['ahpd.cost']);
+  const currency = str(quoted.currency);
+  const price = typeof quoted.amount === 'number' && currency !== undefined
+    ? { amount: quoted.amount, currency }
+    : undefined;
   const total = typeof meta.cost === 'number' && meta.cost >= 0 ? meta.cost
     : typeof copilot.totalNanoAiu === 'number' && copilot.totalNanoAiu >= 0
       ? copilot.totalNanoAiu / 1_000_000_000
@@ -1241,13 +1265,22 @@ function usage(value: unknown): TurnUsage | undefined {
     : undefined;
   // A cost or a session total with no tokens is still consumption worth
   // showing, which is why the test is for numbers rather than for tokens.
-  if (inputTokens === undefined && outputTokens === undefined && total === undefined && sessionCost === undefined) {
+  if (
+    inputTokens === undefined && outputTokens === undefined &&
+    cacheWriteTokens === undefined && reasoningTokens === undefined &&
+    context === undefined && price === undefined &&
+    total === undefined && sessionCost === undefined
+  ) {
     return undefined;
   }
   return {
     ...(inputTokens !== undefined ? { inputTokens } : {}),
     ...(outputTokens !== undefined ? { outputTokens } : {}),
     ...(cacheReadTokens !== undefined ? { cacheReadTokens } : {}),
+    ...(cacheWriteTokens !== undefined ? { cacheWriteTokens } : {}),
+    ...(reasoningTokens !== undefined ? { reasoningTokens } : {}),
+    ...(context !== undefined ? { context } : {}),
+    ...(price !== undefined ? { price } : {}),
     ...(model !== undefined ? { model } : {}),
     ...(resolvedModel !== undefined ? { resolvedModel } : {}),
     ...(total !== undefined ? { cost: total } : {}),

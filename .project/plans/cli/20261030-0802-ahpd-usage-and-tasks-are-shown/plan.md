@@ -70,7 +70,7 @@ session summary { _meta['ahpd.tasks'] } -> session show -> a "Tasks" row
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - A turn's usage is printed](task-01-a-turns-usage-is-printed.md) | todo | - |
+| [01 - A turn's usage is printed](task-01-a-turns-usage-is-printed.md) | implemented | - |
 | [02 - A session shows its open tasks](task-02-a-session-shows-its-open-tasks.md) | todo | - |
 
 ## Risks and tradeoffs
@@ -79,8 +79,8 @@ session summary { _meta['ahpd.tasks'] } -> session show -> a "Tasks" row
 
 ## Resume state
 
-- **Done so far:** planned 2026-10-30.
-- **Next action:** [task-01-a-turns-usage-is-printed.md](task-01-a-turns-usage-is-printed.md).
+- **Done so far:** task 01 is implemented.
+- **Next action:** [task-02-a-session-shows-its-open-tasks.md](task-02-a-session-shows-its-open-tasks.md).
 - **Open questions:** none.
 - **Watch out for:** `ahpd.cost` and `_meta.cost` are two keys in two units; do not merge them.
 

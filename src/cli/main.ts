@@ -23,7 +23,7 @@ import type { Group } from '../mcp/tools.js';
 import { SERVER } from '../mcp/serve.js';
 import { stdio } from '../mcp/stdio.js';
 import { serve as serveHttp } from '../mcp/http.js';
-import type { Answer, ChatOrigin, ModelSelection, SessionSummary, SessionUri, Turn } from '../ahp/types.js';
+import type { Answer, ChatOrigin, ModelSelection, SessionSummary, SessionUri, Turn, TurnUsage } from '../ahp/types.js';
 import { detectLocale } from '../i18n/locale.js';
 
 export const HELP = `ahpc - drive an agent host from a shell
@@ -369,6 +369,30 @@ const lastFailure = async (host: HostConnection, uri: SessionUri): Promise<strin
 };
 
 /**
+ * What a turn spent, in one line, with only the parts the host reported.
+ *
+ * Every field is optional and none is defaulted, so a part with no number is
+ * left out rather than printed as a zero the host never sent. A cache count
+ * is a pair - read and written - and a host that reports one names which.
+ */
+function usageLine(usage: TurnUsage): string {
+  const parts: string[] = [];
+  if (usage.inputTokens !== undefined) parts.push(`in ${usage.inputTokens}`);
+  if (usage.outputTokens !== undefined) parts.push(`out ${usage.outputTokens}`);
+  if (usage.cacheReadTokens !== undefined && usage.cacheWriteTokens !== undefined) {
+    parts.push(`cache ${usage.cacheReadTokens}/${usage.cacheWriteTokens}`);
+  } else if (usage.cacheReadTokens !== undefined) {
+    parts.push(`cache ${usage.cacheReadTokens} read`);
+  } else if (usage.cacheWriteTokens !== undefined) {
+    parts.push(`cache ${usage.cacheWriteTokens} written`);
+  }
+  if (usage.reasoningTokens !== undefined) parts.push(`reasoning ${usage.reasoningTokens}`);
+  if (usage.price !== undefined) parts.push(`${usage.price.amount} ${usage.price.currency}`);
+  if (usage.context !== undefined) parts.push(`context ${usage.context.used}/${usage.context.size}`);
+  return parts.join(' · ');
+}
+
+/**
  * A conversation, as `session history` and `chat history` both print it.
  *
  * Shared rather than repeated, because the two answer the same question about
@@ -382,6 +406,10 @@ function printTurns(turns: Turn[], wants: boolean, full: boolean): number {
     line(`${turn.role === 'user' ? '›' : '‹'} ${turn.role}  ${ago(turn.at)}  ${turn.state}`);
     const text = turn.role === 'user' ? (turn.message ?? '') : spoken(turn);
     if (text) line(`  ${text.replace(/\n/g, '\n  ')}`);
+    // Under what the turn said, because it is about the turn and not a part of
+    // its reply. A report carrying only a session total prints nothing here.
+    const spent = turn.usage === undefined ? '' : usageLine(turn.usage);
+    if (spent) line(`  ${spent}`);
     line();
   }
   return 0;

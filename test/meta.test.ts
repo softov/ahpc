@@ -259,4 +259,51 @@ describe("a turn's usage report", () => {
     reader.close();
     await host.close();
   });
+
+  it("reads the four keys ahpd writes beside the protocol's own", async () => {
+    const { host, reader, agent } = await opened({
+      inputTokens: 1200,
+      _meta: {
+        'ahpd.reasoningTokens': 450,
+        'ahpd.cacheWriteTokens': 800,
+        'ahpd.context': { used: 65_000, size: 200_000 },
+        'ahpd.cost': { amount: 0.031, currency: 'USD' },
+      },
+    });
+    expect(agent?.usage).toEqual({
+      inputTokens: 1200,
+      cacheWriteTokens: 800,
+      reasoningTokens: 450,
+      context: { used: 65_000, size: 200_000 },
+      price: { amount: 0.031, currency: 'USD' },
+    });
+    reader.close();
+    await host.close();
+  });
+
+  it('leaves the four absent when the host sent none of them', async () => {
+    const { host, reader, agent } = await opened({ inputTokens: 10 });
+    expect(agent?.usage).toEqual({ inputTokens: 10 });
+    reader.close();
+    await host.close();
+  });
+
+  it("keeps a report that carries only ahpd's keys, which a context-only host sends", async () => {
+    const { host, reader, agent } = await opened({
+      _meta: { 'ahpd.context': { used: 4_000, size: 128_000 } },
+    });
+    expect(agent?.usage).toEqual({ context: { used: 4_000, size: 128_000 } });
+    reader.close();
+    await host.close();
+  });
+
+  it('drops a context that names only one half of the window', async () => {
+    const { host, reader, agent } = await opened({
+      inputTokens: 10,
+      _meta: { 'ahpd.context': { used: 4_000 } },
+    });
+    expect(agent?.usage).toEqual({ inputTokens: 10 });
+    reader.close();
+    await host.close();
+  });
 });
