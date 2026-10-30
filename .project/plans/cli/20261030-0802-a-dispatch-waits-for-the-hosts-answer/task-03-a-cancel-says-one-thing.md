@@ -1,6 +1,6 @@
 ---
 title: A cancel says one thing
-status: todo
+status: implemented
 depends: []
 layer: "cli, ahp"
 refs:
@@ -41,3 +41,17 @@ A `prompt` whose turn was cancelled prints "The turn was cancelled." on stderr a
 - `npm test` passes.
 
 ## Resume
+
+`stopTurn` resolves `{ cancelled: boolean; refused?: string }` at `src/ahp/connection.ts:361`.
+`src/ahp/live.ts:3111` reads the chat, returns `{ cancelled: false }` where no turn is running, and sends through `sent`; a session with no chat answers with `channels.refusal` or `This session has no chat to stop a turn in.`, and the catch returns `reason(error)` in `refused` instead of telling `onRefusal`.
+`src/ahp/fake.ts:2053` answers `{ cancelled: running }`.
+`cancel` at `src/cli/main.ts:1682` returns `exitOf(stopped)` when `refused` is set, 0 when `cancelled`, and prints `No turn is running.` and returns 1 otherwise, so the two messages never both print.
+`prompt` prints `The turn was cancelled.` at `src/cli/main.ts:1632` when the turn came back `cancelled`.
+`cancel_turn` at `src/mcp/tools.ts:375` answers `{ cancelled }` and throws a refusal through `applied`.
+`stop()` at `src/control.ts:952` reports `refused` through `failed`, which is where `onRefusal` put it.
+`test/oneshot.test.ts` holds three cancel cases and the prompt one; its mock now varies the session state so a test can leave the session no chat.
+
+Departures:
+
+- The no-chat sentence is new wording, `This session has no chat to stop a turn in.`, because the plan asked for one line and `answered`'s lowercase fallback is a fragment of a sentence.
+- The prompt case is driven by another client's `chat/turnCancelled` action on the chat, which the SDK reducer turns into a turn with state `cancelled`; the command path is the same one a host's own action takes.

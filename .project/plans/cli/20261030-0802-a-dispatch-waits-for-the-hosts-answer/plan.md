@@ -1,7 +1,7 @@
 ---
 title: A command that dispatches an action waits for the host's answer
 domain: cli
-status: planned
+status: active
 priority: high
 created: 2026-10-30
 revalidated: 2026-10-30
@@ -98,7 +98,7 @@ host -> action envelope { origin, rejectionReason? } -> channels.deliver -> the 
 | --- | --- | --- |
 | [01 - A dispatch resolves on its echo](task-01-a-dispatch-resolves-on-its-echo.md) | implemented | - |
 | [02 - A command exits with the host's answer](task-02-a-command-exits-with-the-answer.md) | implemented | 01 |
-| [03 - A cancel says one thing](task-03-a-cancel-says-one-thing.md) | todo | - |
+| [03 - A cancel says one thing](task-03-a-cancel-says-one-thing.md) | implemented | - |
 
 ## Risks and tradeoffs
 
@@ -108,13 +108,11 @@ host -> action envelope { origin, rejectionReason? } -> channels.deliver -> the 
 
 ## Resume state
 
-- **Done so far:** tasks 01 and 02 are implemented; task 03 is todo.
-- **Next action:** [task-03-a-cancel-says-one-thing.md](task-03-a-cancel-says-one-thing.md).
+- **Done so far:** all three tasks are implemented.
+- **Next action:** write `implemented.md` and wait for review; the by-hand checks against ahpd are still waiting.
 - **Open questions:** none.
-- **Watch out for:** the chat dispatches go to the session's default chat, so the waiter holds the chat channel, not the session channel.
-  `setRead` and `setArchived` go to the session channel.
-  The `finally` in `cli()` still calls `flush`, which now also covers the waiting sends; the exit code of the seven commands is the host's answer from task 02 on.
-  `test/dispatch.test.ts` is written and passing but untracked, because this environment refuses `git add`; it needs committing from a shell where staging is allowed.
+- **Watch out for:** `test/dispatch.test.ts` is written and passing but untracked, because this environment refuses `git add`; it needs committing from a shell where staging is allowed.
+  The by-hand checks in *Final verification* were not run: this worktree never connects to a host.
 
 ## Final verification checklist
 
