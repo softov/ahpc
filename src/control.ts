@@ -820,7 +820,7 @@ export function createController(
       model = [];
       // Reading it is what makes it read, and the host tells every other
       // client so. Nobody marks their own mail by hand.
-      host.setRead(uri, true);
+      void host.setRead(uri, true);
       app.store.set(OPEN, uri);
       app.store.set(TURNS, []);
       app.store.set(INPUT, null);
@@ -932,7 +932,7 @@ export function createController(
       // closed. The host starts the next turn from the head as soon as it goes
       // idle, and every client watching this chat sees the same queue.
       if (turns(app.store).some((turn) => turn.state === 'running')) {
-        host.queue(uri, trimmed, selection);
+        void host.queue(uri, trimmed, selection);
         return;
       }
       host.say(uri, trimmed, selection);
@@ -941,7 +941,7 @@ export function createController(
     unqueue(id) {
       const uri = app.store.get<SessionUri>(OPEN);
       if (!uri) return;
-      host.unqueue(uri, id);
+      void host.unqueue(uri, id);
     },
 
     stop() {
@@ -970,7 +970,7 @@ export function createController(
       // is the row's whole width spent on something nobody reads.
       const chosen = input.call.options?.find((option) => option.id === optionId);
       sendingInput(app.store, chosen ? app.i18n.t('commands.approvingOption', { option: chosen.label }) : app.i18n.t('commands.approving'));
-      host.confirmToolCall(uri, input.call.id, true, optionId);
+      void host.confirmToolCall(uri, input.call.id, true, optionId);
     },
 
     deny() {
@@ -981,7 +981,7 @@ export function createController(
         return;
       }
       sendingInput(app.store, app.i18n.t('commands.denying'));
-      host.confirmToolCall(uri, input.call.id, false);
+      void host.confirmToolCall(uri, input.call.id, false);
     },
 
     answer(answers, accepted = true) {
@@ -1002,16 +1002,16 @@ export function createController(
         return;
       }
       sendingInput(app.store, accepted ? app.i18n.t('commands.sendingAnswer') : app.i18n.t('commands.declining'));
-      host.completeInput(uri, input.id, accepted, answers);
+      void host.completeInput(uri, input.id, accepted, answers);
     },
 
     setArchived(uri, archived) {
-      host.setArchived(uri, archived);
+      void host.setArchived(uri, archived);
       void controller.refresh();
     },
 
     setRead(uri, read) {
-      host.setRead(uri, read);
+      void host.setRead(uri, read);
       void controller.refresh();
     },
 

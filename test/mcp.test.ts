@@ -470,3 +470,29 @@ describe('the tools a session is driven with', () => {
     expect(input.properties.cursor?.type).toBe('string');
   });
 });
+
+/*
+ * A tool that sends one action, and what the host said about it.
+ *
+ * The waiter underneath is the same one the shell uses, so what these pin is
+ * the surface: the id a queue answers with is the one `unqueue` takes, and a
+ * refusal is an error a model can act on rather than a result saying it
+ * happened.
+ */
+describe('a tool that sends an action, and the host\'s answer', () => {
+  it('queues a message and answers with the id the host gave it', async () => {
+    const queued = await named('queue_turn')!.run(fakeHost(), {
+      session: 'ahp-session:/1f0a', text: 'and then?',
+    }) as { queued: boolean; id: string };
+    expect(queued.queued).toBe(true);
+    expect(queued.id).toMatch(/^q\d+$/);
+  });
+
+  it('reports a tool call the host is not holding as a tool error', async () => {
+    const said = await call(fakeHost(), 'confirm_tool_call', {
+      session: 'ahp-session:/1f0a', toolCallId: 'no-such-call', approved: true,
+    }) as { isError?: boolean; content: { text: string }[] };
+    expect(said.isError).toBe(true);
+    expect(said.content[0]?.text).toBe('No tool call with that id is waiting for an answer.');
+  });
+});

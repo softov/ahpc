@@ -9,7 +9,7 @@ import { checkingUpdates, readUpdate, updateNotice } from '../update.js';
 import { manifest } from '../version.js';
 import type { Where } from '../connect.js';
 import { ago, archived, branch, json, line, mark, project, table } from './render.js';
-import type { HostConnection, HostEvent } from '../ahp/connection.js';
+import type { HostConnection, HostEvent, Sent } from '../ahp/connection.js';
 import { operate } from '../ahp/operate.js';
 import {
   CREATE_PULL_REQUEST, EMPTY_DRAFT, PREPARE_PULL_REQUEST, commitMeta, createPrMeta, externalLink, pullRequestDraft,
@@ -386,6 +386,19 @@ function printTurns(turns: Turn[], wants: boolean, full: boolean): number {
   }
   return 0;
 }
+
+/**
+ * What a command that sends one action exits with.
+ *
+ * The host answers every action it is sent: it applied it, or it said why
+ * not. Its reason is a sentence of its own and goes to stderr, so a pipe
+ * still reads only what the command produced.
+ */
+const exitOf = (sent: Sent): number => {
+  if (sent.refused === undefined) return 0;
+  process.stderr.write(`${sent.refused}\n`);
+  return 1;
+};
 
 /**
  * One command, and then the process is done.
@@ -1052,8 +1065,8 @@ async function sessions(host: HostConnection, args: Args, wants: boolean): Promi
       return 0;
     }
     case 'rm': await host.disposeSession(uri); line(`Disposed ${uri}.`); return 0;
-    case 'read': host.setRead(uri, !args.has('--unread')); return 0;
-    case 'archive': host.setArchived(uri, !args.has('--undo')); return 0;
+    case 'read': return exitOf(await host.setRead(uri, !args.has('--unread')));
+    case 'archive': return exitOf(await host.setArchived(uri, !args.has('--undo')));
     case 'config': {
       const config = await host.config(uri);
       if (wants) { json(config); return 0; }
@@ -1320,8 +1333,7 @@ async function shells(host: HostConnection, args: Args, wants: boolean): Promise
   if (verb === 'send') {
     // A newline, because a shell over pipes runs a line rather than a string,
     // and `terminal send ls` that never runs reads as a terminal that is broken.
-    host.writeTerminal(uri, `${needs(args, 2, 'something to type')}\n`);
-    return 0;
+    return exitOf(await host.writeTerminal(uri, `${needs(args, 2, 'something to type')}\n`));
   }
   if (verb === 'watch') {
     let last = '';
@@ -1668,13 +1680,16 @@ async function turns(host: HostConnection, command: string, args: Args, wants: b
     }
     case 'queue': {
       const uri = needs(args, 0, 'a session URI') as SessionUri;
-      host.queue(uri, needs(args, 1, 'something to say'), selected(args));
+      const queued = await host.queue(uri, needs(args, 1, 'something to say'), selected(args));
+      if (queued.refused !== undefined) return exitOf(queued);
+      // The id is the whole of what a queue leaves behind that `unqueue` takes
+      // back, so it is the one thing this command has to print.
+      if (wants) json({ id: queued.id }); else line(queued.id);
       return 0;
     }
     case 'unqueue': {
       const uri = needs(args, 0, 'a session URI') as SessionUri;
-      host.unqueue(uri, needs(args, 1, 'a queued message id'));
-      return 0;
+      return exitOf(await host.unqueue(uri, needs(args, 1, 'a queued message id')));
     }
 
     case 'watch': {
@@ -1728,8 +1743,7 @@ async function turns(host: HostConnection, command: string, args: Args, wants: b
     case 'confirm': {
       const uri = needs(args, 0, 'a session URI') as SessionUri;
       const call = needs(args, 1, 'a tool call id');
-      host.confirmToolCall(uri, call, !args.has('--deny'), args.value('--option'));
-      return 0;
+      return exitOf(await host.confirmToolCall(uri, call, !args.has('--deny'), args.value('--option')));
     }
     case 'answer': {
       const uri = needs(args, 0, 'a session URI') as SessionUri;
@@ -1741,8 +1755,7 @@ async function turns(host: HostConnection, command: string, args: Args, wants: b
       for (const [key, value] of Object.entries(args.pairs('--field'))) {
         answers[key] = { kind: 'text', value } as Answer;
       }
-      host.completeInput(uri, request, !args.has('--reject'), answers);
-      return 0;
+      return exitOf(await host.completeInput(uri, request, !args.has('--reject'), answers));
     }
 
     case 'dispatch': {

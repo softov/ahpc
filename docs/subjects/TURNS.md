@@ -34,6 +34,8 @@ A message sent while a turn runs is queued behind it.
 
 `cancel` on a session with no running turn says so and exits 1.
 
+`queue` prints the id of the message it queued, which is what `unqueue` takes. Each command that sends one action exits with the host's answer: 0 when the host applied it, or 1 with the host's own reason on stderr when it refused.
+
 A script that drives a session without a person:
 
 ```sh
