@@ -61,8 +61,9 @@ export interface SessionSummary {
   /**
    * Provider-specific metadata, opaque but for the keys a client knows.
    *
-   * `git.branch` is the one read here - it is the protocol's well-known key
-   * and what the reference host puts there. Anything else is carried and
+   * `git.branch` is the protocol's well-known key and what the reference host
+   * puts there; `ahpd.tasks` is what a host with the tasks plugin reports,
+   * `{ open }`. Those two are the ones read here. Anything else is carried and
    * ignored rather than dropped, because the next reader of this row may know
    * a key this one does not.
    */

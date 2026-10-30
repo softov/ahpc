@@ -644,6 +644,8 @@ export function fakeHost(): FakeHost {
     drift?: [number, number, number];
     /** A pull request the host found for the branch, as `_meta.github`. */
     pullRequest?: { url: string; state?: 'open' | 'closed' | 'merged' };
+    /** Open tasks the tasks plugin reports, as `_meta['ahpd.tasks']`. */
+    openTasks?: number;
   }): void => {
     const { id } = options;
     flags.set(id, (options.read === false ? 0 : SessionFlag.IsRead)
@@ -779,6 +781,8 @@ export function fakeHost(): FakeHost {
             },
           }
           : {}),
+        // The tasks plugin's key, and absent for a session no task names.
+        ...(options.openTasks === undefined ? {} : { 'ahpd.tasks': { open: options.openTasks } }),
       },
       ...(options.activity ? { activity: options.activity } : {}),
       ...(options.origin ? { origin: options.origin } : {}),
@@ -819,6 +823,7 @@ export function fakeHost(): FakeHost {
     dir: 'file:///brb_main/src/brb_framework',
     model: 'claude-opus-5',
     activity: 'waiting for permission to run a command',
+    openTasks: 2,
     turns: [
       {
         id: 't1', role: 'user', message: 'EVFILT_FS never fires on Linux. Is that us or libkqueue?',

@@ -805,6 +805,47 @@ describe('ahpc session list, a page at a time', () => {
 });
 
 /*
+ * What `session show` prints when the host reports a task count.
+ *
+ * The tasks plugin is host-side, so the key arrives on the summary rather than
+ * on anything the client asks for: a session row carries `ahpd.tasks` or it
+ * does not, and the row is drawn from that.
+ */
+describe('ahpc session show, and the open tasks a session reports', () => {
+  const run = async (rest: string[]): Promise<string> => {
+    const home = mkdtempSync(join(tmpdir(), 'ahpc-show-'));
+    const had = { XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME, AHPC_HOST: process.env.AHPC_HOST };
+    process.env.XDG_CONFIG_HOME = home;
+    delete process.env.AHPC_HOST;
+    let out = '';
+    const write = process.stdout.write.bind(process.stdout);
+    process.stdout.write = ((chunk: string | Uint8Array) => { out += String(chunk); return true; }) as typeof process.stdout.write;
+    try {
+      const { cli } = await import('../src/cli/main.js');
+      expect(await cli('session', rest)).toBe(0);
+      // Read after the call: an object's fields are built in the order they
+      // are written, and `out` beside the await is empty.
+      return out;
+    }
+    finally {
+      process.stdout.write = write;
+      for (const [key, value] of Object.entries(had)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+      rmSync(home, { recursive: true, force: true });
+    }
+  };
+
+  it('prints the count the host reports, under the status', async () => {
+    const out = await run(['show', 'ahp-session:/1f0a']);
+    expect(out).toMatch(/Status\s+\S+ waiting on you/);
+    expect(out).toMatch(/Tasks\s+2 open/);
+  });
+
+  it('prints no Tasks row for a session no task names', async () => {
+    expect(await run(['show', 'ahp-session:/6b21'])).not.toContain('Tasks');
+  });
+});
+
+/*
  * A command that sends one action, and the host's answer to it.
  *
  * `connect` is replaced with a script held for the length of a test rather

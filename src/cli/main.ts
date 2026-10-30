@@ -8,7 +8,7 @@ import { configPath, connectionToken, loadConfig } from '../config.js';
 import { checkingUpdates, readUpdate, updateNotice } from '../update.js';
 import { manifest } from '../version.js';
 import type { Where } from '../connect.js';
-import { ago, archived, branch, json, line, mark, project, table } from './render.js';
+import { ago, archived, branch, json, line, mark, openTasks, project, table } from './render.js';
 import type { HostConnection, HostEvent, Sent } from '../ahp/connection.js';
 import { operate } from '../ahp/operate.js';
 import {
@@ -1083,6 +1083,7 @@ async function sessions(host: HostConnection, args: Args, wants: boolean): Promi
         ['Session', uri],
         ['Title', row?.title ?? ''],
         ['Status', row ? mark(row.status) : ''],
+        ['Tasks', row ? openTasks(row) : ''],
         ['Error', stopped],
         ['Project', row ? [project(row), branch(row)].filter(Boolean).join('  ') : ''],
         ['Workspace', (row?.workingDirectories ?? []).map((d) => d.replace(/^file:\/\//, '')).join(', ')],

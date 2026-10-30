@@ -1,7 +1,7 @@
 ---
 title: A turn's usage and a session's open tasks are shown from ahpd's `_meta`
 domain: cli
-status: planned
+status: active
 priority: medium
 created: 2026-10-30
 revalidated: 2026-10-30
@@ -71,7 +71,7 @@ session summary { _meta['ahpd.tasks'] } -> session show -> a "Tasks" row
 | Task | Status | Depends on |
 | --- | --- | --- |
 | [01 - A turn's usage is printed](task-01-a-turns-usage-is-printed.md) | implemented | - |
-| [02 - A session shows its open tasks](task-02-a-session-shows-its-open-tasks.md) | todo | - |
+| [02 - A session shows its open tasks](task-02-a-session-shows-its-open-tasks.md) | implemented | - |
 
 ## Risks and tradeoffs
 
@@ -79,10 +79,11 @@ session summary { _meta['ahpd.tasks'] } -> session show -> a "Tasks" row
 
 ## Resume state
 
-- **Done so far:** task 01 is implemented.
-- **Next action:** [task-02-a-session-shows-its-open-tasks.md](task-02-a-session-shows-its-open-tasks.md).
+- **Done so far:** tasks 01 and 02 are implemented.
+- **Next action:** write `implemented.md` and wait for review; the by-hand checks against ahpd are still waiting.
 - **Open questions:** none.
 - **Watch out for:** `ahpd.cost` and `_meta.cost` are two keys in two units; do not merge them.
+  The by-hand checks in *Final verification* were not run: this worktree never connects to a host.
 
 ## Final verification checklist
 
