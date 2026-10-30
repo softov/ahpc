@@ -1,7 +1,7 @@
 ---
 title: A new session is an `ahp-session:` URI
 domain: ahp
-status: planned
+status: active
 priority: high
 created: 2026-10-30
 revalidated: 2026-10-30
@@ -64,7 +64,7 @@ session new / exec -> createSession { channel: ahp-session:/<uuid>, provider } -
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - A new session is `ahp-session:`](task-01-a-new-session-is-ahp-session.md) | todo | - |
+| [01 - A new session is `ahp-session:`](task-01-a-new-session-is-ahp-session.md) | implemented | - |
 
 ## Risks and tradeoffs
 
@@ -72,10 +72,11 @@ session new / exec -> createSession { channel: ahp-session:/<uuid>, provider } -
 
 ## Resume state
 
-- **Done so far:** planned 2026-10-30.
-- **Next action:** [task-01-a-new-session-is-ahp-session.md](task-01-a-new-session-is-ahp-session.md).
+- **Done so far:** task 01 is implemented.
+- **Next action:** write `implemented.md` and wait for review; the by-hand checks against ahpd are still waiting.
 - **Open questions:** none.
 - **Watch out for:** ahpd before host/126 holds the session as `<provider>:/<id>` and keeps the `ahp-session:` URI as an alias, so both names reach it.
+  The by-hand checks in *Final verification* were not run: this worktree never connects to a host.
 
 ## Final verification checklist
 
