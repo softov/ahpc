@@ -409,6 +409,8 @@ export interface HostConnection {
    * any way to ask for another.
    */
   changes(uri: SessionUri, uri_?: string): Promise<Changeset>;
+  /** Watch one changeset by its URI: its state, and again after each change. */
+  watchChanges(changeset: string, observer: (changes: Changeset) => void): { close(): void };
   /**
    * Mark files in a changeset reviewed, or clear them.
    *

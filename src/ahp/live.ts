@@ -308,6 +308,7 @@ interface Loaded {
   chatReducer(state: unknown, action: unknown): unknown;
   sessionReducer(state: unknown, action: unknown): unknown;
   terminalReducer(state: unknown, action: unknown): unknown;
+  changesetReducer(state: unknown, action: unknown): unknown;
 }
 
 export class MissingProtocolPackage extends Error {
@@ -550,6 +551,7 @@ async function load(): Promise<Loaded> {
       chatReducer: core.chatReducer as unknown as Loaded['chatReducer'],
       sessionReducer: core.sessionReducer as unknown as Loaded['sessionReducer'],
       terminalReducer: core.terminalReducer as unknown as Loaded['terminalReducer'],
+      changesetReducer: core.changesetReducer as unknown as Loaded['changesetReducer'],
     };
   } catch (error) {
     // Node says `ERR_MODULE_NOT_FOUND` for a missing package and a missing
@@ -3249,6 +3251,30 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
         ...(meta ? { _meta: meta } : {}),
       }),
     ),
+
+    /**
+     * Watch one changeset, and report it whole each time the host changes it.
+     *
+     * Whole, as `watchTerminal` reports a terminal: `changesetReducer` says
+     * what the changeset now holds.
+     */
+    watchChanges: (uri, observer) => {
+      let live = true;
+      let state: Bag = {};
+      const hold = channels.open(uri, {
+        opened: (fresh) => {
+          if (fresh) state = fresh;
+          if (live) observer(changeset(state));
+        },
+        event: (event) => {
+          if (event.type !== 'action') return;
+          state = bag(ahp.changesetReducer(state, bag(event.params).action));
+          if (live) observer(changeset(state));
+        },
+        refused: (message) => options.onRefusal?.(uri, message, 'read'),
+      });
+      return { close: () => { live = false; hold.release(); } };
+    },
 
     changes: async (uri, wanted) => {
       if (wanted) return changeset(await snapshotOf(wanted) ?? {});

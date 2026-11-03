@@ -63,7 +63,7 @@ export type RefusedAction =
   | 'allow' | 'deny' | 'answer' | 'decline' | 'archive' | 'unarchive'
   | 'newChat' | 'closeChat' | 'dispose' | 'create' | 'listSessions'
   | 'readSession' | 'listCommands' | 'listAgents' | 'readSettings'
-  | 'listChanges' | 'readChanges' | 'listCustomizations' | 'send';
+  | 'listChanges' | 'listCustomizations' | 'send';
 
 /** The catalogue key of each action's name. */
 const ACTION_KEYS: Record<RefusedAction, string> = {
@@ -89,7 +89,6 @@ const ACTION_KEYS: Record<RefusedAction, string> = {
   listAgents: 'commands.action.listAgents',
   readSettings: 'commands.action.readSettings',
   listChanges: 'commands.action.listChanges',
-  readChanges: 'commands.action.readChanges',
   listCustomizations: 'commands.action.listCustomizations',
   send: 'commands.action.send',
 };
@@ -244,6 +243,8 @@ export interface Controller {
   changesets(uri: SessionUri): Promise<ChangesetScope[]>;
   /** One of them, by the URI its template became. Absent is whichever the host would pick. */
   changesAt(uri: SessionUri, changeset?: string): Promise<Changeset>;
+  /** Watch one by its URI: its state, and again after each change the host makes. */
+  watchChanges(changeset: string, observer: (changes: Changeset) => void): { close(): void };
   /**
    * Tick a file off, or take the tick back.
    *
@@ -1243,6 +1244,7 @@ export function createController(
       return await guard(() => all(uri));
     },
     changesAt: (uri, changeset) => guard(() => host.changes(uri, changeset)),
+    watchChanges: (changeset, observer) => host.watchChanges(changeset, observer),
     review: (changeset, files, isReviewed) => { host.review?.(changeset, files, isReviewed); },
 
     async settings() {

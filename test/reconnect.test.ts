@@ -1933,3 +1933,28 @@ it('gives a late terminal watcher the existing output', async () => {
   expect(output.at(-1)).toBe('kept output');
   one.close(); two.close(); await host.close();
 });
+
+it('gives a changeset watcher the snapshot, and the changeset again after each action', async () => {
+  const { host, scripted } = await connect();
+  const uri = `${SESSION}/changeset/uncommitted`;
+  const file = (name: string) => ({
+    id: name,
+    edit: { after: { uri: `file:///x/${name}` }, diff: { added: 1, removed: 0 } },
+  });
+  scripted.states.set(uri, { status: 'ready', files: [file('a.txt'), file('b.txt')] });
+  const seen: string[][] = [];
+  const watch = host.watchChanges(uri, (changes) => seen.push(changes.files.map((one) => one.uri)));
+  await settle();
+  expect(seen.at(-1)).toEqual(['file:///x/a.txt', 'file:///x/b.txt']);
+  await scripted.act(uri, { type: 'changeset/fileRemoved', fileId: 'a.txt' });
+  await settle();
+  expect(seen.at(-1)).toEqual(['file:///x/b.txt']);
+  await scripted.act(uri, { type: 'changeset/filesReviewChanged', files: ['b.txt'], reviewed: true });
+  await settle();
+  watch.close();
+  await scripted.act(uri, { type: 'changeset/fileRemoved', fileId: 'b.txt' });
+  await settle();
+  // The review reached the watcher, and nothing after the close did.
+  expect(seen).toHaveLength(3);
+  await host.close();
+});

@@ -367,6 +367,14 @@ export function fakeHost(): FakeHost {
    */
   const scoped = new Map<SessionUri, Map<string, Changeset>>();
 
+  /** The observers of each changeset, keyed by its URI. */
+  const changeWatchers = new Map<string, Set<(changes: Changeset) => void>>();
+
+  /** Give a changeset's new state to everyone watching it. */
+  const tellWatchers = (at: { owner: SessionUri; scope: string }, after: Changeset): void => {
+    for (const watcher of changeWatchers.get(`${at.owner}/changeset/${at.scope}`) ?? []) watcher(after);
+  };
+
   const EDITS: Changeset = {
     status: 'complete',
     files: [
@@ -2179,6 +2187,25 @@ export function fakeHost(): FakeHost {
     },
 
     /**
+     * Watch one changeset: its state now, and again after `review` or `invoke`.
+     *
+     * A changeset this session does not offer is never reported, as a host
+     * refuses its channel.
+     */
+    watchChanges: (changeset, observer) => {
+      const at = scopeIn(changeset);
+      const held = at && scoped.get(at.owner)?.get(at.scope);
+      if (!at || !held) return { close: () => {} };
+      const key = `${at.owner}/changeset/${at.scope}`;
+      const set = changeWatchers.get(key) ?? new Set();
+      changeWatchers.set(key, set);
+      set.add(observer);
+      // Later, as a host's snapshot arrives after the subscribe.
+      queueMicrotask(() => { if (set.has(observer)) observer(scoped.get(at.owner)?.get(at.scope) ?? held); });
+      return { close: () => { set.delete(observer); } };
+    },
+
+    /**
      * Ticked off, or cleared.
      *
      * The host keeps the flag and tells everyone watching, which is why this
@@ -2204,7 +2231,7 @@ export function fakeHost(): FakeHost {
       };
       scoped.get(at.owner)?.set(at.scope, after);
       if (at.scope === 'session') changesets.set(at.owner, after);
-      emit(at.owner, { type: 'changes', changes: after });
+      tellWatchers(at, after);
     },
 
     /**
@@ -2280,7 +2307,7 @@ export function fakeHost(): FakeHost {
       if (operationId === 'commit') {
         const after: Changeset = { status: 'complete', files: [], ...(held.operations ? { operations: [] } : {}) };
         scoped.get(at.owner)?.set(at.scope, after);
-        emit(at.owner, { type: 'changes', changes: after });
+        tellWatchers(at, after);
         return { message: 'Committed 1a2b3c4: what the session changed' };
       }
       const after: Changeset = {
@@ -2289,7 +2316,7 @@ export function fakeHost(): FakeHost {
       };
       scoped.get(at.owner)?.set(at.scope, after);
       if (at.scope === 'session') changesets.set(at.owner, after);
-      emit(at.owner, { type: 'changes', changes: after });
+      tellWatchers(at, after);
       return { message: `${offered.label} on ${(target?.resource ?? '').split('/').pop() ?? ''}` };
     },
 

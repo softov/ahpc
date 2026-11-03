@@ -110,16 +110,15 @@ it('refuses a scope that is not one of them, rather than answering empty', async
 it('keeps a tick, tells whoever is watching, and takes it back', async () => {
   const host = fakeHost();
   const changeset = `${WITH_CHANGES}/changeset/session`;
-  const seen: HostEvent[] = [];
-  const watch = host.subscribe(WITH_CHANGES, (event) => seen.push(event));
+  const seen: Changeset[] = [];
+  const watch = host.watchChanges(changeset, (changes) => seen.push(changes));
   const first = (await host.changes(WITH_CHANGES, changeset)).files[0];
   expect(first?.reviewed).toBeUndefined();
 
   host.review?.(changeset, [first?.uri ?? ''], true);
-  const after = seen.filter((event) => event.type === 'changes').pop() as { changes: Changeset } | undefined;
   // The host says it, rather than the client keeping its own copy: two clients
   // on one changeset have to agree, and only the host can make them.
-  expect(after?.changes.files[0]?.reviewed).toBe(true);
+  expect(seen.at(-1)?.files[0]?.reviewed).toBe(true);
   expect((await host.changes(WITH_CHANGES, changeset)).files[0]?.reviewed).toBe(true);
 
   host.review?.(changeset, [first?.uri ?? ''], false);
