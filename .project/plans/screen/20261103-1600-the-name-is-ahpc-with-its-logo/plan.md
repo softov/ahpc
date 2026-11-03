@@ -45,6 +45,7 @@ The files read and the patterns to reuse are the `refs` in the frontmatter, each
 | Two lines above the title: a green `.`, then a yellow `.`, a blue `∙` and a red `.` | Softov, 2026-11-03: "on the middle line, before \"a new session\" ... 4 dots each one one color" | 01 |
 | The green dot is above the blue dot | `(defaulted: the columns of the echo)` | 01 |
 | The ANSI colours, not theme tones | `(defaulted: the colours of the echo, which follow the terminal's palette)` | 01 |
+| The logo shows only when its two rows and the three lines fit, so a short terminal keeps the title | `(defaulted: at 60 by 14 the logo alone took the space of the title)` | 01 |
 
 ## Proposed architecture
 
@@ -56,19 +57,19 @@ The files read and the patterns to reuse are the `refs` in the frontmatter, each
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - The name and the logo](task-01-the-name-and-the-logo.md) | todo | - |
+| [01 - The name and the logo](task-01-the-name-and-the-logo.md) | implemented | - |
 
 ## Risks and tradeoffs
 
-- The logo takes two lines from the new session screen, so a short terminal shows less space above the composer.
+- The logo is measured one frame late, so the first frame after a resize can draw it or drop it wrongly.
 - The ANSI colours do not change with the theme.
 
 ## Resume state
 
-- **Done so far:** the plan.
-- **Next action:** build task 01.
+- **Done so far:** task 01 implemented, as [implemented.md](implemented.md) says.
+- **Next action:** Softov reviews the pull request, and looks at the new session screen in a terminal.
 - **Open questions:** none.
-- **Watch out for:** the tests that find the header by `AHPC`.
+- **Watch out for:** the fake's working directory is also named `ahpc`, so a header case reads the bold accent text.
 
 ## Final verification checklist
 
