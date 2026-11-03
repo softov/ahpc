@@ -1,6 +1,6 @@
 ---
 title: The verb keys are on the buttons
-status: todo
+status: implemented
 depends: [task-02-the-actions-are-buttons.md]
 layer: "screen"
 refs:

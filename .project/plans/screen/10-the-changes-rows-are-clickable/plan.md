@@ -77,7 +77,7 @@ click or Tab + Enter on an action button -> app.execute('changes.run', { operati
 | --- | --- | --- |
 | [01 - the scopes are tabs](task-01-the-scopes-are-tabs.md) | implemented | - |
 | [02 - the actions are buttons](task-02-the-actions-are-buttons.md) | implemented | - |
-| [03 - the verb keys are on the buttons](task-03-the-verb-keys-are-on-the-buttons.md) | todo | 02 |
+| [03 - the verb keys are on the buttons](task-03-the-verb-keys-are-on-the-buttons.md) | implemented | 02 |
 
 ## Risks and tradeoffs
 
@@ -87,8 +87,8 @@ click or Tab + Enter on an action button -> app.execute('changes.run', { operati
 
 ## Resume state
 
-- **Done so far:** tasks 01 and 02 are implemented and reviewed. See [implemented.md](implemented.md).
-- **Next action:** [task-03-the-verb-keys-are-on-the-buttons.md](task-03-the-verb-keys-are-on-the-buttons.md), then the check by hand in [screen-10-clickable-rows-checks.md](../../../pending/screen-10-clickable-rows-checks.md).
+- **Done so far:** tasks 01 and 02 are implemented and reviewed, and task 03 is implemented. See [implemented.md](implemented.md).
+- **Next action:** the review of task 03, then the check by hand in [screen-10-clickable-rows-checks.md](../../../pending/screen-10-clickable-rows-checks.md).
 - **Check by hand, 2026-11-03:** the tabs and buttons work; the status row had too many hints.
 - **Open questions:** none.
 - **Watch out for:** an arrow stops at a disabled tab until textui takes `roadmap/ideas/tabs-skip-a-disabled-tab.md`.

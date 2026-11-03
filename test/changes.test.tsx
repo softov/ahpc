@@ -504,6 +504,32 @@ describe('keys run the operations', () => {
     });
   }
 
+  for (const width of [100, 60]) {
+    it(`names each verb key on its button, and not on the status row, at ${width} columns`, async () => {
+      const { host } = offering([
+        { ...STAGE },
+        { id: 'discard', label: 'Discard', scopes: ['resource', 'changeset'], status: 'idle' },
+        { id: 'commit', label: 'Commit', scopes: ['changeset'], status: 'idle' },
+        { id: 'archive', label: 'Archive', scopes: ['changeset'], status: 'idle' },
+      ]);
+      const t = await changes(host, width);
+      await t.press(']');
+      for (let i = 0; i < 10; i++) await t.settle();
+      const buttons = t.lines().find((line) => line.includes('Stage')) ?? '';
+      expect(buttons).toMatch(/Stage s\b/);
+      expect(buttons).toMatch(/Discard del\b/);
+      expect(buttons).toMatch(/Commit c\b/);
+      // A verb with no key of its own gets no hint.
+      expect(buttons).toMatch(/Archive\s*│/);
+      // The status row is the last line inside the frame.
+      const status = t.lines().at(-2) ?? '';
+      expect(status).toContain('esc');
+      for (const verb of ['stage', 'discard', 'commit', 'del']) expect(status).not.toContain(verb);
+      expect(t.lines().every((line) => line.length <= width)).toBe(true);
+      await t.unmount();
+    });
+  }
+
   it('opens the pull request form on p', async () => {
     const t = await tree(fakeHost());
     await t.press('p');

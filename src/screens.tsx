@@ -22,7 +22,7 @@ import {
 import { PRESETS, presetFor, presetLabel, scheduleProblem, zoneIsKnownHere } from './schedule.js';
 import type { Preset } from './schedule.js';
 import {
-  AUTOMATIONS_SCOPE, CHANGES_SCOPE, CHAT_SCOPE, CONTROLLER, MCP_SCOPE, SESSIONS_SCOPE, SKILLS_SCOPE, chooseScope, modelCommand, settingCommand,
+  AUTOMATIONS_SCOPE, CHANGES_SCOPE, CHAT_SCOPE, CONTROLLER, MCP_SCOPE, SESSIONS_SCOPE, SKILLS_SCOPE, VERB_KEYS, chooseScope, modelCommand, settingCommand,
 } from './control.js';
 import { branchName, branchDrift, pullRequestLabel,
   ARCHIVED, AUTOMATIONS, AUTOMATION_EDIT, AUTOMATION_ROW, AUTOMATION_SIDEBAR, CHANGES, CUSTOMIZATIONS, DRAFT, EXPANDED, FILTER, FOCUS, HISTORY, HOST, INPUT,
@@ -1375,6 +1375,7 @@ export const ChangesScreen: (props: Record<string, never>) => RenderOutput =
                 tone={operation.status === 'error' ? 'danger' : operation.status === 'running' ? 'warning' : 'default'}
                 // The picker on `x` leaves out what the host disabled, and so does this.
                 disabled={operation.status === 'disabled'}
+                hint={VERB_KEYS[operation.id] === 'delete' ? 'del' : VERB_KEYS[operation.id]}
                 onPress={() => { void app.execute('changes.run', { operation: operation.id }); }}
               />
             ))}
