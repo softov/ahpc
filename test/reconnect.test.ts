@@ -369,6 +369,33 @@ describe('an expected answer is not reported as a fault', () => {
 
     await host.close();
   });
+
+  it('reports a refused read that no reader claimed, with its kind and the code once', async () => {
+    const reported: { uri: string; message: string; kind: string }[] = [];
+    const open = async (): Promise<AhpTransport> => {
+      const [mine, theirs] = InMemoryTransport.pair();
+      const scripted = new Scripted(theirs);
+      scripted.refuse.set(SESSION, 'No agent for session');
+      return mine;
+    };
+    const host = await liveHost({
+      url: 'ws://scripted',
+      clientId: 'ahpc-test',
+      connect: open,
+      backoff: [0],
+      keepaliveMs: 0,
+      onRefusal: (uri, message, kind) => reported.push({ uri, message, kind }),
+    });
+
+    // What the session list does for the highlighted row.
+    await host.detail(SESSION as never).catch(() => undefined);
+    await settle();
+
+    // The SDK says `RPC error -32001: No agent for session`; the code is said once, at the end.
+    expect(reported).toEqual([{ uri: SESSION, message: 'No agent for session (-32001)', kind: 'read' }]);
+
+    await host.close();
+  });
 });
 
 describe('history is read past the window a host opened with', () => {

@@ -451,6 +451,7 @@ export async function tui(argv: string[]): Promise<void> {
 
   app.services.provide(WRITER_KEY, createWriter(terminal.capabilities()));
   sink.report = (message) => reportHostError(app.store, message);
+  sink.refused = (uri, message, kind) => app.services.require(CONTROLLER).refused(uri, message, kind);
   await app.start();
 
   /*

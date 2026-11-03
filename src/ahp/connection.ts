@@ -12,6 +12,14 @@ import type {
  * refusal too, because a caller that cannot tell silence from success has no
  * way to report either.
  */
+/**
+ * What the host refused, when nobody was reading for the answer.
+ *
+ * `read` is a channel the client asked to see; `send` is an action the client
+ * sent on one.
+ */
+export type RefusalKind = 'read' | 'send';
+
 export interface Sent {
   refused?: string;
 }

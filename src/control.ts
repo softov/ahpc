@@ -23,7 +23,7 @@ import { attempt, failureWords, hostWords } from './ahp/auth.js';
 import { forget, remember, resolveToken } from './ahp/tokens.js';
 import type { AuthAsk } from './ahp/auth.js';
 import { auth } from './connect.js';
-import type { HostConnection, Sent } from './ahp/connection.js';
+import type { HostConnection, RefusalKind, Sent } from './ahp/connection.js';
 import type { Terminals } from './terminal.js';
 import { createTerminals } from './terminal.js';
 import type {
@@ -63,7 +63,7 @@ export type RefusedAction =
   | 'allow' | 'deny' | 'answer' | 'decline' | 'archive' | 'unarchive'
   | 'newChat' | 'closeChat' | 'dispose' | 'create' | 'listSessions'
   | 'readSession' | 'listCommands' | 'listAgents' | 'readSettings'
-  | 'listChanges' | 'readChanges' | 'listCustomizations';
+  | 'listChanges' | 'readChanges' | 'listCustomizations' | 'send';
 
 /** The catalogue key of each action's name. */
 const ACTION_KEYS: Record<RefusedAction, string> = {
@@ -91,6 +91,7 @@ const ACTION_KEYS: Record<RefusedAction, string> = {
   listChanges: 'commands.action.listChanges',
   readChanges: 'commands.action.readChanges',
   listCustomizations: 'commands.action.listCustomizations',
+  send: 'commands.action.send',
 };
 
 /** What a refusal was about: the action, and the session it was for when there was one. */
@@ -127,6 +128,14 @@ export interface Controller {
   setRead(uri: SessionUri, read: boolean): void;
   /** Say that the host refused something, wherever it was noticed, and what it refused. */
   report(error: unknown, about?: About): void;
+  /**
+   * Say that the host refused a channel or an action that no reader waited on.
+   *
+   * Drawn, with its action and the session, only when it is about the open
+   * session or one of its chats. Another session's refusal shows in the
+   * session list's pane, and nowhere else.
+   */
+  refused(uri: string, message: string, kind: RefusalKind): void;
   /**
    * Ask for a token for one resource, and answer whether the host took it.
    *
@@ -795,6 +804,20 @@ export function createController(
     },
 
     report: failed,
+
+    refused(uri, message, kind) {
+      const open = app.store.get<SessionUri>(OPEN) ?? null;
+      const chats = app.store.get<{ resource: string }[]>(CHATS) ?? [];
+      const ours = open !== null && (uri === open
+        || uri === app.store.get<string>(CHAT_URI)
+        || chats.some((chat) => chat.resource === uri));
+      if (ours) {
+        reportHostError(app.store, refusal({ action: kind === 'read' ? 'readSession' : 'send', session: open }, message));
+        return;
+      }
+      if (uri.startsWith('ahp-chat:') || sessions(app.store).some((row) => row.resource === uri)) return;
+      reportHostError(app.store, message);
+    },
 
     askSignIn,
 

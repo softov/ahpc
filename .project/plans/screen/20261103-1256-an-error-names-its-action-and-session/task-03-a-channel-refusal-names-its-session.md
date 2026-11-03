@@ -1,6 +1,6 @@
 ---
 title: A channel refusal names its session, or stays in the pane
-status: todo
+status: implemented
 depends: [task-02-a-refusal-stays-on-its-page.md]
 layer: screen
 refs:
@@ -62,3 +62,5 @@ The session list reads a session only after the highlight stays on it for 300 ms
 - Run `npm run typecheck` and `npx vitest run`, one after the other, and check that both pass.
 
 ## Resume
+
+- Implemented 2026-11-03; awaits review. See [implemented.md](implemented.md).

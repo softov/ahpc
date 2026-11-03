@@ -5,7 +5,8 @@ import type { Consumer } from './channels.js';
 import { publish } from './publish.js';
 import { PublishRefusal } from './publish.js';
 import type { Published } from './publish.js';
-import type { HostConnection, HostEvent, Sent } from './connection.js';
+import type { HostConnection, HostEvent, RefusalKind, Sent } from './connection.js';
+import { hostWords } from './auth.js';
 import type {
   Agent, Answer, Automation, AutomationRun, Changeset, ChangesetOperation, ChangesetOperationTarget, Completion, ConfigProperty, ContentRef, Customization, CustomizationKind,
   TerminalRow, TerminalState,
@@ -74,7 +75,7 @@ export interface LiveHostOptions {
    * the host answering, and reporting it as a lost connection sends somebody
    * to debug their network over a session whose agent has simply gone.
    */
-  onRefusal?(uri: string, message: string): void;
+  onRefusal?(uri: string, message: string, kind: RefusalKind): void;
   /**
    * Open a transport, in place of a WebSocket to `url`.
    *
@@ -1687,7 +1688,7 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
       }).filter((one) => one.resource !== '');
       if (resources.length > 0) options.onAuthRequired?.(resources);
     }
-    return typeof rpc?.code === 'number' ? `${message} (${rpc.code})` : message;
+    return typeof rpc?.code === 'number' ? `${hostWords(message)} (${rpc.code})` : message;
   };
 
   /**
@@ -1709,12 +1710,12 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
     client,
     reason,
     lingerMs: options.lingerMs ?? LINGER_MS,
-    onRefusal: (uri, message) => options.onRefusal?.(uri, message),
+    onRefusal: (uri, message) => options.onRefusal?.(uri, message, 'read'),
     clientId,
     // A refused action reaches a person the same way a refused channel does.
     // Both are the host saying no in its own words, and neither is a fault
     // here to be dressed up as one.
-    onRejection: (uri, message) => options.onRefusal?.(uri, message),
+    onRejection: (uri, message) => options.onRefusal?.(uri, message, 'send'),
   });
   for (const [uri, state] of adopted) channels.adopt(uri, state);
   channels.drain(client);
@@ -2025,7 +2026,7 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
       });
     }
     catch (error) {
-      options.onRefusal?.(chatUri, reason(error));
+      options.onRefusal?.(chatUri, reason(error), 'read');
       return false;
     }
     const after = bag(await snapshotOf(chatUri));
@@ -2057,11 +2058,11 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
     const sending = (async () => {
       const chat = await chatOf(uri);
       if (!chat) {
-        options.onRefusal?.(uri, channels.refusal(uri) ?? 'this session has no chat to speak to');
+        options.onRefusal?.(uri, channels.refusal(uri) ?? 'this session has no chat to speak to', 'send');
         return;
       }
       client.dispatch(chat, action);
-    })().catch((error: unknown) => options.onRefusal?.(uri, reason(error)));
+    })().catch((error: unknown) => options.onRefusal?.(uri, reason(error), 'send'));
     inFlight.add(sending);
     void sending.finally(() => inFlight.delete(sending));
   };
@@ -2697,7 +2698,7 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
           state = bag(ahp.terminalReducer(state, bag(event.params).action));
           if (live) observer(shape(state));
         },
-        refused: (message) => options.onRefusal?.(uri, message),
+        refused: (message) => options.onRefusal?.(uri, message, 'read'),
       });
 
       return { close: () => { live = false; hold.release(); } };
@@ -2713,17 +2714,17 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
 
     resizeTerminal: (uri, cols, rows) => {
       try { client.dispatch(uri, { type: 'terminal/resized', cols, rows }); }
-      catch (error) { options.onRefusal?.(uri, reason(error)); }
+      catch (error) { options.onRefusal?.(uri, reason(error), 'send'); }
     },
 
     clearTerminal: (uri) => {
       try { client.dispatch(uri, { type: 'terminal/cleared' }); }
-      catch (error) { options.onRefusal?.(uri, reason(error)); }
+      catch (error) { options.onRefusal?.(uri, reason(error), 'send'); }
     },
 
     renameTerminal: (uri, title) => {
       try { client.dispatch(uri, { type: 'terminal/titleChanged', title }); }
-      catch (error) { options.onRefusal?.(uri, reason(error)); }
+      catch (error) { options.onRefusal?.(uri, reason(error), 'send'); }
     },
 
     claimTerminal: (uri) => {
@@ -2735,7 +2736,7 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
           claim: { kind: 'client', clientId },
         });
       }
-      catch (error) { options.onRefusal?.(uri, reason(error)); }
+      catch (error) { options.onRefusal?.(uri, reason(error), 'send'); }
     },
 
     completions: async ({ channel, text, offset }) => {
@@ -2851,7 +2852,7 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
       let listed = '';
       /** An action this client could not apply. Said once, and read on. */
       const bad = (message: string): void => {
-        options.onRefusal?.(uri, message);
+        options.onRefusal?.(uri, message, 'read');
         if (live) observer({ type: 'error', message });
       };
 
@@ -3340,7 +3341,7 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
           id,
           enablement: [{ kind: 'session', enabled }],
         });
-      } catch (error) { options.onRefusal?.(uri, reason(error)); }
+      } catch (error) { options.onRefusal?.(uri, reason(error), 'send'); }
     },
 
     detail: async (uri): Promise<SessionDetail> => {
@@ -3413,7 +3414,7 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
       // whatever another client changed while it was on screen.
       try {
         client.dispatch(uri, { type: 'session/configChanged', config: { [key]: value } });
-      } catch (error) { options.onRefusal?.(uri, reason(error)); }
+      } catch (error) { options.onRefusal?.(uri, reason(error), 'send'); }
     },
 
     /** Everything already sent, actually sent. */
