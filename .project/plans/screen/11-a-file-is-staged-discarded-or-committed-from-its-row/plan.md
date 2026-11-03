@@ -65,9 +65,9 @@ p -> changes.run('create-pr') -> the pull request form, as today
 | Discard has a danger tone in the dialog | (defaulted: the host gives it a confirmation, which says it is destructive) | 03 |
 | The click on a button, the picker on `x` and the keys all reach the same dialog | (defaulted: one path for a verb, whatever starts it) | 03 |
 | The staged mark is `S`, not a dot | Softov, 2026-11-03: "for staged it could use a S instead a dot" | 04 |
-| The mark and the letter are at the end of the row, after the counts: `+116 -122  M` and `+116 -122 SM` | Softov, 2026-11-03: "letters at the end" | 04 |
+| `S` stays before the path, where the dot was, and the letter moves to the end, after the counts | Softov, 2026-11-03: "letters at the end"; asked where S goes, answered "S first, letter at end" | 04 |
 | A partly staged file is `S` with the warning tone | (defaulted: the tone the half dot had) | 04 |
-| The read column stays at the start of the row | (defaulted: Softov moved only the mark and the letter) | 04 |
+| The read column stays at the start of the row, before `S` | (defaulted: Softov moved only the letter) | 04 |
 
 ## Proposed architecture
 
@@ -83,7 +83,7 @@ p -> changes.run('create-pr') -> the pull request form, as today
 | [01 - A row shows its git letter](task-01-a-row-shows-its-git-letter.md) | implemented | - |
 | [02 - Keys run the operations](task-02-keys-run-the-operations.md) | implemented | - |
 | [03 - A dialog asks this file or all files](task-03-a-dialog-asks-this-file-or-all-files.md) | implemented | 02 |
-| [04 - The staged mark and the letter are at the end of the row](task-04-the-marks-are-at-the-row-end.md) | todo | 01 |
+| [04 - The staged mark is S, and the letter ends the row](task-04-the-marks-are-at-the-row-end.md) | implemented | 01 |
 
 ## Risks and tradeoffs
 
@@ -94,8 +94,8 @@ p -> changes.run('create-pr') -> the pull request form, as today
 
 ## Resume state
 
-- **Done so far:** tasks 01, 02 and 03 are implemented and await review. See [implemented.md](implemented.md).
-- **Next action:** [task-04-the-marks-are-at-the-row-end.md](task-04-the-marks-are-at-the-row-end.md), then the check by hand in [screen-11-row-operations-checks.md](../../../pending/screen-11-row-operations-checks.md), then review.
+- **Done so far:** tasks 01, 02, 03 and 04 are implemented and await review. See [implemented.md](implemented.md).
+- **Next action:** the check by hand in [screen-11-row-operations-checks.md](../../../pending/screen-11-row-operations-checks.md), then review.
 - **Open questions:** none.
 - **Watch out for:** against an ahpd without host/82, stage, unstage and discard show This file only, and commit shows All files only.
 

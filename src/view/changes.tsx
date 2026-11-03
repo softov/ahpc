@@ -118,24 +118,18 @@ export const ChangesList: (props: ChangesListProps) => RenderOutput =
                   shrink={0}
                 />
               ) : null}
-              {/* Staged, or staged and then changed again: what a commit
-                  takes, and what it takes only part of. */}
+              {/* S for staged, a blank for not. A file staged and then
+                  changed again has its S in the warning tone. */}
               {staging ? (() => {
                 const file = byUri.get(item.id);
-                const staged = file?.staged === true;
                 return (
                   <text
-                    content={!staged ? ' ' : file?.unstaged === true ? theme.glyphs.bulletHalf : theme.glyphs.bulletFilled}
+                    content={file?.staged === true ? 'S' : ' '}
                     fg={(file?.unstaged === true ? 'warning' : 'success') as SemanticVariant}
                     shrink={0}
                   />
                 );
               })() : null}
-              <text
-                content={item.icon ?? ''}
-                {...(state.selected ? {} : { fg: item.tone })}
-                shrink={0}
-              />
               {/* The path truncates at the *front*, so what survives is the
                   filename rather than the six directories every row shares. */}
               <Marquee
@@ -146,6 +140,12 @@ export const ChangesList: (props: ChangesListProps) => RenderOutput =
               />
               <text content={`+${byUri.get(item.id)?.diff.added ?? 0}`} fg="success" shrink={0} />
               <text content={`-${byUri.get(item.id)?.diff.removed ?? 0}`} fg="danger" shrink={0} />
+              {/* The letter ends the row. */}
+              <text
+                content={item.icon ?? ''}
+                {...(state.selected ? {} : { fg: item.tone })}
+                shrink={0}
+              />
             </Row>
           )}
           {...(onOpen ? { onActivate: (uri: string) => onOpen(uri) } : {})}
