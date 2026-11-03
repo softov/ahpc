@@ -1,6 +1,6 @@
 ---
 title: A commit asks for its message
-status: implemented
+status: done
 depends: [task-01-an-operation-carries-its-arguments.md, task-02-a-file-says-whether-it-is-staged.md]
 layer: "screen"
 refs:

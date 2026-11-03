@@ -1,6 +1,6 @@
 ---
 title: An operation carries its arguments and brings back its answer
-status: implemented
+status: done
 depends: []
 layer: "ahp"
 refs:

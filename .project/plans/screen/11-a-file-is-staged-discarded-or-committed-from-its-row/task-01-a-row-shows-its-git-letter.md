@@ -1,6 +1,6 @@
 ---
 title: A row shows its git letter
-status: implemented
+status: done
 depends: []
 layer: "screen"
 refs:

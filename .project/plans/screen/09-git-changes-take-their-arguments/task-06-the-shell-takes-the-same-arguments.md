@@ -1,6 +1,6 @@
 ---
 title: The shell takes the same arguments
-status: implemented
+status: done
 depends: [task-01-an-operation-carries-its-arguments.md, task-04-a-pull-request-is-prepared-in-a-form.md]
 layer: "cli"
 refs:

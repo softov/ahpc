@@ -1,6 +1,6 @@
 ---
 title: The staged mark is S, and the letter ends the row
-status: implemented
+status: done
 depends: [task-01-a-row-shows-its-git-letter.md]
 layer: "screen"
 refs:

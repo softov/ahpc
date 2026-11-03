@@ -1,7 +1,7 @@
 ---
 title: A commit asks for its message, a pull request is prepared in a form, and what the host sends back is shown
 domain: screen
-status: active
+status: built
 priority: high
 created: 2026-09-30
 revalidated: 2026-09-30
@@ -106,12 +106,12 @@ x -> app.ask(changes.run) -> palette: the verbs offered
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - an operation carries its arguments and brings back its answer](task-01-an-operation-carries-its-arguments.md) | implemented | - |
-| [02 - a file says whether it is staged](task-02-a-file-says-whether-it-is-staged.md) | implemented | - |
-| [03 - a commit asks for its message](task-03-a-commit-asks-for-its-message.md) | implemented | 01, 02 |
-| [04 - a pull request is prepared, then read in a form](task-04-a-pull-request-is-prepared-in-a-form.md) | implemented | 01 |
-| [05 - the link the host sends back is shown and copied](task-05-the-link-is-shown-and-copied.md) | implemented | 01 |
-| [06 - the shell takes the same arguments](task-06-the-shell-takes-the-same-arguments.md) | implemented | 01, 04 |
+| [01 - an operation carries its arguments and brings back its answer](task-01-an-operation-carries-its-arguments.md) | done | - |
+| [02 - a file says whether it is staged](task-02-a-file-says-whether-it-is-staged.md) | done | - |
+| [03 - a commit asks for its message](task-03-a-commit-asks-for-its-message.md) | done | 01, 02 |
+| [04 - a pull request is prepared, then read in a form](task-04-a-pull-request-is-prepared-in-a-form.md) | done | 01 |
+| [05 - the link the host sends back is shown and copied](task-05-the-link-is-shown-and-copied.md) | done | 01 |
+| [06 - the shell takes the same arguments](task-06-the-shell-takes-the-same-arguments.md) | done | 01, 04 |
 
 ## Risks and tradeoffs
 
@@ -122,16 +122,14 @@ x -> app.ask(changes.run) -> palette: the verbs offered
 
 ## Resume state
 
-- **Done so far:** tasks 01 to 06.
-- **Next action:** the checks by hand in [screen-09-git-changes-checks.md](../../../pending/screen-09-git-changes-checks.md), then review.
+- **Done so far:** tasks 01 to 06 are done. See [implemented.md](implemented.md).
+- **Check by hand, 2026-11-03:** Softov ran the checks against a host with a GitHub remote, and they passed.
+- **Next action:** none. [deferred.md](deferred.md) says what waits.
 - **Open questions:** none.
-- **Watch out for:**
-  - `x` now goes through `app.ask`, so `changes.run` gets an `operation` argument from the palette.
-  - `forgetChanges` must reset any new store key on the changes screen.
 
 ## Final verification checklist
 
 - [x] `npm run typecheck` clean.
-- [ ] `npx vitest run` passes, with the new cases in `test/changes.test.tsx` and the shell's tests.
-- [ ] Commit, prepare and create checked by hand against a host with a GitHub remote.
+- [x] `npx vitest run` passes, with the new cases in `test/changes.test.tsx` and the shell's tests.
+- [x] Commit, prepare and create checked by hand against a host with a GitHub remote.
 - [x] `plans/index.md` updated.

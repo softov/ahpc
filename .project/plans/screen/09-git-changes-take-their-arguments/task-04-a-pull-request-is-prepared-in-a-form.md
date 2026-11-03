@@ -1,6 +1,6 @@
 ---
 title: A pull request is prepared, then read in a form
-status: implemented
+status: done
 depends: [task-01-an-operation-carries-its-arguments.md]
 layer: "screen"
 refs:
