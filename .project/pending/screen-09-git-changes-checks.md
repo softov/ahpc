@@ -21,7 +21,7 @@ The create step pushes a branch and opens a real pull request, so use a reposito
 ## screen/09: the staged mark
 
 1. Run `git add` on one of the two files in `<work>`.
-2. Check that the list marks that file as staged and the other file as not staged.
+2. Check that the row of that file ends with `SM`, and the other row ends with ` M`.
 
 ## screen/09: commit
 
