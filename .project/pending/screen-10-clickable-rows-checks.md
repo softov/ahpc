@@ -6,6 +6,9 @@ plans:
 
 # Check screen/10 in a real terminal
 
+Softov ran these checks on 2026-11-03, and they passed.
+The file stays for its *Set up*, which other checks use.
+
 screen/10 is built, and its cases pass in `test/changes.test.tsx` at 60 and 100 columns.
 This run checks the clicks and the keys in a real terminal, against an ahpd built from `main`.
 

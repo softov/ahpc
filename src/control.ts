@@ -34,7 +34,7 @@ import type { Invoked } from './ahp/types.js';
 import { SessionFlag } from './ahp/types.js';
 import {
   ARCHIVED, BOOD_FLOAT, CAN_ADD_CHAT, CAN_FORK, CAN_SIDE_CHAT, CHAT_URI, CHATS, CUSTOMIZATIONS, CURSOR, DRAFT, EXPANDED, FILTER, FIND, FINDING, FIND_AT, HAS_CHATS,
-  HOST, HOST_ERROR, HOST_LINK, INPUT, MODEL, MODEL_CONFIG, OPEN_TERMINAL, TERMINALS, TERMINAL_LIST,
+  HOST, HOST_ERROR, HOST_LINK, HOST_NOTE, INPUT, MODEL, MODEL_CONFIG, OPEN_TERMINAL, TERMINALS, TERMINAL_LIST,
   AUTOMATIONS, AUTOMATION_EDIT, AUTOMATION_ROW, AUTOMATION_SIDEBAR, AUTH_ASK,
   CHANGES as CHANGES_AT_PATH, CHANGE_AT, CHANGE_ROW, CHANGE_SCOPES, FILES_AT, FILES_OPEN,
   OPEN, OPEN_FILE, PROVIDER, PULL_REQUEST, PULL_REQUEST_LAYER, TARGET_LAYER, MARKDOWN, QUEUE, QUIT_ARMED, QUIT_WINDOW_MS, RUNNING, SCREEN, SELECTED, SETTINGS, SIDEBAR,
@@ -709,6 +709,7 @@ export function createController(
     app.store.set(CHANGE_ROW, '');
     app.store.set(PULL_REQUEST, null);
     app.store.set(HOST_LINK, null);
+    app.store.set(HOST_NOTE, null);
     if (app.layers.entries().some((entry) => entry.id === PULL_REQUEST_LAYER)) app.layers.close(PULL_REQUEST_LAYER);
   };
 
@@ -1551,22 +1552,30 @@ function commands(
    *
    * A link goes on the row as a link and on the clipboard. A draft is read
    * where it is asked for, so here only its message is shown. Otherwise the
-   * host's own sentence is shown where a refusal would be, because a silent
-   * success on a destructive verb reads as one that did not happen. A
-   * follow-up this client cannot read is said, not dropped.
+   * host's own sentence is shown as a note, because a silent success on a
+   * destructive verb reads as one that did not happen. A follow-up this
+   * client cannot read is said as a refusal, with the host's sentence, not
+   * dropped.
    */
   const answered = (done: Invoked): void => {
     const link = externalLink(done.followUp);
     if (link !== null) {
       app.store.set(HOST_ERROR, null);
+      app.store.set(HOST_NOTE, null);
       app.store.set(HOST_LINK, link);
       writeClipboard(app.store, link, app.terminal);
       return;
     }
     app.store.set(HOST_LINK, null);
     const unread = done.followUp !== undefined && pullRequestDraft(done.followUp) === null;
-    const words = [done.message, unread ? app.i18n.t('commands.followUpUnread') : undefined].filter((one) => one !== undefined);
-    if (words.length > 0) app.store.set(HOST_ERROR, words.join(' '));
+    if (unread) {
+      app.store.set(HOST_NOTE, null);
+      const words = [done.message, app.i18n.t('commands.followUpUnread')].filter((one) => one !== undefined);
+      app.store.set(HOST_ERROR, words.join(' '));
+      return;
+    }
+    app.store.set(HOST_NOTE, done.message ?? null);
+    if (done.message !== undefined) app.store.set(HOST_ERROR, null);
   };
 
   return [

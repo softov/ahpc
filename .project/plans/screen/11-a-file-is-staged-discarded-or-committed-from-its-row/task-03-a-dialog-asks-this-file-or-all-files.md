@@ -1,6 +1,6 @@
 ---
 title: A dialog asks this file or all files
-status: implemented
+status: done
 depends: [02]
 layer: "screen"
 refs:

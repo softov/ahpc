@@ -58,7 +58,7 @@ commit -> operate -> host answers { message } -> answered -> HOST_ERROR -> statu
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - The host's sentence has its own slot](task-01-the-host-sentence-has-its-own-slot.md) | todo | - |
+| [01 - The host's sentence has its own slot](task-01-the-host-sentence-has-its-own-slot.md) | implemented | - |
 
 ## Risks and tradeoffs
 
@@ -66,8 +66,8 @@ commit -> operate -> host answers { message } -> answered -> HOST_ERROR -> statu
 
 ## Resume state
 
-- **Done so far:** the plan.
-- **Next action:** build task 01.
+- **Done so far:** task 01 implemented, as [implemented.md](implemented.md) says.
+- **Next action:** Softov reviews the pull request, and commits against ahpd.
 - **Open questions:** none.
 - **Watch out for:** the case on an answer that this client cannot read.
 

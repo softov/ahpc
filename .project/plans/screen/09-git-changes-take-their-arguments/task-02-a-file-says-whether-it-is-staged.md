@@ -1,6 +1,6 @@
 ---
 title: A file says whether it is staged
-status: implemented
+status: done
 depends: []
 layer: "ahp, screen"
 refs:

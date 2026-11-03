@@ -1,7 +1,7 @@
 ---
 title: A file is staged, unstaged, discarded or committed from its row, or with every file
 domain: screen
-status: active
+status: built
 priority: high
 created: 2026-10-11
 revalidated: 2026-10-11
@@ -80,10 +80,10 @@ p -> changes.run('create-pr') -> the pull request form, as today
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - A row shows its git letter](task-01-a-row-shows-its-git-letter.md) | implemented | - |
-| [02 - Keys run the operations](task-02-keys-run-the-operations.md) | implemented | - |
-| [03 - A dialog asks this file or all files](task-03-a-dialog-asks-this-file-or-all-files.md) | implemented | 02 |
-| [04 - The staged mark is S, and the letter ends the row](task-04-the-marks-are-at-the-row-end.md) | implemented | 01 |
+| [01 - A row shows its git letter](task-01-a-row-shows-its-git-letter.md) | done | - |
+| [02 - Keys run the operations](task-02-keys-run-the-operations.md) | done | - |
+| [03 - A dialog asks this file or all files](task-03-a-dialog-asks-this-file-or-all-files.md) | done | 02 |
+| [04 - The staged mark is S, and the letter ends the row](task-04-the-marks-are-at-the-row-end.md) | done | 01 |
 
 ## Risks and tradeoffs
 
@@ -94,14 +94,14 @@ p -> changes.run('create-pr') -> the pull request form, as today
 
 ## Resume state
 
-- **Done so far:** tasks 01, 02, 03 and 04 are implemented and await review. See [implemented.md](implemented.md).
-- **Next action:** the check by hand in [screen-11-row-operations-checks.md](../../../pending/screen-11-row-operations-checks.md), then review.
+- **Done so far:** tasks 01 to 04 are done. See [implemented.md](implemented.md).
+- **Check by hand, 2026-11-03:** Softov ran the checks against an ahpd with host/82 at 60 and 100 columns, and they passed.
+- **Next action:** none. [deferred.md](deferred.md) says what waits.
 - **Open questions:** none.
-- **Watch out for:** against an ahpd without host/82, stage, unstage and discard show This file only, and commit shows All files only.
 
 ## Final verification checklist
 
 - [x] `npm run typecheck` clean.
 - [x] `npx vitest run` passes, with the new cases in `test/changes.test.tsx`.
-- [ ] By hand against an ahpd with host/82, at 60 and 100 columns: each key opens the dialog with This file focused, and both targets work.
+- [x] By hand against an ahpd with host/82, at 60 and 100 columns: each key opens the dialog with This file focused, and both targets work.
 - [x] `plans/index.md` updated.
