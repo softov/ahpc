@@ -104,6 +104,7 @@ export const ChangesList: (props: ChangesListProps) => RenderOutput =
           <text content={i18n.t('views.changes.partial', { ellipsis: theme.glyphs.ellipsis })} fg="warning" />
         ) : null}
         <List
+          key="files"
           items={items}
           flex={1}
           renderItem={(item: ListItem, state: ListItemState) => (

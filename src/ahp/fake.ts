@@ -2219,7 +2219,7 @@ export function fakeHost(): FakeHost {
       if (!held) return;
       const wanted = new Set(files);
       const after: Changeset = {
-        status: held.status,
+        ...held,
         files: held.files.map((file) => {
           if (!wanted.has(file.uri)) return file;
           // The key goes rather than turning `false`, because absent is what

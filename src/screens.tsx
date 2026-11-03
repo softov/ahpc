@@ -1389,6 +1389,7 @@ export const ChangesScreen: (props: Record<string, never>) => RenderOutput =
           </Row>
         ) : null}
         <ChangesList
+          key="files"
           changes={changes}
           reviewable={chosen?.reviewable === true}
           onOpen={(found: string) => app.store.set(OPEN_FILE, found)}

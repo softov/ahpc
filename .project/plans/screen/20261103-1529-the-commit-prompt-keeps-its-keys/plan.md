@@ -63,7 +63,7 @@ commit prompt open -> changeset update -> actions row or computing line comes or
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - The list stays mounted when a row above it changes](task-01-the-list-stays-mounted.md) | todo | - |
+| [01 - The list stays mounted when a row above it changes](task-01-the-list-stays-mounted.md) | implemented | - |
 
 ## Risks and tradeoffs
 
@@ -71,8 +71,8 @@ commit prompt open -> changeset update -> actions row or computing line comes or
 
 ## Resume state
 
-- **Done so far:** nothing.
-- **Next action:** [task-01-the-list-stays-mounted.md](task-01-the-list-stays-mounted.md).
+- **Done so far:** task 01 implemented, as [implemented.md](implemented.md) says.
+- **Next action:** Softov reviews the pull request, and types a commit message against ahpd.
 - **Open questions:** none.
 - **Watch out for:** a test that does not drop the operations or the computing line passes without the keys.
 
