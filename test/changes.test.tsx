@@ -8,7 +8,13 @@ import { fakeHost } from '../src/ahp/fake.js';
 import type { FakeHost } from '../src/ahp/fake.js';
 import { operate } from '../src/ahp/operate.js';
 import { CHANGE_AT, CHANGE_ROW, HOST_ERROR, HOST_LINK, OPEN_FILE, PULL_REQUEST } from '../src/state.js';
-import type { ChangesetOperation, FileEdit } from '../src/ahp/types.js';
+import type { Changeset, ChangesetOperation, FileEdit } from '../src/ahp/types.js';
+
+/** Change what `host` reports for each changeset that the screen watches. */
+function reshape(host: FakeHost, change: (changeset: string, held: Changeset) => Changeset): void {
+  const watch = host.watchChanges.bind(host);
+  host.watchChanges = (changeset, observer) => watch(changeset, (held) => observer(change(changeset, held)));
+}
 
 /**
  * The changeset, and one file out of it.
@@ -224,6 +230,21 @@ describe('choosing which changeset, and ticking files off', () => {
     await t.unmount();
   });
 
+  it('lets go of a changeset when the scope moves', async () => {
+    const host = fakeHost();
+    const t = await changes(host);
+    const own = `${CHANGED}/changeset/session`;
+    const session = await host.changes(CHANGED, own);
+    await t.press(']');
+    for (let i = 0; i < 10; i++) await t.settle();
+    expect(t.hasText('notes.todo')).toBe(true);
+    // A tick on the scope that is no longer on screen leaves the list alone.
+    host.review?.(own, session.files.map((file) => file.uri), true);
+    for (let i = 0; i < 10; i++) await t.settle();
+    expect(t.hasText('notes.todo')).toBe(true);
+    await t.unmount();
+  });
+
   it('draws no tick column on a changeset the host will not keep one for', async () => {
     const t = await changes();
     // `uncommitted` is not reviewable in the fixture, as it is not on a real
@@ -421,10 +442,8 @@ describe('a row shows its git letter', () => {
   /** A fake host whose working tree also holds a rename. */
   function renaming(): FakeHost {
     const host = fakeHost();
-    const read = host.changes.bind(host);
-    host.changes = async (uri, changeset) => {
-      const held = await read(uri, changeset);
-      if (!changeset?.endsWith('/uncommitted')) return held;
+    reshape(host, (changeset, held) => {
+      if (!changeset.endsWith('/uncommitted')) return held;
       const moved: FileEdit = {
         uri: `${DIR}/scripts/build-linux.sh`,
         before: `${DIR}/compile.sh`,
@@ -433,7 +452,7 @@ describe('a row shows its git letter', () => {
         staged: true,
       };
       return { ...held, files: [...held.files, moved] };
-    };
+    });
     return host;
   }
 
@@ -479,11 +498,7 @@ describe('a row shows its git letter', () => {
 function offering(operations: ChangesetOperation[]): { host: FakeHost; calls: { operationId: string; target?: unknown; meta?: unknown }[] } {
   const host = fakeHost();
   const calls: { operationId: string; target?: unknown; meta?: unknown }[] = [];
-  const read = host.changes.bind(host);
-  host.changes = async (uri, changeset) => {
-    const held = await read(uri, changeset);
-    return changeset?.endsWith('/uncommitted') ? { ...held, operations } : held;
-  };
+  reshape(host, (changeset, held) => (changeset.endsWith('/uncommitted') ? { ...held, operations } : held));
   const invoke = host.invoke!.bind(host);
   host.invoke = async (changeset, operationId, target, meta) => {
     if (!operations.some((one) => one.id === operationId)) return invoke(changeset, operationId, target, meta);
@@ -795,16 +810,12 @@ describe('a commit asks for its message', () => {
   /** A fake host whose `commit` carries a confirmation, as the reference host's does. */
   function confirming(): FakeHost {
     const host = fakeHost();
-    const read = host.changes.bind(host);
-    host.changes = async (uri, changeset) => {
-      const held = await read(uri, changeset);
-      return {
-        ...held,
-        ...(held.operations ? {
-          operations: held.operations.map((one) => (one.id === 'commit' ? { ...one, confirmation: 'Commit 2 staged files?' } : one)),
-        } : {}),
-      };
-    };
+    reshape(host, (_changeset, held) => ({
+      ...held,
+      ...(held.operations ? {
+        operations: held.operations.map((one) => (one.id === 'commit' ? { ...one, confirmation: 'Commit 2 staged files?' } : one)),
+      } : {}),
+    }));
     return host;
   }
 
@@ -834,6 +845,7 @@ describe('a commit asks for its message', () => {
   it('commits with the message typed', async () => {
     const host = fakeHost();
     const t = await tree(host);
+    expect(t.hasText('notes.todo')).toBe(true);
     void t.app.execute('changes.run', { operation: 'commit' });
     for (let i = 0; i < 10; i++) await t.settle();
     // All files, then the message.
@@ -849,6 +861,8 @@ describe('a commit asks for its message', () => {
       meta: { 'ahpd.commit': { message: 'Old build script cleanup' } },
     });
     expect(t.hasText('Committed 1a2b3c4')).toBe(true);
+    // The host's new changeset redraws the list, with no `]`.
+    expect(t.hasText('notes.todo')).toBe(false);
     await t.unmount();
   });
 

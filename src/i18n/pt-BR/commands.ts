@@ -177,7 +177,6 @@ export const commands: Record<string, string> = {
   'commands.action.listAgents': 'Listar agentes',
   'commands.action.readSettings': 'Ler configurações',
   'commands.action.listChanges': 'Listar alterações',
-  'commands.action.readChanges': 'Ler alterações',
   'commands.action.listCustomizations': 'Listar personalizações',
   'commands.action.send': 'Enviar',
   'commands.nothingToApprove': 'Nada está esperando aprovação',

@@ -70,8 +70,8 @@ commit -> invokeChangesetOperation -> ahpd changes the tree -> changeset/fileRem
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - The hosts watch a changeset](task-01-the-hosts-watch-a-changeset.md) | todo | - |
-| [02 - The changes screen watches its changeset](task-02-the-screen-watches-its-changeset.md) | todo | 01 |
+| [01 - The hosts watch a changeset](task-01-the-hosts-watch-a-changeset.md) | implemented | - |
+| [02 - The changes screen watches its changeset](task-02-the-screen-watches-its-changeset.md) | implemented | 01 |
 
 ## Risks and tradeoffs
 
@@ -80,8 +80,8 @@ commit -> invokeChangesetOperation -> ahpd changes the tree -> changeset/fileRem
 
 ## Resume state
 
-- **Done so far:** nothing.
-- **Next action:** [task-01-the-hosts-watch-a-changeset.md](task-01-the-hosts-watch-a-changeset.md).
+- **Done so far:** tasks 01 and 02 implemented, as [implemented.md](implemented.md) says.
+- **Next action:** Softov reviews the pull request, and checks a commit against ahpd.
 - **Open questions:** none.
 - **Watch out for:** the fake's session `changes` event also writes `CHANGES`; a test that passes through it does not test the watch.
 

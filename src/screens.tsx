@@ -1268,16 +1268,13 @@ export const ChangesScreen: (props: Record<string, never>) => RenderOutput =
       return () => { live = false; };
     }, [uri]);
 
-    // The chosen one, re-read when the choice moves. The default arrives on
-    // the session channel already, so only a named scope is fetched here. An
-    // answer for a session or scope that is no longer on screen is dropped.
+    // The chosen one, watched while it is on screen. A commit, a tick or an
+    // edit by another client reaches the list as the host makes it. The
+    // watch closes when the session or the scope moves.
     useEffect(() => {
       if (!uri || !at) return;
-      let live = true;
-      void controller.changesAt(uri, at)
-        .then((found) => { if (live) app.store.set(CHANGES, found); })
-        .catch((error: unknown) => controller.report(error, { action: 'readChanges', session: uri }));
-      return () => { live = false; };
+      const watch = controller.watchChanges(at, (found) => app.store.set(CHANGES, found));
+      return () => { watch.close(); };
     }, [uri, at]);
 
     const chosen = scopes.find((scope) => scope.uriTemplate === at)
