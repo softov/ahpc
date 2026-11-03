@@ -866,6 +866,48 @@ describe('a commit asks for its message', () => {
     await t.unmount();
   });
 
+  /**
+   * Open the commit prompt, then send an update that `change` reshapes.
+   *
+   * The update is a tick, so the host sends the changeset again while the
+   * prompt is open.
+   */
+  async function updatedUnderPrompt(change: (held: Changeset) => Changeset): Promise<{ t: Harness; host: FakeHost }> {
+    const host = fakeHost();
+    let changed = false;
+    reshape(host, (_changeset, held) => (changed ? change(held) : held));
+    const t = await tree(host);
+    await t.press('c');
+    for (let i = 0; i < 10; i++) await t.settle();
+    await t.press('enter');
+    for (let i = 0; i < 10; i++) await t.settle();
+    changed = true;
+    const at = `${CHANGED}/changeset/uncommitted`;
+    const held = await host.changes(CHANGED, at);
+    host.review?.(at, [held.files[0]?.uri ?? ''], true);
+    for (let i = 0; i < 10; i++) await t.settle();
+    return { t, host };
+  }
+
+  it('keeps the typed text in the prompt when the actions row goes behind it', async () => {
+    const { t, host } = await updatedUnderPrompt(({ operations: _gone, ...rest }) => rest);
+    await t.press('backspace');
+    t.type('s fix');
+    for (let i = 0; i < 10; i++) await t.settle();
+    expect(t.hasText('Old build script cleanus fix')).toBe(true);
+    // The `s` went to the prompt, and nothing was staged.
+    expect(host.invoked()).toEqual([]);
+    await t.unmount();
+  });
+
+  it('keeps the typed text in the prompt when the computing line comes behind it', async () => {
+    const { t } = await updatedUnderPrompt((held) => ({ ...held, status: 'computing' }));
+    t.type(' fix');
+    for (let i = 0; i < 10; i++) await t.settle();
+    expect(t.hasText('Old build script cleanup fix')).toBe(true);
+    await t.unmount();
+  });
+
   it('commits nothing on escape', async () => {
     const host = fakeHost();
     const t = await tree(host);

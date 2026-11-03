@@ -28,7 +28,7 @@ Reference: [00-screen.md](screen/00-screen.md)
 | [11 - A file is staged, unstaged, discarded or committed from its row, or with every file](screen/11-a-file-is-staged-discarded-or-committed-from-its-row/plan.md) | high | active 2026-10-11; tasks 01-04 implemented, awaiting review ([implemented.md](screen/11-a-file-is-staged-discarded-or-committed-from-its-row/implemented.md)) | ahpd host/82 | - |
 | [20261103-1256 - An error on the screen names its action and its session, and stays on that session](screen/20261103-1256-an-error-names-its-action-and-session/plan.md) | high | active 2026-11-03; tasks 01-02 merged in PR 3; task 03 implemented, awaiting review ([implemented.md](screen/20261103-1256-an-error-names-its-action-and-session/implemented.md)) | - | - |
 | [20261103-1443 - The changes list follows the host while the screen is open](screen/20261103-1443-the-changes-list-follows-the-host/plan.md) | high | active 2026-11-03; tasks 01-02 implemented, awaiting review | - | - |
-| [20261103-1529 - The commit prompt keeps its keys while the changeset changes](screen/20261103-1529-the-commit-prompt-keeps-its-keys/plan.md) | high | active 2026-11-03; task 01 todo | - | - |
+| [20261103-1529 - The commit prompt keeps its keys while the changeset changes](screen/20261103-1529-the-commit-prompt-keeps-its-keys/plan.md) | high | active 2026-11-03; task 01 implemented, awaiting review | - | - |
 
 Next free number in `screen`: `12`.
 
