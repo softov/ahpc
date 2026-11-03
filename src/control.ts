@@ -315,6 +315,19 @@ export const CHAT_SCOPE = 'chat.conversation';
 export const SKILLS_SCOPE = 'chat.skills';
 export const MCP_SCOPE = 'chat.mcp';
 export const CHANGES_SCOPE = 'chat.changes';
+
+/**
+ * The key of each changeset verb, by operation id. The bindings and the
+ * buttons on the changes screen both read it.
+ */
+export const VERB_KEYS: Readonly<Record<string, string>> = {
+  stage: 's',
+  unstage: 'u',
+  discard: 'delete',
+  commit: 'c',
+  [CREATE_PULL_REQUEST]: 'p',
+};
+
 export const AUTOMATIONS_SCOPE = 'chat.automations';
 
 export function createController(
@@ -3312,11 +3325,7 @@ function shipped(i18n: TextUIApp['i18n']): Binding[] {
     { keys: 'x', commandId: 'app.ask', args: { command: 'changes.run' }, scopeId: CHANGES_SCOPE },
     // One key per verb. A verb the changeset does not offer, or has
     // disabled, leaves its key inert; `changes.run` checks.
-    { keys: 's', commandId: 'changes.run', args: { operation: 'stage' }, scopeId: CHANGES_SCOPE },
-    { keys: 'u', commandId: 'changes.run', args: { operation: 'unstage' }, scopeId: CHANGES_SCOPE },
-    { keys: 'delete', commandId: 'changes.run', args: { operation: 'discard' }, scopeId: CHANGES_SCOPE },
-    { keys: 'c', commandId: 'changes.run', args: { operation: 'commit' }, scopeId: CHANGES_SCOPE },
-    { keys: 'p', commandId: 'changes.run', args: { operation: CREATE_PULL_REQUEST }, scopeId: CHANGES_SCOPE },
+    ...Object.entries(VERB_KEYS).map(([operation, keys]) => ({ keys, commandId: 'changes.run', args: { operation }, scopeId: CHANGES_SCOPE })),
     // Scoped to the screen, so a letter is a letter everywhere else. `enter`
     // is the list's own and opens the detail, so running one is a key of its
     // own and never the thing a stray enter does.
