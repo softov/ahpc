@@ -287,7 +287,7 @@ export const SessionsScreen: (props: Record<string, never>) => RenderOutput =
       // down arrow.
       void controller.detail(selected)
         .then((found) => { if (live) setDetail(found); })
-        .catch((error: unknown) => controller.report(error));
+        .catch((error: unknown) => controller.report(error, { action: 'readSession', session: selected }));
       return () => { live = false; };
     }, [selected ?? '']);
 
@@ -532,7 +532,7 @@ function useHarnessCommands(): Customization[] {
   const [items, setItems] = useState<Customization[]>([]);
   useEffect(() => {
     void controller.harnessCommands().then(setItems)
-      .catch((error: unknown) => controller.report(error));
+      .catch((error: unknown) => controller.report(error, { action: 'listCommands' }));
   }, []);
   return items;
 }
@@ -559,7 +559,7 @@ function useComposerOptions(): ComposerOption[] {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [config, setConfig] = useState<SessionConfig | null>(null);
   useEffect(() => {
-    void controller.agents().then(setAgents).catch((error: unknown) => controller.report(error));
+    void controller.agents().then(setAgents).catch((error: unknown) => controller.report(error, { action: 'listAgents' }));
   }, []);
   // Asking is also what registers a command per property, so the chips below
   // have something to open and the palette has the same questions in it.
@@ -576,7 +576,7 @@ function useComposerOptions(): ComposerOption[] {
   const answered = open ? '' : JSON.stringify(settings);
   useEffect(() => {
     void controller.settings().then(setConfig)
-      .catch((error: unknown) => controller.report(error));
+      .catch((error: unknown) => controller.report(error, { action: 'readSettings' }));
   }, [provider, open, answered, open ? '' : workspace]);
 
   const agent = agents.find((found) => found.provider === provider);
@@ -1175,7 +1175,7 @@ export const NewSessionScreen: (props: Record<string, never>) => RenderOutput =
               .then(() => app.screens.push('chat'))
               // Stay here. A host that refused to create the session has left
               // nothing to navigate to, and the draft is still in the field.
-              .catch((error: unknown) => controller.report(error));
+              .catch((error: unknown) => controller.report(error, { action: 'create' }));
           }}
           onCancel={() => app.execute('sessions.show')}
           // Left off the front of the field, twice over, is the same thought as
@@ -1254,7 +1254,7 @@ export const ChangesScreen: (props: Record<string, never>) => RenderOutput =
           const first = found.find((scope) => scope.variables.length === 0);
           if (first) app.store.set(CHANGE_AT, first.uriTemplate);
         })
-        .catch((error: unknown) => controller.report(error));
+        .catch((error: unknown) => controller.report(error, { action: 'listChanges', session: uri }));
       return () => { live = false; };
     }, [uri]);
 
@@ -1266,7 +1266,7 @@ export const ChangesScreen: (props: Record<string, never>) => RenderOutput =
       let live = true;
       void controller.changesAt(uri, at)
         .then((found) => { if (live) app.store.set(CHANGES, found); })
-        .catch((error: unknown) => controller.report(error));
+        .catch((error: unknown) => controller.report(error, { action: 'readChanges', session: uri }));
       return () => { live = false; };
     }, [uri, at]);
 
@@ -1580,7 +1580,7 @@ export const NewAutomationScreen: (props: Record<string, never>) => RenderOutput
           // is what lets the model and settings below be asked about.
           if (!editing && provider === '' && found[0]) setProvider(found[0].provider);
         })
-        .catch((error: unknown) => controller.report(error));
+        .catch((error: unknown) => controller.report(error, { action: 'listAgents' }));
     }, []);
 
     const form = useForm<{
@@ -2263,7 +2263,7 @@ function useCustomizations(): { items: Customization[]; loading: boolean } {
     if (!uri) return;
     void controller.customizations(uri)
       .then((found) => app.store.set(CUSTOMIZATIONS, found))
-      .catch((error: unknown) => controller.report(error));
+      .catch((error: unknown) => controller.report(error, { action: 'listCustomizations', session: uri }));
   }, [uri]);
 
   return { items: items ?? [], loading: items === null };
@@ -2474,7 +2474,7 @@ export const SettingsScreen: (props: Record<string, never>) => RenderOutput =
     useEffect(() => {
       if (!uri) return;
       void controller.config(uri).then(setConfig)
-        .catch((error: unknown) => controller.report(error));
+        .catch((error: unknown) => controller.report(error, { action: 'readSettings', session: uri }));
     }, [uri ?? '']);
 
     if (!config) return <EmptyState title={i18n.t('screens.settings.loading')} flex={1} />;

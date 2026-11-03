@@ -1,6 +1,6 @@
 ---
 title: A refusal names its action and its session
-status: todo
+status: implemented
 depends: []
 layer: screen
 refs:
@@ -51,3 +51,5 @@ The code of an RPC error shows once.
 - Run `npm run typecheck` and `npx vitest run`, one after the other, and check that both pass.
 
 ## Resume
+
+- Implemented 2026-11-03; awaits review. See [implemented.md](implemented.md).

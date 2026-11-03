@@ -16,7 +16,8 @@ import {
   QUIT_WINDOW_MS, SELECTED, SETTINGS, TERMINALS, SIDEBAR, TURNS, UPDATE_NOTICE, WORKSPACE, openSession, writeSessions,
 } from '../src/state.js';
 import type { InputStatus } from '../src/state.js';
-import type { SessionSummary, Turn } from '../src/ahp/types.js';
+import type { SessionSummary, SessionUri, Turn } from '../src/ahp/types.js';
+import type { Sent } from '../src/ahp/connection.js';
 import { PICKER, openPicker } from '@textui/chat';
 
 /**
@@ -353,7 +354,8 @@ describe('when the agent is waiting', () => {
     controller.unqueue('no-such-message');
     await m.t.settle();
 
-    expect(m.t.store.get<string>(HOST_ERROR)).toBe('No message with that id is waiting.');
+    // The action and the session come first, so the line says what it is about.
+    expect(m.t.store.get<string>(HOST_ERROR)).toBe('Remove queued message, Kqueue events on Linux: No message with that id is waiting.');
     await m.t.unmount();
   });
 
@@ -1861,7 +1863,8 @@ describe('when the host says no', () => {
     return {
       ...host,
       detail: async () => {
-        const error = Object.assign(new Error('No agent for session'), { code: -32001 });
+        // Worded as the SDK words it, with its own copy of the code in front.
+        const error = Object.assign(new Error('RPC error -32001: No agent for session'), { code: -32001 });
         throw error;
       },
     };
@@ -1880,13 +1883,72 @@ describe('when the host says no', () => {
     // The pane asks about whatever is highlighted, so this fires on arrival
     // and again on every arrow key.
     // The code is part of the answer, and a containment check was hiding it.
-    expect(t.store.get<string>(HOST_ERROR)).toBe('No agent for session (-32001)');
+    // It shows once, after the action and the session the refusal was about.
+    expect(t.store.get<string>(HOST_ERROR)).toBe('Read session, Kqueue events on Linux: No agent for session (-32001)');
     expect(t.hasText('No agent for session')).toBe(true);
 
     // And it is still an application: the list still moves.
     t.press('down');
     for (let i = 0; i < 4; i++) await t.settle();
     expect(t.app.screens.current()?.id).toBe('sessions');
+    await t.unmount();
+  });
+
+  it('names the session it could not open, and forgets it when the page goes', async () => {
+    const host = refusing();
+    const t = await renderApp({
+      width: 100, height: 30, shell: 'workbench', theme: 'workbench',
+      onBoot: (app) => { registerChat(app, { host }); },
+    });
+    for (let i = 0; i < 8; i++) await t.settle();
+    const controller = t.app.services.require(CONTROLLER);
+    controller.open(SEEDED as SessionUri);
+    for (let i = 0; i < 4; i++) await t.settle();
+    expect(t.store.get<string>(HOST_ERROR)).toBe('Open session, Kqueue events on Linux: No agent for session (-32001)');
+
+    // The new session page closes the session, and the refusal was about it.
+    controller.close();
+    await t.settle();
+    expect(t.store.get(HOST_ERROR) ?? null).toBeNull();
+    await t.unmount();
+  });
+
+  it('draws nothing for a refusal that arrives after the session closed', async () => {
+    let answer: (sent: Sent) => void = () => undefined;
+    const host: FakeHost = { ...fakeHost(), unqueue: () => new Promise<Sent>((resolve) => { answer = resolve; }) };
+    const t = await renderApp({
+      width: 100, height: 30, shell: 'workbench', theme: 'workbench',
+      onBoot: (app) => { registerChat(app, { host }); },
+    });
+    for (let i = 0; i < 8; i++) await t.settle();
+    const controller = t.app.services.require(CONTROLLER);
+    controller.open(SEEDED as SessionUri);
+    await t.settle();
+    controller.unqueue('no-such-message');
+    controller.close();
+    answer({ refused: 'The host did not answer in 10 seconds' });
+    for (let i = 0; i < 4; i++) await t.settle();
+    expect(t.store.get(HOST_ERROR) ?? null).toBeNull();
+    await t.unmount();
+  });
+
+  it('says that a session was not disposed, after the session closed', async () => {
+    const host: FakeHost = {
+      ...fakeHost(),
+      disposeSession: async () => { throw Object.assign(new Error('RPC error -32001: No agent for session'), { code: -32001 }); },
+    };
+    const t = await renderApp({
+      width: 100, height: 30, shell: 'workbench', theme: 'workbench',
+      onBoot: (app) => { registerChat(app, { host }); },
+    });
+    for (let i = 0; i < 8; i++) await t.settle();
+    const controller = t.app.services.require(CONTROLLER);
+    controller.open(SEEDED as SessionUri);
+    await t.settle();
+    await controller.disposeSession(SEEDED as SessionUri);
+    await t.settle();
+    expect(t.store.get(OPEN) ?? null).toBeNull();
+    expect(t.store.get<string>(HOST_ERROR)).toBe('Dispose session, Kqueue events on Linux: No agent for session (-32001)');
     await t.unmount();
   });
 

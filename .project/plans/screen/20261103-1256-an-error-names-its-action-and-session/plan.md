@@ -1,7 +1,7 @@
 ---
 title: An error on the screen names its action and its session, and stays on that session
 domain: screen
-status: planned
+status: active
 priority: high
 created: 2026-11-03
 revalidated: 2026-11-03
@@ -81,8 +81,8 @@ open(uri) -> told(setRead) + subscribe + detail(uri).catch(failed) -> reportHost
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - A refusal names its action and its session](task-01-a-refusal-names-its-action-and-session.md) | todo | - |
-| [02 - A refusal stays on the page it came from](task-02-a-refusal-stays-on-its-page.md) | todo | 01 |
+| [01 - A refusal names its action and its session](task-01-a-refusal-names-its-action-and-session.md) | implemented | - |
+| [02 - A refusal stays on the page it came from](task-02-a-refusal-stays-on-its-page.md) | implemented | 01 |
 
 ## Risks and tradeoffs
 
@@ -91,8 +91,8 @@ open(uri) -> told(setRead) + subscribe + detail(uri).catch(failed) -> reportHost
 
 ## Resume state
 
-- **Done so far:** planned 2026-11-03.
-- **Next action:** [task-01-a-refusal-names-its-action-and-session.md](task-01-a-refusal-names-its-action-and-session.md).
+- **Done so far:** tasks 01 and 02 are implemented and await review. See [implemented.md](implemented.md).
+- **Next action:** the check by hand in [screen-error-names-its-session-checks.md](../../../pending/screen-error-names-its-session-checks.md), then review.
 - **Open questions:** none.
 - **Watch out for:** `disposeSession` reports and then closes; with task 02, the close would clear the report. Report after the close.
 
