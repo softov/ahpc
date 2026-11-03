@@ -19,7 +19,7 @@ import {
   ASKS_TARGET, CREATE_PULL_REQUEST, EMPTY_DRAFT, PREPARE_PULL_REQUEST, chosenOperations, commitMeta, createPrMeta, externalLink, pullRequestDraft,
 } from './ahp/followup.js';
 import type { PullRequestDraft } from './ahp/followup.js';
-import { attempt, failureWords } from './ahp/auth.js';
+import { attempt, failureWords, hostWords } from './ahp/auth.js';
 import { forget, remember, resolveToken } from './ahp/tokens.js';
 import type { AuthAsk } from './ahp/auth.js';
 import { auth } from './connect.js';
@@ -57,6 +57,48 @@ import type { PullRequestAsk } from './state.js';
  * nothing is reachable one way only.
  */
 
+/** An action the host can refuse, as the status row names it. */
+export type RefusedAction =
+  | 'open' | 'markRead' | 'markUnread' | 'queue' | 'unqueue' | 'stop'
+  | 'allow' | 'deny' | 'answer' | 'decline' | 'archive' | 'unarchive'
+  | 'newChat' | 'closeChat' | 'dispose' | 'create' | 'listSessions'
+  | 'readSession' | 'listCommands' | 'listAgents' | 'readSettings'
+  | 'listChanges' | 'readChanges' | 'listCustomizations';
+
+/** The catalogue key of each action's name. */
+const ACTION_KEYS: Record<RefusedAction, string> = {
+  open: 'commands.action.open',
+  markRead: 'commands.action.markRead',
+  markUnread: 'commands.action.markUnread',
+  queue: 'commands.action.queue',
+  unqueue: 'commands.action.unqueue',
+  stop: 'commands.action.stop',
+  allow: 'commands.action.allow',
+  deny: 'commands.action.deny',
+  answer: 'commands.action.answer',
+  decline: 'commands.action.decline',
+  archive: 'commands.action.archive',
+  unarchive: 'commands.action.unarchive',
+  newChat: 'commands.action.newChat',
+  closeChat: 'commands.action.closeChat',
+  dispose: 'commands.action.dispose',
+  create: 'commands.action.create',
+  listSessions: 'commands.action.listSessions',
+  readSession: 'commands.action.readSession',
+  listCommands: 'commands.action.listCommands',
+  listAgents: 'commands.action.listAgents',
+  readSettings: 'commands.action.readSettings',
+  listChanges: 'commands.action.listChanges',
+  readChanges: 'commands.action.readChanges',
+  listCustomizations: 'commands.action.listCustomizations',
+};
+
+/** What a refusal was about: the action, and the session it was for when there was one. */
+export interface About {
+  action: RefusedAction;
+  session?: SessionUri;
+}
+
 export interface Controller {
   /**
    * Read the catalogue again. `ask` lets a refusal open the sign-in prompt,
@@ -83,8 +125,8 @@ export interface Controller {
   setArchived(uri: SessionUri, archived: boolean): void;
   /** Put the bold back, or take it away. A client flag, not activity. */
   setRead(uri: SessionUri, read: boolean): void;
-  /** Say that the host refused something, wherever it was noticed. */
-  report(error: unknown): void;
+  /** Say that the host refused something, wherever it was noticed, and what it refused. */
+  report(error: unknown, about?: About): void;
   /**
    * Ask for a token for one resource, and answer whether the host took it.
    *
@@ -481,20 +523,48 @@ export function createController(
     },
   });
 
-  const failed = (error: unknown): void => {
+  /**
+   * The status row's line for a refusal: the action, the session it was for,
+   * then the host's reason.
+   *
+   * The session is named by its title, as the list shows it, and by its URI
+   * when the list has no title for it.
+   */
+  const refusal = (about: About, reason: string): string => {
+    const action = app.i18n.t(ACTION_KEYS[about.action]);
+    if (about.session === undefined) return app.i18n.t('commands.refusal', { action, reason });
+    const title = sessions(app.store).find((row) => row.resource === about.session)?.title;
+    const session = title !== undefined && title !== '' ? title : about.session;
+    return app.i18n.t('commands.refusalOn', { action, session, reason });
+  };
+
+  /**
+   * Draw a refusal on the status row.
+   *
+   * An RPC error keeps the host's words and its code once: the SDK's
+   * `RPC error <code>: ` start comes off, and the code goes at the end.
+   */
+  const failed = (error: unknown, about?: About): void => {
     const rpc = error as { code?: number; message?: string } | null;
     const message = rpc?.message ?? String(error);
-    reportHostError(app.store, typeof rpc?.code === 'number' ? `${message} (${rpc.code})` : message);
+    const reason = typeof rpc?.code === 'number' ? `${hostWords(message)} (${rpc.code})` : message;
+    reportHostError(app.store, about === undefined ? reason : refusal(about, reason));
   };
 
   /**
    * Draw the host's reason when it refused an action the screen sent.
    *
    * The screen does not wait on a dispatch, but the refusal is the waiter's,
-   * so nothing else reports it.
+   * so nothing else reports it. A refusal that arrives after another session
+   * opened, or after the open one closed, is not drawn: that page is gone.
    */
-  const told = (sending: Promise<Sent>): void => {
-    void sending.then((sent) => { if (sent.refused !== undefined) failed(new Error(sent.refused)); });
+  const told = (sending: Promise<Sent>, about: About): void => {
+    const at = app.store.get<SessionUri>(OPEN) ?? null;
+    void sending.then((sent) => {
+      if (sent.refused === undefined) return;
+      if ((app.store.get<SessionUri>(OPEN) ?? null) !== at) return;
+      failed(new Error(sent.refused), about);
+    });
   };
 
   /** The one layer the credential prompt is drawn on. A second ask takes it over. */
@@ -654,7 +724,7 @@ export function createController(
       // Not through `guard`: this runs on every status tick, and a prompt it
       // opened would come back each time somebody dismissed it.
       writeSessions(app.store, await host.listSessions());
-    } catch (error) { failed(error); }
+    } catch (error) { failed(error, { action: 'listSessions' }); }
   };
 
   /**
@@ -721,7 +791,7 @@ export function createController(
       try {
         writeSessions(app.store, await (ask ? guard(() => host.listSessions()) : host.listSessions()));
         app.store.set(HOST_ERROR, null);
-      } catch (error) { failed(error); }
+      } catch (error) { failed(error, { action: 'listSessions' }); }
     },
 
     report: failed,
@@ -767,13 +837,14 @@ export function createController(
       try {
         const chat = await guard(() => host.createChat(uri, first, source));
         controller.openChat(chat);
-      } catch (error) { failed(error); }
+      } catch (error) { failed(error, { action: 'newChat', session: uri }); }
     },
 
     async disposeChat(chat) {
+      const uri = app.store.get<SessionUri>(OPEN);
       try {
         await guard(() => host.disposeChat(chat));
-      } catch (error) { failed(error); return; }
+      } catch (error) { failed(error, { action: 'closeChat', ...(uri ? { session: uri } : {}) }); return; }
       // Whatever is left. The host moves its own default; this client only
       // has to stop reading a chat that is gone.
       const left = (app.store.get<{ resource: string }[]>(CHATS) ?? [])
@@ -828,10 +899,13 @@ export function createController(
       // duplicate is what silently kills the stream everything else reads.
       subscription?.close();
       model = [];
-      // Reading it is what makes it read, and the host tells every other
-      // client so. Nobody marks their own mail by hand.
-      told(host.setRead(uri, true));
+      // The last refusal was about the page that is going.
+      app.store.set(HOST_ERROR, null);
       app.store.set(OPEN, uri);
+      // Reading it is what makes it read, and the host tells every other
+      // client so. Nobody marks their own mail by hand. Sent once `OPEN` is
+      // this session, so a refusal is drawn on this session's page.
+      told(host.setRead(uri, true), { action: 'markRead', session: uri });
       app.store.set(TURNS, []);
       app.store.set(INPUT, null);
       // Null rather than empty: the skills are this session's, and two
@@ -878,12 +952,16 @@ export function createController(
         app.store.set(MODEL_CONFIG, detail.modelConfig ?? {});
         offerModel(detail.model?.options ?? []);
         offer(detail.config, uri);
-      }).catch(failed);
+      }).catch((error: unknown) => {
+        if (app.store.get<SessionUri>(OPEN) !== uri) return;
+        failed(error, { action: 'open', session: uri });
+      });
     },
 
     close() {
       subscription?.close();
       subscription = null;
+      app.store.set(HOST_ERROR, null);
       app.store.set(OPEN, null);
       app.store.set(TURNS, []);
       app.store.set(INPUT, null);
@@ -942,7 +1020,7 @@ export function createController(
       // closed. The host starts the next turn from the head as soon as it goes
       // idle, and every client watching this chat sees the same queue.
       if (turns(app.store).some((turn) => turn.state === 'running')) {
-        told(host.queue(uri, trimmed, selection));
+        told(host.queue(uri, trimmed, selection), { action: 'queue', session: uri });
         return;
       }
       host.say(uri, trimmed, selection);
@@ -951,12 +1029,12 @@ export function createController(
     unqueue(id) {
       const uri = app.store.get<SessionUri>(OPEN);
       if (!uri) return;
-      told(host.unqueue(uri, id));
+      told(host.unqueue(uri, id), { action: 'unqueue', session: uri });
     },
 
     stop() {
       const uri = app.store.get<SessionUri>(OPEN);
-      if (uri) told(host.stopTurn(uri));
+      if (uri) told(host.stopTurn(uri), { action: 'stop', session: uri });
     },
 
     /*
@@ -980,7 +1058,7 @@ export function createController(
       // is the row's whole width spent on something nobody reads.
       const chosen = input.call.options?.find((option) => option.id === optionId);
       sendingInput(app.store, chosen ? app.i18n.t('commands.approvingOption', { option: chosen.label }) : app.i18n.t('commands.approving'));
-      told(host.confirmToolCall(uri, input.call.id, true, optionId));
+      told(host.confirmToolCall(uri, input.call.id, true, optionId), { action: 'allow', session: uri });
     },
 
     deny() {
@@ -991,7 +1069,7 @@ export function createController(
         return;
       }
       sendingInput(app.store, app.i18n.t('commands.denying'));
-      told(host.confirmToolCall(uri, input.call.id, false));
+      told(host.confirmToolCall(uri, input.call.id, false), { action: 'deny', session: uri });
     },
 
     answer(answers, accepted = true) {
@@ -1012,25 +1090,28 @@ export function createController(
         return;
       }
       sendingInput(app.store, accepted ? app.i18n.t('commands.sendingAnswer') : app.i18n.t('commands.declining'));
-      told(host.completeInput(uri, input.id, accepted, answers));
+      told(host.completeInput(uri, input.id, accepted, answers), { action: accepted ? 'answer' : 'decline', session: uri });
     },
 
     setArchived(uri, archived) {
-      told(host.setArchived(uri, archived));
+      told(host.setArchived(uri, archived), { action: archived ? 'archive' : 'unarchive', session: uri });
       void controller.refresh();
     },
 
     setRead(uri, read) {
-      told(host.setRead(uri, read));
+      told(host.setRead(uri, read), { action: read ? 'markRead' : 'markUnread', session: uri });
       void controller.refresh();
     },
 
     async disposeSession(uri) {
+      let refused: { error: unknown } | undefined;
       try {
         await guard(() => host.disposeSession(uri));
-      } catch (error) { failed(error); }
+      } catch (error) { refused = { error }; }
       if (app.store.get<SessionUri>(OPEN) === uri) controller.close();
       await controller.refresh();
+      // After the close and the re-read, which both clear the row.
+      if (refused) failed(refused.error, { action: 'dispose', session: uri });
     },
 
     async create({ provider, workingDirectory, first }) {

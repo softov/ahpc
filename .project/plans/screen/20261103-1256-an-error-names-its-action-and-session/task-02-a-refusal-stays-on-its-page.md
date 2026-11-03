@@ -1,6 +1,6 @@
 ---
 title: A refusal stays on the page it came from
-status: todo
+status: implemented
 depends: [task-01-a-refusal-names-its-action-and-session.md]
 layer: screen
 refs:
@@ -37,3 +37,5 @@ Opening a session, or leaving one for the list or the new session page, clears t
 - Run `npm run typecheck` and `npx vitest run`, one after the other, and check that both pass.
 
 ## Resume
+
+- Implemented 2026-11-03; awaits review. See [implemented.md](implemented.md).
