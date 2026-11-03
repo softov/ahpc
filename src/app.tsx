@@ -14,7 +14,7 @@ import { fakeHost } from './ahp/fake.js';
 import { hostResources } from './resources.js';
 import type { HostConnection } from './ahp/connection.js';
 import {
-  BOOD, BOOD_FLOAT, BOOD_FLOOR, BOOD_INLINE, FOCUS, HOST, HOST_ERROR, HOST_LINK, INPUT, INPUT_STATUS, OPEN, RUNNING, SCREEN,
+  BOOD, BOOD_FLOAT, BOOD_FLOOR, BOOD_INLINE, FOCUS, HOST, HOST_ERROR, HOST_LINK, HOST_NOTE, INPUT, INPUT_STATUS, OPEN, RUNNING, SCREEN,
   SESSIONS,
   SPLIT_AT, SPLIT_DEFAULT, QUIT_ARMED, STATUS, TERMINAL_LIST, UPDATE_NOTICE, WORKSPACE, boodFloor, openSession, workspaceName,
 } from './state.js';
@@ -450,6 +450,9 @@ const Status = defineComponent<Record<string, never>>('ChatStatus', () => {
   // The link a changeset verb answered with, after a refusal: it is already on
   // the clipboard, and drawn as a link where the terminal can open one.
   const link = useStoreValue<string | null>(HOST_LINK, null) ?? null;
+  // What the host said a changeset verb did, after the link, in the success
+  // tone.
+  const note = useStoreValue<string | null>(HOST_NOTE, null) ?? null;
   // Ahead of everything: it is about the key just pressed, and it is gone
   // again in under a second.
   const armed = useStoreValue<boolean>(QUIT_ARMED, false) ?? false;
@@ -466,6 +469,8 @@ const Status = defineComponent<Record<string, never>>('ChatStatus', () => {
             <text content={i18n.t('views.app.linkCopied')} fg="muted" shrink={0} />
           </Row>
         )
+        : note
+        ? <text content={note} fg="success" flex={1} truncate="end" />
         : notice
           ? <text content={notice} fg="muted" flex={1} truncate="end" />
           : <Hints flex={1} />}

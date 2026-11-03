@@ -7,7 +7,7 @@ import { CONTROLLER } from '../src/control.js';
 import { fakeHost } from '../src/ahp/fake.js';
 import type { FakeHost } from '../src/ahp/fake.js';
 import { operate } from '../src/ahp/operate.js';
-import { CHANGE_AT, CHANGE_ROW, HOST_ERROR, HOST_LINK, OPEN_FILE, PULL_REQUEST } from '../src/state.js';
+import { CHANGE_AT, CHANGE_ROW, HOST_ERROR, HOST_LINK, HOST_NOTE, OPEN_FILE, PULL_REQUEST } from '../src/state.js';
 import type { Changeset, ChangesetOperation, FileEdit } from '../src/ahp/types.js';
 
 /** Change what `host` reports for each changeset that the screen watches. */
@@ -860,7 +860,9 @@ describe('a commit asks for its message', () => {
       operationId: 'commit',
       meta: { 'ahpd.commit': { message: 'Old build script cleanup' } },
     });
-    expect(t.hasText('Committed 1a2b3c4')).toBe(true);
+    // A success, so the success tone, and no refusal.
+    expect(t.getByText('Committed 1a2b3c4', { exact: false }).props.fg).toBe('success');
+    expect(t.app.store.get(HOST_ERROR) ?? null).toBeNull();
     // The host's new changeset redraws the list, with no `]`.
     expect(t.hasText('notes.todo')).toBe(false);
     await t.unmount();
@@ -1067,6 +1069,28 @@ describe('the link the host sends back', () => {
     await t.unmount();
   });
 
+  it('lets go of the host\'s sentence once another session is opened', async () => {
+    const t = await changes();
+    await t.press(']');
+    for (let i = 0; i < 10; i++) await t.settle();
+    void t.app.execute('changes.run', { operation: 'commit' });
+    for (let i = 0; i < 10; i++) await t.settle();
+    await t.press('enter');
+    for (let i = 0; i < 10; i++) await t.settle();
+    await t.press('enter');
+    for (let i = 0; i < 10; i++) await t.settle();
+    if (t.hasText('Let the host write?')) {
+      await t.press('enter');
+      for (let i = 0; i < 12; i++) await t.settle();
+    }
+    expect(t.app.store.get(HOST_NOTE)).toContain('Committed 1a2b3c4');
+    t.app.services.require(CONTROLLER).open('ahp-session:/1f0a');
+    for (let i = 0; i < 10; i++) await t.settle();
+    expect(t.app.store.get(HOST_NOTE) ?? null).toBeNull();
+    expect(t.hasText('Committed 1a2b3c4')).toBe(false);
+    await t.unmount();
+  });
+
   it('says so when the host sends back something it cannot read', async () => {
     const host = fakeHost();
     const invoke = host.invoke!.bind(host);
@@ -1084,6 +1108,7 @@ describe('the link the host sends back', () => {
     await t.press('enter');
     for (let i = 0; i < 10; i++) await t.settle();
     expect(t.app.store.get(HOST_ERROR)).toBe('The host sent something back that this client cannot show.');
+    expect(t.app.store.get(HOST_NOTE) ?? null).toBeNull();
     await t.unmount();
   });
 });
