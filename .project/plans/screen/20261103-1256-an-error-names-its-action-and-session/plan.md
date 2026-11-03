@@ -53,6 +53,9 @@ open(uri) -> told(setRead) + subscribe + detail(uri).catch(failed) -> reportHost
 - `open` and `close` leave the last refusal on the row.
 - A refusal that arrives after the person moved on is drawn on the new page.
 - The code of an RPC error shows twice.
+- A refusal that no reader claimed goes from `onRefusal` to the row with no session and no check of `OPEN`.
+- The session list reads the highlighted session, and the host's refusal of that read reaches the row as well as the pane.
+- The session list subscribes to each row the highlight passes, with no wait.
 
 ## Answers
 
@@ -68,6 +71,10 @@ open(uri) -> told(setRead) + subscribe + detail(uri).catch(failed) -> reportHost
 | The action names are catalogue keys in English, Portuguese and Spanish | `(defaulted: every screen string goes through the catalogue)` | 01 |
 | `open` and `close` clear the row | `(defaulted: the page that the refusal was about is gone)` | 02 |
 | A refusal that arrives after `OPEN` changed is not drawn | `(defaulted: drawn, it is the line Softov saw)` | 02 |
+| A refusal of a read that the session list started shows in the pane only, not on the row | Softov, 2026-11-03: "Pane only" | 03 |
+| A refusal that no reader claimed is named `Read session` for a channel, and `Send` for a dispatch | `(defaulted: the two kinds the connection can tell apart)` | 03 |
+| A refusal of a channel that is not a session or a chat keeps its message | `(defaulted: it is not about a session)` | 03 |
+| The session list reads a session only after the highlight stays on it for 300 ms | Softov, 2026-11-03: "Wait 300 ms" | 03 |
 | A dispatch to a refused channel still waits ten seconds | Not asked for; out of this plan | - |
 
 ## Proposed architecture
@@ -83,6 +90,7 @@ open(uri) -> told(setRead) + subscribe + detail(uri).catch(failed) -> reportHost
 | --- | --- | --- |
 | [01 - A refusal names its action and its session](task-01-a-refusal-names-its-action-and-session.md) | implemented | - |
 | [02 - A refusal stays on the page it came from](task-02-a-refusal-stays-on-its-page.md) | implemented | 01 |
+| [03 - A channel refusal names its session, or stays in the pane](task-03-a-channel-refusal-names-its-session.md) | todo | 02 |
 
 ## Risks and tradeoffs
 
@@ -91,8 +99,8 @@ open(uri) -> told(setRead) + subscribe + detail(uri).catch(failed) -> reportHost
 
 ## Resume state
 
-- **Done so far:** tasks 01 and 02 are implemented and await review. See [implemented.md](implemented.md).
-- **Next action:** the check by hand in [screen-error-names-its-session-checks.md](../../../pending/screen-error-names-its-session-checks.md), then review.
+- **Done so far:** tasks 01 and 02 are implemented and merged in PR 3. See [implemented.md](implemented.md). The check by hand on 2026-11-03 found the `onRefusal` path.
+- **Next action:** [task-03-a-channel-refusal-names-its-session.md](task-03-a-channel-refusal-names-its-session.md).
 - **Open questions:** none.
 - **Watch out for:** `disposeSession` reports and then closes; with task 02, the close would clear the report. Report after the close.
 

@@ -11,9 +11,8 @@ This run repeats what Softov saw on 2026-11-03, against the host that has a sess
 
 ## Set up
 
-1. In the ahpc checkout, switch to `screen/20261103-1256-an-error-names-its-action-and-session`.
-2. Run `npm install` and `npm run build`.
-3. Start the screen against the host that lists the session with no agent, as on 2026-11-03.
+1. In the ahpc checkout, on `main` after the task 03 pull request merges, run `npm install` and `npm run build`.
+2. Start the screen against the host that lists the session with no agent, as on 2026-11-03.
 
 ## The session that cannot open, at 100 columns
 
@@ -32,7 +31,9 @@ This run repeats what Softov saw on 2026-11-03, against the host that has a sess
 ## The session list
 
 1. Highlight the session with no agent in the session list.
-2. Check that the status row reads `Read session, <title>: No agent for session <uri> (-32001)`.
+2. Check that the pane shows the refusal under *Lifecycle*, with the code once.
+3. Check that the status row stays empty.
+4. Hold the down arrow over several rows, and check that the pane fills only for the row where the highlight stops.
 
 ## Reply
 
