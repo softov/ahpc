@@ -1,6 +1,6 @@
 ---
 title: The actions are buttons
-status: implemented
+status: done
 depends: []
 layer: "screen"
 refs:

@@ -1,6 +1,6 @@
 ---
 title: The scopes are tabs
-status: implemented
+status: done
 depends: []
 layer: "screen"
 refs:

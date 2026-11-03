@@ -1,7 +1,7 @@
 ---
 title: The scopes and actions on the changes screen are clicked or reached with Tab
 domain: screen
-status: active
+status: built
 priority: high
 created: 2026-10-11
 revalidated: 2026-10-11
@@ -75,9 +75,9 @@ click or Tab + Enter on an action button -> app.execute('changes.run', { operati
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - the scopes are tabs](task-01-the-scopes-are-tabs.md) | implemented | - |
-| [02 - the actions are buttons](task-02-the-actions-are-buttons.md) | implemented | - |
-| [03 - the verb keys are on the buttons](task-03-the-verb-keys-are-on-the-buttons.md) | implemented | 02 |
+| [01 - the scopes are tabs](task-01-the-scopes-are-tabs.md) | done | - |
+| [02 - the actions are buttons](task-02-the-actions-are-buttons.md) | done | - |
+| [03 - the verb keys are on the buttons](task-03-the-verb-keys-are-on-the-buttons.md) | done | 02 |
 
 ## Risks and tradeoffs
 
@@ -87,16 +87,15 @@ click or Tab + Enter on an action button -> app.execute('changes.run', { operati
 
 ## Resume state
 
-- **Done so far:** tasks 01 and 02 are implemented and reviewed, and task 03 is implemented. See [implemented.md](implemented.md).
-- **Next action:** the review of task 03, then the check by hand in [screen-10-clickable-rows-checks.md](../../../pending/screen-10-clickable-rows-checks.md).
-- **Check by hand, 2026-11-03:** the tabs and buttons work; the status row had too many hints.
+- **Done so far:** tasks 01 to 03 are done. See [implemented.md](implemented.md).
+- **Check by hand, 2026-11-03:** Softov ran the checks at 60 and 100 columns, and they passed.
+- **Next action:** none. [deferred.md](deferred.md) says what waits.
 - **Open questions:** none.
-- **Watch out for:** an arrow stops at a disabled tab until textui takes `roadmap/ideas/tabs-skip-a-disabled-tab.md`.
 
 ## Final verification checklist
 
 - [x] `npm run typecheck` clean.
 - [x] `npx vitest run` passes, with the new cases in `test/changes.test.tsx`.
-- [ ] By hand, in a real terminal at 60 and 100 columns: a click picks a scope and runs an action.
-- [ ] By hand, at both widths: Tab with an arrow picks a scope, and Tab with Enter runs an action.
+- [x] By hand, in a real terminal at 60 and 100 columns: a click picks a scope and runs an action.
+- [x] By hand, at both widths: Tab with an arrow picks a scope, and Tab with Enter runs an action.
 - [x] `plans/index.md` updated.
