@@ -201,6 +201,9 @@ export const HOST_ERROR = '$/chat/host/error' as BindingPath;
 /** The link the host last answered a changeset verb with, such as a pull request. */
 export const HOST_LINK = '$/chat/host/link' as BindingPath;
 
+/** The sentence the host last answered a changeset verb with, such as "Committed 1a2b3c4". */
+export const HOST_NOTE = '$/chat/host/note' as BindingPath;
+
 /**
  * That a newer release of this client is on npm, as one sentence, or `null`.
  *
