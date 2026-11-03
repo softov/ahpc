@@ -26,6 +26,7 @@ Reference: [00-screen.md](screen/00-screen.md)
 | [09 - A commit asks for its message, a pull request is prepared in a form, and what the host sends back is shown](screen/09-git-changes-take-their-arguments/plan.md) | high | active 2026-10-11; tasks 01-06 implemented, reviewed, awaiting the hand check against a GitHub remote ([implemented.md](screen/09-git-changes-take-their-arguments/implemented.md)) | - | - |
 | [10 - The scopes and actions on the changes screen are clicked or reached with Tab](screen/10-the-changes-rows-are-clickable/plan.md) | high | active 2026-10-11; tasks 01-02 implemented, reviewed, awaiting the hand check ([implemented.md](screen/10-the-changes-rows-are-clickable/implemented.md)) | - | - |
 | [11 - A file is staged, unstaged, discarded or committed from its row, or with every file](screen/11-a-file-is-staged-discarded-or-committed-from-its-row/plan.md) | high | active 2026-10-11; tasks 01-03 implemented, awaiting review ([implemented.md](screen/11-a-file-is-staged-discarded-or-committed-from-its-row/implemented.md)) | ahpd host/82 | - |
+| [20261103-1256 - An error on the screen names its action and its session, and stays on that session](screen/20261103-1256-an-error-names-its-action-and-session/plan.md) | high | planned 2026-11-03 | - | - |
 
 Next free number in `screen`: `12`.
 
@@ -61,7 +62,17 @@ Reference: [00-cli.md](cli/00-cli.md)
 
 Next free number in `cli`: `07`.
 
+## documentation
+
+Reference: [00-documentation.md](documentation/00-documentation.md)
+
+| Plan | Priority | Status | Requires | Blocks |
+| --- | --- | --- | --- | --- |
+| [20261103-1238 - Each subject page shows a picture of its screen](documentation/20261103-1238-each-subject-shows-its-screen/plan.md) | medium | planned 2026-11-03 | - | - |
+
+Briefs: [each release is a docs page](../briefs/each-release-is-a-docs-page.md).
+
 ## Later domains (no plans yet)
 
-`mcp` (`src/mcp`) · `documentation`.
+`mcp` (`src/mcp`).
 Ideas: [the tool server](../ideas/the-tool-server.md), [deliberate duplication](../ideas/deliberate-duplication.md), [artifacts and references on screen](../ideas/artifacts-and-references.md), [subagent rows](../ideas/subagent-rows.md), [finding a host without being told](../ideas/finding-a-host-without-being-told.md), [what protocol 1.0.0 adds](../ideas/what-protocol-1-0-0-adds.md).
