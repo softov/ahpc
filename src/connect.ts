@@ -5,7 +5,7 @@ import { fakeHost } from './ahp/fake.js';
 import { publish } from './ahp/publish.js';
 import { pushTokens } from './ahp/tokens.js';
 import { pushTrust, trustedUris } from './ahp/trust.js';
-import type { HostConnection } from './ahp/connection.js';
+import type { HostConnection, RefusalKind } from './ahp/connection.js';
 import type { AuthAsk } from './ahp/auth.js';
 
 /**
@@ -58,8 +58,13 @@ export interface Where {
  * where a connection that fails during the handshake belongs anyway, and where
  * it stays for the whole of a CLI run.
  */
-export const sink: { report(message: string): void } = {
+export const sink: {
+  report(message: string): void;
+  /** A refusal that no reader claimed, with the channel it was about. */
+  refused(uri: string, message: string, kind: RefusalKind): void;
+} = {
   report: (message) => process.stderr.write(`${message}\n`),
+  refused: (_uri, message) => sink.report(message),
 };
 
 /** The sentence that names a resource and the command that would satisfy it. */
@@ -96,7 +101,7 @@ export async function connect(options: Where): Promise<HostConnection & { pump?(
       url: options.host,
       ...(options.token ? { token: options.token } : {}),
       ...(options.wire ? { wire: options.wire } : {}),
-      onRefusal: (_uri, message) => sink.report(message),
+      onRefusal: (uri, message, kind) => sink.refused(uri, message, kind),
       onLimit: (message) => sink.report(message),
       // Work the host is doing under a token of its own. Reported while it
       // runs and not on the frame that closes it - the finish is the thing
