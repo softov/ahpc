@@ -204,6 +204,14 @@ function describe(i18n: I18n, session: SessionSummary, detail: SessionDetail | n
 
 // ---------------------------------------------------------------- 1. sessions
 
+/**
+ * How long the highlight stays on a row before the list reads that session.
+ *
+ * Each read subscribes to the session, and a host may load it from disk to
+ * answer, so a row the highlight only passes over is not read.
+ */
+export const DETAIL_WAIT_MS = 300;
+
 export const SessionsScreen: (props: Record<string, never>) => RenderOutput =
   defineComponent<Record<string, never>>('SessionsScreen', () => {
     const app = useApp();
@@ -285,10 +293,12 @@ export const SessionsScreen: (props: Record<string, never>) => RenderOutput =
       // gone, the host refuses to talk about them, and an unhandled rejection
       // from a highlight moving is an application that exits when you press a
       // down arrow.
-      void controller.detail(selected)
-        .then((found) => { if (live) setDetail(found); })
-        .catch((error: unknown) => controller.report(error, { action: 'readSession', session: selected }));
-      return () => { live = false; };
+      const timer = setTimeout(() => {
+        void controller.detail(selected)
+          .then((found) => { if (live) setDetail(found); })
+          .catch((error: unknown) => controller.report(error, { action: 'readSession', session: selected }));
+      }, DETAIL_WAIT_MS);
+      return () => { live = false; clearTimeout(timer); };
     }, [selected ?? '']);
 
     return (

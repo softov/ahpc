@@ -8,6 +8,7 @@ import { CONTROLLER, modelCommand } from '../src/control.js';
 import { fakeHost } from '../src/ahp/fake.js';
 import type { FakeHost } from '../src/ahp/fake.js';
 import { decodeStatus } from '../src/ahp/status.js';
+import { DETAIL_WAIT_MS } from '../src/screens.js';
 import { SessionFlag } from '../src/ahp/types.js';
 import { CLIPBOARD_PATH, layoutMarkdown, wrapRuns } from '@textui/core';
 import { toBlocks } from '../src/blocks.js';
@@ -65,6 +66,11 @@ async function catalogue(size?: { width: number; height: number }): Promise<Moun
   await m.t.app.execute('sessions.show');
   for (let i = 0; i < 6; i++) await m.t.settle();
   return m;
+}
+
+/** Wait until the session list has read the highlighted row. */
+function readPane(): Promise<void> {
+  return new Promise((done) => setTimeout(done, DETAIL_WAIT_MS + 20));
 }
 
 /** What is waiting to be sent, in order. */
@@ -960,6 +966,7 @@ describe('the catalogue', () => {
   it('pulls the drawer out with right, and puts it back with left', async () => {
     const { t } = await catalogue();
     expect(t.app.focus.focused()).toBe('chat.sessions');
+    await readPane();
 
     t.press('right');
     for (let i = 0; i < 6; i++) await t.settle();
@@ -977,6 +984,8 @@ describe('the catalogue', () => {
 
   it('draws both panes from the start when the terminal is wide enough', async () => {
     const { t } = await catalogue({ width: 150, height: 30 });
+    await readPane();
+    for (let i = 0; i < 4; i++) await t.settle();
     // Nothing has been pressed. Above the split there is room for both, so
     // the detail is not something you go and fetch.
     expect(t.hasText('ahp-chat:/1f0a')).toBe(true);
@@ -997,6 +1006,7 @@ describe('the catalogue', () => {
     });
     for (let i = 0; i < 8; i++) await t.settle();
     await t.app.execute('sessions.show');
+    await readPane();
     for (let i = 0; i < 6; i++) await t.settle();
 
     expect(t.hasText('ahp-chat:/1f0a')).toBe(true);
@@ -1169,6 +1179,7 @@ describe('what a session actually is', () => {
     t.app.store.set(SELECTED, 'ahp-session:/6b21');
     // At this width the pane is a drawer, so it has to be pulled out first.
     await t.app.execute('session.showDetails');
+    await readPane();
     for (let i = 0; i < 6; i++) await t.settle();
 
     // A session is not a conversation: it holds chats, and the chat URI is
@@ -1196,6 +1207,7 @@ describe('what a session actually is', () => {
     const { t } = await catalogue({ width: 140, height: 30 });
     t.app.store.set(SELECTED, 'ahp-session:/6b21');
     await t.app.execute('session.showDetails');
+    await readPane();
     for (let i = 0; i < 6; i++) await t.settle();
 
     expect(t.hasText('main')).toBe(true);
@@ -1215,6 +1227,7 @@ describe('what a session actually is', () => {
     const { t } = await catalogue({ width: 140, height: 30 });
     t.app.store.set(SELECTED, 'ahp-session:/6b21');
     await t.app.execute('session.showDetails');
+    await readPane();
     for (let i = 0; i < 6; i++) await t.settle();
 
     // The host's own title for its own property, alongside the settings it
@@ -1261,6 +1274,7 @@ describe('what a session actually is', () => {
     const { t } = await catalogue({ width: 100, height: 30 });
     t.app.store.set(SELECTED, 'ahp-session:/6b21');
     await t.app.execute('session.showDetails');
+    await readPane();
     for (let i = 0; i < 6; i++) await t.settle();
 
     expect(t.hasText('Thinking Level')).toBe(true);
@@ -1347,6 +1361,7 @@ describe('what a session actually is', () => {
     const { t } = await catalogue();
     t.app.store.set(SELECTED, 'ahp-session:/9c74');
     await t.app.execute('session.showDetails');
+    await readPane();
     for (let i = 0; i < 6; i++) await t.settle();
 
     t.focus('chat.details');
@@ -1878,6 +1893,7 @@ describe('when the host says no', () => {
     });
     for (let i = 0; i < 8; i++) await t.settle();
     await t.app.execute('sessions.show');
+    await readPane();
     for (let i = 0; i < 8; i++) await t.settle();
 
     // The pane asks about whatever is highlighted, so this fires on arrival
@@ -1949,6 +1965,60 @@ describe('when the host says no', () => {
     await t.settle();
     expect(t.store.get(OPEN) ?? null).toBeNull();
     expect(t.store.get<string>(HOST_ERROR)).toBe('Dispose session, Kqueue events on Linux: No agent for session (-32001)');
+    await t.unmount();
+  });
+
+  it('keeps a refusal that no reader claimed off the row, unless it is about the open session', async () => {
+    const t = await renderApp({
+      width: 100, height: 30, shell: 'workbench', theme: 'workbench',
+      onBoot: (app) => { registerChat(app, { host: fakeHost() }); },
+    });
+    for (let i = 0; i < 8; i++) await t.settle();
+    const controller = t.app.services.require(CONTROLLER);
+
+    // Another session in the list, and a chat that is not the open session's: the pane says it.
+    controller.refused('ahp-session:/9c74', 'No agent for session (-32001)', 'read');
+    controller.refused('ahp-chat:/9c74', 'No agent for session (-32001)', 'read');
+    expect(t.store.get(HOST_ERROR) ?? null).toBeNull();
+
+    // A channel that is no session and no chat keeps its own words.
+    controller.refused('ahp-terminal:/1', 'No such terminal', 'read');
+    expect(t.store.get<string>(HOST_ERROR)).toBe('No such terminal');
+
+    controller.open(SEEDED as SessionUri);
+    for (let i = 0; i < 4; i++) await t.settle();
+    controller.refused(SEEDED, 'No agent for session (-32001)', 'send');
+    expect(t.store.get<string>(HOST_ERROR)).toBe('Send, Kqueue events on Linux: No agent for session (-32001)');
+    controller.refused(t.store.get<string>(CHAT_URI) ?? '', 'No agent for session (-32001)', 'read');
+    expect(t.store.get<string>(HOST_ERROR)).toBe('Read session, Kqueue events on Linux: No agent for session (-32001)');
+
+    // Once the session closes, its refusal is another session's.
+    controller.close();
+    controller.refused(SEEDED, 'No agent for session (-32001)', 'send');
+    expect(t.store.get(HOST_ERROR) ?? null).toBeNull();
+    await t.unmount();
+  });
+
+  it('reads only the session the highlight stops on', async () => {
+    const read: string[] = [];
+    const base = fakeHost();
+    const host: FakeHost = { ...base, detail: (uri) => { read.push(uri); return base.detail(uri); } };
+    const t = await renderApp({
+      width: 100, height: 30, shell: 'workbench', theme: 'workbench',
+      onBoot: (app) => { registerChat(app, { host }); },
+    });
+    for (let i = 0; i < 8; i++) await t.settle();
+    await t.app.execute('sessions.show');
+    for (let i = 0; i < 4; i++) await t.settle();
+    t.app.store.set(SELECTED, 'ahp-session:/6b21');
+    await t.settle();
+    t.app.store.set(SELECTED, 'ahp-session:/9c74');
+    await t.settle();
+    t.app.store.set(SELECTED, SEEDED);
+    await readPane();
+    for (let i = 0; i < 4; i++) await t.settle();
+
+    expect(read).toEqual([SEEDED]);
     await t.unmount();
   });
 
