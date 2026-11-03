@@ -51,10 +51,14 @@ The create step pushes a branch and opens a real pull request, so use a reposito
 
 ## screen/09: the shell
 
-1. Run `node <ahpc>/dist/src/main.js --host ws://127.0.0.1:9313 --connection-token-file <scratch>/token changes <session> --run commit --message "<text>"`.
-2. Check that `git log -1` in `<work>` shows the message.
-3. Run `changes <session> --run create-pr --title "<text>" --body "<text>" --draft` with the same host flags.
-4. Check that the command prints the link, and that GitHub has a draft pull request.
+Claude ran this section on 2026-11-03, and it passed with `--scope uncommitted` and `--yes`.
+The pull request was softov/work#2.
+
+1. Edit one file in `<work>`, on a branch with no upstream.
+2. Run `node <ahpc>/dist/src/main.js --host ws://127.0.0.1:9313 --connection-token-file <scratch>/token changes <session> --scope uncommitted --run commit --message "<text>" --yes`.
+3. Check that `git log -1` in `<work>` shows the message.
+4. Run `changes <session> --scope uncommitted --run create-pr --title "<text>" --body "<text>" --draft --yes` with the same host flags.
+5. Check that the command prints the link, and that GitHub has a draft pull request.
 
 ## Clean up
 
