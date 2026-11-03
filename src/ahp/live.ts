@@ -167,9 +167,9 @@ const LINGER_MS = 5_000;
  * How long a dispatch waits for the host to say what became of it.
  *
  * A host echoes an accepted action to the channel's subscribers, which is the
- * protocol's reconciliation rule, and a rejection to its sender. Some actions
- * get neither, so after this long the silence is taken as applied. Ten
- * seconds is longer than a host on this machine takes to refuse.
+ * protocol's reconciliation rule, and a rejection to its sender. After this
+ * long with neither, the action counts as refused. Ten seconds is longer than
+ * a host on this machine takes to answer.
  */
 const ANSWER_MS = 10_000;
 

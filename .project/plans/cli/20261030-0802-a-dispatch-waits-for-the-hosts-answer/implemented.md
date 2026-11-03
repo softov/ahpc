@@ -16,7 +16,7 @@ A command that sends an action now ends with the host's answer rather than with 
 ## What was built
 
 - `src/ahp/connection.ts` - `Sent` is the answer of a dispatch: `refused` is the host's words for why it did not apply the action, and absent means it did. `setArchived`, `setRead`, `writeTerminal`, `queue`, `unqueue`, `confirmToolCall` and `completeInput` resolve it; `stopTurn` resolves `{ cancelled, refused? }`.
-- `src/ahp/channels.ts` - a map from `clientSeq` to a waiter, settled by an action envelope whose origin names this client; a rejection a waiter takes is not also reported to `onRejection`, `await` resolves as applied at the deadline, and `detach` answers every waiter rather than leaving it to the deadline.
+- `src/ahp/channels.ts` - a map from `clientSeq` to a waiter, settled by an action envelope whose origin names this client; a rejection a waiter takes is not also reported to `onRejection`, `await` resolves a refusal at the deadline, and `detach` answers every waiter rather than leaving it to the deadline.
 - `src/ahp/live.ts` - `sent` holds the channel, dispatches, waits up to 10 seconds and releases; `answered` looks the session's chat up first and routes the chat actions through it. The seven methods go through them, `queue` makes its id before sending, and `stopTurn` reports what the host said instead of telling `onRefusal`.
 - `src/ahp/fake.ts` - the seven resolve at once, with a refusal for an id the script is not holding.
 - `src/cli/main.ts` - `exitOf` is the one place a command turns an answer into an exit code and one stderr line. `queue` prints the id, or `{ "id": ... }` under `--json`; `cancel` prints `refused`, `No turn is running.`, or nothing; `prompt` prints `The turn was cancelled.` for a turn that came back cancelled.

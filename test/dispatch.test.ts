@@ -109,7 +109,7 @@ describe('a dispatch waiting for its echo', () => {
     await expect(answer).resolves.toEqual({});
   });
 
-  it('resolves applied when the host never answers', async () => {
+  it('resolves refused when the host never answers', async () => {
     vi.useFakeTimers();
     try {
       const { channels } = registry();
@@ -117,7 +117,7 @@ describe('a dispatch waiting for its echo', () => {
 
       await vi.advanceTimersByTimeAsync(10_000);
 
-      await expect(answer).resolves.toEqual({});
+      await expect(answer).resolves.toEqual({ refused: 'The host did not answer in 10 seconds.' });
     }
     finally {
       vi.useRealTimers();

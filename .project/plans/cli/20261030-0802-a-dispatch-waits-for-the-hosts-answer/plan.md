@@ -74,7 +74,7 @@ host -> action envelope { origin, rejectionReason? } -> channels.deliver -> the 
 | A dispatch method resolves `{ refused?: string }` and never rejects, as `stopTurn` does. | `(defaulted: the shape stopTurn already has)` | 01 |
 | A dispatch matches its echo by `origin.clientSeq` from `client.dispatch`. | `(defaulted: the protocol's reconciliation rule)` | 01 |
 | A dispatch holds its channel open until the echo arrives. | `(defaulted: a host echoes to the channel's subscribers)` | 01 |
-| A dispatch with no answer after 10 seconds resolves as applied. Only a rejection is a refusal. | Softov, 2026-10-30: "Silence is success" (ahpd sends nothing for terminal input or a flag already set, and the spec lets a host ignore an unknown channel) | 01 |
+| A dispatch with no answer after 10 seconds resolves `refused: "The host did not answer in 10 seconds."`. | Softov, 2026-11-03: fail with a line. ahpd main answers every action that ahpc waits on, and a silent host is not a yes. This replaces "Silence is success" of 2026-10-30. | 01 |
 | A refusal a waiter takes is not also sent to `onRefusal`. | `(defaulted: the claimed-or-reported pattern of refuse, and the double message of cancel)` | 01 |
 | `queue` resolves `{ id, refused? }`, and the CLI prints the id on stdout. | The brief, "Bugs in ahpc" | 02 |
 | A refused command prints the host's reason on stderr and exits 1. | The brief, "Bugs in ahpc" | 02 |
@@ -102,7 +102,8 @@ host -> action envelope { origin, rejectionReason? } -> channels.deliver -> the 
 
 ## Risks and tradeoffs
 
-- An action the host does not answer makes a command wait 10 seconds and exit 0, so a mistyped session URI also exits 0.
+- An action the host does not answer makes a command wait 10 seconds and exit 1.
+  ahpd 0.11.0 does not answer an unknown id, so against that release a bad id fails after 10 seconds.
 - A waiter subscribes to a channel the command did not open - it releases the channel when the echo arrives.
 - Seven methods change their return type - the screen ignores the promise, so its behaviour stays the same.
 
