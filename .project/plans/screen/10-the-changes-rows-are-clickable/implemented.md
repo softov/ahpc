@@ -29,6 +29,17 @@ The keys `]`, `r` and `x` work as before, also while a tab or a button has focus
 - A button for an operation the host marked `disabled` is a disabled `Button`. The plan did not say. The `x` picker already leaves such operations out.
 - A button's status word, such as "running", is the protocol's word and not in the catalogue, as it was in the row of labels before.
 
+## Task 03 - the verb keys are on the buttons
+
+- [`code://src/control.ts`](../../../../src/control.ts) - `VERB_KEYS` maps each verb's operation id to its key. The five `changes.run` bindings are made from it.
+- [`code://src/screens.tsx`](../../../../src/screens.tsx) - each action `Button` gets its key from `VERB_KEYS` as `hint`, with `delete` drawn as `del`. A verb with no key gets no hint.
+- [`code://src/app.tsx`](../../../../src/app.tsx) - `offered` and `verbs` are removed. The changes hints stop at `x`.
+- The three catalogues - the five `views.app.hint*` verb keys are removed.
+- [`code://test/changes.test.tsx`](../../../../test/changes.test.tsx) - one case, at 100 and 60 columns. It checks the hints on the buttons, a verb with no hint, and a status row with no verb.
+- `npm run typecheck` and `npm run build` clean. `npx vitest run` - 831 of 831 passed.
+- With the `hint` prop removed, both new cases fail.
+- At 60 columns the status row is still cut, and `] changeset` draws empty. `KeyHints` shrinks each item and has no rule to drop one.
+
 ## Left for later
 
 - An arrow stops at a disabled tab, so a scope past one is reached by a click or `]`. It is proposed in textui as `roadmap/ideas/tabs-skip-a-disabled-tab.md`.
