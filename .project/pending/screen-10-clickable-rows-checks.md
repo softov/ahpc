@@ -30,6 +30,7 @@ This run checks the clicks and the keys in a real terminal, against an ahpd buil
 4. Open a file, click another scope tab, and check that the file closes.
 5. Click a disabled tab, and check that the scope does not change.
 6. Click an action button, and check that the action runs or asks what it needs.
+7. Check that each action button shows its key, such as `Commit c`, and that the status row lists no verb key.
 
 ## screen/10: the keys at 100 columns
 

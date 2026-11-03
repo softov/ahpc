@@ -59,6 +59,9 @@ click or Tab + Enter on an action button -> app.execute('changes.run', { operati
 | The arrows pick a scope, as the stock `Tabs` does, and Enter is not bound there | Softov, 2026-10-11, asked "On the scope tabs, how should the keyboard pick a tab?", answered "keep arrow pick" | 01 |
 | An arrow that stops at a disabled tab is proposed to textui, and this plan does not wait for it | Softov, 2026-10-11, asked "what should the textui note propose about a disabled tab?", answered "Arrows skip it" | 01 |
 | Tab order is the tabs, the buttons, then the list; the list still takes focus when the screen opens | (defaulted: the list is where a person reads first) | 01, 02 |
+| The verb keys show on their buttons, and leave the status row | Softov, 2026-11-03, asked where the keys for Commit, Discard, Stage, Unstage and Create Pull Request go, answered "On the buttons" | 03 |
+| `delete` shows as `del` on its button | `(defaulted: the status row wrote it so)` | 03 |
+| An operation with no key shows no hint | `(defaulted: the host may offer verbs that have no key here)` | 03 |
 
 ## Proposed architecture
 
@@ -74,6 +77,7 @@ click or Tab + Enter on an action button -> app.execute('changes.run', { operati
 | --- | --- | --- |
 | [01 - the scopes are tabs](task-01-the-scopes-are-tabs.md) | implemented | - |
 | [02 - the actions are buttons](task-02-the-actions-are-buttons.md) | implemented | - |
+| [03 - the verb keys are on the buttons](task-03-the-verb-keys-are-on-the-buttons.md) | todo | 02 |
 
 ## Risks and tradeoffs
 
@@ -84,7 +88,8 @@ click or Tab + Enter on an action button -> app.execute('changes.run', { operati
 ## Resume state
 
 - **Done so far:** tasks 01 and 02 are implemented and reviewed. See [implemented.md](implemented.md).
-- **Next action:** the check by hand in [screen-10-clickable-rows-checks.md](../../../pending/screen-10-clickable-rows-checks.md).
+- **Next action:** [task-03-the-verb-keys-are-on-the-buttons.md](task-03-the-verb-keys-are-on-the-buttons.md), then the check by hand in [screen-10-clickable-rows-checks.md](../../../pending/screen-10-clickable-rows-checks.md).
+- **Check by hand, 2026-11-03:** the tabs and buttons work; the status row had too many hints.
 - **Open questions:** none.
 - **Watch out for:** an arrow stops at a disabled tab until textui takes `roadmap/ideas/tabs-skip-a-disabled-tab.md`.
 
