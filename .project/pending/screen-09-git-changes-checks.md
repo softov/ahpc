@@ -32,8 +32,8 @@ The create step pushes a branch and opens a real pull request, so use a reposito
 
 ## screen/09: prepare and create
 
-1. Edit one more file in `<work>`.
-2. Run the pull request action, and check that the form opens with the host's title and body.
+1. Edit one more file in `<work>`, and check that *Create PR* shows on the actions row.
+2. Press `p` or click *Create PR*, and check that the form opens with the host's title and body.
 3. Change the title, and check that the form cannot be sent with an empty title.
 4. Send the form, and check that the pull request on GitHub has the title and the body from the form.
 5. Check that the status row shows the link to the pull request and says "copied".
