@@ -37,6 +37,13 @@ The keys, the buttons on the actions row and the picker on `x` all reach the sam
 - The commit prompt no longer repeats the host's confirmation, because the dialog shows it.
 - The fake host is not changed. The tests wrap it to offer stage, unstage, discard and commit with one scope or both.
 
+## Task 04 - the staged mark is S, and the letter ends the row
+
+- [`code://src/view/changes.tsx`](../../../../src/view/changes.tsx) - the mark before the path is `S`, or a blank. A partly staged file has its `S` in the warning tone. The letter is the last column, after the counts.
+- [`code://test/changes.test.tsx`](../../../../test/changes.test.tsx) - the cases that read the dot read `S` and its tone. The letter cases read it after the counts, at 100 and 60 columns.
+- `npm run typecheck` and `npm run build` clean. `npx vitest run` - 834 of 834 passed.
+- With the dot back in place of `S`, three cases fail.
+
 ## Left for later
 
 - The hand check against an ahpd with host/82, at 60 and 100 columns.

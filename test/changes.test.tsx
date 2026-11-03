@@ -379,9 +379,14 @@ describe('the actions are buttons', () => {
 describe('what a commit will take', () => {
   /** The row naming `name`, whatever else is on the screen. */
   const row = (t: Harness, name: string): string => t.lines().find((line) => line.includes(name)) ?? '';
-  // Either glyph set: the full one, or the ASCII fallback.
-  const staged = (line: string) => line.includes('●') || /\*\s*[MADRU]/.test(line);
-  const both = (line: string) => line.includes('◌') || /\+\s*[MADRU]/.test(line);
+  /** The mark before the path: `S` for staged, a blank for not. */
+  const staged = (line: string) => /\bS +\/brb_main/.test(line);
+  const bare = (line: string) => /│ {3,}\/brb_main/.test(line);
+  /** The tone of the `S` on the row naming `name`. */
+  const tone = (t: Harness, name: string): unknown => {
+    const y = t.lines().findIndex((line) => line.includes(name));
+    return t.getAllByText('S', { exact: true }).find((one) => one.rect?.y === y)?.props.fg;
+  };
 
   it('marks a staged file, leaves an unstaged one bare, and tells apart one that is both', async () => {
     const t = await changes();
@@ -390,17 +395,20 @@ describe('what a commit will take', () => {
     // The fixture stages the first file, stages and then changes the second,
     // and leaves the rest in the tree.
     expect(staged(row(t, 'compileLinux.sh'))).toBe(true);
-    expect(both(row(t, 'compileLinux.sh'))).toBe(false);
-    expect(both(row(t, 'README.linux.md'))).toBe(true);
-    expect(staged(row(t, 'README.linux.md'))).toBe(false);
-    expect(staged(row(t, 'notes.todo')) || both(row(t, 'notes.todo'))).toBe(false);
+    expect(tone(t, 'compileLinux.sh')).toBe('success');
+    // Staged and then changed again: the same S, in the warning tone.
+    expect(staged(row(t, 'README.linux.md'))).toBe(true);
+    expect(tone(t, 'README.linux.md')).toBe('warning');
+    expect(bare(row(t, 'notes.todo'))).toBe(true);
     await t.unmount();
   });
 
   it('draws no mark where the host says nothing about staging', async () => {
     const t = await changes();
     // The session's own changeset carries no git state at all.
-    expect(t.hasText('●') || t.hasText('◌')).toBe(false);
+    expect(t.lines().some((line) => staged(line) || bare(line))).toBe(false);
+    expect(t.lines().find((line) => line.includes('compileLinux.sh'))).toMatch(/-\d+ M\b/);
+    expect(t.getAllByText('S', { exact: true })).toEqual([]);
     await t.unmount();
   });
 });
@@ -446,8 +454,10 @@ describe('a row shows its git letter', () => {
         expect(row(t, 'notes.todo')).toMatch(/\bU\b/);
         expect(row(t, 'README.linux.md')).toMatch(/\bA\b/);
         expect(row(t, 'build-linux.sh')).toMatch(/\bR\b/);
-        // The staged mark keeps its own column beside the letter.
-        expect(row(t, 'compileLinux.sh').includes('●') || /\*\s*M/.test(row(t, 'compileLinux.sh'))).toBe(true);
+        // S before the path, and the letter at the end, after the counts.
+        expect(row(t, 'compileLinux.sh')).toMatch(/\bS +\/brb_main.*\+\d+ -\d+ M\b/);
+        expect(row(t, 'notes.todo')).toMatch(/\+\d+ -\d+ U\b/);
+        expect(row(t, 'notes.todo')).not.toMatch(/\bS +\/brb_main/);
         // Every row is still drawn, and no line runs past the edge.
         expect(t.hasText('notes.todo')).toBe(true);
         expect(t.lines().every((line) => line.length <= width)).toBe(true);
