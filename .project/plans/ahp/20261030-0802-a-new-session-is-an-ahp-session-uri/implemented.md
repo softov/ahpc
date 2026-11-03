@@ -21,7 +21,8 @@ A session ahpc creates is now named `ahp-session:/<uuid>`, which is the scheme t
 - `test/scenario.test.ts`: 5 tests green, including the new case for the request's `provider` and `channel`.
 - `npm run typecheck`: clean.
 - `npm test`: 817 tests, 816 passed. The one failure is `test/smoke.test.tsx > the composer is the front door > puts where the session runs on a row of its own`, which expects the checkout directory to be named `ahpc` and is at `build-agents-99b61ae4` in this worktree; the same test fails on `main` here, and nothing in this plan touches it.
-- Waiting: the by-hand checks against ahpd in the plan's *Final verification checklist* were not run, because this worktree does not connect to a host.
+- By hand against ahpd `main` on 2026-11-03: `session new` printed an `ahp-session:/` URI, and `session list` listed it under that URI.
+- By hand on 2026-11-03: `exec` printed the answer, exited 0, and disposed its session.
 
 ## Departures from the plan
 
@@ -29,4 +30,4 @@ A session ahpc creates is now named `ahp-session:/<uuid>`, which is the scheme t
 
 ## Left for later
 
-- The by-hand checks against ahpd: `ahpc session new` prints an `ahp-session:/` URI and `ahpc session list` lists it under that URI; `ahpc exec hi` runs and disposes its session.
+- None.

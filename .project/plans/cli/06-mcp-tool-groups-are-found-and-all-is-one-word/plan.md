@@ -78,12 +78,12 @@ main.ts 'mcp' | 'serve' -> wanted(args) -> groups -> serve.ts answer() -> initia
 ## Resume state
 
 - **Done so far:** tasks 01 and 02 implemented on 2026-10-16, awaiting review.
-- **Next action:** Softov reviews the diff.
+- **Next action:** Softov reviews the diff. On 2026-11-03, `ahpc mcp` listed 13 tools, `--mcp-tools all` listed all 30, and `npm run docs:build` passed.
 - **Watch out for:** `--mcp-tools all` must not reach the "No tool group called" refusal in `wanted`.
 
 ## Final verification checklist
 
 - [ ] `npm test` passes.
-- [ ] `ahpc mcp` lists 13 tools, and `--mcp-tools all` lists every tool.
-- [ ] `npm run docs:build` passes.
+- [x] `ahpc mcp` lists 13 tools, and `--mcp-tools all` lists every tool.
+- [x] `npm run docs:build` passes.
 - [ ] `plans/index.md` updated.

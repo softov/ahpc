@@ -1,7 +1,7 @@
 ---
 title: A new session is an `ahp-session:` URI
 domain: ahp
-status: active
+status: built
 priority: high
 created: 2026-10-30
 revalidated: 2026-10-30
@@ -64,7 +64,7 @@ session new / exec -> createSession { channel: ahp-session:/<uuid>, provider } -
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - A new session is `ahp-session:`](task-01-a-new-session-is-ahp-session.md) | implemented | - |
+| [01 - A new session is `ahp-session:`](task-01-a-new-session-is-ahp-session.md) | done | - |
 
 ## Risks and tradeoffs
 
@@ -72,14 +72,13 @@ session new / exec -> createSession { channel: ahp-session:/<uuid>, provider } -
 
 ## Resume state
 
-- **Done so far:** task 01 is implemented.
-- **Next action:** write `implemented.md` and wait for review; the by-hand checks against ahpd are still waiting.
+- **Done so far:** built. Task 01 was reviewed and merged in PR 2 on 2026-11-03, and the checks by hand passed against ahpd `main` on 2026-11-03.
+- **Next action:** none.
 - **Open questions:** none.
 - **Watch out for:** ahpd before host/126 holds the session as `<provider>:/<id>` and keeps the `ahp-session:` URI as an alias, so both names reach it.
-  The by-hand checks in *Final verification* were not run: this worktree never connects to a host.
 
 ## Final verification checklist
 
-- [ ] `npm run typecheck` and `npm test` pass.
-- [ ] Against ahpd, `ahpc session new` prints an `ahp-session:/` URI, and `ahpc session list` lists it under that URI.
-- [ ] Against ahpd, `ahpc exec hi` runs and disposes its session.
+- [x] `npm run typecheck` and `npm test` pass.
+- [x] Against ahpd, `ahpc session new` prints an `ahp-session:/` URI, and `ahpc session list` lists it under that URI.
+- [x] Against ahpd, `ahpc exec hi` runs and disposes its session.

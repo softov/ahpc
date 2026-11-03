@@ -82,7 +82,7 @@ prompt -> turn() -> until() subscribes -> host.say at once -> chat/turnStarted o
 ## Resume state
 
 - **Done so far:** planned 2026-10-14. Tasks 01 and 02 are implemented on 2026-10-14: `turn` reads the session before it sends, and `prompt` takes `--queue` and `--steer`. The MCP `send_turn` tool takes `busy`, the seam and both hosts have `steer`, and a timeout writes its line on stderr.
-- **Next action:** review tasks 01 and 02, then the hand check against ahpd.
+- **Next action:** review tasks 01 and 02. The check by hand passed against ahpd `main` on 2026-11-03: a plain `prompt` was refused, `--queue` and `--steer` returned, the timeout line was written, and the MCP `busy` input worked.
 - **Open questions:** none.
 - **Watch out for:** the scripted host sends events, not only snapshots, so the busy check reads both vocabularies.
   `live.ts` never sends `turnComplete`, so a wait that watched only for one would hang against a real host.

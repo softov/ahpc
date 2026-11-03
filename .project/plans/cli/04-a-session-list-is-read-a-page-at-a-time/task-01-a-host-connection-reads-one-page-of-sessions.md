@@ -1,6 +1,6 @@
 ---
 title: a host connection reads one page of sessions
-status: implemented
+status: done
 depends: []
 layer: ahp
 refs:

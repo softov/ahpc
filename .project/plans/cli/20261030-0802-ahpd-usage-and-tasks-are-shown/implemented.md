@@ -28,7 +28,9 @@ refs:
 - `test/usage.test.tsx`: 6 tests green; the screen's usage panel is unchanged.
 - `npm run typecheck`: clean.
 - `npm test`: 825 tests, 824 passed. The one failure is `test/smoke.test.tsx > the composer is the front door > puts where the session runs on a row of its own`, which expects the checkout directory to be named `ahpc` and is at `build-agents-99b61ae4` in this worktree; the same test fails on `main` here, and nothing in this plan touches it.
-- Waiting: the by-hand checks against ahpd in the plan's *Final verification* were not run, because this worktree does not connect to a host.
+- By hand against ahpd `main` on 2026-11-03: `session history` printed `in 2 · out 4 · cache 27274/12619 · 0.1066192 USD` under a Claude turn.
+- By hand on 2026-11-03, with the tasks plugin: `session show` printed `Tasks 1 open` after the agent added a task.
+- Seen on 2026-11-03: the price prints every decimal place the host sends.
 
 ## Departures from the plan
 
@@ -39,4 +41,4 @@ refs:
 
 ## Left for later
 
-- The by-hand checks against ahpd: `ahpc session history <uri>` prints a usage line under a Claude turn; `ahpc session show <uri>` prints the open task count with the tasks plugin.
+- None.

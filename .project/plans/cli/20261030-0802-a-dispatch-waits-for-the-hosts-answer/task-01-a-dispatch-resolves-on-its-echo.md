@@ -1,6 +1,6 @@
 ---
 title: A dispatch resolves on its echo
-status: implemented
+status: done
 depends: []
 layer: "ahp"
 refs:

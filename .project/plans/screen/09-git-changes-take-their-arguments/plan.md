@@ -123,7 +123,7 @@ x -> app.ask(changes.run) -> palette: the verbs offered
 ## Resume state
 
 - **Done so far:** tasks 01 to 06.
-- **Next action:** the hand checks in the checklist below, then review.
+- **Next action:** the checks by hand in [screen-09-git-changes-checks.md](../../../pending/screen-09-git-changes-checks.md), then review.
 - **Open questions:** none.
 - **Watch out for:**
   - `x` now goes through `app.ask`, so `changes.run` gets an `operation` argument from the palette.

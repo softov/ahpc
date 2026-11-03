@@ -31,10 +31,13 @@ A command that sends an action now ends with the host's answer rather than with 
 - `test/cli.test.ts`: 46 tests green, including the five new cases for the queue id, the `--json` id and the three refusals.
 - `test/mcp.test.ts`: 38 tests green, including the `queue_turn` id and the refused `confirm_tool_call`.
 - `test/oneshot.test.ts`: 13 tests green, including `cancel` on a session with no chat and `prompt` cancelled by another client's action.
-- `test/dispatch.test.ts`: 5 tests green. The file is untracked, because this environment refuses `git add`; see *Left for later*.
+- `test/dispatch.test.ts`: 5 tests green.
 - `npm run typecheck`: clean.
 - `npm test`: 817 tests, 816 passed. The one failure is `test/smoke.test.tsx > the composer is the front door > puts where the session runs on a row of its own`, which expects the checkout directory to be named `ahpc` and is at `build-agents-99b61ae4` in this worktree; the same test fails on `main` here, and nothing in this plan touches it.
-- Waiting: the by-hand checks against ahpd in the plan's *Final verification* were not run, because this worktree does not connect to a host.
+- By hand against ahpd `main` on 2026-11-03: `queue` printed an id, and `unqueue` of that id exited 0.
+- By hand on 2026-11-03: `unqueue`, `confirm` and `answer` with an unknown id printed the host's reason and exited 1.
+- By hand on 2026-11-03: `cancel` on an idle session printed "No turn is running." and exited 1.
+- Seen on 2026-11-03: a bad terminal URI prints two lines, the subscribe error and the rejection.
 
 ## Departures from the plan
 
@@ -46,5 +49,4 @@ A command that sends an action now ends with the host's answer rather than with 
 
 ## Left for later
 
-- The by-hand checks against ahpd: `ahpc queue <uri> hi` prints an id and `ahpc unqueue <uri> <id>` exits 0; `ahpc unqueue <uri> no-such-id`, `ahpc confirm <uri> no-such-call` and `ahpc cancel <uri>` on an idle session each print the host's reason and exit 1.
-- `test/dispatch.test.ts` needs committing from a shell where staging a new file is allowed; `git add` is refused in the environment this plan was built in.
+- None.

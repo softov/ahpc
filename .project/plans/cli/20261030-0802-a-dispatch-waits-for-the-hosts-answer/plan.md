@@ -1,7 +1,7 @@
 ---
 title: A command that dispatches an action waits for the host's answer
 domain: cli
-status: active
+status: built
 priority: high
 created: 2026-10-30
 revalidated: 2026-10-30
@@ -96,9 +96,9 @@ host -> action envelope { origin, rejectionReason? } -> channels.deliver -> the 
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - A dispatch resolves on its echo](task-01-a-dispatch-resolves-on-its-echo.md) | implemented | - |
-| [02 - A command exits with the host's answer](task-02-a-command-exits-with-the-answer.md) | implemented | 01 |
-| [03 - A cancel says one thing](task-03-a-cancel-says-one-thing.md) | implemented | - |
+| [01 - A dispatch resolves on its echo](task-01-a-dispatch-resolves-on-its-echo.md) | done | - |
+| [02 - A command exits with the host's answer](task-02-a-command-exits-with-the-answer.md) | done | 01 |
+| [03 - A cancel says one thing](task-03-a-cancel-says-one-thing.md) | done | - |
 
 ## Risks and tradeoffs
 
@@ -109,16 +109,15 @@ host -> action envelope { origin, rejectionReason? } -> channels.deliver -> the 
 
 ## Resume state
 
-- **Done so far:** all three tasks are implemented.
-- **Next action:** write `implemented.md` and wait for review; the by-hand checks against ahpd are still waiting.
+- **Done so far:** built. The three tasks were reviewed and merged in PR 2 on 2026-11-03, and the checks by hand passed against ahpd `main` on 2026-11-03.
+- **Next action:** none.
 - **Open questions:** none.
-- **Watch out for:** `test/dispatch.test.ts` is written and passing but untracked, because this environment refuses `git add`; it needs committing from a shell where staging is allowed.
-  The by-hand checks in *Final verification* were not run: this worktree never connects to a host.
+- **Watch out for:** ahpd 0.11.0 does not answer an unknown id, so there such a command fails after 10 seconds.
 
 ## Final verification checklist
 
-- [ ] `npm run typecheck` and `npm test` pass.
-- [ ] Against ahpd, `ahpc queue <uri> hi` prints an id, and `ahpc unqueue <uri> <id>` exits 0.
-- [ ] Against ahpd, `ahpc unqueue <uri> no-such-id` prints the host's reason and exits 1.
-- [ ] Against ahpd, `ahpc confirm <uri> no-such-call` prints the host's reason and exits 1.
-- [ ] Against ahpd, `ahpc cancel <uri>` on an idle session prints one line and exits 1.
+- [x] `npm run typecheck` and `npm test` pass.
+- [x] Against ahpd, `ahpc queue <uri> hi` prints an id, and `ahpc unqueue <uri> <id>` exits 0.
+- [x] Against ahpd, `ahpc unqueue <uri> no-such-id` prints the host's reason and exits 1.
+- [x] Against ahpd, `ahpc confirm <uri> no-such-call` prints the host's reason and exits 1.
+- [x] Against ahpd, `ahpc cancel <uri>` on an idle session prints one line and exits 1.

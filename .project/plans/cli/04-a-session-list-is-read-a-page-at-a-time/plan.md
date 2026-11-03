@@ -1,7 +1,7 @@
 ---
 title: A session list is read a page at a time
 domain: cli
-status: active
+status: built
 priority: medium
 created: 2026-10-13
 revalidated: 2026-10-13
@@ -63,8 +63,8 @@ ahpc session list --limit N --cursor C -> cli/main.ts sessions -> HostConnection
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - a host connection reads one page of sessions](task-01-a-host-connection-reads-one-page-of-sessions.md) | implemented | - |
-| [02 - session list and list_sessions take a limit and a cursor](task-02-session-list-and-list-sessions-take-a-limit-and-a-cursor.md) | implemented | 01 |
+| [01 - a host connection reads one page of sessions](task-01-a-host-connection-reads-one-page-of-sessions.md) | done | - |
+| [02 - session list and list_sessions take a limit and a cursor](task-02-session-list-and-list-sessions-take-a-limit-and-a-cursor.md) | done | 01 |
 
 ## Risks and tradeoffs
 
@@ -74,11 +74,9 @@ ahpc session list --limit N --cursor C -> cli/main.ts sessions -> HostConnection
 ## Resume state
 
 - **Done so far:** planned 2026-10-13. Tasks 01 and 02 are implemented on 2026-10-13: `HostConnection.sessionPage` with both hosts, `--limit` and `--cursor` on `session list`, and `limit` and `cursor` on the MCP `list_sessions`.
-- **Next action:** Softov approves the merge. The review and the hand check against ahpd passed on 2026-10-13.
-- **Open questions:**
-  1. A default limit on `list_sessions` - proposed: none for now, as the idea says.
+- **Next action:** none. The plan is built and shipped in 0.9.0. See [implemented.md](implemented.md).
+- **Open questions:** none.
 - **Watch out for:** the cursor is opaque. Never parse it, and never keep it after the command exits.
-  The typed suite has one failure in `test/smoke.test.tsx` at this commit in this worktree, which is the composer chip drawing the worktree's own directory name.
 
 ## Final verification checklist
 

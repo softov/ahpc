@@ -1,7 +1,7 @@
 ---
 title: A turn's usage and a session's open tasks are shown from ahpd's `_meta`
 domain: cli
-status: active
+status: built
 priority: medium
 created: 2026-10-30
 revalidated: 2026-10-30
@@ -70,8 +70,8 @@ session summary { _meta['ahpd.tasks'] } -> session show -> a "Tasks" row
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - A turn's usage is printed](task-01-a-turns-usage-is-printed.md) | implemented | - |
-| [02 - A session shows its open tasks](task-02-a-session-shows-its-open-tasks.md) | implemented | - |
+| [01 - A turn's usage is printed](task-01-a-turns-usage-is-printed.md) | done | - |
+| [02 - A session shows its open tasks](task-02-a-session-shows-its-open-tasks.md) | done | - |
 
 ## Risks and tradeoffs
 
@@ -79,14 +79,13 @@ session summary { _meta['ahpd.tasks'] } -> session show -> a "Tasks" row
 
 ## Resume state
 
-- **Done so far:** tasks 01 and 02 are implemented.
-- **Next action:** write `implemented.md` and wait for review; the by-hand checks against ahpd are still waiting.
+- **Done so far:** built. The two tasks were reviewed and merged in PR 2 on 2026-11-03, and the checks by hand passed against ahpd `main` on 2026-11-03.
+- **Next action:** none.
 - **Open questions:** none.
 - **Watch out for:** `ahpd.cost` and `_meta.cost` are two keys in two units; do not merge them.
-  The by-hand checks in *Final verification* were not run: this worktree never connects to a host.
 
 ## Final verification checklist
 
-- [ ] `npm run typecheck` and `npm test` pass.
-- [ ] Against ahpd, `ahpc session history <uri>` prints a usage line under a Claude turn.
-- [ ] Against ahpd with the tasks plugin, `ahpc session show <uri>` prints the open task count.
+- [x] `npm run typecheck` and `npm test` pass.
+- [x] Against ahpd, `ahpc session history <uri>` prints a usage line under a Claude turn.
+- [x] Against ahpd with the tasks plugin, `ahpc session show <uri>` prints the open task count.

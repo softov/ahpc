@@ -1,6 +1,6 @@
 ---
 title: session list and list_sessions take a limit and a cursor
-status: implemented
+status: done
 depends: [task-01-a-host-connection-reads-one-page-of-sessions.md]
 layer: cli
 refs:

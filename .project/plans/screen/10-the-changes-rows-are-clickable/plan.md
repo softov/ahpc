@@ -84,7 +84,7 @@ click or Tab + Enter on an action button -> app.execute('changes.run', { operati
 ## Resume state
 
 - **Done so far:** tasks 01 and 02 are implemented and reviewed. See [implemented.md](implemented.md).
-- **Next action:** the hand check in a real terminal.
+- **Next action:** the check by hand in [screen-10-clickable-rows-checks.md](../../../pending/screen-10-clickable-rows-checks.md).
 - **Open questions:** none.
 - **Watch out for:** an arrow stops at a disabled tab until textui takes `roadmap/ideas/tabs-skip-a-disabled-tab.md`.
 

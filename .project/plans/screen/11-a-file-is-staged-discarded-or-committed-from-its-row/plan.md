@@ -90,7 +90,7 @@ p -> changes.run('create-pr') -> the pull request form, as today
 ## Resume state
 
 - **Done so far:** tasks 01, 02 and 03 are implemented and await review. See [implemented.md](implemented.md).
-- **Next action:** the hand check against an ahpd with host/82, at 60 and 100 columns.
+- **Next action:** the check by hand in [screen-11-row-operations-checks.md](../../../pending/screen-11-row-operations-checks.md), then review.
 - **Open questions:** none.
 - **Watch out for:** against an ahpd without host/82, stage, unstage and discard show This file only, and commit shows All files only.
 

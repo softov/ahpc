@@ -1,6 +1,6 @@
 ---
 title: A turn's usage is printed
-status: implemented
+status: done
 depends: []
 layer: "ahp, cli"
 refs:

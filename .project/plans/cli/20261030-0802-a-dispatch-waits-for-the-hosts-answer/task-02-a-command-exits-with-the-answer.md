@@ -1,6 +1,6 @@
 ---
 title: A command exits with the host's answer
-status: implemented
+status: done
 depends: [task-01-a-dispatch-resolves-on-its-echo.md]
 layer: "cli, mcp, screen"
 refs:

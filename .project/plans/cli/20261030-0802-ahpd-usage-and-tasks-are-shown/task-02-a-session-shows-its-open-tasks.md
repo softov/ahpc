@@ -1,6 +1,6 @@
 ---
 title: A session shows its open tasks
-status: implemented
+status: done
 depends: []
 layer: "cli"
 refs:
