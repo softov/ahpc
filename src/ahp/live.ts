@@ -1,10 +1,11 @@
 import { appendFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { openChannels } from './channels.js';
+import type { Consumer } from './channels.js';
 import { publish } from './publish.js';
 import { PublishRefusal } from './publish.js';
 import type { Published } from './publish.js';
-import type { HostConnection, HostEvent } from './connection.js';
+import type { HostConnection, HostEvent, Sent } from './connection.js';
 import type {
   Agent, Answer, Automation, AutomationRun, Changeset, ChangesetOperation, ChangesetOperationTarget, Completion, ConfigProperty, ContentRef, Customization, CustomizationKind,
   TerminalRow, TerminalState,
@@ -163,6 +164,16 @@ const KEEPALIVE_MS = 30_000;
 const LINGER_MS = 5_000;
 
 /**
+ * How long a dispatch waits for the host to say what became of it.
+ *
+ * A host echoes an accepted action to the channel's subscribers, which is the
+ * protocol's reconciliation rule, and a rejection to its sender. After this
+ * long with neither, the action counts as refused. Ten seconds is longer than
+ * a host on this machine takes to answer.
+ */
+const ANSWER_MS = 10_000;
+
+/**
  * How many pages of the catalogue to walk before stopping and saying so.
  *
  * A bound rather than a page size: the host picks how big a page is, and this
@@ -269,7 +280,8 @@ interface Client {
   stateChanges(): AsyncIterableIterator<{ status: string; reason?: { type: string } }>;
   /** In-band liveness. A proxy that drops idle sockets never sees the traffic below it. */
   ping(): Promise<void>;
-  dispatch(channel: string, action: unknown): unknown;
+  /** Send one action, and the number it was sent under. */
+  dispatch(channel: string, action: unknown): { clientSeq: number };
 }
 
 interface Mirror {
@@ -1218,8 +1230,32 @@ function usage(value: unknown): TurnUsage | undefined {
   const inputTokens = typeof found.inputTokens === 'number' ? found.inputTokens : undefined;
   const outputTokens = typeof found.outputTokens === 'number' ? found.outputTokens : undefined;
   const cacheReadTokens = typeof found.cacheReadTokens === 'number' ? found.cacheReadTokens : undefined;
+  const cacheWriteTokens = typeof meta['ahpd.cacheWriteTokens'] === 'number' ? meta['ahpd.cacheWriteTokens'] : undefined;
+  const reasoningTokens = typeof meta['ahpd.reasoningTokens'] === 'number' ? meta['ahpd.reasoningTokens'] : undefined;
   const model = str(found.model);
   const resolvedModel = str(bag(meta.autoModeResolved).chosenModel);
+  /*
+   * The window a host reports as `{ used, size }`.
+   *
+   * Both halves or neither: half a window is not a window, and a `used` with
+   * no size would draw a fraction whose denominator nobody sent.
+   */
+  const held = bag(meta['ahpd.context']);
+  const context = typeof held.used === 'number' && typeof held.size === 'number'
+    ? { used: held.used, size: held.size }
+    : undefined;
+  /*
+   * A price that names its currency, beside the credits above.
+   *
+   * `cost` is one unit, so ahpd's `{ amount, currency }` goes in `price` and
+   * keeps its own: a reader that printed the amount alone would be stating a
+   * number in a currency it never read.
+   */
+  const quoted = bag(meta['ahpd.cost']);
+  const currency = str(quoted.currency);
+  const price = typeof quoted.amount === 'number' && currency !== undefined
+    ? { amount: quoted.amount, currency }
+    : undefined;
   const total = typeof meta.cost === 'number' && meta.cost >= 0 ? meta.cost
     : typeof copilot.totalNanoAiu === 'number' && copilot.totalNanoAiu >= 0
       ? copilot.totalNanoAiu / 1_000_000_000
@@ -1229,13 +1265,22 @@ function usage(value: unknown): TurnUsage | undefined {
     : undefined;
   // A cost or a session total with no tokens is still consumption worth
   // showing, which is why the test is for numbers rather than for tokens.
-  if (inputTokens === undefined && outputTokens === undefined && total === undefined && sessionCost === undefined) {
+  if (
+    inputTokens === undefined && outputTokens === undefined &&
+    cacheWriteTokens === undefined && reasoningTokens === undefined &&
+    context === undefined && price === undefined &&
+    total === undefined && sessionCost === undefined
+  ) {
     return undefined;
   }
   return {
     ...(inputTokens !== undefined ? { inputTokens } : {}),
     ...(outputTokens !== undefined ? { outputTokens } : {}),
     ...(cacheReadTokens !== undefined ? { cacheReadTokens } : {}),
+    ...(cacheWriteTokens !== undefined ? { cacheWriteTokens } : {}),
+    ...(reasoningTokens !== undefined ? { reasoningTokens } : {}),
+    ...(context !== undefined ? { context } : {}),
+    ...(price !== undefined ? { price } : {}),
     ...(model !== undefined ? { model } : {}),
     ...(resolvedModel !== undefined ? { resolvedModel } : {}),
     ...(total !== undefined ? { cost: total } : {}),
@@ -1991,24 +2036,23 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
 
 
   /**
+   * Dispatches that have not left this client yet.
+   *
+   * A dispatch is *async* before it is sent, because the chat a session
+   * dispatches to has to be looked up, so a caller that hangs up immediately
+   * afterwards hangs up first. A screen never does that; a command that sends
+   * one thing and exits does it every time.
+   */
+  const inFlight = new Set<Promise<unknown>>();
+
+  /**
    * Dispatch to the session's chat, and never reject.
    *
-   * These are the fire-and-forget half of the protocol: nothing awaits them,
-   * so a rejection here has nowhere to go but `unhandledRejection`, which ends
-   * the process. What a caller gets instead is the refusal, reported.
+   * The fire-and-forget half of the protocol: a draft, a message, a steering
+   * word. Nothing awaits them, so a rejection here has nowhere to go but
+   * `unhandledRejection`, which ends the process. What a caller gets instead
+   * is the refusal, reported.
    */
-  /**
-   * Dispatches that have not reached the socket yet.
-   *
-   * A dispatch is fire-and-forget by design - the host reduces it and says so,
-   * and nothing here waits for a turn it did not start. But it is *async*
-   * before it is sent, because the chat a session dispatches to has to be
-   * looked up, so a caller that hangs up immediately afterwards hangs up
-   * first. A screen never does that; a command that sends one thing and exits
-   * does it every time.
-   */
-  const inFlight = new Set<Promise<void>>();
-
   const dispatch = (uri: SessionUri, action: unknown): void => {
     const sending = (async () => {
       const chat = await chatOf(uri);
@@ -2020,6 +2064,53 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
     })().catch((error: unknown) => options.onRefusal?.(uri, reason(error)));
     inFlight.add(sending);
     void sending.finally(() => inFlight.delete(sending));
+  };
+
+  /**
+   * A subscription that only wants the channel open.
+   *
+   * A host echoes an accepted action to the channel's subscribers, so a
+   * dispatch that waits for its answer has to be one of them. The state and
+   * the events are a screen's; here the subscription is the whole point.
+   */
+  const listening: Consumer = { opened: () => undefined, event: () => undefined };
+
+  /**
+   * Send one action on a channel, and resolve with the host's answer.
+   *
+   * The hold is taken before the send and released after the answer, because
+   * an echo goes to the channel's subscribers. It never rejects: an error from
+   * the socket is a refusal like any other, and one a caller can print.
+   */
+  const sent = async (channel: string, action: unknown): Promise<Sent> => {
+    const hold = channels.open(channel, listening);
+    try {
+      const { clientSeq } = client.dispatch(channel, action);
+      return await channels.await(clientSeq, ANSWER_MS);
+    }
+    catch (error) {
+      return { refused: reason(error) };
+    }
+    finally {
+      hold.release();
+    }
+  };
+
+  /**
+   * Send one action to the session's chat, and resolve with the answer.
+   *
+   * The chat is looked up first, because a session dispatches to its default
+   * chat and the waiter has to be holding that channel.
+   */
+  const answered = (uri: SessionUri, action: unknown): Promise<Sent> => {
+    const sending = (async (): Promise<Sent> => {
+      const chat = await chatOf(uri);
+      if (!chat) return { refused: channels.refusal(uri) ?? 'this session has no chat to speak to' };
+      return sent(chat, action);
+    })().catch((error: unknown) => ({ refused: reason(error) }));
+    inFlight.add(sending);
+    void sending.finally(() => inFlight.delete(sending));
+    return sending;
   };
 
   const made: HostConnection & { close(): Promise<void> } = {
@@ -2384,16 +2475,11 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
     createSession: async ({ provider, workingDirectory, config: values }) => {
       /*
        * The client chooses the URI, which is what makes the session
-       * addressable before the host has answered - and it is named after the
-       * provider, because the scheme is how every other client decides which
-       * provider a session belongs to.
-       *
-       * A session created as `ahp-session:/<uuid>` was one no other client
-       * could open: the host echoes the creator's name into its catalogue, and
-       * VS Code's window read the scheme, found no provider called
-       * `ahp-session`, and drew the row without ever loading its conversation.
+       * addressable before the host has answered. The scheme names the kind of
+       * resource, not the provider: `session-channel.md` says the provider is
+       * not encoded there, and the `provider` field is what carries it.
        */
-      const resource = `${provider}:/${randomUUID()}`;
+      const resource = `ahp-session:/${randomUUID()}`;
       // The channel *is* the new session's URI. `createSession` reads as a
       // root command and is not one: sending it to `ahp-root://` with the URI
       // beside it named a parameter the host has nothing called, so the
@@ -2617,14 +2703,13 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
       return { close: () => { live = false; hold.release(); } };
     },
 
-    writeTerminal: (uri, data) => {
-      try {
-        // Side-effect only: what comes back is `terminal/data`, once the shell
-        // has actually said something. Echoing here would print every
-        // keystroke twice on the client that typed it.
-        client.dispatch(uri, { type: 'terminal/input', data });
-      } catch (error) { options.onRefusal?.(uri, reason(error)); }
-    },
+    writeTerminal: (uri, data) => sent(uri, {
+      // Side-effect only: what comes back is `terminal/data`, once the shell
+      // has actually said something. Echoing here would print every
+      // keystroke twice on the client that typed it.
+      type: 'terminal/input',
+      data,
+    }),
 
     resizeTerminal: (uri, cols, rows) => {
       try { client.dispatch(uri, { type: 'terminal/resized', cols, rows }); }
@@ -2736,17 +2821,9 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
       channels.forget(uri);
     },
 
-    setArchived: (uri, archived) => {
-      try {
-        client.dispatch(uri, { type: 'session/isArchivedChanged', isArchived: archived });
-      } catch (error) { options.onRefusal?.(uri, reason(error)); }
-    },
+    setArchived: (uri, archived) => sent(uri, { type: 'session/isArchivedChanged', isArchived: archived }),
 
-    setRead: (uri, read) => {
-      try {
-        client.dispatch(uri, { type: 'session/isReadChanged', isRead: read });
-      } catch (error) { options.onRefusal?.(uri, reason(error)); }
-    },
+    setRead: (uri, read) => sent(uri, { type: 'session/isReadChanged', isRead: read }),
 
     /**
      * Watch one session, and the chat it dispatches to.
@@ -3022,16 +3099,19 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
      * need to know whether a turn is running.
      */
     queue: (uri, text, model) => {
-      dispatch(uri, {
+      // The id is made here, because it is this client's answer for a message
+      // the host will hold: `unqueue` needs the same one back.
+      const id = randomUUID();
+      return answered(uri, {
         type: 'chat/pendingMessageSet',
         kind: 'queued',
-        id: randomUUID(),
+        id,
         message: {
           text,
           origin: { kind: 'user' },
           ...(model ? { model: selectionOf(model) } : {}),
         },
-      });
+      }).then((answer) => ({ id, ...answer }));
     },
 
     /*
@@ -3054,50 +3134,47 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
       });
     },
 
-    unqueue: (uri, id) => {
-      dispatch(uri, { type: 'chat/pendingMessageRemoved', kind: 'queued', id });
-    },
+    unqueue: (uri, id) => answered(uri, { type: 'chat/pendingMessageRemoved', kind: 'queued', id }),
 
     stopTurn: (uri) => (async () => {
       const chatUri = await chatOf(uri);
-      if (!chatUri) return false;
+      if (!chatUri) {
+        return { cancelled: false, refused: channels.refusal(uri) ?? 'This session has no chat to stop a turn in.' };
+      }
       // The id is read back rather than remembered: a turn somebody started
       // in an editor is stoppable from here too, and its id is in the state.
       const state = await snapshotOf(chatUri);
       const active = bag(bag(state).activeTurn);
       const turnId = str(active.id);
-      if (!turnId) return false;
+      if (!turnId) return { cancelled: false };
       const started = Date.parse(str(active.startedAt) ?? '');
-      client.dispatch(chatUri, {
+      const answer = await sent(chatUri, {
         type: 'chat/turnCancelled',
         turnId,
         duration: Number.isNaN(started) ? 0 : Math.max(0, Date.now() - started),
       });
-      return true;
-    })().catch((error: unknown) => {
-      options.onRefusal?.(uri, reason(error));
-      return false;
-    }),
+      return answer.refused === undefined
+        ? { cancelled: true }
+        : { cancelled: false, refused: answer.refused };
+    })().catch((error: unknown) => ({ cancelled: false, refused: reason(error) })),
 
-    confirmToolCall: (uri, toolCallId, approved, optionId) => {
-      dispatch(uri, approved
-        ? {
-          type: 'chat/toolCallConfirmed',
-          toolCallId,
-          approved: true,
-          // A person pressed a button, and the record of why this ran should
-          // say so rather than blaming a setting.
-          confirmed: 'user-action',
-          ...(optionId ? { selectedOptionId: optionId } : {}),
-        }
-        : { type: 'chat/toolCallConfirmed', toolCallId, approved: false, reason: 'denied' });
-    },
+    confirmToolCall: (uri, toolCallId, approved, optionId) => answered(uri, approved
+      ? {
+        type: 'chat/toolCallConfirmed',
+        toolCallId,
+        approved: true,
+        // A person pressed a button, and the record of why this ran should
+        // say so rather than blaming a setting.
+        confirmed: 'user-action',
+        ...(optionId ? { selectedOptionId: optionId } : {}),
+      }
+      : { type: 'chat/toolCallConfirmed', toolCallId, approved: false, reason: 'denied' }),
 
     completeInput: (uri, requestId, accepted, answers) => {
       const typed = Object.fromEntries(
         Object.entries(answers).map(([id, answer]) => [id, answerValue(answer)]),
       );
-      dispatch(uri, {
+      return answered(uri, {
         type: 'chat/inputCompleted',
         requestId,
         response: accepted ? 'accept' : 'decline',

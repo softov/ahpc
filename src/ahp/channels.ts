@@ -1,5 +1,7 @@
 /** Who is holding which channel open, and what the host is saying on it. */
 
+import type { Sent } from './connection.js';
+
 /** One thing the host said on a channel: an action, or a protocol notification. */
 export interface ChannelEvent {
   type: string;
@@ -87,6 +89,19 @@ export interface Channels {
    * happens that could have changed it.
    */
   forget(uri?: string): void;
+  /**
+   * Wait for the host's answer to one dispatch.
+   *
+   * The host echoes an accepted action to the channel's subscribers with the
+   * `clientSeq` it was sent under, and an action it will not apply with the
+   * same origin and a reason. This is that answer, or a refusal when the
+   * deadline passes with nothing: a host that follows the protocol answers
+   * every action, so silence means the action was lost or ignored, and a
+   * caller told it was applied would report a change that never happened. It
+   * is registered synchronously, so a host that answers before the caller has
+   * returned still settles it.
+   */
+  await(clientSeq: number, deadlineMs: number): Promise<Sent>;
   /** Start reading a connection's event stream. Ends when the stream does. */
   drain(client: ChannelClient): void;
   /**
@@ -187,6 +202,11 @@ export interface ChannelsOptions {
 export function openChannels(options: ChannelsOptions): Channels {
   const held = new Map<string, Held>();
   const refused = new Map<string, string>();
+  /**
+   * Dispatches waiting for the host's answer, by the number they were sent
+   * under.
+   */
+  const waiting = new Map<number, (answer: Sent) => void>();
   let client = options.client;
   let seen = 0;
   /**
@@ -214,6 +234,37 @@ export function openChannels(options: ChannelsOptions): Channels {
   };
 
   /**
+   * Give one dispatch the answer that came for it.
+   *
+   * Returns whether a waiter took it, which is what decides if a rejection has
+   * already been answered: the caller that waited for it is the one that says
+   * what happened.
+   */
+  const settle = (clientSeq: unknown, why: unknown): boolean => {
+    if (typeof clientSeq !== 'number') return false;
+    const done = waiting.get(clientSeq);
+    if (done === undefined) return false;
+    waiting.delete(clientSeq);
+    done(typeof why === 'string' ? { refused: why } : {});
+    return true;
+  };
+
+  /**
+   * Whether this envelope answers a dispatch of this client's.
+   *
+   * `origin` names the client that sent the action, which is the protocol's
+   * reconciliation rule; a host that produced the action itself sends none,
+   * and that is not an echo of anything here.
+   */
+  const answered = (event: ChannelEvent): boolean => {
+    if (event.type !== 'action') return false;
+    const envelope = bag(event.params);
+    const origin = bag(envelope?.origin);
+    if (typeof origin?.clientId !== 'string' || origin.clientId !== options.clientId) return false;
+    return settle(origin.clientSeq, envelope?.rejectionReason);
+  };
+
+  /**
    * An action the host refused, which is not an action that happened.
    *
    * A rejected envelope carries the action the host declined to apply, so a
@@ -230,20 +281,26 @@ export function openChannels(options: ChannelsOptions): Channels {
    * client is nothing to say to the person sitting here, so it is dropped
    * without being reported; one with no origin at all is taken as ours,
    * because the alternative is losing the message a host that omits it sent.
+   * One a waiter has already taken is not reported either: it answered a
+   * command that is going to print it.
    */
-  const rejected = (uri: string, event: ChannelEvent): boolean => {
+  const rejected = (uri: string, event: ChannelEvent, claimed: boolean): boolean => {
     if (event.type !== 'action') return false;
     const envelope = bag(event.params);
     const why = envelope?.rejectionReason;
     if (typeof why !== 'string') return false;
     const from = bag(envelope?.origin)?.clientId;
     const mine = options.clientId === undefined || typeof from !== 'string' || from === options.clientId;
-    if (mine) options.onRejection?.(uri, why);
+    if (mine && !claimed) options.onRejection?.(uri, why);
     return true;
   };
 
   const deliver = (uri: string, event: ChannelEvent): void => {
-    if (rejected(uri, event)) return;
+    // Settled before `rejected`, so a rejection that answers a waiter is one
+    // the waiter takes rather than one reported a second time.
+    const claimed = answered(event);
+    if (rejected(uri, event, claimed)) return;
+
     note(event);
     const channel = held.get(uri);
     if (!channel) return;
@@ -481,6 +538,17 @@ export function openChannels(options: ChannelsOptions): Channels {
     refusal: (uri) => refused.get(uri),
     forget: (uri) => { if (uri === undefined) refused.clear(); else refused.delete(uri); },
 
+    await: (clientSeq, deadlineMs) => new Promise<Sent>((resolve) => {
+      const timer = setTimeout(() => {
+        waiting.delete(clientSeq);
+        resolve({ refused: `The host did not answer in ${Math.round(deadlineMs / 1000)} seconds.` });
+      }, deadlineMs);
+      waiting.set(clientSeq, (answer) => {
+        clearTimeout(timer);
+        resolve(answer);
+      });
+    }),
+
     drain: (next) => { drain(next, generation); },
 
     resume: (next, result) => {
@@ -561,6 +629,10 @@ export function openChannels(options: ChannelsOptions): Channels {
 
     detach: () => {
       generation += 1;
+      // An action sent on the connection that has gone will never be echoed,
+      // so its waiter is answered now rather than left to its deadline.
+      for (const done of waiting.values()) done({ refused: 'The connection went away before the host answered.' });
+      waiting.clear();
       for (const [uri, channel] of held) {
         if (channel.uses === 0) {
           clearTimeout(channel.leaving);

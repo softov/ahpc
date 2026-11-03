@@ -87,7 +87,7 @@ export function createTerminals(app: TextUIApp, host: HostConnection, report: (e
     write: (data) => {
       const uri = app.store.get<string>(OPEN_TERMINAL);
       if (!uri) return;
-      host.writeTerminal(uri, data);
+      void host.writeTerminal(uri, data).then((sent) => { if (sent.refused !== undefined) report(new Error(sent.refused)); });
     },
 
     resize: (cols, rows) => {

@@ -99,6 +99,17 @@ export class Scripted {
    * has no test of its own. `releaseHandshake` answers whichever is held.
    */
   holdHandshake = false;
+  /**
+   * Echo a dispatched action back to the channel's subscribers.
+   *
+   * What a host does with an action it applied, and the answer a dispatch
+   * that waits for one listens for. Off by default: most scenarios are about
+   * what the client sent, and an echo hands every draft and steer back to a
+   * reader that did not ask for them.
+   */
+  echo = false;
+  /** The `clientId` the handshake used, which an echo names as its origin. */
+  private clientId = 'ahpc-test';
   /** What `resourceResolve` answers. */
   resolveWith: Record<string, unknown> = { uri: 'file:///x', type: 'file' };
   /** The rows `sessionConfigCompletions` answers with. */
@@ -334,6 +345,9 @@ export class Scripted {
 
   private async answer(message: Frame): Promise<void> {
     const { id, method } = message;
+    if ((method === 'initialize' || method === 'reconnect') && typeof message.params?.clientId === 'string') {
+      this.clientId = message.params.clientId;
+    }
     /*
      * Nothing is answered before the handshake is.
      *
@@ -473,6 +487,23 @@ export class Scripted {
     if (method === 'sessionConfigCompletions') { await reply({ items: this.completionsWith }); return; }
     if (method !== undefined && method.startsWith('resource')) { await reply({}); return; }
     if (method === 'ping') { await reply(null); return; }
+    if (method === 'dispatchAction' && this.echo) {
+      // An applied action comes back to the channel's subscribers with the
+      // origin of the client that sent it, which is what reconciliation is.
+      const params = message.params ?? {};
+      this.seq += 1;
+      await this.send({
+        jsonrpc: '2.0',
+        method: 'action',
+        params: {
+          channel: params.channel,
+          action: params.action,
+          serverSeq: this.seq,
+          origin: { clientId: this.clientId, clientSeq: params.clientSeq },
+        },
+      });
+      return;
+    }
     // `unsubscribe` and `dispatchAction` are notifications: recorded above,
     // and answered with the silence the protocol asks for.
   }

@@ -37,7 +37,7 @@ describe('a session is created, spoken to, and read back', () => {
      * nobody opened.
      */
     const made = await host.createSession({ provider: 'claude', workingDirectory: '/work' });
-    expect(made.startsWith('claude:/')).toBe(true);
+    expect(made.startsWith('ahp-session:/')).toBe(true);
     const chat = `ahp-chat:/${made.slice(made.lastIndexOf('/') + 1)}`;
     scripted.states.set(made, { defaultChat: chat, chats: [{ resource: chat, title: 'Chat' }], status: 1 });
     scripted.states.set(chat, { turns: [] });
@@ -71,6 +71,21 @@ describe('a session is created, spoken to, and read back', () => {
     expect(reader.view()?.turns.some((turn) => turn.message === 'what is in this directory')).toBe(true);
 
     reader.close();
+    await host.close();
+  });
+
+  it('names a new session with the session scheme, and sends the provider beside it', async () => {
+    const { host, scripted } = await connect();
+
+    const made = await host.createSession({ provider: 'claude' });
+
+    expect(made).toMatch(/^ahp-session:\/[0-9a-f-]{36}$/);
+    // The provider travels in the request, beside the name: the protocol does
+    // not encode it in the scheme, so it is not part of the URI.
+    const created = scripted.asked.find((frame) => frame.method === 'createSession');
+    expect(created?.params?.provider).toBe('claude');
+    expect(created?.params?.channel).toBe(made);
+
     await host.close();
   });
 });

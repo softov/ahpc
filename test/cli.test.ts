@@ -8,7 +8,7 @@
  * answers and exits, so a host has nothing left to ask it for.
  */
 
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -16,6 +16,7 @@ import { join } from 'node:path';
 import { RpcError } from '@microsoft/agent-host-protocol/client';
 import { parse } from '../src/tui.js';
 import { SWITCHES, commandIn } from '../src/flags.js';
+import type { HostConnection } from '../src/ahp/connection.js';
 
 describe('the screen reads the flags it documents', () => {
   it('takes a directory to publish, read-only by default', () => {
@@ -256,6 +257,14 @@ describe('ahpc chat, reading a conversation rather than listing one', () => {
     expect(out).toContain('EVFILT_FS never fires on Linux');
     expect(out).toContain('agent');
     expect(out).toContain('libkqueue');
+  });
+
+  it('prints what a turn spent under it, and nothing under a turn that reported none', async () => {
+    const out = await run(['history', CHAT]);
+    expect(out).toContain('  in 12400 · out 830 · cache 9600/1200 · reasoning 300 · 0.031 USD · context 65000/200000');
+    // One agent turn reported usage; the question and the running turn did not,
+    // and a line under either would be numbers the host never sent.
+    expect(out.match(/^ {2}in \d+/gm)).toHaveLength(1);
   });
 
   it('carries the turns under --json and --full alike', async () => {
@@ -792,5 +801,131 @@ describe('ahpc session list, a page at a time', () => {
     const { code, err } = await run(['list', '--limit', '0']);
     expect(code).toBe(2);
     expect(err).toContain('--limit wants a positive whole number');
+  });
+});
+
+/*
+ * What `session show` prints when the host reports a task count.
+ *
+ * The tasks plugin is host-side, so the key arrives on the summary rather than
+ * on anything the client asks for: a session row carries `ahpd.tasks` or it
+ * does not, and the row is drawn from that.
+ */
+describe('ahpc session show, and the open tasks a session reports', () => {
+  const run = async (rest: string[]): Promise<string> => {
+    const home = mkdtempSync(join(tmpdir(), 'ahpc-show-'));
+    const had = { XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME, AHPC_HOST: process.env.AHPC_HOST };
+    process.env.XDG_CONFIG_HOME = home;
+    delete process.env.AHPC_HOST;
+    let out = '';
+    const write = process.stdout.write.bind(process.stdout);
+    process.stdout.write = ((chunk: string | Uint8Array) => { out += String(chunk); return true; }) as typeof process.stdout.write;
+    try {
+      const { cli } = await import('../src/cli/main.js');
+      expect(await cli('session', rest)).toBe(0);
+      // Read after the call: an object's fields are built in the order they
+      // are written, and `out` beside the await is empty.
+      return out;
+    }
+    finally {
+      process.stdout.write = write;
+      for (const [key, value] of Object.entries(had)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+      rmSync(home, { recursive: true, force: true });
+    }
+  };
+
+  it('prints the count the host reports, under the status', async () => {
+    const out = await run(['show', 'ahp-session:/1f0a']);
+    expect(out).toMatch(/Status\s+\S+ waiting on you/);
+    expect(out).toMatch(/Tasks\s+2 open/);
+  });
+
+  it('prints no Tasks row for a session no task names', async () => {
+    expect(await run(['show', 'ahp-session:/6b21'])).not.toContain('Tasks');
+  });
+});
+
+/*
+ * A command that sends one action, and the host's answer to it.
+ *
+ * `connect` is replaced with a script held for the length of a test rather
+ * than a host made per call: `queue` prints an id that `unqueue` takes back,
+ * and two connections are two hosts with two queues between them.
+ */
+describe('a command that sends an action, and the host\'s answer', () => {
+  const SESSION = 'ahp-session:/1f0a';
+
+  let host: HostConnection | undefined;
+
+  beforeEach(() => {
+    vi.resetModules();
+    host = undefined;
+    vi.doMock('../src/connect.js', async (importOriginal) => {
+      const real = await importOriginal<typeof import('../src/connect.js')>();
+      const { fakeHost } = await import('../src/ahp/fake.js');
+      return { ...real, connect: async () => { host ??= fakeHost(); return host; } };
+    });
+  });
+
+  afterEach(() => {
+    host = undefined;
+    vi.doUnmock('../src/connect.js');
+    vi.resetModules();
+  });
+
+  /** One command, with both streams caught rather than written. */
+  const capture = async (command: string, rest: string[]): Promise<{ code: number; out: string; err: string }> => {
+    let out = '';
+    let err = '';
+    const outWrite = process.stdout.write.bind(process.stdout);
+    const errWrite = process.stderr.write.bind(process.stderr);
+    process.stdout.write = ((chunk: string | Uint8Array) => { out += String(chunk); return true; }) as typeof process.stdout.write;
+    process.stderr.write = ((chunk: string | Uint8Array) => { err += String(chunk); return true; }) as typeof process.stderr.write;
+    try {
+      const { cli } = await import('../src/cli/main.js');
+      // The streams are read after the call, not beside it: an object's
+      // fields are built in the order they are written.
+      const code = await cli(command, rest);
+      return { code, out, err };
+    }
+    finally {
+      process.stdout.write = outWrite;
+      process.stderr.write = errWrite;
+    }
+  };
+
+  it('prints the id of the message it queued, and takes it back with that id', async () => {
+    const queued = await capture('queue', [SESSION, 'and then?']);
+    expect(queued.code).toBe(0);
+    expect(queued.err).toBe('');
+    expect(queued.out).toMatch(/^q\d+\n$/);
+
+    const taken = await capture('unqueue', [SESSION, queued.out.trim()]);
+    expect(taken).toEqual({ code: 0, out: '', err: '' });
+  });
+
+  it('gives the id to a reader under --json, so a script reads the same answer', async () => {
+    const { code, out } = await capture('queue', [SESSION, 'and then?', '--json']);
+    expect(code).toBe(0);
+    expect(JSON.parse(out)).toEqual({ id: expect.stringMatching(/^q\d+$/) });
+  });
+
+  it('says the host\'s reason and exits 1 when the message is not waiting', async () => {
+    const { code, out, err } = await capture('unqueue', [SESSION, 'no-such-id']);
+    expect(code).toBe(1);
+    expect(out).toBe('');
+    expect(err).toBe('No message with that id is waiting.\n');
+  });
+
+  it('says the host\'s reason and exits 1 when the tool call is not waiting', async () => {
+    const { code, err } = await capture('confirm', [SESSION, 'no-such-call']);
+    expect(code).toBe(1);
+    expect(err).toBe('No tool call with that id is waiting for an answer.\n');
+  });
+
+  it('says the host\'s reason and exits 1 when the question was never asked', async () => {
+    const { code, err } = await capture('answer', [SESSION, 'no-such-question']);
+    expect(code).toBe(1);
+    expect(err).toBe('No question with that id is waiting for an answer.\n');
   });
 });

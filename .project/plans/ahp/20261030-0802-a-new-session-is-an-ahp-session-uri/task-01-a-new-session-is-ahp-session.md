@@ -1,6 +1,6 @@
 ---
 title: A new session is `ahp-session:`
-status: todo
+status: implemented
 depends: []
 layer: "ahp"
 refs:
@@ -34,3 +34,9 @@ refs:
 - By hand against ahpd: the checks in the plan's *Final verification checklist*.
 
 ## Resume
+
+`createSession` names the session `ahp-session:/${randomUUID()}` at `src/ahp/live.ts:2449`, with `provider` still in the request beside the channel; the comment above it says the scheme names the kind of resource, not the provider.
+The comment on `sessionOfLink` at `src/links.ts:64-66` now says this client starts `ahp-session:/` and an older client or host may have started `<provider>:/`.
+`test/scenario.test.ts:41` expects the new scheme, and `:77` is the case for the request's `provider` and `channel`.
+
+Departures: none.

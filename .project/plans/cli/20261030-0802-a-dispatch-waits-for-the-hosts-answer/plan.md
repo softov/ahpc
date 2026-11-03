@@ -1,7 +1,7 @@
 ---
 title: A command that dispatches an action waits for the host's answer
 domain: cli
-status: planned
+status: active
 priority: high
 created: 2026-10-30
 revalidated: 2026-10-30
@@ -74,12 +74,12 @@ host -> action envelope { origin, rejectionReason? } -> channels.deliver -> the 
 | A dispatch method resolves `{ refused?: string }` and never rejects, as `stopTurn` does. | `(defaulted: the shape stopTurn already has)` | 01 |
 | A dispatch matches its echo by `origin.clientSeq` from `client.dispatch`. | `(defaulted: the protocol's reconciliation rule)` | 01 |
 | A dispatch holds its channel open until the echo arrives. | `(defaulted: a host echoes to the channel's subscribers)` | 01 |
-| A dispatch with no echo after 10 seconds resolves `refused: "The host did not answer in 10 seconds."`. | `(defaulted: a command must end, and a silent host is not a yes)` | 01 |
+| A dispatch with no answer after 10 seconds resolves `refused: "The host did not answer in 10 seconds."`. | Softov, 2026-11-03: fail with a line. ahpd main answers every action that ahpc waits on, and a silent host is not a yes. This replaces "Silence is success" of 2026-10-30. | 01 |
 | A refusal a waiter takes is not also sent to `onRefusal`. | `(defaulted: the claimed-or-reported pattern of refuse, and the double message of cancel)` | 01 |
 | `queue` resolves `{ id, refused? }`, and the CLI prints the id on stdout. | The brief, "Bugs in ahpc" | 02 |
 | A refused command prints the host's reason on stderr and exits 1. | The brief, "Bugs in ahpc" | 02 |
 | The MCP tools that dispatch return the refusal as a tool error. | `(defaulted: the tools and the shell share the seam and must agree)` | 02 |
-| The screen does not wait; it calls the methods with `void`. | `(defaulted: the screen already draws refusals through onRefusal)` | 02 |
+| The screen does not wait, and draws a refusal on its error line. | `(defaulted: the waiter takes the refusal, so onRefusal never sees it)` | 02 |
 | `cancel` prints one line when it cannot cancel. | The brief, "Bugs in ahpc" | 03 |
 | A `prompt` whose turn was cancelled prints "The turn was cancelled." on stderr and exits 1. | The brief, "Bugs in ahpc" | 03 |
 | The extra `failed` turn after a cancel is not in scope. | The brief says it is likely agent-claude, not ahpc | - |
@@ -96,23 +96,24 @@ host -> action envelope { origin, rejectionReason? } -> channels.deliver -> the 
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - A dispatch resolves on its echo](task-01-a-dispatch-resolves-on-its-echo.md) | todo | - |
-| [02 - A command exits with the host's answer](task-02-a-command-exits-with-the-answer.md) | todo | 01 |
-| [03 - A cancel says one thing](task-03-a-cancel-says-one-thing.md) | todo | - |
+| [01 - A dispatch resolves on its echo](task-01-a-dispatch-resolves-on-its-echo.md) | implemented | - |
+| [02 - A command exits with the host's answer](task-02-a-command-exits-with-the-answer.md) | implemented | 01 |
+| [03 - A cancel says one thing](task-03-a-cancel-says-one-thing.md) | implemented | - |
 
 ## Risks and tradeoffs
 
-- A host that never echoes makes a command wait 10 seconds and fail - ahpd and VS Code echo each own action.
+- An action the host does not answer makes a command wait 10 seconds and exit 1.
+  ahpd 0.11.0 does not answer an unknown id, so against that release a bad id fails after 10 seconds.
 - A waiter subscribes to a channel the command did not open - it releases the channel when the echo arrives.
 - Seven methods change their return type - the screen ignores the promise, so its behaviour stays the same.
 
 ## Resume state
 
-- **Done so far:** planned 2026-10-30.
-- **Next action:** [task-01-a-dispatch-resolves-on-its-echo.md](task-01-a-dispatch-resolves-on-its-echo.md).
+- **Done so far:** all three tasks are implemented.
+- **Next action:** write `implemented.md` and wait for review; the by-hand checks against ahpd are still waiting.
 - **Open questions:** none.
-- **Watch out for:** the chat dispatches go to the session's default chat, so the waiter holds the chat channel, not the session channel.
-  `setRead` and `setArchived` go to the session channel.
+- **Watch out for:** `test/dispatch.test.ts` is written and passing but untracked, because this environment refuses `git add`; it needs committing from a shell where staging is allowed.
+  The by-hand checks in *Final verification* were not run: this worktree never connects to a host.
 
 ## Final verification checklist
 

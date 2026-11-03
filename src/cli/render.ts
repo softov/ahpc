@@ -72,6 +72,14 @@ export const branch = (session: SessionSummary): string => {
   return typeof found === 'string' ? found : '';
 };
 
+/** The open tasks a host reports under `_meta['ahpd.tasks']`, if it reports a count. */
+export const openTasks = (session: SessionSummary): string => {
+  const tasks = session._meta?.['ahpd.tasks'];
+  if (typeof tasks !== 'object' || tasks === null) return '';
+  const open = (tasks as { open?: unknown }).open;
+  return typeof open === 'number' ? `${open} open` : '';
+};
+
 /**
  * Rows as columns, sized to what is actually in them.
  *

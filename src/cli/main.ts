@@ -8,8 +8,8 @@ import { configPath, connectionToken, loadConfig } from '../config.js';
 import { checkingUpdates, readUpdate, updateNotice } from '../update.js';
 import { manifest } from '../version.js';
 import type { Where } from '../connect.js';
-import { ago, archived, branch, json, line, mark, project, table } from './render.js';
-import type { HostConnection, HostEvent } from '../ahp/connection.js';
+import { ago, archived, branch, json, line, mark, openTasks, project, table } from './render.js';
+import type { HostConnection, HostEvent, Sent } from '../ahp/connection.js';
 import { operate } from '../ahp/operate.js';
 import {
   CREATE_PULL_REQUEST, EMPTY_DRAFT, PREPARE_PULL_REQUEST, commitMeta, createPrMeta, externalLink, pullRequestDraft,
@@ -23,7 +23,7 @@ import type { Group } from '../mcp/tools.js';
 import { SERVER } from '../mcp/serve.js';
 import { stdio } from '../mcp/stdio.js';
 import { serve as serveHttp } from '../mcp/http.js';
-import type { Answer, ChatOrigin, ModelSelection, SessionSummary, SessionUri, Turn } from '../ahp/types.js';
+import type { Answer, ChatOrigin, ModelSelection, SessionSummary, SessionUri, Turn, TurnUsage } from '../ahp/types.js';
 import { detectLocale } from '../i18n/locale.js';
 
 export const HELP = `ahpc - drive an agent host from a shell
@@ -369,6 +369,30 @@ const lastFailure = async (host: HostConnection, uri: SessionUri): Promise<strin
 };
 
 /**
+ * What a turn spent, in one line, with only the parts the host reported.
+ *
+ * Every field is optional and none is defaulted, so a part with no number is
+ * left out rather than printed as a zero the host never sent. A cache count
+ * is a pair - read and written - and a host that reports one names which.
+ */
+function usageLine(usage: TurnUsage): string {
+  const parts: string[] = [];
+  if (usage.inputTokens !== undefined) parts.push(`in ${usage.inputTokens}`);
+  if (usage.outputTokens !== undefined) parts.push(`out ${usage.outputTokens}`);
+  if (usage.cacheReadTokens !== undefined && usage.cacheWriteTokens !== undefined) {
+    parts.push(`cache ${usage.cacheReadTokens}/${usage.cacheWriteTokens}`);
+  } else if (usage.cacheReadTokens !== undefined) {
+    parts.push(`cache ${usage.cacheReadTokens} read`);
+  } else if (usage.cacheWriteTokens !== undefined) {
+    parts.push(`cache ${usage.cacheWriteTokens} written`);
+  }
+  if (usage.reasoningTokens !== undefined) parts.push(`reasoning ${usage.reasoningTokens}`);
+  if (usage.price !== undefined) parts.push(`${usage.price.amount} ${usage.price.currency}`);
+  if (usage.context !== undefined) parts.push(`context ${usage.context.used}/${usage.context.size}`);
+  return parts.join(' · ');
+}
+
+/**
  * A conversation, as `session history` and `chat history` both print it.
  *
  * Shared rather than repeated, because the two answer the same question about
@@ -382,10 +406,27 @@ function printTurns(turns: Turn[], wants: boolean, full: boolean): number {
     line(`${turn.role === 'user' ? '›' : '‹'} ${turn.role}  ${ago(turn.at)}  ${turn.state}`);
     const text = turn.role === 'user' ? (turn.message ?? '') : spoken(turn);
     if (text) line(`  ${text.replace(/\n/g, '\n  ')}`);
+    // Under what the turn said, because it is about the turn and not a part of
+    // its reply. A report carrying only a session total prints nothing here.
+    const spent = turn.usage === undefined ? '' : usageLine(turn.usage);
+    if (spent) line(`  ${spent}`);
     line();
   }
   return 0;
 }
+
+/**
+ * What a command that sends one action exits with.
+ *
+ * The host answers every action it is sent: it applied it, or it said why
+ * not. Its reason is a sentence of its own and goes to stderr, so a pipe
+ * still reads only what the command produced.
+ */
+const exitOf = (sent: Sent): number => {
+  if (sent.refused === undefined) return 0;
+  process.stderr.write(`${sent.refused}\n`);
+  return 1;
+};
 
 /**
  * One command, and then the process is done.
@@ -1042,6 +1083,7 @@ async function sessions(host: HostConnection, args: Args, wants: boolean): Promi
         ['Session', uri],
         ['Title', row?.title ?? ''],
         ['Status', row ? mark(row.status) : ''],
+        ['Tasks', row ? openTasks(row) : ''],
         ['Error', stopped],
         ['Project', row ? [project(row), branch(row)].filter(Boolean).join('  ') : ''],
         ['Workspace', (row?.workingDirectories ?? []).map((d) => d.replace(/^file:\/\//, '')).join(', ')],
@@ -1052,8 +1094,8 @@ async function sessions(host: HostConnection, args: Args, wants: boolean): Promi
       return 0;
     }
     case 'rm': await host.disposeSession(uri); line(`Disposed ${uri}.`); return 0;
-    case 'read': host.setRead(uri, !args.has('--unread')); return 0;
-    case 'archive': host.setArchived(uri, !args.has('--undo')); return 0;
+    case 'read': return exitOf(await host.setRead(uri, !args.has('--unread')));
+    case 'archive': return exitOf(await host.setArchived(uri, !args.has('--undo')));
     case 'config': {
       const config = await host.config(uri);
       if (wants) { json(config); return 0; }
@@ -1320,8 +1362,7 @@ async function shells(host: HostConnection, args: Args, wants: boolean): Promise
   if (verb === 'send') {
     // A newline, because a shell over pipes runs a line rather than a string,
     // and `terminal send ls` that never runs reads as a terminal that is broken.
-    host.writeTerminal(uri, `${needs(args, 2, 'something to type')}\n`);
-    return 0;
+    return exitOf(await host.writeTerminal(uri, `${needs(args, 2, 'something to type')}\n`));
   }
   if (verb === 'watch') {
     let last = '';
@@ -1613,6 +1654,11 @@ async function turns(host: HostConnection, command: string, args: Args, wants: b
     for (const message of answer === undefined ? [] : failure(answer)) {
       process.stderr.write(`${message}\n`);
     }
+    /*
+     * A cancelled turn leaves no error part behind, so `failure` has nothing
+     * to say about it and the run ended with a 1 that looked like a bug.
+     */
+    if (answer?.state === 'cancelled') process.stderr.write('The turn was cancelled.\n');
     return answer;
   };
 
@@ -1662,19 +1708,24 @@ async function turns(host: HostConnection, command: string, args: Args, wants: b
     case 'cancel': {
       // Awaited, because the cancel is sent only once the running turn's id
       // has been read back, and the connection closes when this returns.
-      if (await host.stopTurn(needs(args, 0, 'a session URI') as SessionUri)) return 0;
+      const stopped = await host.stopTurn(needs(args, 0, 'a session URI') as SessionUri);
+      if (stopped.refused !== undefined) return exitOf(stopped);
+      if (stopped.cancelled) return 0;
       process.stderr.write('No turn is running.\n');
       return 1;
     }
     case 'queue': {
       const uri = needs(args, 0, 'a session URI') as SessionUri;
-      host.queue(uri, needs(args, 1, 'something to say'), selected(args));
+      const queued = await host.queue(uri, needs(args, 1, 'something to say'), selected(args));
+      if (queued.refused !== undefined) return exitOf(queued);
+      // The id is the whole of what a queue leaves behind that `unqueue` takes
+      // back, so it is the one thing this command has to print.
+      if (wants) json({ id: queued.id }); else line(queued.id);
       return 0;
     }
     case 'unqueue': {
       const uri = needs(args, 0, 'a session URI') as SessionUri;
-      host.unqueue(uri, needs(args, 1, 'a queued message id'));
-      return 0;
+      return exitOf(await host.unqueue(uri, needs(args, 1, 'a queued message id')));
     }
 
     case 'watch': {
@@ -1728,8 +1779,7 @@ async function turns(host: HostConnection, command: string, args: Args, wants: b
     case 'confirm': {
       const uri = needs(args, 0, 'a session URI') as SessionUri;
       const call = needs(args, 1, 'a tool call id');
-      host.confirmToolCall(uri, call, !args.has('--deny'), args.value('--option'));
-      return 0;
+      return exitOf(await host.confirmToolCall(uri, call, !args.has('--deny'), args.value('--option')));
     }
     case 'answer': {
       const uri = needs(args, 0, 'a session URI') as SessionUri;
@@ -1741,8 +1791,7 @@ async function turns(host: HostConnection, command: string, args: Args, wants: b
       for (const [key, value] of Object.entries(args.pairs('--field'))) {
         answers[key] = { kind: 'text', value } as Answer;
       }
-      host.completeInput(uri, request, !args.has('--reject'), answers);
-      return 0;
+      return exitOf(await host.completeInput(uri, request, !args.has('--reject'), answers));
     }
 
     case 'dispatch': {

@@ -21,6 +21,8 @@ import type { Frame, Scripted } from './scenario.js';
 
 const held = vi.hoisted(() => ({
   scripted: undefined as Scripted | undefined,
+  /** What the session answers a `subscribe` with, so a test can leave it no chat. */
+  session: {} as Record<string, unknown>,
   /** What the chat answers a `subscribe` with, so each test says whether a turn runs. */
   chat: {} as Record<string, unknown>,
 }));
@@ -31,7 +33,8 @@ vi.mock('../src/connect.js', async (importOriginal) => {
     ...real,
     connect: async () => {
       const made = await scripted((one) => {
-        one.states.set(SESSION, { defaultChat: CHAT, chats: [{ resource: CHAT, title: 'Chat' }], status: 1 });
+        one.echo = true;
+        one.states.set(SESSION, held.session);
         one.states.set(CHAT, held.chat);
       });
       held.scripted = made.scripted;
@@ -51,6 +54,7 @@ beforeEach(() => {
   had = { XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME, AHPC_HOST: process.env.AHPC_HOST };
   process.env.XDG_CONFIG_HOME = home;
   delete process.env.AHPC_HOST;
+  held.session = { defaultChat: CHAT, chats: [{ resource: CHAT, title: 'Chat' }], status: 1 };
   held.chat = { resource: CHAT, title: 'Chat', turns: [], activeTurn: TURN };
 });
 
@@ -107,13 +111,46 @@ describe('cancel', () => {
     expect(err).toBe('No turn is running.\n');
     expect(dispatched()).toEqual([]);
   });
+
+  it('says one line, and exits 1, when there is no chat to cancel in', async () => {
+    held.session = { chats: [], status: 1 };
+    const { cli } = await import('../src/cli/main.js');
+    const { code, out, err } = await capture(() => cli('cancel', [SESSION]));
+
+    expect(code).toBe(1);
+    expect(out).toBe('');
+    expect(err).toBe('This session has no chat to stop a turn in.\n');
+    expect(err.split('\n').filter((one) => one !== '')).toHaveLength(1);
+  });
+
+  it('says the turn was cancelled, and exits 1, when another client stops it', async () => {
+    held.chat = { resource: CHAT, title: 'Chat', turns: [] };
+    const { cli } = await import('../src/cli/main.js');
+
+    const answering = capture(() => cli('prompt', [SESSION, 'count']));
+    for (let i = 0; i < 400 && !dispatched().some((one) => one.action.type === 'chat/turnStarted'); i += 1) {
+      await new Promise((tick) => { setTimeout(tick, 1); });
+    }
+    const started = dispatched().find((one) => one.action.type === 'chat/turnStarted');
+    expect(started).toBeDefined();
+    // Another client's cancel, relayed as an action on the chat the way a
+    // host relays one it applied.
+    await held.scripted?.act(CHAT, {
+      type: 'chat/turnCancelled', turnId: String(started?.action.turnId), duration: 1_000,
+    });
+
+    const { code, err } = await answering;
+    expect(code).toBe(1);
+    expect(err).toBe('The turn was cancelled.\n');
+  });
 });
 
 /*
  * The rest of them, each against the action it is.
  *
- * None of these waits on the host's answer, since the protocol gives a
- * dispatch none to wait on; what each must do is have sent it.
+ * The ones that wait for the host's answer have it by the time they return;
+ * `session set`, `session toggle` and `dispatch` do not wait, and what each
+ * must do here is have sent its action before the command returned.
  */
 describe('every other command that sends one action', () => {
   const cases: [string, string[], string, string][] = [

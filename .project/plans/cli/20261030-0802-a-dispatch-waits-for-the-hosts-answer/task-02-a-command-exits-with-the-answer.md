@@ -1,6 +1,6 @@
 ---
 title: A command exits with the host's answer
-status: todo
+status: implemented
 depends: [task-01-a-dispatch-resolves-on-its-echo.md]
 layer: "cli, mcp, screen"
 refs:
@@ -25,7 +25,7 @@ The MCP tools that dispatch do the same.
 - `UPDATE: src/mcp/tools.ts:346` - `queue_turn` returns `{ queued: true, id }`, or the refusal as a tool error.
 - `UPDATE: src/mcp/tools.ts:422-451` - `confirm_tool_call` and `answer_question` return the refusal as a tool error.
 - `UPDATE: src/mcp/tools.ts:669` - the terminal send tool returns the refusal as a tool error.
-- `UPDATE: src/control.ts:823-1014` - the screen calls each changed method with `void`.
+- `UPDATE: src/control.ts:823-1014` - the screen passes each changed call to `told`, which draws a refusal.
 - `UPDATE: docs/subjects/TURNS.md` - say that `queue` prints the id and that each command exits with the host's answer.
 - `UPDATE: test/cli.test.ts` - the cases in *Validation*.
 - `UPDATE: test/mcp.test.ts` - the tool cases in *Validation*.
@@ -36,7 +36,7 @@ The MCP tools that dispatch do the same.
 2. Use the helper in the seven commands.
 3. Print the id from `queue` on stdout, as one line, or as `{ "id": ... }` with `--json`.
 4. Change the MCP tools to throw the refusal, as the other tools report an error.
-5. Add `void` to each call in `control.ts`.
+5. Pass each call in `control.ts` to `told`.
 6. Update `docs/subjects/TURNS.md`.
 7. Add the tests.
 
@@ -51,3 +51,16 @@ The MCP tools that dispatch do the same.
 - By hand against ahpd: the checks in the plan's *Final verification checklist*.
 
 ## Resume
+
+`exitOf` at `src/cli/main.ts:397` is the one helper: it returns 0 when `refused` is absent, and otherwise writes the host's sentence to stderr and returns 1.
+`session read` and `session archive` use it at `:1068-1069`, `terminal send` at `:1334`, `queue` and `unqueue` at `:1681-1692`, `confirm` and `answer` at `:1743-1760`.
+`queue` prints the id with `line` or `{ id }` with `json`, and returns `exitOf` directly when the host refused, so a refusal prints no id.
+`applied` at `src/mcp/tools.ts:137` throws the refusal as an `Error`, which `serve.ts` already turns into `isError` content; `queue_turn` returns `{ queued: true, id }`, and `confirm_tool_call`, `answer_question` and `send_to_terminal` return their usual result when the host applied the action.
+`src/control.ts` passes all eight sites to `told`, so the screen does not wait and still draws a refusal.
+`docs/subjects/TURNS.md` gains one paragraph after the `cancel` line: `queue` prints the id, and each command exits with the host's answer.
+`test/cli.test.ts` holds five cases against one scripted host held across the two calls of a test, because a queue lives on a host rather than in the command; `test/mcp.test.ts` holds the `queue_turn` id and the refused `confirm_tool_call`.
+
+Departures:
+
+- The task named the main.ts helper's behaviour rather than its name; it is `exitOf`, and the MCP one is `applied`, matching the verbs the surrounding helpers use.
+- `test/dispatch.test.ts` from task 01 is still untracked: this environment refuses `git add`, so a new file cannot be committed. It passes; it needs a commit from a shell where staging is permitted.

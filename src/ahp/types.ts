@@ -61,8 +61,9 @@ export interface SessionSummary {
   /**
    * Provider-specific metadata, opaque but for the keys a client knows.
    *
-   * `git.branch` is the one read here - it is the protocol's well-known key
-   * and what the reference host puts there. Anything else is carried and
+   * `git.branch` is the protocol's well-known key and what the reference host
+   * puts there; `ahpd.tasks` is what a host with the tasks plugin reports,
+   * `{ open }`. Those two are the ones read here. Anything else is carried and
    * ignored rather than dropped, because the next reader of this row may know
    * a key this one does not.
    */
@@ -520,6 +521,10 @@ export interface TurnUsage {
   outputTokens?: number;
   /** Input tokens read from cache rather than sent. */
   cacheReadTokens?: number;
+  /** Input tokens written to the cache, from `_meta['ahpd.cacheWriteTokens']`. */
+  cacheWriteTokens?: number;
+  /** Tokens spent reasoning, from `_meta['ahpd.reasoningTokens']`. */
+  reasoningTokens?: number;
   /** The model the host billed, which may differ from what the turn asked for. */
   model?: string;
   /** What automatic routing resolved to, when the request went through Auto. */
@@ -528,6 +533,20 @@ export interface TurnUsage {
   cost?: number;
   /** The session's total cost in credits, from `_meta.copilotUsage.sessionTotalNanoAiu`. */
   sessionCost?: number;
+  /**
+   * How full the context window is, from `_meta['ahpd.context']`.
+   *
+   * The window and what it holds, not what the turn spent: a host that sends
+   * only this has counted no tokens for the turn.
+   */
+  context?: { used: number; size: number };
+  /**
+   * What the turn was priced at, from `_meta['ahpd.cost']`.
+   *
+   * Apart from `cost`, which is in credits: this one is money in a currency of
+   * its own, and one field cannot hold both a number and a unit.
+   */
+  price?: { amount: number; currency: string };
 }
 
 export interface ModelRow {

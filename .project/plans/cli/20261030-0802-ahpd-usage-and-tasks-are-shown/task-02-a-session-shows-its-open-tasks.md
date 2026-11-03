@@ -1,6 +1,6 @@
 ---
 title: A session shows its open tasks
-status: todo
+status: implemented
 depends: []
 layer: "cli"
 refs:
@@ -32,3 +32,11 @@ refs:
 - `npm test` passes.
 
 ## Resume
+
+`openTasks` at `src/cli/render.ts:76` reads `_meta['ahpd.tasks'].open` when it is a number and answers `<n> open`, otherwise an empty cell; it sits beside `branch`, which is the other `_meta` reader.
+`session show` at `src/cli/main.ts:1086` carries the `Tasks` row after `Status`, and the table's empty filter drops it for a session no task names.
+The doc comment on `SessionSummary._meta` at `src/ahp/types.ts:61-69` now names `ahpd.tasks` beside `git.branch`.
+`test/cli.test.ts` has the two cases, against the seeded session `ahp-session:/1f0a` (`src/ahp/fake.ts:826`, `openTasks: 2`) and `ahp-session:/6b21`, which has none.
+
+Departures: the reader lives in `src/cli/render.ts` beside `branch` rather than inline in `main.ts`, because the summary's `_meta` is read there for both rows.
+`seed()` in the fake host gained an `openTasks` option so a seeded summary can carry the key the way the plugin sends it.

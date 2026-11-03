@@ -19,7 +19,7 @@
  * groups a caller asks for; see `Group`.
  */
 
-import type { HostConnection } from '../ahp/connection.js';
+import type { HostConnection, Sent } from '../ahp/connection.js';
 import { SessionFlag } from '../ahp/types.js';
 import type { Answer, SessionSummary, SessionUri, TerminalState, Turn } from '../ahp/types.js';
 import { TurnRunning, failure, spoken, turn as runTurn, until } from '../wait.js';
@@ -125,6 +125,17 @@ const pathOf = (input: Record<string, unknown>, key = 'path'): string => {
 function has<T>(part: T | undefined, what: string): T {
   if (part === undefined) throw new Error(`This host serves no ${what}. A host is given one, and this one was not.`);
   return part;
+}
+
+/**
+ * The host's reason for not doing what a tool asked, as the tool's error.
+ *
+ * A thrown error is what the server turns into `isError` content, which is
+ * the shape a model can read and act on; a tool that returned a refusal as
+ * its result would look like the thing happened.
+ */
+function applied(sent: Sent): void {
+  if (sent.refused !== undefined) throw new Error(sent.refused);
 }
 
 export const TOOLS: Tool[] = [
@@ -343,7 +354,11 @@ export const TOOLS: Tool[] = [
       required: ['session', 'text'],
       additionalProperties: false,
     },
-    run: async (host, input) => { host.queue(uriOf(input), text(input.text)); return { queued: true }; },
+    run: async (host, input) => {
+      const queued = await host.queue(uriOf(input), text(input.text));
+      applied(queued);
+      return { queued: true, id: queued.id };
+    },
   },
   {
     name: 'cancel_turn',
@@ -356,7 +371,11 @@ export const TOOLS: Tool[] = [
       required: ['session'],
       additionalProperties: false,
     },
-    run: async (host, input) => ({ cancelled: await host.stopTurn(uriOf(input)) }),
+    run: async (host, input) => {
+      const stopped = await host.stopTurn(uriOf(input));
+      applied(stopped);
+      return { cancelled: stopped.cancelled };
+    },
   },
   {
     name: 'wait_for_attention',
@@ -419,12 +438,12 @@ export const TOOLS: Tool[] = [
     },
     run: async (host, input) => {
       const option = text(input.optionId);
-      host.confirmToolCall(
+      applied(await host.confirmToolCall(
         uriOf(input),
         text(input.toolCallId),
         input.approved === true,
         option === '' ? undefined : option,
-      );
+      ));
       return { answered: true };
     },
   },
@@ -448,7 +467,7 @@ export const TOOLS: Tool[] = [
       const answers = typeof input.answers === 'object' && input.answers !== null
         ? input.answers as Record<string, Answer>
         : {};
-      host.completeInput(uriOf(input), text(input.requestId), input.reject !== true, answers);
+      applied(await host.completeInput(uriOf(input), text(input.requestId), input.reject !== true, answers));
       return { answered: true };
     },
   },
@@ -666,7 +685,7 @@ export const TOOLS: Tool[] = [
       additionalProperties: false,
     },
     run: async (host, input) => {
-      host.writeTerminal(pathOf(input, 'terminal'), `${text(input.text)}${input.newline === false ? '' : '\n'}`);
+      applied(await host.writeTerminal(pathOf(input, 'terminal'), `${text(input.text)}${input.newline === false ? '' : '\n'}`));
       return { sent: true };
     },
   },
