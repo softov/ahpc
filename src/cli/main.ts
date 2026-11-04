@@ -950,8 +950,9 @@ export async function cli(command: string, rest: string[]): Promise<number> {
      *
      * A command run with no screen has nobody to ask, so a `-32007` is the
      * host saying which resource it wants and this is the answer: name it, name
-     * the variable that satisfies it, and exit 1. Nothing is retried, because
-     * the act may already have done something before it was refused.
+     * the variable that satisfies it, and exit 1. The act is not run again
+     * here: a shell has nobody to ask, and an exported variable is pushed on
+     * every connection, so the next run carries it.
      */
     const refusal = authRequiredOf(error);
     if (refusal === null) {

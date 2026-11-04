@@ -117,6 +117,37 @@ describe('the credential prompt', () => {
     await t.unmount();
   });
 
+  it('runs a refused createSession once more, and creates one session', async () => {
+    // Nothing is protected at boot: the refusal this case needs is its own.
+    const { t, host } = await open(() => undefined);
+    const real = host.createSession;
+    let asked = 0;
+    host.createSession = async (request) => {
+      asked += 1;
+      if (asked === 1) throw refused(RESOURCE);
+      return await real.call(host, request);
+    };
+    const pushed = watchSignIn(host);
+    const before = (await host.listSessions()).length;
+
+    // Held until the prompt is answered, which is what the retry is made of.
+    const made = controllerOf(t).create({ provider: 'claude' });
+    for (let i = 0; i < 10; i++) await t.settle();
+    expect(t.getAllByComponent('SignInPrompt')).toHaveLength(1);
+
+    await submit(t, 'tok-created');
+    const uri = await made;
+
+    // One credential, one more createSession, and one session to show for it.
+    expect(pushed).toEqual([{ resource: RESOURCE, token: 'tok-created' }]);
+    expect(asked).toBe(2);
+    const after = await host.listSessions();
+    expect(after).toHaveLength(before + 1);
+    expect(after.map((one) => one.resource)).toContain(uri);
+
+    await t.unmount();
+  });
+
   it('keeps the prompt open, with the host words, when the credential is refused', async () => {
     const { t, host } = await open();
     host.authenticate = async () => { throw new Error('that token is not good'); };
