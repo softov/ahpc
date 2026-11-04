@@ -1,6 +1,6 @@
 ---
 title: import and export move a file
-status: todo
+status: done
 depends: [task-01-new-edit-and-duplicate.md]
 layer: "cli"
 refs:

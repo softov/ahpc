@@ -2611,10 +2611,15 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
       const result = bag(await client.request('listAutomationTriggerDefinitions', { channel: ROOT }));
       return list(result.items).map((raw) => {
         const one = bag(raw);
+        const events = list(one.events).map(bag).flatMap((event) => {
+          const id = str(event.id);
+          return id ? [{ id, ...(str(event.title) ? { title: str(event.title) as string } : {}) }] : [];
+        });
         return {
           kind: str(one.kind) ?? str(one.type) ?? '',
           ...(str(one.title) ? { title: str(one.title) as string } : {}),
           ...(str(one.description) ? { description: str(one.description) as string } : {}),
+          ...(events.length > 0 ? { events } : {}),
         };
       }).filter((one) => one.kind !== '');
     },

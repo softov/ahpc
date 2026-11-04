@@ -1,6 +1,8 @@
 /** Every command, and the argv reading that picks one. */
 
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
+import { resolve as resolvePath } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { connect } from '../connect.js';
 import { askFor, authRequiredOf, failureWords, hostWords } from '../ahp/auth.js';
 import { tokenVariable } from '../ahp/tokens.js';
@@ -15,6 +17,10 @@ import {
   CREATE_PULL_REQUEST, EMPTY_DRAFT, PREPARE_PULL_REQUEST, commitMeta, createPrMeta, externalLink, pullRequestDraft,
 } from '../ahp/followup.js';
 import { SWITCHES } from '../flags.js';
+import {
+  automationFile, automationToBlueprint, isVsCodeFile, parseAutomationBlueprint, readAutomationFile,
+  scheduleTrigger, serializeAutomationBlueprint, unpinned,
+} from '../automation-file.js';
 import { parseSessionLink, sessionOfLink } from '../links.js';
 import { decodeStatus } from '../ahp/status.js';
 import { TurnRunning, failure, spoken, turn as runTurn, until } from '../wait.js';
@@ -107,6 +113,15 @@ Automations
   automation show <uri>        one of them                            [--json]
   automation triggers          what this host can trigger on          [--json]
   automation runs <uri>        its history, every page                [--json]
+  automation new               make one, switched on
+                               --prompt T  and  --schedule CRON [--time-zone Z]
+                               or --on TYPE:EVENT   [--title T] [--agent P]
+                               [--model M] [--folder DIR]
+  automation edit <uri>        change the fields given, the same flags
+  automation duplicate <uri>   a copy, switched off, titled '<title> (copy)'
+  automation export <uri>      as ahpd's .automation.md     [--out PATH]
+                               or VS Code's                    [--vscode]
+  automation import <file>     a new one, switched off  [--folder DIR] [--vscode]
   automation run <uri>         start it now
   automation enable <uri>      switch it on
   automation disable <uri>     switch it off
@@ -1517,6 +1532,8 @@ async function automation(host: HostConnection, args: Args, wants: boolean): Pro
     return 0;
   }
 
+  if (['new', 'edit', 'duplicate', 'import', 'export'].includes(verb)) return authorAutomation(host, verb, args);
+
   const uri = needs(args, 1, 'an automation URI');
   if (verb === 'show') {
     const found = (await host.automations()).find((one) => one.resource === uri);
@@ -1569,7 +1586,223 @@ async function automation(host: HostConnection, args: Args, wants: boolean): Pro
     await host.removeAutomation(uri);
     return 0;
   }
-  throw new Fault(`No 'automation ${verb}'. Try list, show, triggers, runs, run, enable, disable, rm.`);
+  throw new Fault(`No 'automation ${verb}'. Try list, show, triggers, runs, new, edit, duplicate, import, export, run, enable, disable, rm.`);
+}
+
+/** A record, or an empty one. */
+const record = (value: unknown): Record<string, unknown> =>
+  (typeof value === 'object' && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : {});
+
+/** A folder as the `file://` URI a definition holds, read against the current folder. */
+const folderUri = (path: string): string => pathToFileURL(resolvePath(path)).href;
+
+/** The schedule trigger `--schedule` and `--time-zone` ask for, keeping the id of the one it replaces. */
+function scheduleOf(args: Args, held?: Record<string, unknown>): Record<string, unknown> | undefined {
+  // `--time-zone` alone moves the schedule an automation holds to another zone.
+  const expression = args.value('--schedule')
+    ?? (args.value('--time-zone') !== undefined ? record(held?.schedule).expression as string | undefined : undefined);
+  if (expression === undefined) return undefined;
+  const zone = args.value('--time-zone') ?? (record(held?.schedule).timeZone as string | undefined)
+    ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'UTC';
+  return {
+    ...(held ?? {}),
+    id: typeof held?.id === 'string' ? held.id : 't1',
+    kind: 'schedule',
+    schedule: { expression, timeZone: zone },
+    misfirePolicy: typeof held?.misfirePolicy === 'string' ? held.misfirePolicy : 'runOnce',
+  };
+}
+
+/**
+ * The event trigger `--on <type>:<event>` asks for, with the titles the host gives.
+ *
+ * Refused for a type the host does not list, and for an event the type does not
+ * list when it lists them: a trigger the host cannot fire is one it refuses on
+ * save, with less to go on.
+ */
+async function eventOf(host: HostConnection, args: Args): Promise<Record<string, unknown> | undefined> {
+  const on = args.value('--on');
+  if (on === undefined) return undefined;
+  const at = on.indexOf(':');
+  if (at <= 0 || at === on.length - 1) throw new Fault(`--on wants <type>:<event>, such as session:turnCompleted, not ${on}.`);
+  const type = on.slice(0, at);
+  const event = on.slice(at + 1);
+  const offered = host.automationTriggers ? await host.automationTriggers() : [];
+  const found = offered.find((one) => one.kind === type);
+  if (!found) throw new Fault(`This host has no trigger called ${type}. See ahpc automation triggers.`);
+  const picked = found.events?.find((one) => one.id === event);
+  if (found.events !== undefined && !picked) {
+    throw new Fault(`${type} has no event called ${event}. It has ${found.events.map((one) => one.id).join(', ')}.`);
+  }
+  return {
+    id: 'e1',
+    kind: 'event',
+    type,
+    title: found.title ?? type,
+    events: [{ id: event, ...(picked?.title ? { title: picked.title } : {}) }],
+    config: {},
+  };
+}
+
+/** The session template from `--agent`, `--model` and `--folder`, over the one an automation holds. */
+function sessionOf(args: Args, held: Record<string, unknown> = {}): Record<string, unknown> {
+  const agent = args.value('--agent');
+  const model = args.value('--model');
+  const folder = args.value('--folder');
+  return {
+    ...held,
+    ...(agent !== undefined ? { provider: agent } : {}),
+    ...(model !== undefined ? { model: { id: model } } : {}),
+    ...(folder !== undefined ? { workingDirectories: [folderUri(folder)] } : {}),
+  };
+}
+
+/** One automation the host holds, with the definition it sent. */
+async function heldAutomation(host: HostConnection, uri: string): Promise<{ title: string; definition: Record<string, unknown> }> {
+  const found = (await host.automations?.() ?? []).find((one) => one.resource === uri);
+  if (!found) throw new Fault(`No automation at ${uri}.`);
+  if (!found.definition) throw new Fault(`The host did not send the definition of ${uri}.`);
+  return { title: found.title, definition: found.definition };
+}
+
+/**
+ * Make, change, copy, write out and read in an automation.
+ *
+ * Over `automation/createRequested` and `automation/updateRequested`, so it
+ * works with any host that serves automations. The file is ahpd's own unless
+ * `--vscode` asks for VS Code's, as `ahpd automation export` and `import` do.
+ */
+async function authorAutomation(host: HostConnection, verb: string, args: Args): Promise<number> {
+  if (verb === 'new') {
+    if (!host.createAutomation) throw new Fault('This host will not make an automation.');
+    const prompt = args.value('--prompt');
+    if (prompt === undefined || prompt.trim() === '') throw new Fault('automation new needs --prompt: what each run says.');
+    const schedule = scheduleOf(args);
+    const event = await eventOf(host, args);
+    if (!schedule && !event) throw new Fault('automation new needs --schedule <cron> or --on <type>:<event>.');
+    const uri = await host.createAutomation({
+      title: (args.value('--title') ?? prompt).trim().slice(0, 80),
+      enabled: true,
+      message: { text: prompt.trim(), origin: { kind: 'automation' } },
+      session: sessionOf(args),
+      triggers: [...(schedule ? [schedule] : []), ...(event ? [event] : [])],
+    });
+    process.stdout.write(`${uri}\n`);
+    return 0;
+  }
+
+  if (verb === 'import') {
+    if (!host.createAutomation) throw new Fault('This host will not make an automation.');
+    const file = needs(args, 1, 'an automation file');
+    let text: string;
+    try {
+      text = await readFile(file, 'utf8');
+    }
+    catch {
+      throw new Fault(`No file at ${resolvePath(file)}.`);
+    }
+    const folder = args.value('--folder');
+    let definition: Record<string, unknown>;
+    if (args.has('--vscode')) {
+      let blueprint;
+      try {
+        blueprint = parseAutomationBlueprint(text);
+      }
+      catch (error) {
+        throw new Fault(`${file}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      if (folder === undefined) throw new Fault('automation import needs --folder: the file names no folder to run in.');
+      definition = {
+        title: blueprint.name,
+        message: { text: blueprint.prompt, origin: { kind: 'automation' } },
+        session: { workingDirectories: [folderUri(folder)] },
+        enabled: false,
+        triggers: scheduleTrigger(blueprint.schedule),
+      };
+    }
+    else {
+      let read: Record<string, unknown>;
+      try {
+        read = readAutomationFile(text);
+      }
+      catch (error) {
+        throw new Fault(`${file}: The file cannot be read: ${error instanceof Error ? error.message : String(error)}.`);
+      }
+      if (isVsCodeFile(read)) throw new Fault(`${file}: This is a VS Code automation file. Add --vscode.`);
+      const session = record(read.session);
+      const named = Array.isArray(session.workingDirectories) ? session.workingDirectories : [];
+      if (folder === undefined && named.length === 0) {
+        throw new Fault('automation import needs --folder: the file names no folder to run in.');
+      }
+      definition = {
+        ...unpinned(read),
+        enabled: false,
+        session: { ...session, ...(folder !== undefined ? { workingDirectories: [folderUri(folder)] } : {}) },
+      };
+    }
+    const uri = await host.createAutomation(definition);
+    const title = typeof definition.title === 'string' ? definition.title.trim() : '';
+    process.stdout.write(`Imported ${title || uri} as ${uri}. It is switched off.\n`);
+    return 0;
+  }
+
+  const uri = needs(args, 1, 'an automation URI');
+  const { title, definition } = await heldAutomation(host, uri);
+
+  if (verb === 'export') {
+    let text: string;
+    if (args.has('--vscode')) {
+      try {
+        text = serializeAutomationBlueprint(automationToBlueprint({ resource: uri, definition }));
+      }
+      catch (error) {
+        throw new Fault(error instanceof Error ? error.message : String(error));
+      }
+    }
+    else {
+      text = automationFile(unpinned(definition));
+    }
+    const out = args.value('--out');
+    if (out === undefined) {
+      process.stdout.write(text);
+      return 0;
+    }
+    await writeFile(out, text, 'utf8');
+    process.stdout.write(`Wrote ${resolvePath(out)}.\n`);
+    return 0;
+  }
+
+  if (verb === 'duplicate') {
+    if (!host.createAutomation) throw new Fault('This host will not make an automation.');
+    const copy = await host.createAutomation({ ...unpinned(definition), title: `${title} (copy)`, enabled: false });
+    process.stdout.write(`${copy}\n`);
+    return 0;
+  }
+
+  // `edit`: only the fields given, each sent whole.
+  if (!host.updateAutomation) throw new Fault('This host will not change an automation.');
+  const changes: Record<string, unknown> = {};
+  const newTitle = args.value('--title');
+  if (newTitle !== undefined) changes.title = newTitle.trim();
+  const prompt = args.value('--prompt');
+  if (prompt !== undefined) changes.message = { ...record(definition.message), text: prompt.trim() };
+  if ([args.value('--agent'), args.value('--model'), args.value('--folder')].some((one) => one !== undefined)) changes.session = sessionOf(args, record(definition.session));
+  const triggers = Array.isArray(definition.triggers) ? definition.triggers.map(record) : [];
+  const held = triggers.find((one) => one.kind === 'schedule');
+  const schedule = scheduleOf(args, held);
+  const event = await eventOf(host, args);
+  if (schedule || event) {
+    changes.triggers = [
+      ...triggers.filter((one) => !(schedule && one.kind === 'schedule') && !(event && one.kind === 'event')),
+      ...(schedule ? [schedule] : []),
+      ...(event ? [event] : []),
+    ];
+  }
+  if (Object.keys(changes).length === 0) {
+    throw new Fault('automation edit needs a field to change: --title, --prompt, --agent, --model, --folder, --schedule or --on.');
+  }
+  await host.updateAutomation(uri, changes);
+  return 0;
 }
 
 /**

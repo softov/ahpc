@@ -1,6 +1,7 @@
 {
   "version": "5",
   "specifiers": {
+    "npm:@cofold/yaml@0.3": "0.3.0",
     "npm:@microsoft/agent-host-protocol@1": "1.0.0",
     "npm:@textui/chat@0.9": "0.9.0",
     "npm:@textui/core@0.9": "0.9.0",
@@ -14,6 +15,9 @@
     "npm:vitest@3": "3.2.7_@types+node@22.20.3"
   },
   "npm": {
+    "@cofold/yaml@0.3.0": {
+      "integrity": "sha512-QzpY9r2DAHPcRgZ1y1RiXUnaAkJSGQwJ3Sma36n9mRBGazf+CcFfkV+G+SVKIWoqiKNUa6FcYYqTS+WqnfYsTw=="
+    },
     "@esbuild/aix-ppc64@0.28.2": {
       "integrity": "sha512-XExcO+dvLKvVtNTibSTBej1NCAbaGhWn9Ww1ZPx80qsahhPFe/8jgWP0IchNe0F3HwkU7n8ejhH8bjonqht8mQ==",
       "os": ["aix"],
@@ -701,6 +705,7 @@
   "workspace": {
     "packageJson": {
       "dependencies": [
+        "npm:@cofold/yaml@0.3",
         "npm:@microsoft/agent-host-protocol@1",
         "npm:@textui/chat@0.9",
         "npm:@textui/core@0.9",

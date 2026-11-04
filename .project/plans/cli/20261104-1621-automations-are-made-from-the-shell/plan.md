@@ -1,7 +1,7 @@
 ---
 title: Automations are made, changed, copied and moved from the shell
 domain: cli
-status: planned
+status: built
 priority: medium
 created: 2026-11-04
 revalidated: 2026-11-04
@@ -60,8 +60,8 @@ ahpc automation export -> the automation's state -> ahpd's file or VS Code's fil
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - new, edit and duplicate](task-01-new-edit-and-duplicate.md) | todo | - |
-| [02 - import and export move a file](task-02-import-and-export-move-a-file.md) | todo | 01 |
+| [01 - new, edit and duplicate](task-01-new-edit-and-duplicate.md) | done | - |
+| [02 - import and export move a file](task-02-import-and-export-move-a-file.md) | done | 01 |
 
 ## Risks and tradeoffs
 
@@ -69,12 +69,12 @@ ahpc automation export -> the automation's state -> ahpd's file or VS Code's fil
 
 ## Resume state
 
-- **Done so far:** planned 2026-11-04.
-- **Next action:** [task-01-new-edit-and-duplicate.md](task-01-new-edit-and-duplicate.md).
+- **Done so far:** planned and built 2026-11-04; see [implemented.md](implemented.md).
+- **Next action:** none.
 - **Open questions:** none.
 - **Watch out for:** a host without automations answers with `This host serves no automations.`, as the other verbs do.
 
 ## Final verification checklist
 
-- [ ] `npm run typecheck`, `npm run build` and `npx vitest run` pass.
-- [ ] Against ahpd, a file from `ahpd automation export` imports with `ahpc automation import`, and back.
+- [x] `npm run typecheck`, `npm run build` and `npx vitest run` pass.
+- [x] Against ahpd, a file from `ahpd automation export` imports with `ahpc automation import`, and back.

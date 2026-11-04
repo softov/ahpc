@@ -572,7 +572,13 @@ export interface HostConnection {
    * offerable because nothing here knows what events exist. The kinds are the
    * host's, not a list kept here.
    */
-  automationTriggers?(): Promise<{ kind: string; title?: string; description?: string }[]>;
+  automationTriggers?(): Promise<{
+    kind: string;
+    title?: string;
+    description?: string;
+    /** The events a trigger of this kind picks from, when the host lists them. */
+    events?: { id: string; title?: string }[];
+  }[]>;
   /**
    * Follow the host's own log.
    *

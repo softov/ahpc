@@ -56,6 +56,7 @@
     "wire": "node tools/validate.mjs"
   },
   "dependencies": {
+    "@cofold/yaml": "^0.3.0",
     "@microsoft/agent-host-protocol": "^1.0.0",
     "@textui/chat": "^0.9.0",
     "@textui/core": "^0.9.0",

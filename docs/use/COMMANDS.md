@@ -34,7 +34,7 @@ Most commands take a session URI, which `ahpc session list` prints. Anywhere a `
 | [Changes](../subjects/CHANGES.md) | `changes`, `content` |
 | [Resources](../subjects/RESOURCES.md) | `resource list`, `resource read`, `resource write`, ... |
 | [Terminals](../subjects/TERMINALS.md) | `terminal list`, `terminal new`, `terminal send`, `terminal watch`, `terminal rm` |
-| [Automations](../subjects/AUTOMATIONS.md) | `automation list`, `automation run`, `automation enable`, ... |
+| [Automations](../subjects/AUTOMATIONS.md) | `automation list`, `automation new`, `automation run`, `automation export`, ... |
 | [Customizations](../subjects/CUSTOMIZATIONS.md) | `customizations`, `session customizations`, `session toggle` |
 | [Telemetry](../subjects/TELEMETRY.md) | `logs` |
 

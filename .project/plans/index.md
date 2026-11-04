@@ -76,7 +76,7 @@ Reference: [00-cli.md](cli/00-cli.md)
 | [05 - `prompt` on a busy session refuses, queues or steers, and says when it stops waiting](cli/05-prompt-on-a-busy-session/plan.md) | high | built 2026-11-04 ([implemented.md](cli/05-prompt-on-a-busy-session/implemented.md)) | - | - |
 | [06 - The automation list is served by default, the other groups are named, and all turns on every group](cli/06-mcp-tool-groups-are-found-and-all-is-one-word/plan.md) | medium | built 2026-11-04 ([implemented.md](cli/06-mcp-tool-groups-are-found-and-all-is-one-word/implemented.md)) | - | - |
 | [20261104-1112 - MCP over stdio answers each call when it is done](cli/20261104-1112-mcp-over-stdio-answers-at-the-same-time/plan.md) | high | active 2026-11-04; tasks 01-02 implemented, awaiting review | - | - |
-| [20261104-1621 - Automations are made, changed, copied and moved from the shell](cli/20261104-1621-automations-are-made-from-the-shell/plan.md) | medium | planned 2026-11-04 | - | documentation/20261104-1621-the-docs-pictures-come-from-a-demo-host |
+| [20261104-1621 - Automations are made, changed, copied and moved from the shell](cli/20261104-1621-automations-are-made-from-the-shell/plan.md) | medium | built 2026-11-04 ([implemented.md](cli/20261104-1621-automations-are-made-from-the-shell/implemented.md)) | - | documentation/20261104-1621-the-docs-pictures-come-from-a-demo-host |
 
 Next free number in `cli`: `07`.
 
