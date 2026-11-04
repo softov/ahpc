@@ -41,7 +41,7 @@ Softov wants ahpc to reach an ahpd daemon through a Dev Tunnel port that is not 
 
 ## Who writes
 
-- ahpc: open PR #23 changes the docs only. No branch on `softov/ahpc` touches `src/ahp/live.ts`, `src/ahp/refused.ts`, `src/config.ts` or `src/connect.ts`.
+- ahpc: open PR #23 changes the docs only. No branch on `ahpio/ahpc` touches `src/ahp/live.ts`, `src/ahp/refused.ts`, `src/config.ts` or `src/connect.ts`.
 - ahpd: a token operation would touch `packages/tunnel-devtunnel/src/kind.ts` and `service.ts`. This brief did not check ahpd's branches.
 
 ## The change

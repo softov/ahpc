@@ -4,7 +4,7 @@ domain: documentation
 revalidated: 2026-11-03
 ---
 
-The documentation is `docs/`, in folders by kind of reader, built as a VitePress site at `https://softov.github.io/ahpc/`.
+The documentation is `docs/`, in folders by kind of reader, built as a VitePress site at `https://ahpio.github.io/ahpc/`.
 `docs/start/` installs and connects, and `docs/use/` shows each way to run ahpc.
 `docs/subjects/` has one page per subject of the protocol, and `docs/reference/` lists every flag, tool and setting.
 `docs/README.md` is the index of all documents.
