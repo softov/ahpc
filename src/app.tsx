@@ -235,6 +235,22 @@ const Hints = defineComponent<BoxProps>('ChatHints', (props) => {
   // A question is not a confirmation, and the keys are not the same either.
   // Offering "a approve" over an elicitation is the same mistake as rendering
   // one as the other, made in the one row that is supposed to explain it.
+  // Folded to one line on the history: `a` and `d` still answer it, and
+  // escape leaves the screen.
+  const folded = focused === 'chat.transcript';
+  if (screen === 'chat' && waiting?.kind === 'toolConfirmation' && folded) {
+    return (
+      <KeyHints
+        {...props}
+        hints={[
+          { keys: 'a', label: i18n.t('views.app.hintApprove') },
+          { keys: 'd', label: i18n.t('views.app.hintDeny') },
+          { keys: 'esc', label: i18n.t('views.app.hintBack') },
+        ]}
+      />
+    );
+  }
+
   if (screen === 'chat' && waiting?.kind === 'toolConfirmation') {
     return (
       <KeyHints
@@ -249,7 +265,7 @@ const Hints = defineComponent<BoxProps>('ChatHints', (props) => {
     );
   }
 
-  if (screen === 'chat' && waiting) {
+  if (screen === 'chat' && waiting && !folded) {
     return (
       <KeyHints
         {...props}

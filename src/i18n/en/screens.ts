@@ -55,6 +55,8 @@ export const screens: Record<string, string> = {
   'screens.chat.findPlaceholder': 'find in this conversation',
   'screens.chat.noMatch': 'no match',
   'screens.chat.findPosition': '{at} of {total}',
+  'screens.chat.foldedConfirmation': '· a approve · d deny · click to open',
+  'screens.chat.foldedQuestion': '· click to open',
 
   'screens.newSession.title': 'A new session',
   'screens.newSession.firstMessage': 'The first message is what starts it.',

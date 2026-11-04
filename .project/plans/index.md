@@ -32,7 +32,7 @@ Reference: [00-screen.md](screen/00-screen.md)
 | [20261103-1600 - The header says ahpc, and the new session screen shows the logo](screen/20261103-1600-the-name-is-ahpc-with-its-logo/plan.md) | medium | active 2026-11-03; task 01 implemented, awaiting review | - | - |
 | [20261103-1619 - The host's answer to a changeset verb is not drawn as a refusal](screen/20261103-1619-a-host-success-is-not-red/plan.md) | high | active 2026-11-03; task 01 implemented, awaiting review | - | - |
 | [20261104-0437 - The status row does not end with the screen's name](screen/20261104-0437-the-status-row-drops-the-screen-name/plan.md) | medium | active 2026-11-04; task 01 implemented, awaiting review | - | - |
-| [20261104-0549 - The waiting question folds to one line while you read](screen/20261104-0549-the-question-folds-while-you-read/plan.md) | medium | planned 2026-11-04 | - | - |
+| [20261104-0549 - The waiting question folds to one line while you read](screen/20261104-0549-the-question-folds-while-you-read/plan.md) | medium | active 2026-11-04; task 01 implemented, awaiting review | - | - |
 
 Next free number in `screen`: `12`.
 

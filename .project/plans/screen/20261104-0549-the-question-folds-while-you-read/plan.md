@@ -1,7 +1,7 @@
 ---
 title: The waiting question folds to one line while you read
 domain: screen
-status: planned
+status: active
 priority: medium
 created: 2026-11-04
 revalidated: 2026-11-04
@@ -57,7 +57,7 @@ FOCUS elsewhere && INPUT            -> ChatHitl (autoFocus)
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - The question folds to one line on the history](task-01-the-question-folds-to-a-line.md) | todo | - |
+| [01 - The question folds to one line on the history](task-01-the-question-folds-to-a-line.md) | implemented | - |
 
 ## Risks and tradeoffs
 
@@ -65,11 +65,11 @@ FOCUS elsewhere && INPUT            -> ChatHitl (autoFocus)
 
 ## Resume state
 
-- **Done so far:** the plan.
-- **Next action:** build task 01 on a branch.
+- **Done so far:** task 01 implemented, as [implemented.md](implemented.md) says.
+- **Next action:** Softov reviews the pull request, and checks the fold by hand.
 - **Open questions:** none.
 
 ## Final verification checklist
 
-- [ ] `npm run typecheck`, `npm run build` and `npx vitest run` pass.
+- [x] `npm run typecheck`, `npm run build` and `npx vitest run` pass.
 - [ ] By hand, escape from a waiting confirmation folds it to one line, `a` approves from there, and a click opens it.

@@ -6,8 +6,10 @@ import {
   useEffect,
   useFocusScope,
   useI18n,
+  useInput,
   useMeasure,
   useMemo,
+  useRef,
   useRequiredService,
   useSize,
   useState,
@@ -777,6 +779,57 @@ function hitlInput(input: PendingInput): ChatPendingInput {
   };
 }
 
+/**
+ * The block that is waiting on a person, folded to one line while they read
+ * the history it is about.
+ *
+ * It answers `a` and `d` for a confirmation, the way the full block does, and
+ * a click opens the full block again.
+ */
+const FoldedQuestion = defineComponent<{
+  input: ChatPendingInput;
+  onApprove(): void;
+  onDeny(): void;
+  onOpen(): void;
+  onMeasure(rect: { y: number } | null): void;
+}>('FoldedQuestion', ({ input, onApprove, onDeny, onOpen, onMeasure }) => {
+  const theme = useTheme();
+  const i18n = useI18n();
+  const rect = useMeasure();
+  const latest = useRef(onMeasure);
+  latest.current = onMeasure;
+  useEffect(() => { latest.current(rect); }, [rect.y]);
+  useEffect(() => () => { latest.current(null); }, []);
+
+  const confirmation = input.kind === 'toolConfirmation';
+  useInput((event) => {
+    if (event.name === 'a') { onApprove(); return true; }
+    if (event.name === 'd') { onDeny(); return true; }
+    return false;
+  }, { global: true, enabled: confirmation });
+
+  // The full block's own title, with the fallback it uses.
+  const asks = i18n.t('textui.hitl.title', undefined, 'The agent asks');
+  const title = confirmation ? (input.call.confirmationTitle ?? asks) : asks;
+  // The title gives way on a narrow terminal, and the keys keep their room.
+  return (
+    <Row gap={1}>
+      <text
+        content={`${theme.glyphs.warning} ${title}`}
+        fg="warning"
+        truncate="end"
+        onClick={() => { onOpen(); }}
+      />
+      <text
+        content={i18n.t(confirmation ? 'screens.chat.foldedConfirmation' : 'screens.chat.foldedQuestion')}
+        fg="warning"
+        shrink={0}
+        onClick={() => { onOpen(); }}
+      />
+    </Row>
+  );
+});
+
 export const ChatScreen: (props: Record<string, never>) => RenderOutput =
   defineComponent<Record<string, never>>('ChatScreen', () => {
     const app = useApp();
@@ -790,6 +843,8 @@ export const ChatScreen: (props: Record<string, never>) => RenderOutput =
     // derived from one then changes too, and the memos below never hold.
     const turns = useStoreValue<Turn[]>(TURNS, NO_TURNS) ?? NO_TURNS;
     const input = useStoreValue<PendingInput | null>(INPUT, null) ?? null;
+    // The waiting block folds to one line while the history has focus.
+    const folded = useStoreValue<string | null>(FOCUS, null) === 'chat.transcript';
     const queued = useStoreValue<QueuedMessage[]>(QUEUE, NO_QUEUE) ?? NO_QUEUE;
     const draft = useStoreValue<string>(DRAFT, '') ?? '';
     const expanded = useStoreValue<Record<string, boolean>>(EXPANDED, NONE_EXPANDED) ?? NONE_EXPANDED;
@@ -1000,7 +1055,19 @@ export const ChatScreen: (props: Record<string, never>) => RenderOutput =
         {/* The block that is waiting on a person sits between the conversation
             and the composer, where it cannot scroll away and cannot be typed
             past. */}
-        {input ? (
+        {input && folded ? (
+          <FoldedQuestion
+            input={hitlInput(input)}
+            onApprove={() => controller.approve()}
+            onDeny={() => controller.deny()}
+            // Off the history, so the full block mounts and its own focus
+            // claim lands on it.
+            onOpen={() => app.focus.blur()}
+            // Under its own name: the full block reports `null` as it
+            // unmounts, and that can land after this line has reported.
+            onMeasure={(rect) => app.store.set(boodFloorFor('folded'), rect?.y ?? 0)}
+          />
+        ) : input ? (
           <ChatHitl
             input={hitlInput(input)}
             draft={answers ?? {}}

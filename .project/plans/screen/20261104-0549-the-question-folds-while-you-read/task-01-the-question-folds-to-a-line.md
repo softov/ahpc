@@ -1,6 +1,6 @@
 ---
 title: The question folds to one line on the history
-status: todo
+status: implemented
 depends: []
 layer: "screen"
 refs:
