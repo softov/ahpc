@@ -42,7 +42,7 @@ SCREEN -> Status -> a muted text at the row end
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - The screen's name leaves the status row](task-01-the-screen-name-leaves-the-row.md) | todo | - |
+| [01 - The screen's name leaves the status row](task-01-the-screen-name-leaves-the-row.md) | implemented | - |
 
 ## Risks and tradeoffs
 
@@ -50,11 +50,11 @@ SCREEN -> Status -> a muted text at the row end
 
 ## Resume state
 
-- **Done so far:** nothing.
-- **Next action:** task 01.
+- **Done so far:** task 01 implemented, as [implemented.md](implemented.md) says.
+- **Next action:** Softov reviews the pull request, and looks at the status row by hand.
 - **Open questions:** none.
 
 ## Final verification checklist
 
-- [ ] `npm run typecheck`, `npm run build` and `npx vitest run` pass.
+- [x] `npm run typecheck`, `npm run build` and `npx vitest run` pass.
 - [ ] By hand, the status row on the sessions screen ends with the hints.

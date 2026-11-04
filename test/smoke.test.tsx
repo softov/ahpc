@@ -185,6 +185,17 @@ describe.each(SIZES.map((s) => [`${s.width}x${s.height}`, s] as const))('at %s',
     await t.unmount();
   });
 
+  it('ends the status row with the hints, not the screen name', async () => {
+    const list = await catalogue(size);
+    expect(list.t.app.screens.current()?.id).toBe('sessions');
+    expect(list.t.getAllByText('sessions', { exact: true })).toHaveLength(0);
+    await list.t.unmount();
+    const chat = await conversation(size);
+    expect(chat.t.app.screens.current()?.id).toBe('chat');
+    expect(chat.t.getAllByText('chat', { exact: true })).toHaveLength(0);
+    await chat.t.unmount();
+  });
+
   it('draws every row inside the frame it was given', async () => {
     const { t } = await conversation(size);
     expect(t.lines().every((line) => line.length <= size.width)).toBe(true);
