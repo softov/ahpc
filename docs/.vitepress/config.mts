@@ -2,6 +2,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig, type DefaultTheme } from 'vitepress';
+import { releases } from './releases';
 
 /** The `docs/` folder, which is the site's source. */
 const DOCS = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -69,6 +70,20 @@ const sidebar: DefaultTheme.SidebarItem[] = [
   },
 ];
 
+/** How many releases the releases sidebar shows before *View all releases*. */
+const RECENT = 10;
+
+/** The sidebar of a page under `docs/updates/`: the newest releases, then the archive. */
+const updates: DefaultTheme.SidebarItem[] = [
+  {
+    text: 'Updates',
+    items: [
+      ...releases().slice(0, RECENT).map((release) => page(release.version, release.link)),
+      page('View all releases', '/updates/archive'),
+    ],
+  },
+];
+
 /** Every page under `docs/`, as a site path such as `/use/SCREEN`. */
 const pages = (dir: string): string[] => readdirSync(dir).flatMap((entry) => {
   if (entry.startsWith('.') || entry === 'node_modules' || entry === 'public' || entry === 'img') return [];
@@ -81,10 +96,10 @@ const pages = (dir: string): string[] => readdirSync(dir).flatMap((entry) => {
 /** The pages that are not in the sidebar: the home page and the index of all documents. */
 const UNLISTED = new Set(['/index', '/README']);
 
-const listed = new Set(sidebar.flatMap((group) => group.items ?? []).map((item) => item.link));
+const listed = new Set([...sidebar, ...updates].flatMap((group) => group.items ?? []).map((item) => item.link));
 const missing = pages(DOCS).filter((path) => !UNLISTED.has(path) && !listed.has(path));
 if (missing.length > 0) {
-  throw new Error(`docs/.vitepress/config.mts: not in the sidebar: ${missing.map((path) => `docs${path}.md`).join(', ')}`);
+  throw new Error(`docs/.vitepress/config.mts: in no sidebar: ${missing.map((path) => `docs${path}.md`).join(', ')}`);
 }
 
 /**
@@ -139,11 +154,12 @@ export default defineConfig({
   themeConfig: {
     nav: [
       { text: 'Home', link: '/' },
+      { text: 'Updates', link: releases()[0]?.link ?? '/updates/archive', activeMatch: '^/updates/' },
       { text: 'All documents', link: '/README' },
       { text: 'npm', link: 'https://www.npmjs.com/package/@softov/ahpc' },
       { text: 'GitHub', link: GITHUB },
     ],
-    sidebar,
+    sidebar: { '/updates/': updates, '/': sidebar },
     search: { provider: 'local' },
     editLink: {
       pattern: `${GITHUB}/edit/main/docs/:path`,

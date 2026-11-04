@@ -49,3 +49,12 @@ One page per thing ahpc works with on a host. Each page says what it is, how the
 | --- | --- |
 | [Design](DESIGN.md) | Why the client is built this way |
 | [Conformance](CONFORMANCE.md) | What ahpc implements of AHP, and where it differs |
+
+## Updates
+
+What changed in each release: one page for each minor release, with its patch releases on the same page.
+
+| Page | What it covers |
+| --- | --- |
+| [All releases](updates/archive.md) | Every release, by year |
+| [ahpc 0.10](updates/v0_10.md) | 0.10.0 |
