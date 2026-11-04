@@ -11,7 +11,7 @@ These checks close it.
 
 ## Set up
 
-1. Do steps 1 to 11 of *Set up* in [hand-check-findings.md](hand-check-findings.md).
+1. Do steps 1 to 11 of *Set up* in [set-up-a-test-host.md](set-up-a-test-host.md).
 2. Run `<ahpc>` with no command.
 
 ## The status row

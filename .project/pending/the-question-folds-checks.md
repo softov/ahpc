@@ -11,7 +11,7 @@ These checks close the plan.
 
 ## Set up
 
-1. Do steps 1 to 11 of *Set up* in [hand-check-findings.md](hand-check-findings.md).
+1. Do steps 1 to 11 of *Set up* in [set-up-a-test-host.md](set-up-a-test-host.md).
 2. Run `<ahpc>` with no command, and open `<session>` from the list.
 3. Set the permissions chip under the composer to *Ask each time*.
 4. Send "Run `ls` in the workspace."

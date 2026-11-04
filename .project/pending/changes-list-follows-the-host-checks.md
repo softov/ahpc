@@ -11,7 +11,7 @@ These checks close it.
 
 ## Set up
 
-1. Do steps 1 to 11 of *Set up* in [hand-check-findings.md](hand-check-findings.md).
+1. Do steps 1 to 11 of *Set up* in [set-up-a-test-host.md](set-up-a-test-host.md).
 2. Run `<ahpc>` with no command, and open `<session>` from the list.
 3. Press escape until focus is on the history, and press `c` to open the changes screen.
 4. Check that the list shows the edited, the deleted and the new file.
