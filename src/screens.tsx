@@ -563,7 +563,7 @@ function useComposerOptions(): ComposerOption[] {
   const unicode = useCapabilities().unicode;
   const controller = useRequiredService(CONTROLLER);
   const open = useStoreValue<string | null>(OPEN, null) ?? null;
-  const provider = useStoreValue<string>(PROVIDER, 'claude') ?? 'claude';
+  const provider = useStoreValue<string>(PROVIDER, '') ?? '';
   const model = useStoreValue<string>(MODEL, '') ?? '';
   const modelConfig = useStoreValue<Record<string, string>>(MODEL_CONFIG, {}) ?? {};
   const settings = useStoreValue<Record<string, string>>(SETTINGS, {}) ?? {};
@@ -588,6 +588,8 @@ function useComposerOptions(): ComposerOption[] {
   // change reached it.
   const answered = open ? '' : JSON.stringify(settings);
   useEffect(() => {
+    // No agent yet: the host is asked once the first one arrives.
+    if (!open && !provider) return;
     void controller.settings().then(setConfig)
       .catch((error: unknown) => controller.report(error, { action: 'readSettings' }));
   }, [provider, open, answered, open ? '' : workspace]);
@@ -1277,7 +1279,7 @@ export const NewSessionScreen: (props: Record<string, never>) => RenderOutput =
             setRecall(history.length + 1);
             const workspace = app.store.get<string>(WORKSPACE) ?? '';
             void controller.create({
-              provider: app.store.get<string>(PROVIDER) ?? 'claude',
+              provider: app.store.get<string>(PROVIDER) ?? '',
               ...(workspace ? { workingDirectory: workspace } : {}),
               first,
             })
