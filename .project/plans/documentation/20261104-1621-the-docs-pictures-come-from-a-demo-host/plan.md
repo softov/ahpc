@@ -1,7 +1,7 @@
 ---
 title: The docs pictures are drawn from a demo host
 domain: documentation
-status: planned
+status: built
 priority: medium
 created: 2026-11-04
 revalidated: 2026-11-04
@@ -68,8 +68,8 @@ npm run docs:pictures -> tools/pictures.mjs -> $AHPD_DIR examples/demo on a free
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - npm run docs:pictures draws every picture](task-01-docs-pictures-draws-every-picture.md) | todo | - |
-| [02 - Each subject page shows its picture](task-02-each-subject-page-shows-its-picture.md) | todo | 01 |
+| [01 - npm run docs:pictures draws every picture](task-01-docs-pictures-draws-every-picture.md) | done | - |
+| [02 - Each subject page shows its picture](task-02-each-subject-page-shows-its-picture.md) | done | 01 |
 
 ## Risks and tradeoffs
 
@@ -78,14 +78,14 @@ npm run docs:pictures -> tools/pictures.mjs -> $AHPD_DIR examples/demo on a free
 
 ## Resume state
 
-- **Done so far:** planned 2026-11-04.
-- **Next action:** build the plans in `requires` and ahpd's demo host, then [task-01-docs-pictures-draws-every-picture.md](task-01-docs-pictures-draws-every-picture.md).
+- **Done so far:** planned and built 2026-11-04; see [implemented.md](implemented.md).
+- **Next action:** none.
 - **Open questions:** none.
 - **Watch out for:** a still that reaches its 10 second cap draws what it has. Check each picture by eye before a commit.
 
 ## Final verification checklist
 
-- [ ] `AHPD_DIR=<ahpd checkout> npm run docs:pictures` writes the 11 pictures and leaves no process and no scratch folder behind.
-- [ ] `grep -il "brb\|advisor\|softov" docs/img/*.svg` prints nothing.
-- [ ] `npm run docs:build` passes.
-- [ ] Each of the 9 subject pages shows its picture under *Screen* in `npm run docs:dev`.
+- [x] `AHPD_DIR=<ahpd checkout> npm run docs:pictures` writes the 11 pictures and leaves no process and no scratch folder behind.
+- [x] `grep -il "brb\|advisor\|softov" docs/img/*.svg` prints nothing.
+- [x] `npm run docs:build` passes.
+- [x] Each of the 9 subject pages shows its picture under *Screen* in `npm run docs:dev`.

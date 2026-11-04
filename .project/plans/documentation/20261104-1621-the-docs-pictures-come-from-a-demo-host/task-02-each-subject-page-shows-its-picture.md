@@ -1,6 +1,6 @@
 ---
 title: Each subject page shows its picture
-status: todo
+status: done
 depends: [task-01-docs-pictures-draws-every-picture.md]
 layer: "docs"
 refs:

@@ -4,6 +4,8 @@ A session is one agent working in one workspace on the host. It has a transcript
 
 ## Screen
 
+![The session list, with status and workspace for each](../img/sessions.svg)
+
 The session list is the first screen. See [Screen](../use/SCREEN.md#the-session-list).
 
 | Key | |

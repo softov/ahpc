@@ -4,6 +4,8 @@ The files a session changed, grouped in changesets: for example every change in 
 
 ## Screen
 
+![The changes of a session, with a staged file and the actions on them](../img/changes.svg)
+
 `c` in a session opens the changes.
 
 | Key | |

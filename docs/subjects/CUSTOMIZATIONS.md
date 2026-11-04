@@ -4,6 +4,8 @@ Skills, prompts, agents and MCP servers that plugins and directories give a sess
 
 ## Screen
 
+![The skills and commands of a session](../img/customizations.svg)
+
 In a session:
 
 | Key | |

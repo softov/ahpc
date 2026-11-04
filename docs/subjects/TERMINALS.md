@@ -4,6 +4,8 @@ Shells running on the host. Any client can open one, type into it, and read its 
 
 ## Screen
 
+![A terminal with the output of a command](../img/terminals.svg)
+
 The palette (`ctrl+p`) has **Show terminals** and **New terminal**. In the terminal screen:
 
 | Command | |

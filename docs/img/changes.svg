@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="530" viewBox="0 0 820 530" font-family="ui-monospace, SFMono-Regular, &apos;SF Mono&apos;, Menlo, Consolas, &apos;DejaVu Sans Mono&apos;, monospace" font-size="13px">
+<title>chat - changes</title>
+<rect width="820" height="530" rx="6" fill="#0d1117"/>
+<text x="10" y="23" fill="#58a6ff" font-weight="bold" textLength="32" lengthAdjust="spacing" xml:space="preserve">ahpc</text>
+<text x="50" y="23" fill="#a7a7a7" textLength="8" lengthAdjust="spacing" xml:space="preserve">·</text>
+<text x="66" y="23" fill="#9b949e" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">○</text>
+<text x="74" y="23" fill="#c9d1d9" textLength="664" lengthAdjust="spacing" xml:space="preserve"> read ideas                                                                        </text>
+<text x="738" y="23" fill="#9b949e" textLength="72" lengthAdjust="spacing" xml:space="preserve">notes-app</text>
+<text x="10" y="40" fill="#c9d1d9" textLength="64" lengthAdjust="spacing" xml:space="preserve"> Commit </text>
+<text x="74" y="40" fill="#54535b" textLength="8" lengthAdjust="spacing" xml:space="preserve">c</text>
+<text x="82" y="40" fill="#c9d1d9" textLength="160" lengthAdjust="spacing" xml:space="preserve">    Discard Changes </text>
+<text x="242" y="40" fill="#54535b" textLength="24" lengthAdjust="spacing" xml:space="preserve">del</text>
+<text x="266" y="40" fill="#c9d1d9" textLength="144" lengthAdjust="spacing" xml:space="preserve">    Stage Changes </text>
+<text x="410" y="40" fill="#54535b" textLength="8" lengthAdjust="spacing" xml:space="preserve">s</text>
+<text x="418" y="40" fill="#c9d1d9" textLength="160" lengthAdjust="spacing" xml:space="preserve">    Unstage Changes </text>
+<text x="578" y="40" fill="#54535b" textLength="8" lengthAdjust="spacing" xml:space="preserve">u</text>
+<text x="10" y="57" fill="#58a6ff" font-weight="bold" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▸</text>
+<text x="26" y="57" fill="#3fb950" font-weight="bold" textLength="8" lengthAdjust="spacing" xml:space="preserve">S</text>
+<text x="42" y="57" fill="#58a6ff" font-weight="bold" textLength="312" lengthAdjust="spacing" xml:space="preserve">/tmp/ahpc-demo/work/notes-app/README.md</text>
+<text x="754" y="57" fill="#3fb950" font-weight="bold" textLength="16" lengthAdjust="spacing" xml:space="preserve">+1</text>
+<text x="778" y="57" fill="#f85149" font-weight="bold" textLength="16" lengthAdjust="spacing" xml:space="preserve">-1</text>
+<text x="802" y="57" fill="#58a6ff" font-weight="bold" textLength="8" lengthAdjust="spacing" xml:space="preserve">M</text>
+<text x="34" y="74" fill="#c9d1d9" textLength="720" lengthAdjust="spacing" xml:space="preserve"> /tmp/ahpc-demo/work/notes-app/notes/old.md                                               </text>
+<text x="754" y="74" fill="#3fb950" textLength="16" lengthAdjust="spacing" xml:space="preserve">+0</text>
+<text x="778" y="74" fill="#f85149" textLength="16" lengthAdjust="spacing" xml:space="preserve">-1</text>
+<text x="802" y="74" fill="#f85149" textLength="8" lengthAdjust="spacing" xml:space="preserve">D</text>
+<text x="34" y="91" fill="#c9d1d9" textLength="720" lengthAdjust="spacing" xml:space="preserve"> /tmp/ahpc-demo/work/notes-app/src/app/main.ts                                            </text>
+<text x="754" y="91" fill="#3fb950" textLength="16" lengthAdjust="spacing" xml:space="preserve">+2</text>
+<text x="778" y="91" fill="#f85149" textLength="16" lengthAdjust="spacing" xml:space="preserve">-0</text>
+<text x="802" y="91" fill="#d29922" textLength="8" lengthAdjust="spacing" xml:space="preserve">M</text>
+<text x="34" y="108" fill="#c9d1d9" textLength="720" lengthAdjust="spacing" xml:space="preserve"> /tmp/ahpc-demo/work/notes-app/docs/guide/faq.md                                          </text>
+<text x="754" y="108" fill="#3fb950" textLength="16" lengthAdjust="spacing" xml:space="preserve">+3</text>
+<text x="778" y="108" fill="#f85149" textLength="16" lengthAdjust="spacing" xml:space="preserve">-0</text>
+<text x="802" y="108" fill="#3fb950" textLength="8" lengthAdjust="spacing" xml:space="preserve">U</text>
+<text x="10" y="516" fill="#58a6ff" font-weight="bold" textLength="16" lengthAdjust="spacingAndGlyphs" xml:space="preserve">↑↓</text>
+<text x="34" y="516" fill="#9b949e" textLength="32" lengthAdjust="spacing" xml:space="preserve">move</text>
+<text x="66" y="516" fill="#a7a7a7" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
+<text x="90" y="516" fill="#58a6ff" font-weight="bold" textLength="40" lengthAdjust="spacing" xml:space="preserve">enter</text>
+<text x="138" y="516" fill="#9b949e" textLength="32" lengthAdjust="spacing" xml:space="preserve">open</text>
+<text x="170" y="516" fill="#a7a7a7" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
+<text x="194" y="516" fill="#58a6ff" font-weight="bold" textLength="8" lengthAdjust="spacing" xml:space="preserve">]</text>
+<text x="210" y="516" fill="#9b949e" textLength="72" lengthAdjust="spacing" xml:space="preserve">changeset</text>
+<text x="282" y="516" fill="#a7a7a7" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
+<text x="306" y="516" fill="#58a6ff" font-weight="bold" textLength="8" lengthAdjust="spacing" xml:space="preserve">x</text>
+<text x="322" y="516" fill="#9b949e" textLength="16" lengthAdjust="spacing" xml:space="preserve">do</text>
+<text x="338" y="516" fill="#a7a7a7" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
+<text x="362" y="516" fill="#58a6ff" font-weight="bold" textLength="24" lengthAdjust="spacing" xml:space="preserve">esc</text>
+<text x="394" y="516" fill="#9b949e" textLength="32" lengthAdjust="spacing" xml:space="preserve">back</text>
+<text x="426" y="516" fill="#a7a7a7" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
+<text x="450" y="516" fill="#58a6ff" font-weight="bold" textLength="48" lengthAdjust="spacing" xml:space="preserve">ctrl+c</text>
+<text x="506" y="516" fill="#9b949e" textLength="32" lengthAdjust="spacing" xml:space="preserve">quit</text>
+</svg>
