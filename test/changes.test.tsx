@@ -7,7 +7,7 @@ import { CONTROLLER } from '../src/control.js';
 import { fakeHost } from '../src/ahp/fake.js';
 import type { FakeHost } from '../src/ahp/fake.js';
 import { operate } from '../src/ahp/operate.js';
-import { CHANGE_AT, CHANGE_ROW, HOST_ERROR, HOST_LINK, HOST_NOTE, OPEN_FILE, PULL_REQUEST } from '../src/state.js';
+import { CHANGE_AT, CHANGE_ROW, HOST_ERROR, HOST_LINK, HOST_NOTE, OPEN_FILE, PULL_REQUEST, SCREEN } from '../src/state.js';
 import type { Changeset, ChangesetOperation, FileEdit } from '../src/ahp/types.js';
 
 /** Change what `host` reports for each changeset that the screen watches. */
@@ -253,6 +253,47 @@ describe('choosing which changeset, and ticking files off', () => {
     await t.press(']');
     for (let i = 0; i < 10; i++) await t.settle();
     expect(t.hasText('□') || t.hasText('[ ]')).toBe(false);
+    await t.unmount();
+  });
+
+  it('sends no tick and offers no r on a changeset the host will not keep one for', async () => {
+    const host = fakeHost();
+    const sent: string[] = [];
+    const review = host.review?.bind(host);
+    host.review = (changeset, files, isReviewed) => { sent.push(changeset); review?.(changeset, files, isReviewed); };
+    const t = await changes(host);
+    expect(t.hasText('r read')).toBe(true);
+    await t.press(']');
+    for (let i = 0; i < 10; i++) await t.settle();
+    expect(t.hasText('r read')).toBe(false);
+    await t.press('r');
+    for (let i = 0; i < 10; i++) await t.settle();
+    expect(sent).toEqual([]);
+    await t.unmount();
+  });
+
+  it('takes what a verb said off the footer when the screen goes', async () => {
+    const t = await changes();
+    t.app.store.set(HOST_NOTE, 'Committed bd5f52c');
+    t.app.store.set(HOST_LINK, 'https://example.com/pull/1');
+    t.app.store.set(HOST_ERROR, 'Nothing to commit');
+    await t.press('escape');
+    for (let i = 0; i < 6; i++) await t.settle();
+    expect(t.app.store.get(SCREEN)).not.toBe('changes');
+    expect(t.app.store.get(HOST_NOTE) ?? null).toBeNull();
+    expect(t.app.store.get(HOST_LINK) ?? null).toBeNull();
+    expect(t.app.store.get(HOST_ERROR) ?? null).toBeNull();
+    await t.unmount();
+  });
+
+  it('opens with no refusal left from before', async () => {
+    const t = await changes();
+    t.app.store.set(HOST_ERROR, 'The working tree is not reviewable');
+    await t.press('escape');
+    for (let i = 0; i < 6; i++) await t.settle();
+    await t.app.execute('changes.show');
+    for (let i = 0; i < 6; i++) await t.settle();
+    expect(t.app.store.get(HOST_ERROR) ?? null).toBeNull();
     await t.unmount();
   });
 });

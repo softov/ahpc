@@ -5,7 +5,7 @@ import type { HostEvent } from './ahp/connection.js';
 import type { AuthAsk } from './ahp/auth.js';
 import type { PullRequestDraft } from './ahp/followup.js';
 import type {
-  Changeset, PendingInput, QueuedMessage, SessionSummary, SessionUri, Turn,
+  Changeset, ChangesetScope, PendingInput, QueuedMessage, SessionSummary, SessionUri, Turn,
 } from './ahp/types.js';
 import { byUrgency, decodeStatus } from './ahp/status.js';
 import type { Activity } from './ahp/status.js';
@@ -571,6 +571,12 @@ export function pendingInput(store: ReactiveStore): PendingInput | null {
 /** The credential the host is asking for, or `null` when it is not. */
 export function authAsk(store: ReactiveStore): AuthAsk | null {
   return store.get<AuthAsk | null>(AUTH_ASK) ?? null;
+}
+
+/** The scope the changes screen shows: the one chosen, or the first that needs nothing filled in. */
+export function shownScope(scopes: readonly ChangesetScope[], at: string): ChangesetScope | undefined {
+  return scopes.find((scope) => scope.uriTemplate === at)
+    ?? scopes.find((scope) => scope.variables.length === 0);
 }
 
 export function changes(store: ReactiveStore): Changeset {

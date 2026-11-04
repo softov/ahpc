@@ -39,7 +39,7 @@ import {
   CHANGES as CHANGES_AT_PATH, CHANGE_AT, CHANGE_ROW, CHANGE_SCOPES, FILES_AT, FILES_OPEN,
   OPEN, OPEN_FILE, PROVIDER, PULL_REQUEST, PULL_REQUEST_LAYER, TARGET_LAYER, MARKDOWN, QUEUE, QUIT_ARMED, QUIT_WINDOW_MS, RUNNING, SCREEN, SELECTED, SETTINGS, SIDEBAR,
   SPLIT_AT, SPLIT_DEFAULT, TURNS, WORKSPACE,
-  applyEvent, inputRefused, openSession, pendingInput, queue, reportHostError, sendingInput, sessions, turns,
+  applyEvent, inputRefused, openSession, pendingInput, queue, reportHostError, sendingInput, sessions, shownScope, turns,
   writeSessions, writeStatus,
 } from './state.js';
 import type { PullRequestAsk } from './state.js';
@@ -1943,7 +1943,12 @@ function commands(
       when: `${OPEN}`,
       // Always the list, never wherever it was left. A screen that reopens on
       // the one file somebody read an hour ago hides the other nineteen.
-      run: () => { app.store.set(OPEN_FILE, null); app.screens.push('changes'); },
+      run: () => {
+        app.store.set(OPEN_FILE, null);
+        // The last refusal was about the screen that is going.
+        app.store.set(HOST_ERROR, null);
+        app.screens.push('changes');
+      },
     },
     {
       /*
@@ -2037,6 +2042,8 @@ function commands(
         const at = app.store.get<string>(CHANGE_AT) ?? '';
         const row = app.store.get<string>(CHANGE_ROW) ?? '';
         if (!at || !row) return;
+        // A scope the host says keeps no ticks refuses every one.
+        if (shownScope(app.store.get<ChangesetScope[]>(CHANGE_SCOPES) ?? [], at)?.reviewable !== true) return;
         const held = app.store.get<Changeset>(CHANGES_AT_PATH);
         const file = held?.files.find((one) => one.uri === row);
         controller.review(at, [row], file?.reviewed !== true);

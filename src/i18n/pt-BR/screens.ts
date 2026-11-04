@@ -62,8 +62,6 @@ export const screens: Record<string, string> = {
   'screens.newSession.firstMessage': 'A primeira mensagem é o que a inicia.',
   'screens.newSession.back': '{glyph} esc para as sessões que você já tem',
 
-  'screens.changes.title': 'Alterações',
-  'screens.changes.titleOf': 'Alterações - {title}',
   'screens.changes.refused': 'O host não quis enviar',
   'screens.changes.reading': 'Lendo o arquivo',
   'screens.changes.needsTurn': '{label} (precisa de um turno)',
