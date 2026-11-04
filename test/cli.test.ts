@@ -465,20 +465,29 @@ describe('the entry point, and what reaches a person on stderr', () => {
    * Run the entry point once, over a throwaway config directory, and give back
    * what it wrote to stderr. `AHPC_DEBUG` is set by the call rather than read
    * from here, because the point is that the shell sets it and this never does.
+   * A run may name its own argv, and shape the throwaway home directory before
+   * the entry point reads it.
    */
-  const entry = async (debug?: string): Promise<string> => {
+  const entry = async (
+    debug?: string,
+    run: string[] = argv,
+    prepare?: (home: string) => void,
+  ): Promise<string> => {
     const home = mkdtempSync(join(tmpdir(), 'ahpc-entry-'));
     const had = {
       XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME,
       AHPC_HOST: process.env.AHPC_HOST,
+      AHPC_TOKEN: process.env.AHPC_TOKEN,
       AHPC_DEBUG: process.env.AHPC_DEBUG,
     };
     const said = { argv: process.argv, code: process.exitCode };
     process.env.XDG_CONFIG_HOME = home;
     delete process.env.AHPC_HOST;
+    delete process.env.AHPC_TOKEN;
     if (debug === undefined) delete process.env.AHPC_DEBUG;
     else process.env.AHPC_DEBUG = debug;
-    process.argv = argv;
+    prepare?.(home);
+    process.argv = run;
     // The module is the program: importing it runs it, so the second run here
     // would be answered out of the cache instead of running at all.
     vi.resetModules();
@@ -518,6 +527,32 @@ describe('the entry point, and what reaches a person on stderr', () => {
     const debug = await entry('1');
     expect(debug).toContain('That is the only chat in this session');
     expect(debug).toContain('at Object.disposeChat');
+  });
+
+  it('prints one sentence for a token file the screen cannot read', async () => {
+    const absent = join(tmpdir(), 'ahpc-absent-token-file');
+    const err = await entry(undefined, ['node', 'ahpc', '--connection-token-file', absent]);
+    // The sentence names the path that was typed and the flag that writes a
+    // file there, and it is the whole of what a person reads.
+    expect(err).toContain(`No connection token at ${absent}.`);
+    expect(err).toContain('--connection-token-file');
+    expect(err.trimEnd().split('\n')).toHaveLength(1);
+  });
+
+  it('stops the screen for a missing token file the config names', async () => {
+    const absent = join(tmpdir(), 'ahpc-absent-configured-token');
+    const err = await entry(undefined, ['node', 'ahpc'], (home) => {
+      mkdirSync(join(home, 'ahpc'), { recursive: true });
+      writeFileSync(join(home, 'ahpc', 'config.json'), JSON.stringify({ connectionTokenFile: absent }));
+    });
+    expect(err).toContain(`No connection token at ${absent}.`);
+    expect(err.trimEnd().split('\n')).toHaveLength(1);
+  });
+
+  it('refuses both token flags on the screen path too', async () => {
+    const err = await entry(undefined, ['node', 'ahpc', '--token', 'typed', '--connection-token-file', '/nowhere']);
+    expect(err).toContain('Pass --token or --connection-token-file, not both.');
+    expect(err.trimEnd().split('\n')).toHaveLength(1);
   });
 });
 
