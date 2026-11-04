@@ -1,7 +1,7 @@
 ---
 title: The smoke test reads the checkout's folder name
 domain: screen
-status: planned
+status: active
 priority: medium
 created: 2026-11-04
 revalidated: 2026-11-04
@@ -42,7 +42,7 @@ process.cwd() -> WORKSPACE -> the composer's directory chip
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - The case expects the checkout's folder](task-01-the-case-expects-the-checkouts-folder.md) | todo | - |
+| [01 - The case expects the checkout's folder](task-01-the-case-expects-the-checkouts-folder.md) | implemented | - |
 
 ## Risks and tradeoffs
 
@@ -50,11 +50,11 @@ process.cwd() -> WORKSPACE -> the composer's directory chip
 
 ## Resume state
 
-- **Done so far:** the plan.
-- **Next action:** build task 01 on a branch.
+- **Done so far:** task 01 implemented, as [implemented.md](implemented.md) says.
+- **Next action:** Softov reviews the pull request.
 - **Open questions:** none.
 
 ## Final verification checklist
 
-- [ ] `npm run typecheck`, `npm run build` and `npx vitest run` pass.
-- [ ] `npx vitest run test/smoke.test.tsx` passes in a clone named `othername`.
+- [x] `npm run typecheck`, `npm run build` and `npx vitest run` pass.
+- [x] `npx vitest run test/smoke.test.tsx` passes in a clone named `othername`.
