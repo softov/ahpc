@@ -370,13 +370,26 @@ export async function tui(argv: string[]): Promise<void> {
    */
   const file = loadConfig('ahpc', options.configFile);
   options.host = options.host ?? process.env.AHPC_HOST ?? file.host;
-  options.token = connectionToken(
-    {
-      ...(options.token !== undefined ? { token: options.token } : {}),
-      ...(options.tokenFile !== undefined ? { tokenFile: options.tokenFile } : {}),
-    },
-    file,
-  );
+  /*
+   * A token file that was named and cannot be read is a sentence for the
+   * person who named it, not a crash to read a stack trace through. The shell
+   * answers this way, and the screen starts no renderer for a connection it
+   * cannot open.
+   */
+  try {
+    options.token = connectionToken(
+      {
+        ...(options.token !== undefined ? { token: options.token } : {}),
+        ...(options.tokenFile !== undefined ? { tokenFile: options.tokenFile } : {}),
+      },
+      file,
+    );
+  }
+  catch (error) {
+    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+    process.exitCode = 1;
+    return;
+  }
   if (file.theme && !argv.includes('--theme')) options.theme = file.theme;
   options.lang = detectLocale(options.lang, file.lang);
   if (file.shell && !argv.includes('--shell')) options.shell = file.shell;
