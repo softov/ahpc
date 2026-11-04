@@ -1,6 +1,6 @@
 ---
 title: A cancelled request stops
-status: todo
+status: implemented
 depends: [task-01-each-request-runs-as-it-arrives.md]
 layer: "mcp"
 refs:
@@ -57,3 +57,14 @@ A cancelled `send_turn` stops the turn it started, or takes back the message it 
 - `npm run typecheck`, `npm run build` and `npx vitest run` pass.
 
 ## Resume
+
+Built 2026-11-04.
+`stdio` keeps an `AbortController` for each request id in flight, and `notifications/cancelled` aborts the request it names.
+A cancellation of `initialize` or of an id that is not in flight is ignored, and an aborted request writes no response.
+The signal goes from `answer` to `call`, and from `call` to `Tool.run` as its fourth argument.
+`send_turn` passes it to `turn`, and `until` ends its wait when it aborts, at once rather than at the timeout.
+`turn` then stops a turn it started and takes back a message it queued, and leaves a steered turn alone.
+The idea file for step 13 already existed with the content the step asked for, so nothing was created.
+`test/stdio.test.ts` holds two cancellation cases, and `test/busy.test.ts` holds four.
+The gates pass: typecheck, build, and 894 tests in 44 files.
+Nothing is left in this task.

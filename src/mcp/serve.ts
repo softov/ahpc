@@ -105,6 +105,13 @@ export async function call(
   input: unknown,
   report?: Report,
   groups: readonly string[] = [],
+  /**
+   * The transport's cancel of this call.
+   *
+   * Last, because a transport that has none - which is every one today but
+   * stdio - leaves it out and its groups stay where they were.
+   */
+  signal?: AbortSignal,
 ): Promise<unknown> {
   const tool = named(name);
   if (tool === undefined) {
@@ -123,7 +130,7 @@ export async function call(
     };
   }
   try {
-    const answer = await tool.run(host, bag(input), report);
+    const answer = await tool.run(host, bag(input), report, signal);
     return {
       // Both, because clients differ: the text is what a model reads and
       // `structuredContent` is what a program does, and sending only the
@@ -189,6 +196,14 @@ export async function answer(
      * why every progress path here is optional.
      */
     notify?(notification: { method: string; params: unknown }): void;
+    /**
+     * The transport's cancel of the request being answered.
+     *
+     * stdio aborts it when the client sends `notifications/cancelled`, and the
+     * tool that reads it stops what it started. Absent where the transport has
+     * no way to cancel, which is HTTP: one request, one response.
+     */
+    signal?: AbortSignal;
   },
 ): Promise<Outgoing | undefined> {
   const method = typeof message.method === 'string' ? message.method : '';
@@ -226,7 +241,7 @@ export async function answer(
     const params = bag(message.params);
     const name = typeof params.name === 'string' ? params.name : '';
     if (name === '') return no(INVALID_PARAMS, 'tools/call needs a name.');
-    try { return ok(await call(host, name, params.arguments, reporter(message, options.notify), options.groups)); }
+    try { return ok(await call(host, name, params.arguments, reporter(message, options.notify), options.groups, options.signal)); }
     catch (error) { return no(INTERNAL, error instanceof Error ? error.message : String(error)); }
   }
   return no(METHOD_NOT_FOUND, `This server does not implement ${method}. It serves tools and nothing else.`);

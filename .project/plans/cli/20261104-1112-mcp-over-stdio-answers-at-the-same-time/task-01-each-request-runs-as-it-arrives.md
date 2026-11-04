@@ -1,6 +1,6 @@
 ---
 title: Each request runs as it arrives
-status: todo
+status: implemented
 depends: []
 layer: "mcp"
 refs:
@@ -38,3 +38,11 @@ A `ping` is answered while a `send_turn` waits.
 - `npm run typecheck`, `npm run build` and `npx vitest run` pass.
 
 ## Resume
+
+Built 2026-11-04.
+`stdio` takes `input` and `output`, and defaults them to `process.stdin` and `process.stdout`.
+`take` parses each line and starts `answer` at once, and the promise joins a set of requests in flight.
+Each response is one `write` of one whole line, and the end of the input waits for the set before it resolves.
+`test/stdio.test.ts` holds the four cases.
+The gates pass: typecheck, build, and 888 tests in 44 files.
+Nothing is left in this task.

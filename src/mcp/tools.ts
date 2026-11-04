@@ -77,8 +77,17 @@ export interface Tool {
    * absent unless the caller asked for progress and the transport can carry
    * it. A tool that reports nothing is a tool that finishes quickly enough
    * not to need to.
+   *
+   * `signal` is the transport's cancel of this call. A tool that started
+   * something long-running reads it and undoes what it started; one that
+   * finishes at once has nothing left to stop and ignores it.
    */
-  run(host: HostConnection, input: Record<string, unknown>, report?: (said: string) => void): Promise<unknown>;
+  run(
+    host: HostConnection,
+    input: Record<string, unknown>,
+    report?: (said: string) => void,
+    signal?: AbortSignal,
+  ): Promise<unknown>;
 }
 
 const text = (value: unknown): string => (typeof value === 'string' ? value : '');
@@ -309,7 +318,7 @@ export const TOOLS: Tool[] = [
       required: ['session', 'text'],
       additionalProperties: false,
     },
-    run: async (host, input, report) => {
+    run: async (host, input, report, signal) => {
       const model = text(input.model);
       const busy = input.busy === 'queue' || input.busy === 'steer' ? input.busy : undefined;
       let answer: Turn | undefined;
@@ -318,6 +327,9 @@ export const TOOLS: Tool[] = [
           ...(busy === undefined ? {} : { busy }),
           ...(model === '' ? {} : { model: { id: model } as never }),
           ...(typeof input.timeoutSeconds === 'number' ? { timeoutSeconds: input.timeoutSeconds } : {}),
+          // A cancelled call ends this wait at once, and the turn it started
+          // is its to stop.
+          ...(signal === undefined ? {} : { signal }),
           /*
            * What a caller watching this is told while it waits.
            *
