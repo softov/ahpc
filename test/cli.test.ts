@@ -9,7 +9,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -608,6 +608,109 @@ describe('the connection token, and the file the host keeps it in', () => {
     expect(commandIn(['--connection-token-file', 'status'])).toBeUndefined();
     const usage = (await import('../src/tui.js')).USAGE;
     expect(usage).toContain('--connection-token-file');
+  });
+
+  it('says why a file could not be read', async () => {
+    const { connectionToken } = await import('../src/config.js');
+    clean();
+    const dir = mkdtempSync(join(tmpdir(), 'ahpc-token-'));
+    try {
+      // A missing file keeps the sentence that sends somebody to the flag
+      // that writes one there.
+      const missing = join(dir, 'absent.token');
+      expect(() => connectionToken({ tokenFile: missing }, {}))
+        .toThrow(`No connection token at ${missing}. The host writes one there when it is given --connection-token-file.`);
+
+      // A folder is not a file somebody could have written a secret into.
+      const folder = join(dir, 'tokens');
+      mkdirSync(folder);
+      expect(() => connectionToken({ tokenFile: folder }, {}))
+        .toThrow(`${folder} is a folder, not a token file.`);
+
+      // Any other failure keeps the system's own reason rather than the
+      // sentence for a file that simply is not there.
+      const file = join(dir, 'plain');
+      writeFileSync(file, '');
+      const under = join(file, 't.token');
+      expect(() => connectionToken({ tokenFile: under }, {}))
+        .toThrow(`Cannot read ${under}: `);
+    } finally { rmSync(dir, { recursive: true, force: true }); restore(); }
+  });
+
+  it.skipIf(process.getuid?.() === 0)('says a file it may not open is a permission failure', async () => {
+    const { connectionToken } = await import('../src/config.js');
+    clean();
+    const dir = mkdtempSync(join(tmpdir(), 'ahpc-token-'));
+    try {
+      const at = join(dir, 'sealed.token');
+      writeFileSync(at, 'e6c1f0a94b6d4e2f8a3c5d7e9f0b1c2d\n');
+      chmodSync(at, 0o000);
+      expect(() => connectionToken({ tokenFile: at }, {}))
+        .toThrow(`Cannot read ${at}: permission denied.`);
+    } finally { chmodSync(join(dir, 'sealed.token'), 0o600); rmSync(dir, { recursive: true, force: true }); restore(); }
+  });
+
+  it('reads a config path from the home folder', async () => {
+    const { connectionToken, loadConfig } = await import('../src/config.js');
+    clean();
+    const dir = mkdtempSync(join(tmpdir(), 'ahpc-token-'));
+    const home = process.env.HOME;
+    try {
+      process.env.HOME = dir;
+      writeFileSync(join(dir, 't'), 'from-the-home-folder\n');
+      const config = join(dir, 'config.json');
+      writeFileSync(config, JSON.stringify({ connectionTokenFile: '~/t' }));
+      expect(connectionToken({}, loadConfig('ahpc', config))).toBe('from-the-home-folder');
+    } finally {
+      if (home === undefined) delete process.env.HOME;
+      else process.env.HOME = home;
+      rmSync(dir, { recursive: true, force: true });
+      restore();
+    }
+  });
+
+  it('reads a config path from the folder the config file is in', async () => {
+    const { connectionToken, loadConfig } = await import('../src/config.js');
+    clean();
+    const dir = mkdtempSync(join(tmpdir(), 'ahpc-token-'));
+    const elsewhere = mkdtempSync(join(tmpdir(), 'ahpc-elsewhere-'));
+    const was = process.cwd();
+    try {
+      writeFileSync(join(dir, 't.token'), 'from-the-config-folder\n');
+      // A file of the same name where ahpc happens to start must not be read
+      // in place of the one the config file sits beside.
+      writeFileSync(join(elsewhere, 't.token'), 'from-the-working-folder\n');
+      const config = join(dir, 'config.json');
+      writeFileSync(config, JSON.stringify({ connectionTokenFile: 't.token' }));
+      const file = loadConfig('ahpc', config);
+      process.chdir(elsewhere);
+      expect(connectionToken({}, file)).toBe('from-the-config-folder');
+    } finally {
+      process.chdir(was);
+      rmSync(dir, { recursive: true, force: true });
+      rmSync(elsewhere, { recursive: true, force: true });
+      restore();
+    }
+  });
+
+  it('reads a path the shell gave exactly as the shell gave it', async () => {
+    const { connectionToken } = await import('../src/config.js');
+    clean();
+    const dir = mkdtempSync(join(tmpdir(), 'ahpc-token-'));
+    const was = process.cwd();
+    try {
+      // The shell expands `~` before ahpc sees the argument, so a `~` that
+      // survived to here names a folder called that in the working folder.
+      mkdirSync(join(dir, '~'));
+      writeFileSync(join(dir, '~', 't.token'), 'from-a-literal-tilde\n');
+      process.chdir(dir);
+      expect(connectionToken({ tokenFile: join('~', 't.token') }, { connectionTokenFile: '/nowhere/other' }))
+        .toBe('from-a-literal-tilde');
+    } finally {
+      process.chdir(was);
+      rmSync(dir, { recursive: true, force: true });
+      restore();
+    }
   });
 });
 

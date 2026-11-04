@@ -2,7 +2,7 @@
 
 import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
 
 /** What a config file may say. Every key is what a flag would have said. */
 export interface Config {
@@ -14,8 +14,10 @@ export interface Config {
    * A file holding that token, read instead of writing the secret down here.
    *
    * The same file `ahpd --connection-token-file` keeps, and the same key name
-   * that host's own configuration uses. A path is not a credential, so this
-   * key is safe in a file people share and back up, which `token` is not.
+   * that host's own configuration uses. A leading `~/` is the home folder, and
+   * a relative path is read from the folder this file is in. A path is not a
+   * credential, so this key is safe in a file people share and back up, which
+   * `token` is not.
    */
   connectionTokenFile?: string;
   /**
@@ -99,6 +101,15 @@ export const statePath = (tool: string, file: string): string =>
   join(configHome(), tool, file);
 
 /**
+ * The folder each config file was read from.
+ *
+ * A path written in the file means a file beside it, not a file beside
+ * whatever folder ahpc was started in. Kept apart from the values it answers
+ * with so nothing that copies or spreads them carries the folder along.
+ */
+const configFolders = new WeakMap<Config, string>();
+
+/**
  * Read it, or answer that there was nothing to read.
  *
  * A file that is not there is not an error - most people have none. A file
@@ -122,6 +133,7 @@ export function loadConfig(tool: string, named?: string): Config {
     if (typeof found !== 'object' || found === null || Array.isArray(found)) {
       throw new Error('it is not an object');
     }
+    configFolders.set(found as Config, dirname(path));
     return found as Config;
   }
   catch (error) {
@@ -154,8 +166,25 @@ export function connectionToken(
   if (said.token !== undefined) return said.token;
   if (said.tokenFile !== undefined) return readTokenFile(said.tokenFile);
   if (process.env.AHPC_TOKEN) return process.env.AHPC_TOKEN;
-  if (file.connectionTokenFile !== undefined) return readTokenFile(file.connectionTokenFile);
+  if (file.connectionTokenFile !== undefined) {
+    return readTokenFile(configTokenPath(file.connectionTokenFile, configFolders.get(file)));
+  }
   return file.token;
+}
+
+/**
+ * The file a config file's `connectionTokenFile` names.
+ *
+ * A leading `~/` is the home folder, as it is in a `trust` entry. Anything
+ * still relative belongs to the config file that wrote it, so a configuration
+ * folder that moves keeps reading its own token rather than one wherever ahpc
+ * happened to be started. A path the shell gave is already resolved against
+ * the working folder, so it does not come through here.
+ */
+function configTokenPath(named: string, folder: string | undefined): string {
+  if (named.startsWith('~/')) return join(homedir(), named.slice(2));
+  if (isAbsolute(named)) return named;
+  return folder === undefined ? named : resolve(folder, named);
 }
 
 /**
@@ -172,10 +201,27 @@ function readTokenFile(path: string): string {
   try {
     text = readFileSync(path, 'utf8');
   }
-  catch {
-    throw new Error(`No connection token at ${path}. The host writes one there when it is given --connection-token-file.`);
+  catch (error) {
+    throw new Error(whyNotRead(path, error));
   }
   const held = text.trim();
   if (held === '') throw new Error(`${path} is empty.`);
   return held;
+}
+
+/**
+ * The sentence for a token file that could not be read.
+ *
+ * A missing file keeps the one sentence that sends somebody to the flag that
+ * writes it. A file that is there and refused, or that is a folder, says so;
+ * anything else repeats the system's own reason rather than losing it.
+ */
+function whyNotRead(path: string, error: unknown): string {
+  const code = (error as NodeJS.ErrnoException | null)?.code;
+  if (code === 'ENOENT') {
+    return `No connection token at ${path}. The host writes one there when it is given --connection-token-file.`;
+  }
+  if (code === 'EACCES' || code === 'EPERM') return `Cannot read ${path}: permission denied.`;
+  if (code === 'EISDIR') return `${path} is a folder, not a token file.`;
+  return `Cannot read ${path}: ${error instanceof Error ? error.message : String(error)}.`;
 }
