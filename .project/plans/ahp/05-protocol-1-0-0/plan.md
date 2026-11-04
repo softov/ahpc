@@ -30,7 +30,7 @@ ahpc installs protocol 1.0.0 and offers it first, so against ahpd it runs at 1.0
 
 ### Gaps
 
-- 1.0.0 adds state ahpc does not draw: a chat's own read and archived bits, `chat/isArchivedChanged`, `chat/isReadChanged`, `moveChat` with `session/chatsReordered` and `chat/movableChanged`, `ChatState.backgroundWork`, `session/mcpServerBackgroundRequested`, `ChangesetStatus.recomputing`. Listed in [the 1.0.0 idea](../../../ideas/what-protocol-1-0-0-adds.md).
+- 1.0.0 adds state ahpc does not draw: a chat's own read and archived bits, `chat/isArchivedChanged`, `chat/isReadChanged`, `moveChat` with `session/chatsReordered` and `chat/movableChanged`, `ChatState.backgroundWork`, `session/mcpServerBackgroundRequested`, `ChangesetStatus.recomputing`. Each is an idea: [a chat is read and archived](../../../ideas/a-chat-is-read-and-archived.md), [a chat moves to another session](../../../ideas/a-chat-moves-to-another-session.md), [a chat lists its background work](../../../ideas/a-chat-lists-its-background-work.md), [an MCP server start can be backgrounded](../../../ideas/an-mcp-server-start-can-be-backgrounded.md), [a changeset says it is recomputing](../../../ideas/a-changeset-says-it-is-recomputing.md), [an answered question shows its answers](../../../ideas/an-answered-question-shows-its-answers.md).
 
 ## Decisions locked in
 

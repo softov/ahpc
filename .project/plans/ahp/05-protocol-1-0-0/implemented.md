@@ -32,4 +32,4 @@ A host on an older version still settles on 0.9.0, 0.8.0 or 0.7.0.
 ## Left for later
 
 - No test pins `VERSIONS`, so a later edit could drop `1.0.0` with the suite green.
-- Drawing what 1.0.0 adds is a later plan, from [the 1.0.0 idea](../../../ideas/what-protocol-1-0-0-adds.md).
+- Drawing what 1.0.0 adds is a later plan, from the ideas [a chat is read and archived](../../../ideas/a-chat-is-read-and-archived.md), [a chat moves to another session](../../../ideas/a-chat-moves-to-another-session.md), [a chat lists its background work](../../../ideas/a-chat-lists-its-background-work.md), [an MCP server start can be backgrounded](../../../ideas/an-mcp-server-start-can-be-backgrounded.md), [a changeset says it is recomputing](../../../ideas/a-changeset-says-it-is-recomputing.md), [an answered question shows its answers](../../../ideas/an-answered-question-shows-its-answers.md).
