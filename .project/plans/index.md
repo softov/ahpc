@@ -51,6 +51,13 @@ Reference: [00-ahp.md](ahp/00-ahp.md)
 | [06 - Trusted folders are sent to the host on every connection](ahp/06-trusted-folders-are-sent-on-every-connection/plan.md) | high | built 2026-10-11 ([implemented.md](ahp/06-trusted-folders-are-sent-on-every-connection/implemented.md)) | - | - |
 | [07 - A session's model is read as ahpd.model too](ahp/07-a-sessions-model-is-read-as-ahpd-model-too/plan.md) | high | built 2026-10-09 ([implemented.md](ahp/07-a-sessions-model-is-read-as-ahpd-model-too/implemented.md)); a13ec65 | - | ahpd `host/43 p4` task 03 |
 | [08 - A VS Code 1.141 host is reached at 0.10.0](ahp/08-a-vs-code-1-141-host-is-reached-at-0-10-0/plan.md) | high | built 2026-10-09 ([implemented.md](ahp/08-a-vs-code-1-141-host-is-reached-at-0-10-0/implemented.md)); 356852c | - | - |
+| [20261104-0734 - A token file that cannot be read says why, and its path is read the same from any folder](ahp/20261104-0734-a-token-file-read-says-why/plan.md) | medium | planned 2026-11-04 | - | - |
+| [20261104-0734 - A missing connection token file is one sentence on the screen](ahp/20261104-0734-a-missing-token-file-is-one-sentence/plan.md) | medium | planned 2026-11-04 | ahp/20261104-0734-a-token-file-read-says-why | - |
+| [20261104-0734 - A refused connection token is told apart from a host that is down](ahp/20261104-0734-a-refused-token-is-told-from-a-down-host/plan.md) | medium | planned 2026-11-04 | - | - |
+| [20261104-0734 - The resource token has its own flag, and --token always means the connection](ahp/20261104-0734-the-resource-token-has-its-own-flag/plan.md) | medium | planned 2026-11-04 | - | - |
+| [20261104-0734 - A command a host refuses names the variable that would let it through](ahp/20261104-0734-a-refused-command-names-the-variable/plan.md) | medium | planned 2026-11-04 | ahp/20261104-0734-the-resource-token-has-its-own-flag | - |
+| [20261104-0734 - The comments on a refused act agree with the spec, and a retry is tested](ahp/20261104-0734-the-retry-comments-agree-with-the-spec/plan.md) | medium | planned 2026-11-04 | ahp/20261104-0734-a-refused-command-names-the-variable | - |
+| [20261104-0734 - The sign-in prompt answers the ask it was opened for, sends once, and settles on close](ahp/20261104-0734-the-sign-in-prompt-settles-its-edges/plan.md) | medium | planned 2026-11-04 | ahp/20261104-0734-the-retry-comments-agree-with-the-spec | - |
 
 Next free number in `ahp`: `09`.
 

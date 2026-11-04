@@ -33,6 +33,6 @@ It is the other end of `ahpd --connection-token-file`, which writes a fresh secr
 
 Three, none of them chosen, all filed rather than absorbed here.
 
-- [A bad token file prints a stack in the screen](../../../briefs/a-missing-token-file-is-one-sentence.md), and a configured path is read even when no host is named, so a missing one stops the scripted host.
-- [Every token file read failure is called a missing file](../../../briefs/a-token-file-read-says-why-it-failed.md), and a `~` in a configured path is not expanded.
-- [A refused connection token reads like an unreachable host](../../../briefs/a-refused-token-is-told-from-a-down-host.md), which is what the by-hand verification above ran into.
+- [A bad token file prints a stack in the screen](../20261104-0734-a-missing-token-file-is-one-sentence/plan.md), and a configured path is read even when no host is named, so a missing one stops the scripted host.
+- [Every token file read failure is called a missing file](../20261104-0734-a-token-file-read-says-why/plan.md), and a `~` in a configured path is not expanded.
+- [A refused connection token reads like an unreachable host](../20261104-0734-a-refused-token-is-told-from-a-down-host/plan.md), which is what the by-hand verification above ran into.

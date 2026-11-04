@@ -73,13 +73,13 @@ Seven problem files are `open`, and none of them has been turned into a plan. Tw
 
 | Severity | Problem | The fix it names |
 | --- | --- | --- |
-| major | [a bad token file prints a stack in the screen](../briefs/a-missing-token-file-is-one-sentence.md) | give the screen the shell's one-sentence surface, and read the token only when there is a host |
-| major | [`--token` means two things in `ahpc auth`](../briefs/the-resource-token-has-its-own-flag.md) | give the resource token its own flag |
-| minor | [the shell's refusal advice names two things that do not work](../briefs/a-refused-command-names-the-variable.md) | two sentences, and only the variable in a refused command's |
-| minor | [a refused connection token reads like an unreachable host](../briefs/a-refused-token-is-told-from-a-down-host.md) | say which of the two it was, or name both |
-| minor | [every token file read failure is called a missing file](../briefs/a-token-file-read-says-why-it-failed.md) | report the reason, and expand `~` against the config's directory |
-| minor | [the sign-in prompt leaves edges unsettled](../briefs/the-sign-in-prompt-settles-its-edges.md) | carry the resource in `signIn`, guard the form in flight, settle on dispose |
-| minor | [two comments disagree about what is retried](../briefs/the-retry-comments-agree-with-the-spec.md) | decide which calls may run twice and write it down |
+| major | [a bad token file prints a stack in the screen](../plans/ahp/20261104-0734-a-missing-token-file-is-one-sentence/plan.md) | give the screen the shell's one-sentence surface, and read the token only when there is a host |
+| major | [`--token` means two things in `ahpc auth`](../plans/ahp/20261104-0734-the-resource-token-has-its-own-flag/plan.md) | give the resource token its own flag |
+| minor | [the shell's refusal advice names two things that do not work](../plans/ahp/20261104-0734-a-refused-command-names-the-variable/plan.md) | two sentences, and only the variable in a refused command's |
+| minor | [a refused connection token reads like an unreachable host](../plans/ahp/20261104-0734-a-refused-token-is-told-from-a-down-host/plan.md) | say which of the two it was, or name both |
+| minor | [every token file read failure is called a missing file](../plans/ahp/20261104-0734-a-token-file-read-says-why/plan.md) | report the reason, and expand `~` against the config's directory |
+| minor | [the sign-in prompt leaves edges unsettled](../plans/ahp/20261104-0734-the-sign-in-prompt-settles-its-edges/plan.md) | carry the resource in `signIn`, guard the form in flight, settle on dispose |
+| minor | [two comments disagree about what is retried](../plans/ahp/20261104-0734-the-retry-comments-agree-with-the-spec/plan.md) | decide which calls may run twice and write it down |
 
 The two major ones and the retry question share a root: the connection and resource credentials are still read from one flag, one sentence and one comment.
 
