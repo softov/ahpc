@@ -1,7 +1,7 @@
 ---
 title: A token file that cannot be read says why, and its path is read the same from any folder
 domain: ahp
-status: planned
+status: active
 priority: medium
 created: 2026-11-04
 revalidated: 2026-11-04
@@ -46,7 +46,7 @@ connectionToken -> readTokenFile -> readFileSync
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - Reasons and paths](task-01-reasons-and-paths.md) | todo | - |
+| [01 - Reasons and paths](task-01-reasons-and-paths.md) | implemented | - |
 
 ## Risks and tradeoffs
 
@@ -54,8 +54,8 @@ connectionToken -> readTokenFile -> readFileSync
 
 ## Resume state
 
-- **Done so far:** the plan.
-- **Next action:** build task 01.
+- **Done so far:** task 01 - reasons and paths.
+- **Next action:** nothing to build; the task is implemented and awaits review.
 - **Open questions:** none.
 
 ## Final verification checklist

@@ -1,6 +1,6 @@
 ---
 title: Reasons and paths
-status: todo
+status: implemented
 depends: []
 layer: "ahp"
 refs:
