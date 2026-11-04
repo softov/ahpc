@@ -71,8 +71,8 @@ Reference: [00-cli.md](cli/00-cli.md)
 | [02 - The wire is proxied, checked, counted, followed by channel and compared, from ahpc](cli/02-the-wire-is-proxied-and-analysed/plan.md) | high | dropped 2026-10-11 ([deferred.md](cli/02-the-wire-is-proxied-and-analysed/deferred.md)) | - | - |
 | [03 - A failed turn says why](cli/03-a-failed-turn-says-why/plan.md) | high | built 2026-10-07 ([implemented.md](cli/03-a-failed-turn-says-why/implemented.md)) | - | - |
 | [04 - A session list is read a page at a time](cli/04-a-session-list-is-read-a-page-at-a-time/plan.md) | medium | built 2026-11-03; shipped in 0.9.0 ([implemented.md](cli/04-a-session-list-is-read-a-page-at-a-time/implemented.md)) | - | - |
-| [05 - `prompt` on a busy session refuses, queues or steers, and says when it stops waiting](cli/05-prompt-on-a-busy-session/plan.md) | high | active 2026-10-14; tasks 01-02 implemented, the hand check passed 2026-11-03, awaiting review | - | - |
-| [06 - The automation list is served by default, the other groups are named, and all turns on every group](cli/06-mcp-tool-groups-are-found-and-all-is-one-word/plan.md) | medium | active 2026-10-16; tasks 01-02 implemented, the hand check passed 2026-11-03, awaiting review | - | - |
+| [05 - `prompt` on a busy session refuses, queues or steers, and says when it stops waiting](cli/05-prompt-on-a-busy-session/plan.md) | high | built 2026-11-04 ([implemented.md](cli/05-prompt-on-a-busy-session/implemented.md)) | - | - |
+| [06 - The automation list is served by default, the other groups are named, and all turns on every group](cli/06-mcp-tool-groups-are-found-and-all-is-one-word/plan.md) | medium | built 2026-11-04 ([implemented.md](cli/06-mcp-tool-groups-are-found-and-all-is-one-word/implemented.md)) | - | - |
 
 Next free number in `cli`: `07`.
 

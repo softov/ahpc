@@ -1,7 +1,7 @@
 ---
 title: "`prompt` on a busy session refuses, queues or steers, and says when it stops waiting"
 domain: cli
-status: active
+status: built
 priority: high
 created: 2026-10-14
 revalidated: 2026-10-14
@@ -71,8 +71,8 @@ prompt -> turn() -> until() subscribes -> host.say at once -> chat/turnStarted o
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - A busy session is refused, queued behind or steered](task-01-a-busy-session-is-refused-queued-or-steered.md) | implemented | - |
-| [02 - A timeout says the turn still runs](task-02-a-timeout-says-the-turn-still-runs.md) | implemented | - |
+| [01 - A busy session is refused, queued behind or steered](task-01-a-busy-session-is-refused-queued-or-steered.md) | done | - |
+| [02 - A timeout says the turn still runs](task-02-a-timeout-says-the-turn-still-runs.md) | done | - |
 
 ## Risks and tradeoffs
 
@@ -81,8 +81,8 @@ prompt -> turn() -> until() subscribes -> host.say at once -> chat/turnStarted o
 
 ## Resume state
 
-- **Done so far:** planned 2026-10-14. Tasks 01 and 02 are implemented on 2026-10-14: `turn` reads the session before it sends, and `prompt` takes `--queue` and `--steer`. The MCP `send_turn` tool takes `busy`, the seam and both hosts have `steer`, and a timeout writes its line on stderr.
-- **Next action:** review tasks 01 and 02. The check by hand passed against ahpd `main` on 2026-11-03: a plain `prompt` was refused, `--queue` and `--steer` returned, the timeout line was written, and the MCP `busy` input worked.
+- **Done so far:** tasks 01 and 02 done, as [implemented.md](implemented.md) says. Softov checked them against ahpd on 2026-11-03, and approved them on 2026-11-04.
+- **Next action:** none.
 - **Open questions:** none.
 - **Watch out for:** the scripted host sends events, not only snapshots, so the busy check reads both vocabularies.
   `live.ts` never sends `turnComplete`, so a wait that watched only for one would hang against a real host.
@@ -90,10 +90,10 @@ prompt -> turn() -> until() subscribes -> host.say at once -> chat/turnStarted o
 
 ## Final verification checklist
 
-- [ ] A test: plain `prompt` on a busy session returns 1, writes the refusal line, and sends nothing.
-- [ ] A test: `--queue` waits for the new turn, not the running one.
-- [ ] A test: `--steer` dispatches kind `steering` and returns the running turn.
-- [ ] A test: the MCP tool refuses without `busy`, and queues with `busy: queue`.
-- [ ] A test: a timeout writes the stderr line.
-- [ ] `npm run typecheck` and `npx vitest run` pass.
-- [ ] `plans/index.md` updated.
+- [x] A test: plain `prompt` on a busy session returns 1, writes the refusal line, and sends nothing.
+- [x] A test: `--queue` waits for the new turn, not the running one.
+- [x] A test: `--steer` dispatches kind `steering` and returns the running turn.
+- [x] A test: the MCP tool refuses without `busy`, and queues with `busy: queue`.
+- [x] A test: a timeout writes the stderr line.
+- [x] `npm run typecheck` and `npx vitest run` pass.
+- [x] `plans/index.md` updated.

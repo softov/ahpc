@@ -1,6 +1,6 @@
 ---
 title: A busy session is refused, queued behind or steered
-status: implemented
+status: done
 depends: []
 layer: "cli, mcp, ahp"
 refs:

@@ -1,7 +1,7 @@
 ---
 title: The automation list is served by default, the other groups are named, and all turns on every group
 domain: cli
-status: active
+status: built
 priority: medium
 created: 2026-10-16
 revalidated: 2026-10-16
@@ -67,8 +67,8 @@ main.ts 'mcp' | 'serve' -> wanted(args) -> groups -> serve.ts answer() -> initia
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - The server serves list_automations, names off groups, takes all](task-01-list-automations-off-groups-and-all.md) | implemented | - |
-| [02 - The docs say what is served by default](task-02-docs-say-what-is-served.md) | implemented | 01 |
+| [01 - The server serves list_automations, names off groups, takes all](task-01-list-automations-off-groups-and-all.md) | done | - |
+| [02 - The docs say what is served by default](task-02-docs-say-what-is-served.md) | done | 01 |
 
 ## Risks and tradeoffs
 
@@ -77,13 +77,13 @@ main.ts 'mcp' | 'serve' -> wanted(args) -> groups -> serve.ts answer() -> initia
 
 ## Resume state
 
-- **Done so far:** tasks 01 and 02 implemented on 2026-10-16, awaiting review.
-- **Next action:** Softov reviews the diff. On 2026-11-03, `ahpc mcp` listed 13 tools, `--mcp-tools all` listed all 30, and `npm run docs:build` passed.
+- **Done so far:** tasks 01 and 02 done, as [implemented.md](implemented.md) says. Softov checked them against ahpd on 2026-11-03, and approved them on 2026-11-04.
+- **Next action:** none.
 - **Watch out for:** `--mcp-tools all` must not reach the "No tool group called" refusal in `wanted`.
 
 ## Final verification checklist
 
-- [ ] `npm test` passes.
+- [x] `npm test` passes.
 - [x] `ahpc mcp` lists 13 tools, and `--mcp-tools all` lists every tool.
 - [x] `npm run docs:build` passes.
-- [ ] `plans/index.md` updated.
+- [x] `plans/index.md` updated.

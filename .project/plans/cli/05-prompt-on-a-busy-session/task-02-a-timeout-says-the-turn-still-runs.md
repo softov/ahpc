@@ -1,6 +1,6 @@
 ---
 title: A timeout says the turn still runs
-status: implemented
+status: done
 depends: []
 layer: cli
 refs:

@@ -1,6 +1,6 @@
 ---
 title: The docs say what is served by default
-status: implemented
+status: done
 depends: [task-01-list-automations-off-groups-and-all.md]
 layer: "docs"
 refs:

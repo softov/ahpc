@@ -1,6 +1,6 @@
 ---
 title: The server serves list_automations, names the groups that are off, and takes all
-status: implemented
+status: done
 depends: []
 layer: "mcp"
 refs:
