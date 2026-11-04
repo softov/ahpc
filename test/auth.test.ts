@@ -1,8 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import {
   AUTH_REQUIRED, attempt, authRequiredOf, askFor, failureWords, hostWords,
 } from '../src/ahp/auth.js';
-import { needsToken } from '../src/cli/main.js';
+import { signInSentence } from '../src/connect.js';
+import { needsToken, refusedSentence } from '../src/cli/main.js';
 
 /*
  * The refusal, read once, and the one retry a credential buys.
@@ -157,13 +161,78 @@ describe('a refusal in a shell', () => {
   it('names the resource and the variable that would satisfy it', () => {
     expect(needsToken('https://api.anthropic.com', 'Anthropic API')).toBe(
       'Anthropic API (https://api.anthropic.com) needs a token. '
-      + 'Pass --token, set AHPC_TOKEN_API_ANTHROPIC_COM, or pipe one in: '
-      + 'ahpc auth https://api.anthropic.com',
+      + 'Pass --resource-token, set AHPC_TOKEN_API_ANTHROPIC_COM, or pipe one in.',
     );
   });
 
   it('names the resource alone when the host gave no name for it', () => {
     expect(needsToken('https://api.github.com')).toContain('https://api.github.com needs a token');
     expect(needsToken('https://api.github.com')).toContain('AHPC_TOKEN_API_GITHUB_COM');
+  });
+});
+
+describe('a refused command, and the only way in it has', () => {
+  const RESOURCE = 'https://api.anthropic.com';
+  const NAME = 'Anthropic API';
+
+  it('names the variable, and neither --token nor ahpc auth', () => {
+    const said = refusedSentence(RESOURCE, NAME);
+    expect(said).toBe(
+      'Anthropic API (https://api.anthropic.com) needs a token. '
+      + 'Set AHPC_TOKEN_API_ANTHROPIC_COM and run it again.',
+    );
+    expect(said).not.toContain('--token');
+    expect(said).not.toContain('ahpc auth');
+  });
+
+  it('prints that sentence when session list is refused with -32007', async () => {
+    vi.resetModules();
+    vi.doMock('../src/connect.js', async (importOriginal) => {
+      const real = await importOriginal<typeof import('../src/connect.js')>();
+      const { fakeHost } = await import('../src/ahp/fake.js');
+      return {
+        ...real,
+        connect: async () => {
+          const host = fakeHost();
+          host.protect(RESOURCE, NAME);
+          return host;
+        },
+      };
+    });
+
+    const home = await mkdtemp(path.join(tmpdir(), 'ahpc-refused-'));
+    const had = { XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME, AHPC_HOST: process.env.AHPC_HOST };
+    process.env.XDG_CONFIG_HOME = home;
+    delete process.env.AHPC_HOST;
+    try {
+      const { cli, Fault } = await import('../src/cli/main.js');
+      const said = await cli('session', ['list']).then(() => null, (error: unknown) => error);
+      expect(said).toBeInstanceOf(Fault);
+      expect((said as Error).message).toBe(refusedSentence(RESOURCE, NAME));
+      expect((said as Error).message).not.toContain('--token');
+      expect((said as Error).message).not.toContain('ahpc auth');
+    }
+    finally {
+      for (const [key, value] of Object.entries(had)) {
+        if (value === undefined) delete process.env[key]; else process.env[key] = value;
+      }
+      await rm(home, { recursive: true, force: true });
+      vi.doUnmock('../src/connect.js');
+      vi.resetModules();
+    }
+  });
+
+  it('keeps "has expired" for an expired ask, and names the variable', () => {
+    const expired = signInSentence({ resource: RESOURCE, name: NAME, reason: 'expired', words: 'gone' });
+    expect(expired).toContain('has expired');
+    // A new token, because the challenged one must not be sent again.
+    expect(expired).toContain('Set AHPC_TOKEN_API_ANTHROPIC_COM to a new token');
+    expect(expired).not.toContain('ahpc auth');
+  });
+
+  it('names the variable for an ask that is not expired', () => {
+    expect(signInSentence({ resource: RESOURCE, name: NAME, words: 'needs one' })).toBe(
+      'Anthropic API needs a token. Set AHPC_TOKEN_API_ANTHROPIC_COM and run it again.',
+    );
   });
 });

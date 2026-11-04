@@ -1,7 +1,7 @@
 ---
 title: A command a host refuses names the variable that would let it through
 domain: ahp
-status: planned
+status: active
 priority: medium
 created: 2026-11-04
 revalidated: 2026-11-04
@@ -46,7 +46,7 @@ The files read are the `refs` in the frontmatter, each with its note.
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - Two sentences, one for each place](task-01-two-sentences.md) | todo | - |
+| [01 - Two sentences, one for each place](task-01-two-sentences.md) | implemented | - |
 
 ## Risks and tradeoffs
 
@@ -54,8 +54,8 @@ The files read are the `refs` in the frontmatter, each with its note.
 
 ## Resume state
 
-- **Done so far:** the plan.
-- **Next action:** build task 01.
+- **Done so far:** task 01 - `refusedSentence` for the refusal catch, `needsToken` with `--resource-token`, and `signInSentence` naming the variable.
+- **Next action:** none. The plan is waiting on review.
 - **Open questions:** none.
 
 ## Final verification checklist
