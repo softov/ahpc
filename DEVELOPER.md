@@ -58,6 +58,7 @@ AHPD_DIR=../ahpd npm run docs:pictures
 ```
 
 It starts `examples/demo` in `/tmp/ahpc-demo`, makes the sessions, chats, terminal and automations with ahpc's own commands, writes every picture, and removes the folder.
+Each picture is as tall as what its screen shows, and never under 12 rows. `sessions.svg`, `transcript.svg` and `compose.svg` keep the size `README.md` shows them at.
 The times on the screen come from the clock, so every run changes them a little.
 Open each picture before you commit it.
 

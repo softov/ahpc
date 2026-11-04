@@ -1,6 +1,6 @@
 ---
 title: Each screen is a page under Use
-status: todo
+status: done
 depends: [task-02-the-pictures-show-more-and-fit.md]
 layer: "docs"
 refs:

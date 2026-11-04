@@ -1,6 +1,6 @@
 ---
 title: The pictures show more and fit
-status: todo
+status: done
 depends: [task-01-a-still-runs-a-command.md]
 layer: "tools"
 refs:

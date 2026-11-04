@@ -48,7 +48,7 @@ To stop typing `--host`, put it in the [config file](CONFIGURE.md):
 
 | | |
 | --- | --- |
-| [Screen](../use/SCREEN.md) | `ahpc` with no command. Chat with an agent, approve its tool calls, browse its changes |
+| [Screen](../use/SCREEN.md) | `ahpc` with no command. Start a session, chat with an agent, approve its tool calls, browse its changes |
 | [Commands](../use/COMMANDS.md) | `ahpc session list`, `ahpc prompt <uri> "..."`. One command, an answer, and exit |
 | [Tool server](../use/TOOL-SERVER.md) | `ahpc mcp`. Another agent, such as Claude Code, drives the sessions on your host |
 

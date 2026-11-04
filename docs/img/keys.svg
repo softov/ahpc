@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="530" viewBox="0 0 820 530" font-family="ui-monospace, SFMono-Regular, &apos;SF Mono&apos;, Menlo, Consolas, &apos;DejaVu Sans Mono&apos;, monospace" font-size="13px">
+<title>chat - sessions</title>
+<rect width="820" height="530" rx="6" fill="#0d1117"/>
+<text x="10" y="23" fill="#1b2f48" font-weight="bold" textLength="32" lengthAdjust="spacing" xml:space="preserve">ahpc</text>
+<text x="50" y="23" fill="#2d2f34" textLength="8" lengthAdjust="spacing" xml:space="preserve">·</text>
+<text x="66" y="23" fill="#2a2b32" textLength="152" lengthAdjust="spacing" xml:space="preserve">ws://127.0.0.1:9210</text>
+<text x="610" y="23" fill="#1b2f48" font-weight="bold" textLength="16" lengthAdjust="spacing" xml:space="preserve">f1</text>
+<text x="634" y="23" fill="#2a2b32" textLength="32" lengthAdjust="spacing" xml:space="preserve">help</text>
+<text x="674" y="23" fill="#2d2f34" textLength="8" lengthAdjust="spacing" xml:space="preserve">·</text>
+<text x="690" y="23" fill="#1b2f48" font-weight="bold" textLength="48" lengthAdjust="spacing" xml:space="preserve">ctrl+p</text>
+<text x="746" y="23" fill="#2a2b32" textLength="64" lengthAdjust="spacing" xml:space="preserve">commands</text>
+<text x="10" y="40" fill="#6b7178" font-weight="bold" textLength="64" lengthAdjust="spacing" xml:space="preserve">Sessions</text>
+<text x="666" y="40" fill="#2a2b32" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">⚠</text>
+<text x="674" y="40" fill="#2a2b32" textLength="136" lengthAdjust="spacing" xml:space="preserve"> 2 waiting on you</text>
+<text x="18" y="57" fill="#2a2b32" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">⌕</text>
+<text x="34" y="57" fill="#2d2f34" textLength="224" lengthAdjust="spacing" xml:space="preserve">title, provider or workspace</text>
+<text x="10" y="74" fill="#122a48" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▸</text>
+<text x="26" y="74" fill="#122a48" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">◌</text>
+<text x="34" y="74" fill="#122a48" textLength="776" lengthAdjust="spacing" xml:space="preserve"> read                                                                              waiting on you</text>
+<text x="10" y="91" fill="#122a48" textLength="376" lengthAdjust="spacing" xml:space="preserve">    demo  ·  website  ·  Reading what you asked</text>
+<text x="26" y="108" fill="#362c16" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">◌</text>
+<text x="34" y="108" fill="#6b7178" textLength="664" lengthAdjust="spacing" xml:space="preserve"> write todo buy bread and milk                                                     </text>
+<text x="698" y="108" fill="#2a2b32" textLength="112" lengthAdjust="spacing" xml:space="preserve">waiting on you</text>
+<text x="42" y="125" fill="#2a2b32" textLength="400" lengthAdjust="spacing" xml:space="preserve">demo  ·  notes-app main  ·  Reading what you asked</text>
+<text x="26" y="142" fill="#1b2f48" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">●</text>
+<text x="34" y="142" fill="#6b7178" textLength="48" lengthAdjust="spacing" xml:space="preserve"> slow </text>
+<text x="98" y="142" fill="#9b949e" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">⌕</text>
+<text x="114" y="142" fill="#a7a7a7" textLength="112" lengthAdjust="spacing" xml:space="preserve">Type a command</text>
+<text x="226" y="142" fill="#a7a7a7" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">…</text>
+<text x="754" y="142" fill="#2a2b32" textLength="56" lengthAdjust="spacing" xml:space="preserve">running</text>
+<text x="42" y="159" fill="#2a2b32" textLength="40" lengthAdjust="spacing" xml:space="preserve">demo </text>
+<text x="26" y="176" fill="#3f1c1f" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">✕</text>
+<text x="34" y="176" fill="#6b7178" textLength="48" lengthAdjust="spacing" xml:space="preserve"> fail </text>
+<text x="122" y="176" fill="#9b949e" font-weight="bold" textLength="32" lengthAdjust="spacing" xml:space="preserve">View</text>
+<text x="770" y="176" fill="#2a2b32" textLength="40" lengthAdjust="spacing" xml:space="preserve">error</text>
+<text x="42" y="193" fill="#2a2b32" textLength="40" lengthAdjust="spacing" xml:space="preserve">demo </text>
+<text x="90" y="193" fill="#3191ff" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▸</text>
+<text x="98" y="193" fill="#3191ff" textLength="632" lengthAdjust="spacing" xml:space="preserve">   Show creature                                                          alt+g</text>
+<text x="26" y="210" fill="#2a2b32" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">○</text>
+<text x="34" y="210" fill="#6b7178" textLength="48" lengthAdjust="spacing" xml:space="preserve"> read </text>
+<text x="82" y="210" fill="#c9d1d9" textLength="216" lengthAdjust="spacing" xml:space="preserve">     Configure             </text>
+<text x="298" y="210" fill="#9b949e" textLength="432" lengthAdjust="spacing" xml:space="preserve">Theme, layout and the rest of what this client decides</text>
+<text x="778" y="210" fill="#2a2b32" textLength="32" lengthAdjust="spacing" xml:space="preserve">idle</text>
+<text x="42" y="227" fill="#2a2b32" textLength="40" lengthAdjust="spacing" xml:space="preserve">demo </text>
+<text x="82" y="227" fill="#c9d1d9" textLength="352" lengthAdjust="spacing" xml:space="preserve">     Show keys                              </text>
+<text x="434" y="227" fill="#9b949e" textLength="272" lengthAdjust="spacing" xml:space="preserve">Every key that does something here</text>
+<text x="714" y="227" fill="#a7a7a7" textLength="16" lengthAdjust="spacing" xml:space="preserve">f1</text>
+<text x="82" y="244" fill="#c9d1d9" textLength="176" lengthAdjust="spacing" xml:space="preserve">     Render markdown  </text>
+<text x="258" y="244" fill="#9b949e" textLength="416" lengthAdjust="spacing" xml:space="preserve">Draw what the agent said as markdown, or as it typed</text>
+<text x="674" y="244" fill="#9b949e" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">…</text>
+<text x="690" y="244" fill="#a7a7a7" textLength="40" lengthAdjust="spacing" xml:space="preserve">alt+m</text>
+<text x="82" y="261" fill="#c9d1d9" textLength="496" lengthAdjust="spacing" xml:space="preserve">     Change theme                                             </text>
+<text x="578" y="261" fill="#9b949e" textLength="136" lengthAdjust="spacing" xml:space="preserve">Colors and shapes</text>
+<text x="722" y="261" fill="#c9d1d9" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▸</text>
+<text x="82" y="278" fill="#c9d1d9" textLength="376" lengthAdjust="spacing" xml:space="preserve">     Change layout                             </text>
+<text x="458" y="278" fill="#9b949e" textLength="256" lengthAdjust="spacing" xml:space="preserve">Where the panels and controls go</text>
+<text x="722" y="278" fill="#c9d1d9" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▸</text>
+<text x="122" y="295" fill="#9b949e" font-weight="bold" textLength="56" lengthAdjust="spacing" xml:space="preserve">Screens</text>
+<text x="82" y="312" fill="#c9d1d9" textLength="360" lengthAdjust="spacing" xml:space="preserve">     Go back                                 </text>
+<text x="442" y="312" fill="#9b949e" textLength="232" lengthAdjust="spacing" xml:space="preserve">Return to the previous screen</text>
+<text x="682" y="312" fill="#a7a7a7" textLength="48" lengthAdjust="spacing" xml:space="preserve">escape</text>
+<text x="82" y="329" fill="#c9d1d9" textLength="224" lengthAdjust="spacing" xml:space="preserve">     Show automations       </text>
+<text x="306" y="329" fill="#9b949e" textLength="424" lengthAdjust="spacing" xml:space="preserve">What the host runs on its own, and when it next fires</text>
+<text x="90" y="363" fill="#9b949e" textLength="120" lengthAdjust="spacing" xml:space="preserve">creature.toggle</text>
+<text x="714" y="363" fill="#a7a7a7" textLength="16" lengthAdjust="spacing" xml:space="preserve">29</text>
+<text x="90" y="380" fill="#a7a7a7" textLength="16" lengthAdjust="spacingAndGlyphs" xml:space="preserve">↑↓</text>
+<text x="106" y="380" fill="#a7a7a7" textLength="160" lengthAdjust="spacing" xml:space="preserve"> move · enter run · </text>
+<text x="266" y="380" fill="#a7a7a7" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▸</text>
+<text x="274" y="380" fill="#a7a7a7" textLength="176" lengthAdjust="spacing" xml:space="preserve"> sub-items · esc close</text>
+<text x="10" y="516" fill="#1b2f48" font-weight="bold" textLength="16" lengthAdjust="spacingAndGlyphs" xml:space="preserve">↑↓</text>
+<text x="34" y="516" fill="#2a2b32" textLength="32" lengthAdjust="spacing" xml:space="preserve">move</text>
+<text x="66" y="516" fill="#2d2f34" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
+<text x="90" y="516" fill="#1b2f48" font-weight="bold" textLength="40" lengthAdjust="spacing" xml:space="preserve">enter</text>
+<text x="138" y="516" fill="#2a2b32" textLength="48" lengthAdjust="spacing" xml:space="preserve">choose</text>
+<text x="186" y="516" fill="#2d2f34" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
+<text x="210" y="516" fill="#1b2f48" font-weight="bold" textLength="24" lengthAdjust="spacing" xml:space="preserve">esc</text>
+<text x="242" y="516" fill="#2a2b32" textLength="32" lengthAdjust="spacing" xml:space="preserve">back</text>
+<text x="274" y="516" fill="#2d2f34" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
+<text x="298" y="516" fill="#1b2f48" font-weight="bold" textLength="48" lengthAdjust="spacing" xml:space="preserve">ctrl+c</text>
+<text x="354" y="516" fill="#2a2b32" textLength="32" lengthAdjust="spacing" xml:space="preserve">quit</text>
+</svg>

@@ -58,6 +58,8 @@ interface Options {
   boodFloat: boolean;
   /** Say something on the open session before the frame is taken. */
   say?: string;
+  /** A command to run on the screen before the frame is taken, such as `app.palette`. */
+  command?: string;
   /** Answer the confirmation the script stops at, to reach the question. */
   approve: boolean;
   /** ...and then answer the question, to reach the end of the turn. */
@@ -177,6 +179,8 @@ Stills, for a README or a test
   --settled             Run the script out before the frame
   --pump <n>            Or exactly this many scripted words
   --say <text>          Say this on the open session first
+  --command <id>        Run this command before the frame, such as
+                        app.palette or harness.choose
   --approve             Answer the confirmation the script stops at
   --answer              ...and then the question
 
@@ -216,6 +220,7 @@ export function parse(argv: string[]): Options {
       case '--pump': options.pump = Number(argv[++i]); break;
       case '--svg': options.svg = String(argv[++i]); break;
       case '--say': options.say = String(argv[++i]); break;
+      case '--command': options.command = String(argv[++i]); break;
       case '--approve': options.approve = true; break;
       case '--answer': options.answer = true; break;
       case '--screen': options.screen = String(argv[++i]); break;
@@ -298,6 +303,8 @@ export async function answered(
 
 async function still(options: Options): Promise<void> {
   const host = await connect(options);
+  /** A `--command` no command answers to, said once the host is let go. */
+  let refused: string | undefined;
 
   const { text } = await renderStill({
     width: options.width,
@@ -355,10 +362,25 @@ async function still(options: Options): Promise<void> {
       }
 
       await answered(app, host, end - Date.now());
+
+      // Not awaited: a palette or a picker resolves when somebody picks, and
+      // a still is the frame while it is open.
+      if (options.command !== undefined) {
+        if (app.commands.get(options.command) === undefined) {
+          refused = `No command called ${options.command}.`;
+          return;
+        }
+        // A command that asks for something opens the palette on its question,
+        // as a key bound to it does through `app.ask`.
+        const asks = (app.commands.get(options.command)?.args ?? []).some((arg) => arg.required === true);
+        const ran = asks ? app.execute('app.ask', { command: options.command }) : app.execute(options.command);
+        void ran.catch(() => undefined);
+        await answered(app, host, end - Date.now());
+      }
     },
 
     after: async (app) => {
-      if (options.svg === undefined) return;
+      if (options.svg === undefined || refused !== undefined) return;
       // The theme's own two colours, not the exporter's defaults: a cell left
       // at the terminal default means "whatever the emulator is set to", and
       // the honest answer for a picture of *this* application is the
@@ -377,6 +399,11 @@ async function still(options: Options): Promise<void> {
   // ever, which is what every `--host` still did.
   await host.close?.();
 
+  if (refused !== undefined) {
+    process.stderr.write(`${refused}\n`);
+    process.exitCode = 1;
+    return;
+  }
   if (options.svg !== undefined) {
     process.stderr.write(`${options.svg}\n`);
     return;

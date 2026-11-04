@@ -1,7 +1,7 @@
 ---
 title: Each screen of the client is a page, and the pictures fit what they show
 domain: documentation
-status: planned
+status: built
 priority: medium
 created: 2026-11-04
 revalidated: 2026-11-04
@@ -56,9 +56,9 @@ The files read and the patterns to reuse are the `refs` in the frontmatter, each
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - A still runs a command before its frame](task-01-a-still-runs-a-command.md) | todo | - |
-| [02 - The pictures show more and fit](task-02-the-pictures-show-more-and-fit.md) | todo | 01 |
-| [03 - Each screen is a page under Use](task-03-each-screen-is-a-page.md) | todo | 02 |
+| [01 - A still runs a command before its frame](task-01-a-still-runs-a-command.md) | done | - |
+| [02 - The pictures show more and fit](task-02-the-pictures-show-more-and-fit.md) | done | 01 |
+| [03 - Each screen is a page under Use](task-03-each-screen-is-a-page.md) | done | 02 |
 
 ## Risks and tradeoffs
 
@@ -66,13 +66,13 @@ The files read and the patterns to reuse are the `refs` in the frontmatter, each
 
 ## Resume state
 
-- **Done so far:** planned 2026-11-04.
-- **Next action:** [task-01-a-still-runs-a-command.md](task-01-a-still-runs-a-command.md).
+- **Done so far:** built 2026-11-04. See [implemented.md](implemented.md).
+- **Next action:** review.
 - **Open questions:** none.
-- **Watch out for:** `terminals.svg` shows a prompt only once the ahpd plan in `requires` is built.
+- **Watch out for:** `terminals.svg` shows a prompt only once the ahpd plan in `requires` is merged.
 
 ## Final verification checklist
 
-- [ ] `npm run typecheck`, `npm run build`, `npx vitest run` and `npm run docs:build` pass.
-- [ ] `AHPD_DIR=<ahpd checkout> npm run docs:pictures` writes every picture, and each one is opened and checked.
-- [ ] The *Use* sidebar lists Screen, New session, Session, Keys, Commands, Tool server and Recording.
+- [x] `npm run typecheck`, `npm run build`, `npx vitest run` and `npm run docs:build` pass.
+- [x] `AHPD_DIR=<ahpd checkout> npm run docs:pictures` writes every picture, and each one is opened and checked.
+- [x] The *Use* sidebar lists Screen, New session, Session, Keys, Commands, Tool server and Recording.
