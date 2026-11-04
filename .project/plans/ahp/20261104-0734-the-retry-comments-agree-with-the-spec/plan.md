@@ -1,7 +1,7 @@
 ---
 title: The comments on a refused act agree with the spec, and a retry is tested
 domain: ahp
-status: planned
+status: active
 priority: medium
 created: 2026-11-04
 revalidated: 2026-11-04
@@ -48,7 +48,7 @@ The files read are the `refs` in the frontmatter, each with its note.
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - The comments, the decision and a retry test](task-01-comments-and-a-retry-test.md) | todo | - |
+| [01 - The comments, the decision and a retry test](task-01-comments-and-a-retry-test.md) | implemented | - |
 
 ## Risks and tradeoffs
 
@@ -56,8 +56,8 @@ The files read are the `refs` in the frontmatter, each with its note.
 
 ## Resume state
 
-- **Done so far:** the plan.
-- **Next action:** build task 01.
+- **Done so far:** task 01 - the shell comment gives the real reason, the decision cites the spec, and `createSession` is covered by a retry test.
+- **Next action:** none. The plan is waiting on review.
 - **Open questions:** none.
 
 ## Final verification checklist
