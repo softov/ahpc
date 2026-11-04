@@ -84,7 +84,7 @@ Reference: [00-documentation.md](documentation/00-documentation.md)
 | Plan | Priority | Status | Requires | Blocks |
 | --- | --- | --- | --- | --- |
 | [20261103-1238 - Each subject page shows a picture of its screen](documentation/20261103-1238-each-subject-shows-its-screen/plan.md) | medium | planned 2026-11-03 | - | - |
-| [20261104-1120 - Each release is a docs page, from 0.10 on](documentation/20261104-1120-each-release-is-a-docs-page/plan.md) | high | planned 2026-11-04 | - | - |
+| [20261104-1120 - Each release is a docs page, from 0.10 on](documentation/20261104-1120-each-release-is-a-docs-page/plan.md) | high | active 2026-11-04; tasks 01-02 implemented, awaiting review | - | - |
 
 ## Later domains (no plans yet)
 

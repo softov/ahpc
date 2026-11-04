@@ -59,8 +59,9 @@ A queued row that names the model a message will run on is the worked example of
 One package, one tag.
 
 1. Bump `version` in [`package.json`](package.json).
-2. Commit.
-3. Tag it and push the tag:
+2. Date the release's section in `docs/updates/vX_Y.md`. A new minor release gets a new page, with `title`, `date` and *The good stuff*; the site lists it from the file.
+3. Commit.
+4. Tag it and push the tag:
 
 ```sh
 git tag vX.Y.Z

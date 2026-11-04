@@ -1,7 +1,7 @@
 ---
 title: Each release is a docs page, from 0.10 on
 domain: documentation
-status: planned
+status: active
 priority: high
 created: 2026-11-04
 revalidated: 2026-11-04
@@ -71,8 +71,8 @@ docs/updates/v0_10.md -> releases() -> the /updates/ sidebar, the Updates nav en
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - The site lists the release pages](task-01-the-site-lists-the-release-pages.md) | todo | - |
-| [02 - The 0.10 page holds its changes](task-02-the-0-10-page-holds-its-changes.md) | todo | 01 |
+| [01 - The site lists the release pages](task-01-the-site-lists-the-release-pages.md) | implemented | - |
+| [02 - The 0.10 page holds its changes](task-02-the-0-10-page-holds-its-changes.md) | implemented | 01 |
 
 ## Risks and tradeoffs
 
@@ -81,8 +81,8 @@ docs/updates/v0_10.md -> releases() -> the /updates/ sidebar, the Updates nav en
 
 ## Resume state
 
-- **Done so far:** planned 2026-11-04.
-- **Next action:** [task-01-the-site-lists-the-release-pages.md](task-01-the-site-lists-the-release-pages.md).
+- **Done so far:** tasks 01 and 02 implemented 2026-11-04, as [implemented.md](implemented.md) says. Softov read the page on 2026-11-04.
+- **Next action:** Softov reviews the pull request.
 - **Open questions:** none.
 - **Watch out for:** the build fails on a page that no sidebar lists, so the archive must be in the `/updates/` sidebar.
 
