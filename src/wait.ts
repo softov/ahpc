@@ -22,7 +22,17 @@ export function until(
   host: HostConnection,
   uri: SessionUri,
   done: (event: HostEvent) => boolean,
-  options: { onEvent?(event: HostEvent): void; timeoutSeconds?: number } = {},
+  options: {
+    onEvent?(event: HostEvent): void;
+    timeoutSeconds?: number;
+    /**
+     * A cancel, which ends the wait as running out of time does.
+     *
+     * The answer is `undefined` rather than an event, because nothing the
+     * session did ended it - the caller asked to stop waiting.
+     */
+    signal?: AbortSignal;
+  } = {},
 ): Promise<HostEvent | undefined> {
   return new Promise((answer) => {
     let closed = false;
@@ -41,15 +51,24 @@ export function until(
     const finish = (event: HostEvent | undefined): void => {
       if (closed) return;
       closed = true;
+      // Taken off on every way out: a listener left behind would answer a
+      // cancel that belongs to some later wait, or to none at all.
+      options.signal?.removeEventListener('abort', stopped);
       clearTimeout(timer);
       handle?.close();
       answer(event);
     };
+    /** A cancel, which is the same ending as running out of time. */
+    const stopped = (): void => { finish(undefined); };
     const timer = setTimeout(
       () => finish(undefined),
       Math.max(1, (options.timeoutSeconds ?? 900)) * 1000,
     );
     timer.unref?.();
+    options.signal?.addEventListener('abort', stopped);
+    // Cancelled before there was a listener: nothing is left to wait for,
+    // and the subscription is closed as soon as it is made.
+    if (options.signal?.aborted === true) stopped();
     handle = host.subscribe(uri, (event) => {
       options.onEvent?.(event);
       if (done(event)) finish(event);
@@ -123,6 +142,15 @@ export interface TurnOptions {
    * on an approval and most turns never ask for one.
    */
   onStep?(call: { id: string; name: string }): void;
+  /**
+   * A cancel from the caller.
+   *
+   * The wait ends, and what this caller sent is undone: a turn it started is
+   * stopped, and a message it queued is taken back, or stopped once the host
+   * has started it. A steered message started nothing of its own, so the turn
+   * it went into is left alone.
+   */
+  signal?: AbortSignal;
 }
 
 /**
@@ -170,6 +198,10 @@ const running = (event: HostEvent): { busy: boolean; id: string | undefined } | 
  * report rather than to throw: the turn is still going and the session is
  * still there. Throws `TurnRunning` where the session was in a turn and this
  * caller named nothing to do about it, which is not a wait at all.
+ *
+ * A cancel ends the wait early and undoes what the message did: a turn it
+ * started is stopped, and a message it queued is taken back. A steered message
+ * started nothing of its own, so the turn it went into is left alone.
  */
 export async function turn(
   host: HostConnection,
@@ -191,6 +223,16 @@ export async function turn(
   let behind: string | undefined;
   /** The turn a steering message went into, whose end is the answer. */
   let steering: string | undefined;
+  /** Whether the message started a turn of this caller's, which a cancel stops. */
+  let started = false;
+  /** The answer to `queue`, kept so a cancel can take the message back by its id. */
+  let queued: Promise<{ id: string }> | undefined;
+  /**
+   * A turn of this caller's seen running: not in the baseline, and not the
+   * turn a message went behind or into. A queued message that the host has
+   * already started is no longer in the queue, so a cancel stops this instead.
+   */
+  let ours: string | undefined;
   /** The turn being streamed, so a change of turn starts its text over. */
   let streaming: string | undefined;
   /** Tool calls already reported, so a snapshot rebuilt per token says each once. */
@@ -223,16 +265,26 @@ export async function turn(
      * or into it.
      */
     if (!sent) {
+      /*
+       * Cancelled before the session said what it was doing: nothing was
+       * sent, so there is nothing to undo, and the wait ends here.
+       */
+      if (options.signal?.aborted === true) return true;
       const state = running(event);
       if (state !== undefined) {
         sent = true;
-        if (!state.busy) host.say(uri, text, options.model);
+        if (!state.busy) { started = true; host.say(uri, text, options.model); }
         else if (options.busy === undefined) { refused = true; return true; }
         else if (options.busy === 'queue') {
           // Its end is somebody else's answer, so its id joins the baseline.
           if (state.id !== undefined) before.add(state.id);
           behind = state.id;
-          host.queue(uri, text, options.model);
+          // Kept, because the queue is the host's and only the id it gives
+          // back names the message to a cancel.
+          queued = host.queue(uri, text, options.model);
+          // Read only by a cancel. A refusal with no cancel to read it is the
+          // host's to report, and is not left as an unhandled rejection.
+          queued.catch(() => undefined);
         }
         else {
           steering = state.id;
@@ -266,7 +318,11 @@ export async function turn(
      * that read only snapshots waited for ever on the scripted host, which
      * this client offers as the one that needs nothing installed.
      */
-    if (event.type === 'turnStarted') { sawActive = true; return false; }
+    if (event.type === 'turnStarted') {
+      sawActive = true;
+      if (steering === undefined && !before.has(event.turn.id)) ours = event.turn.id;
+      return false;
+    }
     if (event.type === 'delta') {
       if (event.kind === 'markdown') options.onDelta?.(event.text);
       return false;
@@ -294,6 +350,7 @@ export async function turn(
 
     if (event.active) {
       sawActive = true;
+      if (steering === undefined && !before.has(event.active.id)) ours = event.active.id;
       // A new turn starts its text over: a length kept from another turn would
       // hide the beginning of this one.
       if (event.active.id !== streaming) { streaming = event.active.id; given = 0; }
@@ -317,9 +374,29 @@ export async function turn(
     if (!sawActive && fresh.length === 0) return false;
     answer = fresh[fresh.length - 1];
     return true;
-  }, { ...(options.timeoutSeconds === undefined ? {} : { timeoutSeconds: options.timeoutSeconds }) });
+  }, {
+    ...(options.timeoutSeconds === undefined ? {} : { timeoutSeconds: options.timeoutSeconds }),
+    ...(options.signal === undefined ? {} : { signal: options.signal }),
+  });
 
   await finished;
   if (refused) throw new TurnRunning();
+  /*
+   * What a cancel undoes, once the wait is over.
+   *
+   * A turn this caller started is stopped, and a message it queued is taken
+   * back by the id the host gave it. A steered message started no turn of its
+   * own, so the turn it went into is left alone.
+   */
+  // Only where the cancel is what ended the wait. A cancel that arrives after
+  // the turn has answered has nothing left to undo, and a stop sent then would
+  // land on whatever turn the session is running next.
+  if (options.signal?.aborted === true && answer === undefined) {
+    if (queued !== undefined) {
+      const held = await queued.catch(() => undefined);
+      if (held !== undefined) await host.unqueue(uri, held.id);
+    }
+    if (started || ours !== undefined) await host.stopTurn(uri);
+  }
   return answer;
 }

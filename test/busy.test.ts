@@ -21,6 +21,7 @@ import { join } from 'node:path';
 import { CHAT, SESSION as LIVE, connect, settle } from './scenario.js';
 import type { FakeHost } from '../src/ahp/fake.js';
 import type { HostEvent } from '../src/ahp/connection.js';
+import { turn } from '../src/wait.js';
 
 const held = vi.hoisted(() => ({ host: undefined as FakeHost | undefined }));
 
@@ -294,6 +295,141 @@ describe('the tool server, on a session with a turn running', () => {
     expect(answer.state).toBe('complete');
     expect(answer.text).toContain(said);
   }, 30_000);
+});
+
+describe('a turn a cancel stops', () => {
+  /**
+   * The host, with the calls a cancel makes recorded.
+   *
+   * A spy rather than an expectation on the state: whether the turn was
+   * running is the host's to know, and what this asks is that the stop was
+   * sent at all and sent once.
+   */
+  const watching = (host: FakeHost): { stopped: string[]; taken: string[] } => {
+    const stopped: string[] = [];
+    const taken: string[] = [];
+    const realStop = host.stopTurn.bind(host);
+    host.stopTurn = async (uri) => { stopped.push(uri); return realStop(uri); };
+    const realUnqueue = host.unqueue.bind(host);
+    host.unqueue = async (uri, id) => { taken.push(id); return realUnqueue(uri, id); };
+    return { stopped, taken };
+  };
+
+  it('stops the turn it said to an idle session, once', async () => {
+    const { fakeHost } = await import('../src/ahp/fake.js');
+    const host = fakeHost();
+    const { stopped } = watching(host);
+    const controller = new AbortController();
+
+    const waiting = turn(host, IDLE, 'hello there', { signal: controller.signal, timeoutSeconds: 5 });
+    // The message has gone, and the turn it started is scripted but not yet
+    // stepped: the same moment a client cancels it.
+    expect(host.pending()).toBeGreaterThan(0);
+
+    controller.abort();
+
+    // The wait ends now rather than at the timeout it was given.
+    expect(await Promise.race([waiting, tick().then(() => 'still waiting')])).toBeUndefined();
+    expect(stopped).toEqual([IDLE]);
+  });
+
+  it('takes back a message it queued, by the id the host gave it', async () => {
+    const { fakeHost } = await import('../src/ahp/fake.js');
+    const host = fakeHost();
+    const { stopped, taken } = watching(host);
+    const controller = new AbortController();
+
+    const waiting = turn(host, BUSY, 'and then what?', { busy: 'queue', signal: controller.signal, timeoutSeconds: 5 });
+    // The queue is the host's, so its id comes back a tick later.
+    await tick();
+
+    controller.abort();
+
+    // The wait ends now rather than at the timeout it was given.
+    expect(await Promise.race([waiting, tick().then(() => 'still waiting')])).toBeUndefined();
+    // The queued message is gone, and the turn it went behind was never this
+    // caller's to stop.
+    expect(taken).toHaveLength(1);
+    expect(taken[0]).toMatch(/^q\d+$/);
+    expect(stopped).toEqual([]);
+    expect(snapshotOf(host, BUSY)?.queued ?? []).toEqual([]);
+  });
+
+  it('stops the turn its queued message started, once the host has started it', async () => {
+    const { fakeHost } = await import('../src/ahp/fake.js');
+    const host = fakeHost();
+    const { stopped } = watching(host);
+    const controller = new AbortController();
+
+    const waiting = turn(host, BUSY, 'and then what?', { busy: 'queue', signal: controller.signal, timeoutSeconds: 5 });
+    await tick();
+    // The turn it went behind ends, and the host starts the queued message.
+    host.confirmToolCall(BUSY, BLOCKED_CALL, false);
+    for (let i = 0; i < 400; i += 1) {
+      const now = snapshotOf(host, BUSY);
+      if (now?.active !== undefined && now.active.id !== 't3' && (now.queued ?? []).length === 0) break;
+      host.pump();
+      await tick();
+    }
+    expect(snapshotOf(host, BUSY)?.queued ?? []).toEqual([]);
+
+    controller.abort();
+
+    expect(await Promise.race([waiting, tick().then(() => 'still waiting')])).toBeUndefined();
+    // No longer in the queue, so taking it back does nothing: the turn it
+    // started is what the cancel stops.
+    expect(stopped).toEqual([BUSY]);
+  });
+
+  it('undoes nothing when the cancel comes after the turn has answered', async () => {
+    const { fakeHost } = await import('../src/ahp/fake.js');
+    const host = fakeHost();
+    const { stopped } = watching(host);
+    const controller = new AbortController();
+
+    const waiting = turn(host, IDLE, 'hello there', { signal: controller.signal, timeoutSeconds: 5 });
+    // The whole turn runs and ends in this tick, and the cancel lands before
+    // the wait has read its answer.
+    host.drain();
+    controller.abort();
+
+    expect(await waiting).toBeDefined();
+    expect(stopped).toEqual([]);
+  });
+
+  it('leaves a steered turn alone', async () => {
+    const { fakeHost } = await import('../src/ahp/fake.js');
+    const host = fakeHost();
+    const { stopped, taken } = watching(host);
+    const controller = new AbortController();
+
+    const waiting = turn(host, RUNNING, 'stop and do this instead', { busy: 'steer', signal: controller.signal, timeoutSeconds: 5 });
+    controller.abort();
+
+    // The wait ends now rather than at the timeout it was given.
+    expect(await Promise.race([waiting, tick().then(() => 'still waiting')])).toBeUndefined();
+    // A steered message starts no turn of its own, so there is nothing of this
+    // caller's to stop, and the turn it went into keeps running.
+    expect(stopped).toEqual([]);
+    expect(taken).toEqual([]);
+    expect(snapshotOf(host, RUNNING)?.active?.id).toBe(RUNNING_TURN);
+  });
+
+  it('sends nothing when it is cancelled before the session says what it is doing', async () => {
+    const { fakeHost } = await import('../src/ahp/fake.js');
+    const host = fakeHost();
+    const sent: string[] = [];
+    const realSay = host.say.bind(host);
+    host.say = (uri, text, model) => { sent.push(text); realSay(uri, text, model); };
+    const controller = new AbortController();
+    controller.abort();
+
+    const waiting = turn(host, IDLE, 'hello there', { signal: controller.signal, timeoutSeconds: 5 });
+
+    expect(await waiting).toBeUndefined();
+    expect(sent).toEqual([]);
+    expect(host.pending()).toBe(0);
+  });
 });
 
 describe('a turn that does not end', () => {

@@ -1,7 +1,7 @@
 ---
 title: MCP over stdio answers each call when it is done
 domain: cli
-status: planned
+status: active
 priority: high
 created: 2026-11-04
 revalidated: 2026-11-04
@@ -83,8 +83,8 @@ notifications/cancelled -> stdio finds the request in flight -> abort -> no line
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - Each request runs as it arrives](task-01-each-request-runs-as-it-arrives.md) | todo | - |
-| [02 - A cancelled request stops](task-02-a-cancelled-request-stops.md) | todo | 01 |
+| [01 - Each request runs as it arrives](task-01-each-request-runs-as-it-arrives.md) | implemented | - |
+| [02 - A cancelled request stops](task-02-a-cancelled-request-stops.md) | implemented | 01 |
 
 ## Risks and tradeoffs
 
@@ -94,8 +94,8 @@ notifications/cancelled -> stdio finds the request in flight -> abort -> no line
 
 ## Resume state
 
-- **Done so far:** planned 2026-11-04.
-- **Next action:** [task-01-each-request-runs-as-it-arrives.md](task-01-each-request-runs-as-it-arrives.md).
+- **Done so far:** planned 2026-11-04, and tasks 01 and 02 implemented 2026-11-04.
+- **Next action:** Softov reviews the pull request, and checks `ping` by hand as [the pending check](../../../pending/mcp-over-stdio-checks.md) says.
 - **Open questions:** none.
 - **Watch out for:** the scripted host sends its first snapshot inside `subscribe`, so `until` can finish before `subscribe` returns.
 
