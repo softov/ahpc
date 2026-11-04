@@ -89,6 +89,7 @@ Reference: [00-documentation.md](documentation/00-documentation.md)
 | [20261103-1238 - Each subject page shows a picture of its screen](documentation/20261103-1238-each-subject-shows-its-screen/plan.md) | medium | dropped 2026-11-04; replaced by documentation/20261104-1621-the-docs-pictures-come-from-a-demo-host | - | - |
 | [20261104-1120 - Each release is a docs page, from 0.10 on](documentation/20261104-1120-each-release-is-a-docs-page/plan.md) | high | built 2026-11-04 ([implemented.md](documentation/20261104-1120-each-release-is-a-docs-page/implemented.md)) | - | - |
 | [20261104-1621 - The docs pictures are drawn from a demo host](documentation/20261104-1621-the-docs-pictures-come-from-a-demo-host/plan.md) | medium | built 2026-11-04 ([implemented.md](documentation/20261104-1621-the-docs-pictures-come-from-a-demo-host/implemented.md)) | screen/20261104-1621-a-still-waits-for-the-host, screen/20261104-1621-the-provider-is-the-hosts-first-agent, cli/20261104-1621-automations-are-made-from-the-shell, ahpd host/20261104-1619-a-demo-host-shows-every-subject | - |
+| [20261104-1956 - Each screen of the client is a page, and the pictures fit what they show](documentation/20261104-1956-each-screen-is-a-page-and-pictures-fit/plan.md) | medium | planned 2026-11-04 | ahpd host/20261104-1956-the-demo-shell-runs-under-a-pty | - |
 
 ## Later domains (no plans yet)
 
