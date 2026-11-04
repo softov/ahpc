@@ -4,7 +4,7 @@ import { MissingProtocolPackage, liveHost } from './ahp/live.js';
 import { whyNoConnection } from './ahp/refused.js';
 import { fakeHost } from './ahp/fake.js';
 import { publish } from './ahp/publish.js';
-import { pushTokens } from './ahp/tokens.js';
+import { pushTokens, tokenVariable } from './ahp/tokens.js';
 import { pushTrust, trustedUris } from './ahp/trust.js';
 import type { HostConnection, RefusalKind } from './ahp/connection.js';
 import type { AuthAsk } from './ahp/auth.js';
@@ -72,12 +72,12 @@ export const sink: {
   refused: (_uri, message) => sink.report(message),
 };
 
-/** The sentence that names a resource and the command that would satisfy it. */
+/** The sentence that names a resource and the variable that would satisfy it. */
 export function signInSentence(one: AuthAsk): string {
   const what = one.name ?? one.resource;
   return one.reason === 'expired'
-    ? `The token for ${what} has expired. Sign in again: ahpc auth ${one.resource}`
-    : `${what} needs signing in to: ahpc auth ${one.resource}`;
+    ? `The token for ${what} has expired. Set ${tokenVariable(one.resource)} to a new token and run it again.`
+    : `${what} needs a token. Set ${tokenVariable(one.resource)} and run it again.`;
 }
 
 /**

@@ -25,8 +25,9 @@ The count is per act: a credential the host refuses does not count as an attempt
 A second `-32007` for the same act is reported and nothing else is sent.
 Only an act this client can run as one awaited call is covered.
 A fire-and-forget dispatch is not, because ahpc sends one without keeping a handle to match its echo, and re-sending a chat message or a keystroke on its own is worse than asking the person to do it again.
+Every awaited act may run once more, not only a read: `createSession` is the spec's own example.
 
-Source: (defaulted: the reference's three rules at `/github/ahpapp/src/auth-gate.tsx:15-24` and `refusalStep` at `/github/ahpapp/src/auth-required.ts:133-145`, and the plan's own words "retry the refused act exactly once".)
+Source: `AuthRequired Error Code` in `/github/agent-host-protocol/docs/specification/authentication.md` (at `2c37a04f`): a client receiving `AuthRequired` SHOULD retry the original command, and the section's example is `createSession`. (defaulted: the reference's three rules at `/github/ahpapp/src/auth-gate.tsx:15-24` and `refusalStep` at `/github/ahpapp/src/auth-required.ts:133-145`, and the plan's own words "retry the refused act exactly once".)
 
 ## Consequences
 

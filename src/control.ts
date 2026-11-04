@@ -675,11 +675,13 @@ export function createController(
    * was typed in, with the host's own words, so the answer is to retype rather
    * than to run the act again. One the host accepts is kept for the rest of
    * the run, so a reconnect and the next refusal can push it without asking.
+   * The words go only to the ask this answers: a refusal that arrives after
+   * another resource has taken the prompt over has nothing to say about it.
    */
   const signIn = async (resource: string, token: string): Promise<boolean> => {
     if (!host.authenticate) {
       const current = app.store.get<AuthAsk | null>(AUTH_ASK);
-      if (current) app.store.set(AUTH_ASK, { ...current, words: app.i18n.t('commands.noToken') });
+      if (current?.resource === resource) app.store.set(AUTH_ASK, { ...current, words: app.i18n.t('commands.noToken') });
       return false;
     }
     try {
@@ -688,7 +690,7 @@ export function createController(
     }
     catch (error) {
       const current = app.store.get<AuthAsk | null>(AUTH_ASK);
-      if (current) app.store.set(AUTH_ASK, { ...current, words: failureWords(error) });
+      if (current?.resource === resource) app.store.set(AUTH_ASK, { ...current, words: failureWords(error) });
       return false;
     }
     settle(resource);
@@ -1294,7 +1296,9 @@ export function createController(
   auth.ask = (one) => { void controller.askSignIn(one); };
   bag.add({ dispose: () => { auth.ask = openedAsk; } });
 
-  return Object.assign(controller, { dispose: () => bag.dispose() });
+  return Object.assign(controller, {
+    dispose: () => { settle(null); bag.dispose(); },
+  });
 }
 
 // ------------------------------------------------------------------- commands

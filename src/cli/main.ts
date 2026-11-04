@@ -950,8 +950,9 @@ export async function cli(command: string, rest: string[]): Promise<number> {
      *
      * A command run with no screen has nobody to ask, so a `-32007` is the
      * host saying which resource it wants and this is the answer: name it, name
-     * the variable that satisfies it, and exit 1. Nothing is retried, because
-     * the act may already have done something before it was refused.
+     * the variable that satisfies it, and exit 1. The act is not run again
+     * here: a shell has nobody to ask, and an exported variable is pushed on
+     * every connection, so the next run carries it.
      */
     const refusal = authRequiredOf(error);
     if (refusal === null) {
@@ -978,7 +979,7 @@ export async function cli(command: string, rest: string[]): Promise<number> {
       throw new Fault(`${hostWords(said)} (${code})`);
     }
     const one = askFor(refusal);
-    throw new Fault(one === null ? failureWords(error) : needsToken(one.resource, one.name));
+    throw new Fault(one === null ? failureWords(error) : refusedSentence(one.resource, one.name));
   }
   finally {
     // Sent, then hung up. A command that dispatches one action and exits is
@@ -990,15 +991,26 @@ export async function cli(command: string, rest: string[]): Promise<number> {
 }
 
 /**
- * What to do about a resource that wants a token.
+ * What a command the host refused says about a resource that wants a token.
  *
- * One sentence for the two places this command says it: a `-32007` from the
- * host, and `ahpc auth` finding nothing to send. They are the same problem, and
- * a second wording is a second thing to keep true.
+ * A command that sends one action and exits has no way to sign in, so the
+ * variable is the one thing it can name. Naming a flag would be advice that
+ * does not work there.
+ */
+export function refusedSentence(resource: string, name?: string): string {
+  const what = name !== undefined && name !== resource ? `${name} (${resource})` : resource;
+  return `${what} needs a token. Set ${tokenVariable(resource)} and run it again.`;
+}
+
+/**
+ * What `ahpc auth` says when it was given nothing to push.
+ *
+ * It names the flag, the variable and the pipe, because all three work there:
+ * the command pushes a credential rather than sending one it did not have.
  */
 export function needsToken(resource: string, name?: string): string {
   const what = name !== undefined && name !== resource ? `${name} (${resource})` : resource;
-  return `${what} needs a token. Pass --token, set ${tokenVariable(resource)}, or pipe one in: ahpc auth ${resource}`;
+  return `${what} needs a token. Pass --resource-token, set ${tokenVariable(resource)}, or pipe one in.`;
 }
 
 /** Everything under `session`. */
