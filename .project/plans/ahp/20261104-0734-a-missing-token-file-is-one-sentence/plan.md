@@ -1,7 +1,7 @@
 ---
 title: A missing connection token file is one sentence on the screen
 domain: ahp
-status: planned
+status: active
 priority: medium
 created: 2026-11-04
 revalidated: 2026-11-04
@@ -45,7 +45,7 @@ main.tsx -> tui() -> connectionToken -> throw
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - The screen says one sentence](task-01-the-screen-says-one-sentence.md) | todo | - |
+| [01 - The screen says one sentence](task-01-the-screen-says-one-sentence.md) | implemented | - |
 
 ## Risks and tradeoffs
 
@@ -53,8 +53,8 @@ main.tsx -> tui() -> connectionToken -> throw
 
 ## Resume state
 
-- **Done so far:** the plan.
-- **Next action:** build task 01.
+- **Done so far:** task 01 - the screen says one sentence.
+- **Next action:** nothing to build; the task is implemented and awaits review.
 - **Open questions:** none.
 
 ## Final verification checklist

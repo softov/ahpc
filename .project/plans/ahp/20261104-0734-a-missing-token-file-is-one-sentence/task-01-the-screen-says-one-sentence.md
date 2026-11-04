@@ -1,6 +1,6 @@
 ---
 title: The screen says one sentence
-status: todo
+status: implemented
 depends: []
 layer: "ahp"
 refs:
