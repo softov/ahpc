@@ -349,7 +349,9 @@ export function createController(
   app.store.set(QUEUE, []);
   app.store.set(DRAFT, '');
   // What the first message will be sent as, before there is a session to ask.
-  app.store.set(PROVIDER, 'claude');
+  // Empty until the host lists its agents, and then the first of them: a
+  // provider this client named itself is one the host may not serve.
+  app.store.set(PROVIDER, '');
   app.store.set(MODEL, '');
   app.store.set(SETTINGS, {});
 
@@ -778,7 +780,13 @@ export function createController(
     const found = sessions(app.store).find((row) => row.resource === uri)?.provider;
     return found !== undefined && sources.get(found)?.[kind] === true;
   };
+  /** The first agent the host lists, as the provider, while none is chosen yet. */
+  const first = (found: readonly Agent[]): void => {
+    const head = found[0];
+    if (head !== undefined && !app.store.get<string>(PROVIDER)) app.store.set(PROVIDER, head.provider);
+  };
   void host.agents().then((found) => {
+    first(found);
     for (const entry of found) capable.set(entry.provider, entry.multipleChats === true);
     for (const entry of found) sources.set(entry.provider, entry.chatSources ?? {});
     // A session may already be open by the time this lands.
@@ -1252,10 +1260,13 @@ export function createController(
 
     async settings() {
       const uri = app.store.get<SessionUri>(OPEN) ?? null;
+      const provider = app.store.get<string>(PROVIDER) ?? '';
+      // No agent yet, so there is nothing to ask the host about.
+      if (!uri && !provider) return { properties: [], values: {} };
       const config = uri
         ? await host.config(uri)
         : await host.resolveConfig({
-          provider: app.store.get<string>(PROVIDER) ?? 'claude',
+          provider,
           ...(app.store.get<string>(WORKSPACE) ? { workingDirectory: app.store.get<string>(WORKSPACE) as string } : {}),
           values: app.store.get<Record<string, string>>(SETTINGS) ?? {},
         });
@@ -1414,7 +1425,7 @@ function commands(
    * that answers "no" until somebody happens to open an unrelated picker is a
    * command that is missing for no reason anybody can see.
    */
-  const provider = (): string => app.store.get<string>(PROVIDER) ?? 'claude';
+  const provider = (): string => app.store.get<string>(PROVIDER) ?? '';
   const agent = (): Agent | undefined => known.agents.find((found) => found.provider === provider());
   /**
    * The keys of a session's config that are about its directory.
@@ -1443,6 +1454,9 @@ function commands(
   const listAgents = async (): Promise<ArgChoices> => {
     try {
       known.agents = await controller.agents();
+      // The first agent, while none is chosen yet, as at boot.
+      const head = known.agents[0];
+      if (head !== undefined && !app.store.get<string>(PROVIDER)) app.store.set(PROVIDER, head.provider);
     } catch (error) { controller.report(error); }
     // The provider id is what the command is answered with, and the harness's
     // own description is what tells two of them apart - a person choosing

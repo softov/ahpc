@@ -1,7 +1,7 @@
 ---
 title: The provider is the host's first agent, not claude
 domain: screen
-status: planned
+status: built
 priority: high
 created: 2026-11-04
 revalidated: 2026-11-04
@@ -51,7 +51,7 @@ boot -> PROVIDER '' -> listAgents -> PROVIDER = first agent -> settings() -> res
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - The provider comes from the host](task-01-the-provider-comes-from-the-host.md) | todo | - |
+| [01 - The provider comes from the host](task-01-the-provider-comes-from-the-host.md) | done | - |
 
 ## Risks and tradeoffs
 
@@ -59,12 +59,12 @@ boot -> PROVIDER '' -> listAgents -> PROVIDER = first agent -> settings() -> res
 
 ## Resume state
 
-- **Done so far:** planned 2026-11-04.
-- **Next action:** [task-01-the-provider-comes-from-the-host.md](task-01-the-provider-comes-from-the-host.md).
+- **Done so far:** planned and built 2026-11-04; see [implemented.md](implemented.md).
+- **Next action:** none.
 - **Open questions:** none.
 - **Watch out for:** the scripted host lists `claude` first, so the existing tests keep their provider.
 
 ## Final verification checklist
 
-- [ ] `npm run typecheck`, `npm run build` and `npx vitest run` pass.
-- [ ] Against a host with no `claude` agent, the screen starts with no error.
+- [x] `npm run typecheck`, `npm run build` and `npx vitest run` pass.
+- [x] Against a host with no `claude` agent, the screen starts with no error.
