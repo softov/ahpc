@@ -1,7 +1,7 @@
 ---
 title: The host's answer to a changeset verb is not drawn as a refusal
 domain: screen
-status: active
+status: built
 priority: high
 created: 2026-11-03
 revalidated: 2026-11-03
@@ -58,7 +58,7 @@ commit -> operate -> host answers { message } -> answered -> HOST_ERROR -> statu
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - The host's sentence has its own slot](task-01-the-host-sentence-has-its-own-slot.md) | implemented | - |
+| [01 - The host's sentence has its own slot](task-01-the-host-sentence-has-its-own-slot.md) | done | - |
 
 ## Risks and tradeoffs
 
@@ -66,12 +66,12 @@ commit -> operate -> host answers { message } -> answered -> HOST_ERROR -> statu
 
 ## Resume state
 
-- **Done so far:** task 01 implemented, as [implemented.md](implemented.md) says.
-- **Next action:** Softov reviews the pull request, and commits against ahpd.
+- **Done so far:** task 01 done, as [implemented.md](implemented.md) says. Softov checked it against ahpd on 2026-11-04.
+- **Next action:** none.
 - **Open questions:** none.
 - **Watch out for:** the case on an answer that this client cannot read.
 
 ## Final verification checklist
 
-- [ ] `npm run typecheck`, `npm run build` and `npx vitest run` pass.
-- [ ] Against ahpd, a commit shows "Committed" in green on the status row.
+- [x] `npm run typecheck`, `npm run build` and `npx vitest run` pass.
+- [x] Against ahpd, a commit shows "Committed" in green on the status row.

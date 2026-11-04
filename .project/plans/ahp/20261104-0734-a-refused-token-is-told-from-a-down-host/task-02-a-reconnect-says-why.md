@@ -1,6 +1,6 @@
 ---
 title: A reconnect says why it cannot get back
-status: implemented
+status: done
 depends: 
   - task-01-one-request-tells-why.md
 layer: "ahp"

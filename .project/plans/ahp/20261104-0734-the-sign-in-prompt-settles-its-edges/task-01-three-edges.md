@@ -1,6 +1,6 @@
 ---
 title: The three edges
-status: implemented
+status: done
 depends: []
 layer: "ahp"
 refs:

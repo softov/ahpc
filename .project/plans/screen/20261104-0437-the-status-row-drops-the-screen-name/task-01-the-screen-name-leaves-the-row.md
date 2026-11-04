@@ -1,6 +1,6 @@
 ---
 title: The screen's name leaves the status row
-status: implemented
+status: done
 depends: []
 layer: "screen"
 refs:

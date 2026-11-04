@@ -1,7 +1,7 @@
 ---
 title: A token file that cannot be read says why, and its path is read the same from any folder
 domain: ahp
-status: active
+status: built
 priority: medium
 created: 2026-11-04
 revalidated: 2026-11-04
@@ -46,7 +46,7 @@ connectionToken -> readTokenFile -> readFileSync
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - Reasons and paths](task-01-reasons-and-paths.md) | implemented | - |
+| [01 - Reasons and paths](task-01-reasons-and-paths.md) | done | - |
 
 ## Risks and tradeoffs
 
@@ -54,10 +54,10 @@ connectionToken -> readTokenFile -> readFileSync
 
 ## Resume state
 
-- **Done so far:** task 01 - reasons and paths.
-- **Next action:** nothing to build; the task is implemented and awaits review.
+- **Done so far:** task 01 done, as [implemented.md](implemented.md) says. Softov merged it on 2026-11-04, and the gates passed on `main`.
+- **Next action:** none.
 - **Open questions:** none.
 
 ## Final verification checklist
 
-- [ ] `npm run typecheck`, `npm run build` and `npx vitest run` pass.
+- [x] `npm run typecheck`, `npm run build` and `npx vitest run` pass.

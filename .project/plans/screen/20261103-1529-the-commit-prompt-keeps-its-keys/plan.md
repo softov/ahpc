@@ -1,7 +1,7 @@
 ---
 title: The commit prompt keeps its keys while the changeset changes
 domain: screen
-status: active
+status: built
 priority: high
 created: 2026-11-03
 revalidated: 2026-11-03
@@ -63,7 +63,7 @@ commit prompt open -> changeset update -> actions row or computing line comes or
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - The list stays mounted when a row above it changes](task-01-the-list-stays-mounted.md) | implemented | - |
+| [01 - The list stays mounted when a row above it changes](task-01-the-list-stays-mounted.md) | done | - |
 
 ## Risks and tradeoffs
 
@@ -71,12 +71,12 @@ commit prompt open -> changeset update -> actions row or computing line comes or
 
 ## Resume state
 
-- **Done so far:** task 01 implemented, as [implemented.md](implemented.md) says.
-- **Next action:** Softov reviews the pull request, and types a commit message against ahpd.
+- **Done so far:** task 01 done, as [implemented.md](implemented.md) says. Softov checked it against ahpd on 2026-11-04.
+- **Next action:** none.
 - **Open questions:** none.
 - **Watch out for:** a test that does not drop the operations or the computing line passes without the keys.
 
 ## Final verification checklist
 
-- [ ] `npm run typecheck`, `npm run build` and `npx vitest run` pass.
-- [ ] Against ahpd, the commit prompt takes typed text and backspace, and `git log -1` shows the message.
+- [x] `npm run typecheck`, `npm run build` and `npx vitest run` pass.
+- [x] Against ahpd, the commit prompt takes typed text and backspace, and `git log -1` shows the message.

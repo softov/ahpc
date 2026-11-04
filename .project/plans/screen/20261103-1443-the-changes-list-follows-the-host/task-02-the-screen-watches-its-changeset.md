@@ -1,6 +1,6 @@
 ---
 title: The changes screen watches its changeset
-status: implemented
+status: done
 depends: [task-01-the-hosts-watch-a-changeset.md]
 layer: "screen"
 refs:

@@ -1,6 +1,6 @@
 ---
 title: One request tells why the first connection failed
-status: implemented
+status: done
 depends: []
 layer: "ahp"
 refs:

@@ -1,7 +1,7 @@
 ---
 title: The header says ahpc, and the new session screen shows the logo
 domain: screen
-status: active
+status: built
 priority: medium
 created: 2026-11-03
 revalidated: 2026-11-03
@@ -57,7 +57,7 @@ The files read and the patterns to reuse are the `refs` in the frontmatter, each
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - The name and the logo](task-01-the-name-and-the-logo.md) | implemented | - |
+| [01 - The name and the logo](task-01-the-name-and-the-logo.md) | done | - |
 
 ## Risks and tradeoffs
 
@@ -66,12 +66,12 @@ The files read and the patterns to reuse are the `refs` in the frontmatter, each
 
 ## Resume state
 
-- **Done so far:** task 01 implemented, as [implemented.md](implemented.md) says.
-- **Next action:** Softov reviews the pull request, and looks at the new session screen in a terminal.
+- **Done so far:** task 01 done, as [implemented.md](implemented.md) says. Softov checked it against ahpd on 2026-11-04.
+- **Next action:** none.
 - **Open questions:** none.
 - **Watch out for:** the fake's working directory is also named `ahpc`, so a header case reads the bold accent text.
 
 ## Final verification checklist
 
-- [ ] `npm run typecheck`, `npm run build` and `npx vitest run` pass.
-- [ ] In a terminal, the header says `ahpc`, and the logo shows above "A new session".
+- [x] `npm run typecheck`, `npm run build` and `npx vitest run` pass.
+- [x] In a terminal, the header says `ahpc`, and the logo shows above "A new session".

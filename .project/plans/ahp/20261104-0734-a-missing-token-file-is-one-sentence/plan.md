@@ -1,7 +1,7 @@
 ---
 title: A missing connection token file is one sentence on the screen
 domain: ahp
-status: active
+status: built
 priority: medium
 created: 2026-11-04
 revalidated: 2026-11-04
@@ -45,7 +45,7 @@ main.tsx -> tui() -> connectionToken -> throw
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - The screen says one sentence](task-01-the-screen-says-one-sentence.md) | implemented | - |
+| [01 - The screen says one sentence](task-01-the-screen-says-one-sentence.md) | done | - |
 
 ## Risks and tradeoffs
 
@@ -53,10 +53,10 @@ main.tsx -> tui() -> connectionToken -> throw
 
 ## Resume state
 
-- **Done so far:** task 01 - the screen says one sentence.
-- **Next action:** nothing to build; the task is implemented and awaits review.
+- **Done so far:** task 01 done, as [implemented.md](implemented.md) says. Softov merged it on 2026-11-04, and the gates passed on `main`.
+- **Next action:** none.
 - **Open questions:** none.
 
 ## Final verification checklist
 
-- [ ] `npm run typecheck`, `npm run build` and `npx vitest run` pass.
+- [x] `npm run typecheck`, `npm run build` and `npx vitest run` pass.

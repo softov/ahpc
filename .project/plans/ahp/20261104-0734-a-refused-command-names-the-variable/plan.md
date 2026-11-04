@@ -1,7 +1,7 @@
 ---
 title: A command a host refuses names the variable that would let it through
 domain: ahp
-status: active
+status: built
 priority: medium
 created: 2026-11-04
 revalidated: 2026-11-04
@@ -46,7 +46,7 @@ The files read are the `refs` in the frontmatter, each with its note.
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - Two sentences, one for each place](task-01-two-sentences.md) | implemented | - |
+| [01 - Two sentences, one for each place](task-01-two-sentences.md) | done | - |
 
 ## Risks and tradeoffs
 
@@ -54,10 +54,10 @@ The files read are the `refs` in the frontmatter, each with its note.
 
 ## Resume state
 
-- **Done so far:** task 01 - `refusedSentence` for the refusal catch, `needsToken` with `--resource-token`, and `signInSentence` naming the variable.
-- **Next action:** none. The plan is waiting on review.
+- **Done so far:** task 01 done, as [implemented.md](implemented.md) says. Softov merged it on 2026-11-04, and the gates passed on `main`.
+- **Next action:** none.
 - **Open questions:** none.
 
 ## Final verification checklist
 
-- [ ] `npm run typecheck`, `npm run build` and `npx vitest run` pass.
+- [x] `npm run typecheck`, `npm run build` and `npx vitest run` pass.

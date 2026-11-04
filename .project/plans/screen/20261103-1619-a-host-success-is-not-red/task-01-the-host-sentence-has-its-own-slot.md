@@ -1,6 +1,6 @@
 ---
 title: The host's sentence has its own slot
-status: implemented
+status: done
 depends: []
 layer: "screen"
 refs:

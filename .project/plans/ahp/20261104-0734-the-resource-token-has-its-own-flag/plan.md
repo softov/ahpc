@@ -1,7 +1,7 @@
 ---
 title: The resource token has its own flag, and --token always means the connection
 domain: ahp
-status: active
+status: built
 priority: medium
 created: 2026-11-04
 revalidated: 2026-11-04
@@ -46,7 +46,7 @@ ahpc auth <resource> --resource-token T -> host.authenticate(resource, T)
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - The --resource-token flag](task-01-resource-token-flag.md) | implemented | - |
+| [01 - The --resource-token flag](task-01-resource-token-flag.md) | done | - |
 
 ## Risks and tradeoffs
 
@@ -54,10 +54,10 @@ ahpc auth <resource> --resource-token T -> host.authenticate(resource, T)
 
 ## Resume state
 
-- **Done so far:** task 01 - `--resource-token`, the refusal of a lone `--token`, the help line, the docs example and the three Validation cases.
-- **Next action:** none. The plan is waiting on review.
+- **Done so far:** task 01 done, as [implemented.md](implemented.md) says. Softov merged it on 2026-11-04, and the gates passed on `main`.
+- **Next action:** none.
 - **Open questions:** none.
 
 ## Final verification checklist
 
-- [ ] `npm run typecheck`, `npm run build` and `npx vitest run` pass.
+- [x] `npm run typecheck`, `npm run build` and `npx vitest run` pass.

@@ -1,6 +1,6 @@
 ---
 title: The hosts watch a changeset
-status: implemented
+status: done
 depends: []
 layer: "host"
 refs:

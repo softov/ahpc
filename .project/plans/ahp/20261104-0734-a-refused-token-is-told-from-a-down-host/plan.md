@@ -1,7 +1,7 @@
 ---
 title: A refused connection token is told apart from a host that is down
 domain: ahp
-status: active
+status: built
 priority: medium
 created: 2026-11-04
 revalidated: 2026-11-04
@@ -48,8 +48,8 @@ openTransport fails -> whyNoConnection(url, token) -> 401 | 426 | nothing -> one
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - One request tells why the first connection failed](task-01-one-request-tells-why.md) | implemented | - |
-| [02 - A reconnect says why it cannot get back](task-02-a-reconnect-says-why.md) | implemented | 01 |
+| [01 - One request tells why the first connection failed](task-01-one-request-tells-why.md) | done | - |
+| [02 - A reconnect says why it cannot get back](task-02-a-reconnect-says-why.md) | done | 01 |
 
 ## Risks and tradeoffs
 
@@ -58,11 +58,11 @@ openTransport fails -> whyNoConnection(url, token) -> 401 | 426 | nothing -> one
 
 ## Resume state
 
-- **Done so far:** task 01 and task 02, both implemented.
-- **Next action:** review the build, then check the start by hand against ahpd with a wrong token.
+- **Done so far:** tasks 01 and 02 done, as [implemented.md](implemented.md) says. Softov checked it against ahpd on 2026-11-04.
+- **Next action:** none.
 - **Open questions:** none.
 
 ## Final verification checklist
 
-- [ ] `npm run typecheck`, `npm run build` and `npx vitest run` pass.
-- [ ] By hand, against ahpd with a wrong token, the start says the token was refused.
+- [x] `npm run typecheck`, `npm run build` and `npx vitest run` pass.
+- [x] By hand, against ahpd with a wrong token, the start says the token was refused.

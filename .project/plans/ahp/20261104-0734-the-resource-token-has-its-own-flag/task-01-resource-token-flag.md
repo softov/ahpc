@@ -1,6 +1,6 @@
 ---
 title: The --resource-token flag
-status: implemented
+status: done
 depends: []
 layer: "ahp"
 refs:
