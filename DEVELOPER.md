@@ -10,7 +10,7 @@ The interface comes from [TextUI](https://github.com/softov/textui): `@textui/co
 ## Getting set up
 
 ```sh
-git clone https://github.com/softov/ahpc
+git clone https://github.com/ahpio/ahpc
 cd ahpc
 npm install
 ```

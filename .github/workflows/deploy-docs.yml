@@ -1,7 +1,7 @@
 name: Docs
 
 # Builds docs/ as a VitePress site and publishes it to GitHub Pages, at
-# https://softov.github.io/ahpc/. Pages must have "GitHub Actions" as its
+# https://ahpio.github.io/ahpc/. Pages must have "GitHub Actions" as its
 # source.
 
 on:

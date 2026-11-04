@@ -11,7 +11,7 @@ const DOCS = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const ROOT = resolve(DOCS, '..');
 
 /** Where the repository is shown. */
-const GITHUB = 'https://github.com/softov/ahpc';
+const GITHUB = 'https://github.com/ahpio/ahpc';
 
 const { description } = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')) as { description: string };
 
