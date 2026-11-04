@@ -431,7 +431,6 @@ const Hints = defineComponent<BoxProps>('ChatHints', (props) => {
 
 const Status = defineComponent<Record<string, never>>('ChatStatus', () => {
   const i18n = useI18n();
-  const screen = useStoreValue<string | null>(SCREEN, 'sessions');
   // What the host last refused, where a person is already looking. A refusal
   // that only reaches a log is a client that appears to have ignored the key
   // you pressed.
@@ -474,7 +473,6 @@ const Status = defineComponent<Record<string, never>>('ChatStatus', () => {
         : notice
           ? <text content={notice} fg="muted" flex={1} truncate="end" />
           : <Hints flex={1} />}
-      <text content={screen ?? '-'} fg="muted" />
     </Row>
   );
 });
