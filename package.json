@@ -29,7 +29,7 @@
     "url": "https://github.com/ahpio/ahpc/issues"
   },
   "bin": {
-    "ahpc": "./dist/src/main.js"
+    "ahpc": "dist/src/main.js"
   },
   "publishConfig": {
     "access": "public"
