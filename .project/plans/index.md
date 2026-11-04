@@ -34,6 +34,8 @@ Reference: [00-screen.md](screen/00-screen.md)
 | [20261104-0437 - The status row does not end with the screen's name](screen/20261104-0437-the-status-row-drops-the-screen-name/plan.md) | medium | built 2026-11-04 ([implemented.md](screen/20261104-0437-the-status-row-drops-the-screen-name/implemented.md)) | - | - |
 | [20261104-0549 - The waiting question folds to one line while you read](screen/20261104-0549-the-question-folds-while-you-read/plan.md) | medium | built 2026-11-04 ([implemented.md](screen/20261104-0549-the-question-folds-while-you-read/implemented.md)) | - | - |
 | [20261104-0644 - The smoke test reads the checkout's folder name](screen/20261104-0644-the-smoke-test-reads-its-folder/plan.md) | medium | built 2026-11-04 ([implemented.md](screen/20261104-0644-the-smoke-test-reads-its-folder/implemented.md)) | - | - |
+| [20261104-1621 - A still waits for the host to answer before it draws](screen/20261104-1621-a-still-waits-for-the-host/plan.md) | medium | planned 2026-11-04 | - | documentation/20261104-1621-the-docs-pictures-come-from-a-demo-host |
+| [20261104-1621 - The provider is the host's first agent, not claude](screen/20261104-1621-the-provider-is-the-hosts-first-agent/plan.md) | high | planned 2026-11-04 | - | documentation/20261104-1621-the-docs-pictures-come-from-a-demo-host |
 
 Next free number in `screen`: `12`.
 
@@ -74,6 +76,7 @@ Reference: [00-cli.md](cli/00-cli.md)
 | [05 - `prompt` on a busy session refuses, queues or steers, and says when it stops waiting](cli/05-prompt-on-a-busy-session/plan.md) | high | built 2026-11-04 ([implemented.md](cli/05-prompt-on-a-busy-session/implemented.md)) | - | - |
 | [06 - The automation list is served by default, the other groups are named, and all turns on every group](cli/06-mcp-tool-groups-are-found-and-all-is-one-word/plan.md) | medium | built 2026-11-04 ([implemented.md](cli/06-mcp-tool-groups-are-found-and-all-is-one-word/implemented.md)) | - | - |
 | [20261104-1112 - MCP over stdio answers each call when it is done](cli/20261104-1112-mcp-over-stdio-answers-at-the-same-time/plan.md) | high | active 2026-11-04; tasks 01-02 implemented, awaiting review | - | - |
+| [20261104-1621 - Automations are made, changed, copied and moved from the shell](cli/20261104-1621-automations-are-made-from-the-shell/plan.md) | medium | planned 2026-11-04 | - | documentation/20261104-1621-the-docs-pictures-come-from-a-demo-host |
 
 Next free number in `cli`: `07`.
 
@@ -83,8 +86,9 @@ Reference: [00-documentation.md](documentation/00-documentation.md)
 
 | Plan | Priority | Status | Requires | Blocks |
 | --- | --- | --- | --- | --- |
-| [20261103-1238 - Each subject page shows a picture of its screen](documentation/20261103-1238-each-subject-shows-its-screen/plan.md) | medium | planned 2026-11-03 | - | - |
+| [20261103-1238 - Each subject page shows a picture of its screen](documentation/20261103-1238-each-subject-shows-its-screen/plan.md) | medium | dropped 2026-11-04; replaced by documentation/20261104-1621-the-docs-pictures-come-from-a-demo-host | - | - |
 | [20261104-1120 - Each release is a docs page, from 0.10 on](documentation/20261104-1120-each-release-is-a-docs-page/plan.md) | high | built 2026-11-04 ([implemented.md](documentation/20261104-1120-each-release-is-a-docs-page/implemented.md)) | - | - |
+| [20261104-1621 - The docs pictures are drawn from a demo host](documentation/20261104-1621-the-docs-pictures-come-from-a-demo-host/plan.md) | medium | planned 2026-11-04 | screen/20261104-1621-a-still-waits-for-the-host, screen/20261104-1621-the-provider-is-the-hosts-first-agent, cli/20261104-1621-automations-are-made-from-the-shell, ahpd host/20261104-1619-a-demo-host-shows-every-subject | - |
 
 ## Later domains (no plans yet)
 

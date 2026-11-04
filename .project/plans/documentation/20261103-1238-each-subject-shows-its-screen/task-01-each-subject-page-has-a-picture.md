@@ -1,6 +1,6 @@
 ---
 title: Each subject page has a picture of its screen
-status: todo
+status: dropped
 depends: []
 layer: docs
 refs:

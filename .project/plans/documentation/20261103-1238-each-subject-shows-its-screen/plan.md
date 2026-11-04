@@ -1,7 +1,7 @@
 ---
 title: Each subject page shows a picture of its screen
 domain: documentation
-status: planned
+status: dropped
 priority: medium
 created: 2026-11-03
 revalidated: 2026-11-03
@@ -64,7 +64,7 @@ docs/subjects/<SUBJECT>.md ## Screen -> ![...](../img/<subject>.svg) -> vitepres
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - Each subject page has a picture of its screen](task-01-each-subject-page-has-a-picture.md) | todo | - |
+| [01 - Each subject page has a picture of its screen](task-01-each-subject-page-has-a-picture.md) | dropped | - |
 
 ## Risks and tradeoffs
 
@@ -73,8 +73,8 @@ docs/subjects/<SUBJECT>.md ## Screen -> ![...](../img/<subject>.svg) -> vitepres
 
 ## Resume state
 
-- **Done so far:** planned 2026-11-03.
-- **Next action:** [task-01-each-subject-page-has-a-picture.md](task-01-each-subject-page-has-a-picture.md).
+- **Done so far:** planned 2026-11-03; dropped 2026-11-04.
+- **Next action:** none. [documentation/20261104-1621-the-docs-pictures-come-from-a-demo-host](../20261104-1621-the-docs-pictures-come-from-a-demo-host/plan.md) draws the real pictures in place of these placeholders.
 - **Open questions:** none.
 - **Watch out for:** `docs/img/sessions.svg` exists and is used by `README.md` and `docs/use/SCREEN.md`; do not write a placeholder over it.
 

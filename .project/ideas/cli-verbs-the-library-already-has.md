@@ -9,22 +9,10 @@ The library already makes almost every protocol call, but the CLI shows only par
 `ahpc dispatch <uri> <type> --field k=v` sends any action.
 But a field is only text, a boolean or a number, so an action with an object or an array cannot go through it.
 
-## Automation files
-
-`ahpc automation export <id>` writes an automation as VS Code's `.automation.md` file, and `ahpc automation import <file> --folder <path>` makes one from it.
-The work is in the client, over `automation/createRequested` and the automation's state, so it works with any host.
-The rules are those of VS Code's `automationBlueprint.ts`, as in ahpd's host/95.
-That is the keys `version`, `id`, `name`, `description` and `schedule`, and the prompt as the body.
-Export refuses what the format cannot hold, and import makes a new automation that is switched off.
-ahpd's host/95 does the same as an `ahpd automation` command.
-
 ## Verbs the library has and the CLI does not
 
 | Area | Verb | Library | Protocol |
 | --- | --- | --- | --- |
-| Automation | create | `createAutomation` (`src/ahp/live.ts:2435`) | `automation/createRequested` |
-| Automation | edit the title, prompt or schedule | `updateAutomation` (`src/ahp/live.ts:2460`), used now only for enable and disable | `automation/updateRequested` |
-| Automation | duplicate | `createAutomation` with a copy | `automation/createRequested` |
 | Session config | look up a value, and show the settings before `session new` | `configCompletions`, `resolveConfig` (`src/ahp/connection.ts`), used only by the TUI | `sessionConfigCompletions`, `resolveSessionConfig` |
 | Chat | set a draft | `setDraft`, TUI only | `chat/draftChanged` |
 | Terminal | resize, clear, rename, claim | `src/ahp/live.ts:2625-2649`, TUI only | `terminal/resized`, `cleared`, `titleChanged`, `claimed` |
