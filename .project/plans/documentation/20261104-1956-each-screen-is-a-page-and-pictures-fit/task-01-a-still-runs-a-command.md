@@ -1,6 +1,6 @@
 ---
 title: A still runs a command before its frame
-status: todo
+status: done
 depends: []
 layer: "screen"
 refs:

@@ -6,15 +6,22 @@ A session is one agent working in one workspace on the host. It has a transcript
 
 ![The session list, with status and workspace for each](../img/sessions.svg)
 
-The session list is the first screen. See [Screen](../use/SCREEN.md#the-session-list).
+`esc` on a new session opens the session list. See [Moving between screens](../use/SCREEN.md#moving-between-screens).
+
+Each row is a session: its status, agent, workspace, branch, and what it is doing now. Sessions waiting on you are counted at the top.
 
 | Key | |
 | --- | --- |
-| `ctrl+n` | New session |
+| `enter` | Open the session |
+| `n` | New session |
+| `f` | Back to the session that was open |
 | `ctrl+f` | Filter by title, agent or workspace |
-| `x` | Show archived sessions |
 | `right` / `left` | Show or hide the selected session's details |
-| `s` | Session settings, in an open session |
+| `u` | Mark it read |
+| `a` | Archive it |
+| `x` | Show archived sessions |
+| `d`, `delete` | Dispose of it, after you confirm |
+| `r` | Refresh |
 
 ## Commands
 

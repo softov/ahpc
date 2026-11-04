@@ -1,56 +1,63 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="820" height="530" viewBox="0 0 820 530" font-family="ui-monospace, SFMono-Regular, &apos;SF Mono&apos;, Menlo, Consolas, &apos;DejaVu Sans Mono&apos;, monospace" font-size="13px">
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="462" viewBox="0 0 820 462" font-family="ui-monospace, SFMono-Regular, &apos;SF Mono&apos;, Menlo, Consolas, &apos;DejaVu Sans Mono&apos;, monospace" font-size="13px">
 <title>chat - new</title>
-<rect width="820" height="530" rx="6" fill="#0d1117"/>
-<text x="10" y="23" fill="#58a6ff" font-weight="bold" textLength="32" lengthAdjust="spacing" xml:space="preserve">ahpc</text>
-<text x="50" y="23" fill="#a7a7a7" textLength="8" lengthAdjust="spacing" xml:space="preserve">·</text>
-<text x="66" y="23" fill="#9b949e" textLength="152" lengthAdjust="spacing" xml:space="preserve">ws://127.0.0.1:9210</text>
-<text x="610" y="23" fill="#58a6ff" font-weight="bold" textLength="16" lengthAdjust="spacing" xml:space="preserve">f1</text>
-<text x="634" y="23" fill="#9b949e" textLength="32" lengthAdjust="spacing" xml:space="preserve">help</text>
-<text x="674" y="23" fill="#a7a7a7" textLength="8" lengthAdjust="spacing" xml:space="preserve">·</text>
-<text x="690" y="23" fill="#58a6ff" font-weight="bold" textLength="48" lengthAdjust="spacing" xml:space="preserve">ctrl+p</text>
-<text x="746" y="23" fill="#9b949e" textLength="64" lengthAdjust="spacing" xml:space="preserve">commands</text>
-<text x="402" y="176" fill="#0dbc79" textLength="8" lengthAdjust="spacing" xml:space="preserve">.</text>
-<text x="394" y="193" fill="#e5e510" textLength="8" lengthAdjust="spacing" xml:space="preserve">.</text>
-<text x="402" y="193" fill="#2472c8" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">∙</text>
-<text x="410" y="193" fill="#cd3131" textLength="8" lengthAdjust="spacing" xml:space="preserve">.</text>
-<text x="354" y="210" fill="#9b949e" textLength="104" lengthAdjust="spacing" xml:space="preserve">A new session</text>
-<text x="266" y="227" fill="#a7a7a7" textLength="288" lengthAdjust="spacing" xml:space="preserve">The first message is what starts it.</text>
-<text x="250" y="244" fill="#a7a7a7" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">◂</text>
-<text x="258" y="244" fill="#a7a7a7" textLength="304" lengthAdjust="spacing" xml:space="preserve"> esc for the sessions you already have</text>
-<text x="10" y="431" fill="#c9d1d9" textLength="800" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈</text>
-<text x="10" y="448" fill="#a7a7a7" text-decoration="underline" textLength="8" lengthAdjust="spacing" xml:space="preserve">A</text>
-<text x="18" y="448" fill="#a7a7a7" textLength="168" lengthAdjust="spacing" xml:space="preserve">sk the agent anything</text>
-<text x="186" y="448" fill="#a7a7a7" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">…</text>
-<text x="10" y="465" fill="#c9d1d9" textLength="800" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈</text>
-<text x="18" y="482" fill="#9b949e" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">◆</text>
-<text x="26" y="482" fill="#c9d1d9" textLength="48" lengthAdjust="spacing" xml:space="preserve"> Demo </text>
-<text x="74" y="482" fill="#a7a7a7" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▾</text>
-<text x="106" y="482" fill="#9b949e" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">◇</text>
-<text x="114" y="482" fill="#c9d1d9" textLength="72" lengthAdjust="spacing" xml:space="preserve"> default </text>
-<text x="186" y="482" fill="#a7a7a7" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▾</text>
-<text x="218" y="482" fill="#9b949e" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">✓</text>
-<text x="226" y="482" fill="#c9d1d9" textLength="64" lengthAdjust="spacing" xml:space="preserve"> Writes </text>
-<text x="290" y="482" fill="#a7a7a7" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▾</text>
-<text x="322" y="482" fill="#9b949e" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▪</text>
-<text x="330" y="482" fill="#c9d1d9" textLength="56" lengthAdjust="spacing" xml:space="preserve"> plain </text>
-<text x="386" y="482" fill="#a7a7a7" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▾</text>
-<text x="18" y="499" fill="#9b949e" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">⌂</text>
-<text x="26" y="499" fill="#c9d1d9" textLength="112" lengthAdjust="spacing" xml:space="preserve"> no workspace </text>
-<text x="138" y="499" fill="#a7a7a7" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▾</text>
-<text x="754" y="499" fill="#484f58" font-weight="bold" textLength="32" lengthAdjust="spacing" xml:space="preserve">send</text>
-<text x="794" y="499" fill="#a7a7a7" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▸</text>
-<text x="10" y="516" fill="#58a6ff" font-weight="bold" textLength="40" lengthAdjust="spacing" xml:space="preserve">enter</text>
-<text x="58" y="516" fill="#9b949e" textLength="40" lengthAdjust="spacing" xml:space="preserve">start</text>
-<text x="98" y="516" fill="#a7a7a7" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
-<text x="122" y="516" fill="#58a6ff" font-weight="bold" textLength="72" lengthAdjust="spacing" xml:space="preserve">alt+enter</text>
-<text x="202" y="516" fill="#9b949e" textLength="56" lengthAdjust="spacing" xml:space="preserve">newline</text>
-<text x="258" y="516" fill="#a7a7a7" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
-<text x="282" y="516" fill="#58a6ff" font-weight="bold" textLength="24" lengthAdjust="spacing" xml:space="preserve">tab</text>
-<text x="314" y="516" fill="#9b949e" textLength="56" lengthAdjust="spacing" xml:space="preserve">options</text>
-<text x="370" y="516" fill="#a7a7a7" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
-<text x="394" y="516" fill="#58a6ff" font-weight="bold" textLength="24" lengthAdjust="spacing" xml:space="preserve">esc</text>
-<text x="426" y="516" fill="#9b949e" textLength="64" lengthAdjust="spacing" xml:space="preserve">sessions</text>
-<text x="490" y="516" fill="#a7a7a7" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
-<text x="514" y="516" fill="#58a6ff" font-weight="bold" textLength="48" lengthAdjust="spacing" xml:space="preserve">ctrl+c</text>
-<text x="570" y="516" fill="#9b949e" textLength="32" lengthAdjust="spacing" xml:space="preserve">quit</text>
+<rect width="820" height="462" rx="6" fill="#0d1117"/>
+<text x="10" y="23" fill="#1b2f48" font-weight="bold" textLength="32" lengthAdjust="spacing" xml:space="preserve">ahpc</text>
+<text x="50" y="23" fill="#2d2f34" textLength="8" lengthAdjust="spacing" xml:space="preserve">·</text>
+<text x="66" y="23" fill="#2a2b32" textLength="152" lengthAdjust="spacing" xml:space="preserve">ws://127.0.0.1:9210</text>
+<text x="610" y="23" fill="#1b2f48" font-weight="bold" textLength="16" lengthAdjust="spacing" xml:space="preserve">f1</text>
+<text x="634" y="23" fill="#2a2b32" textLength="32" lengthAdjust="spacing" xml:space="preserve">help</text>
+<text x="674" y="23" fill="#2d2f34" textLength="8" lengthAdjust="spacing" xml:space="preserve">·</text>
+<text x="690" y="23" fill="#1b2f48" font-weight="bold" textLength="48" lengthAdjust="spacing" xml:space="preserve">ctrl+p</text>
+<text x="746" y="23" fill="#2a2b32" textLength="64" lengthAdjust="spacing" xml:space="preserve">commands</text>
+<text x="402" y="142" fill="#0a3429" textLength="8" lengthAdjust="spacing" xml:space="preserve">.</text>
+<text x="394" y="159" fill="#3b3d12" textLength="8" lengthAdjust="spacing" xml:space="preserve">.</text>
+<text x="402" y="159" fill="#0f233b" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">∙</text>
+<text x="410" y="159" fill="#351519" textLength="8" lengthAdjust="spacing" xml:space="preserve">.</text>
+<text x="282" y="176" fill="#9b949e" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">⌕</text>
+<text x="298" y="176" fill="#a7a7a7" textLength="232" lengthAdjust="spacing" xml:space="preserve">What the next message runs on</text>
+<text x="546" y="193" fill="#2d2f34" textLength="8" lengthAdjust="spacing" xml:space="preserve">.</text>
+<text x="250" y="210" fill="#2d2f34" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">◂</text>
+<text x="274" y="210" fill="#3191ff" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▸</text>
+<text x="282" y="210" fill="#3191ff" textLength="256" lengthAdjust="spacing" xml:space="preserve"> Demo Fast             demo-fast</text>
+<text x="546" y="210" fill="#2d2f34" textLength="16" lengthAdjust="spacing" xml:space="preserve">ve</text>
+<text x="266" y="227" fill="#c9d1d9" textLength="192" lengthAdjust="spacing" xml:space="preserve">   Demo Large           </text>
+<text x="458" y="227" fill="#9b949e" textLength="80" lengthAdjust="spacing" xml:space="preserve">demo-large</text>
+<text x="266" y="244" fill="#c9d1d9" textLength="192" lengthAdjust="spacing" xml:space="preserve">   Demo Small           </text>
+<text x="458" y="244" fill="#9b949e" textLength="80" lengthAdjust="spacing" xml:space="preserve">demo-small</text>
+<text x="274" y="278" fill="#9b949e" textLength="72" lengthAdjust="spacing" xml:space="preserve">demo-fast</text>
+<text x="530" y="278" fill="#a7a7a7" textLength="8" lengthAdjust="spacing" xml:space="preserve">3</text>
+<text x="274" y="295" fill="#a7a7a7" textLength="16" lengthAdjust="spacingAndGlyphs" xml:space="preserve">↑↓</text>
+<text x="290" y="295" fill="#a7a7a7" textLength="248" lengthAdjust="spacing" xml:space="preserve"> move · enter choose · esc back</text>
+<text x="10" y="363" fill="#6b7178" textLength="800" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈</text>
+<text x="10" y="380" fill="#2d2f34" textLength="176" lengthAdjust="spacing" xml:space="preserve">Ask the agent anything</text>
+<text x="186" y="380" fill="#2d2f34" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">…</text>
+<text x="10" y="397" fill="#6b7178" textLength="800" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈</text>
+<text x="18" y="414" fill="#2a2b32" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">◆</text>
+<text x="26" y="414" fill="#6b7178" textLength="48" lengthAdjust="spacing" xml:space="preserve"> Demo </text>
+<text x="74" y="414" fill="#2d2f34" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▾</text>
+<text x="106" y="414" fill="#2a2b32" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">◇</text>
+<text x="114" y="414" fill="#6b7178" textLength="72" lengthAdjust="spacing" xml:space="preserve"> default </text>
+<text x="186" y="414" fill="#2d2f34" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▾</text>
+<text x="218" y="414" fill="#2a2b32" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">✓</text>
+<text x="226" y="414" fill="#6b7178" textLength="64" lengthAdjust="spacing" xml:space="preserve"> Writes </text>
+<text x="290" y="414" fill="#2d2f34" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▾</text>
+<text x="322" y="414" fill="#2a2b32" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▪</text>
+<text x="330" y="414" fill="#6b7178" textLength="56" lengthAdjust="spacing" xml:space="preserve"> plain </text>
+<text x="386" y="414" fill="#2d2f34" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▾</text>
+<text x="18" y="431" fill="#2a2b32" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">⌂</text>
+<text x="26" y="431" fill="#6b7178" textLength="112" lengthAdjust="spacing" xml:space="preserve"> no workspace </text>
+<text x="138" y="431" fill="#2d2f34" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▾</text>
+<text x="754" y="431" fill="#171c22" font-weight="bold" textLength="32" lengthAdjust="spacing" xml:space="preserve">send</text>
+<text x="794" y="431" fill="#2d2f34" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▸</text>
+<text x="10" y="448" fill="#1b2f48" font-weight="bold" textLength="16" lengthAdjust="spacingAndGlyphs" xml:space="preserve">↑↓</text>
+<text x="34" y="448" fill="#2a2b32" textLength="32" lengthAdjust="spacing" xml:space="preserve">move</text>
+<text x="66" y="448" fill="#2d2f34" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
+<text x="90" y="448" fill="#1b2f48" font-weight="bold" textLength="40" lengthAdjust="spacing" xml:space="preserve">enter</text>
+<text x="138" y="448" fill="#2a2b32" textLength="48" lengthAdjust="spacing" xml:space="preserve">choose</text>
+<text x="186" y="448" fill="#2d2f34" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
+<text x="210" y="448" fill="#1b2f48" font-weight="bold" textLength="24" lengthAdjust="spacing" xml:space="preserve">esc</text>
+<text x="242" y="448" fill="#2a2b32" textLength="32" lengthAdjust="spacing" xml:space="preserve">back</text>
+<text x="274" y="448" fill="#2d2f34" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
+<text x="298" y="448" fill="#1b2f48" font-weight="bold" textLength="48" lengthAdjust="spacing" xml:space="preserve">ctrl+c</text>
+<text x="354" y="448" fill="#2a2b32" textLength="32" lengthAdjust="spacing" xml:space="preserve">quit</text>
 </svg>

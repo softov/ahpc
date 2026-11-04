@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="820" height="530" viewBox="0 0 820 530" font-family="ui-monospace, SFMono-Regular, &apos;SF Mono&apos;, Menlo, Consolas, &apos;DejaVu Sans Mono&apos;, monospace" font-size="13px">
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="224" viewBox="0 0 820 224" font-family="ui-monospace, SFMono-Regular, &apos;SF Mono&apos;, Menlo, Consolas, &apos;DejaVu Sans Mono&apos;, monospace" font-size="13px">
 <title>chat - changes</title>
-<rect width="820" height="530" rx="6" fill="#0d1117"/>
+<rect width="820" height="224" rx="6" fill="#0d1117"/>
 <text x="10" y="23" fill="#58a6ff" font-weight="bold" textLength="32" lengthAdjust="spacing" xml:space="preserve">ahpc</text>
 <text x="50" y="23" fill="#a7a7a7" textLength="8" lengthAdjust="spacing" xml:space="preserve">·</text>
 <text x="66" y="23" fill="#9b949e" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">○</text>
@@ -24,29 +24,46 @@
 <text x="754" y="74" fill="#3fb950" textLength="16" lengthAdjust="spacing" xml:space="preserve">+0</text>
 <text x="778" y="74" fill="#f85149" textLength="16" lengthAdjust="spacing" xml:space="preserve">-1</text>
 <text x="802" y="74" fill="#f85149" textLength="8" lengthAdjust="spacing" xml:space="preserve">D</text>
-<text x="34" y="91" fill="#c9d1d9" textLength="720" lengthAdjust="spacing" xml:space="preserve"> /tmp/ahpc-demo/work/notes-app/src/app/main.ts                                            </text>
-<text x="754" y="91" fill="#3fb950" textLength="16" lengthAdjust="spacing" xml:space="preserve">+2</text>
-<text x="778" y="91" fill="#f85149" textLength="16" lengthAdjust="spacing" xml:space="preserve">-0</text>
+<text x="26" y="91" fill="#3fb950" textLength="8" lengthAdjust="spacing" xml:space="preserve">S</text>
+<text x="34" y="91" fill="#c9d1d9" textLength="720" lengthAdjust="spacing" xml:space="preserve"> /tmp/ahpc-demo/work/notes-app/package.json                                               </text>
+<text x="754" y="91" fill="#3fb950" textLength="16" lengthAdjust="spacing" xml:space="preserve">+1</text>
+<text x="778" y="91" fill="#f85149" textLength="16" lengthAdjust="spacing" xml:space="preserve">-1</text>
 <text x="802" y="91" fill="#d29922" textLength="8" lengthAdjust="spacing" xml:space="preserve">M</text>
-<text x="34" y="108" fill="#c9d1d9" textLength="720" lengthAdjust="spacing" xml:space="preserve"> /tmp/ahpc-demo/work/notes-app/docs/guide/faq.md                                          </text>
-<text x="754" y="108" fill="#3fb950" textLength="16" lengthAdjust="spacing" xml:space="preserve">+3</text>
+<text x="34" y="108" fill="#c9d1d9" textLength="720" lengthAdjust="spacing" xml:space="preserve"> /tmp/ahpc-demo/work/notes-app/src/app/main.ts                                            </text>
+<text x="754" y="108" fill="#3fb950" textLength="16" lengthAdjust="spacing" xml:space="preserve">+2</text>
 <text x="778" y="108" fill="#f85149" textLength="16" lengthAdjust="spacing" xml:space="preserve">-0</text>
-<text x="802" y="108" fill="#3fb950" textLength="8" lengthAdjust="spacing" xml:space="preserve">U</text>
-<text x="10" y="516" fill="#58a6ff" font-weight="bold" textLength="16" lengthAdjust="spacingAndGlyphs" xml:space="preserve">↑↓</text>
-<text x="34" y="516" fill="#9b949e" textLength="32" lengthAdjust="spacing" xml:space="preserve">move</text>
-<text x="66" y="516" fill="#a7a7a7" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
-<text x="90" y="516" fill="#58a6ff" font-weight="bold" textLength="40" lengthAdjust="spacing" xml:space="preserve">enter</text>
-<text x="138" y="516" fill="#9b949e" textLength="32" lengthAdjust="spacing" xml:space="preserve">open</text>
-<text x="170" y="516" fill="#a7a7a7" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
-<text x="194" y="516" fill="#58a6ff" font-weight="bold" textLength="8" lengthAdjust="spacing" xml:space="preserve">]</text>
-<text x="210" y="516" fill="#9b949e" textLength="72" lengthAdjust="spacing" xml:space="preserve">changeset</text>
-<text x="282" y="516" fill="#a7a7a7" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
-<text x="306" y="516" fill="#58a6ff" font-weight="bold" textLength="8" lengthAdjust="spacing" xml:space="preserve">x</text>
-<text x="322" y="516" fill="#9b949e" textLength="16" lengthAdjust="spacing" xml:space="preserve">do</text>
-<text x="338" y="516" fill="#a7a7a7" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
-<text x="362" y="516" fill="#58a6ff" font-weight="bold" textLength="24" lengthAdjust="spacing" xml:space="preserve">esc</text>
-<text x="394" y="516" fill="#9b949e" textLength="32" lengthAdjust="spacing" xml:space="preserve">back</text>
-<text x="426" y="516" fill="#a7a7a7" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
-<text x="450" y="516" fill="#58a6ff" font-weight="bold" textLength="48" lengthAdjust="spacing" xml:space="preserve">ctrl+c</text>
-<text x="506" y="516" fill="#9b949e" textLength="32" lengthAdjust="spacing" xml:space="preserve">quit</text>
+<text x="802" y="108" fill="#d29922" textLength="8" lengthAdjust="spacing" xml:space="preserve">M</text>
+<text x="34" y="125" fill="#c9d1d9" textLength="720" lengthAdjust="spacing" xml:space="preserve"> /tmp/ahpc-demo/work/notes-app/src/app/ui/list/view.ts                                    </text>
+<text x="754" y="125" fill="#3fb950" textLength="16" lengthAdjust="spacing" xml:space="preserve">+1</text>
+<text x="778" y="125" fill="#f85149" textLength="16" lengthAdjust="spacing" xml:space="preserve">-1</text>
+<text x="802" y="125" fill="#d29922" textLength="8" lengthAdjust="spacing" xml:space="preserve">M</text>
+<text x="34" y="142" fill="#c9d1d9" textLength="720" lengthAdjust="spacing" xml:space="preserve"> /tmp/ahpc-demo/work/notes-app/docs/guide/faq.md                                          </text>
+<text x="754" y="142" fill="#3fb950" textLength="16" lengthAdjust="spacing" xml:space="preserve">+3</text>
+<text x="778" y="142" fill="#f85149" textLength="16" lengthAdjust="spacing" xml:space="preserve">-0</text>
+<text x="802" y="142" fill="#3fb950" textLength="8" lengthAdjust="spacing" xml:space="preserve">U</text>
+<text x="34" y="159" fill="#c9d1d9" textLength="720" lengthAdjust="spacing" xml:space="preserve"> /tmp/ahpc-demo/work/notes-app/notes/drafts/today.md                                      </text>
+<text x="754" y="159" fill="#3fb950" textLength="16" lengthAdjust="spacing" xml:space="preserve">+1</text>
+<text x="778" y="159" fill="#f85149" textLength="16" lengthAdjust="spacing" xml:space="preserve">-0</text>
+<text x="802" y="159" fill="#3fb950" textLength="8" lengthAdjust="spacing" xml:space="preserve">U</text>
+<text x="34" y="176" fill="#c9d1d9" textLength="720" lengthAdjust="spacing" xml:space="preserve"> /tmp/ahpc-demo/work/notes-app/src/app/lib/search.ts                                      </text>
+<text x="754" y="176" fill="#3fb950" textLength="16" lengthAdjust="spacing" xml:space="preserve">+1</text>
+<text x="778" y="176" fill="#f85149" textLength="16" lengthAdjust="spacing" xml:space="preserve">-0</text>
+<text x="802" y="176" fill="#3fb950" textLength="8" lengthAdjust="spacing" xml:space="preserve">U</text>
+<text x="10" y="210" fill="#58a6ff" font-weight="bold" textLength="16" lengthAdjust="spacingAndGlyphs" xml:space="preserve">↑↓</text>
+<text x="34" y="210" fill="#9b949e" textLength="32" lengthAdjust="spacing" xml:space="preserve">move</text>
+<text x="66" y="210" fill="#a7a7a7" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
+<text x="90" y="210" fill="#58a6ff" font-weight="bold" textLength="40" lengthAdjust="spacing" xml:space="preserve">enter</text>
+<text x="138" y="210" fill="#9b949e" textLength="32" lengthAdjust="spacing" xml:space="preserve">open</text>
+<text x="170" y="210" fill="#a7a7a7" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
+<text x="194" y="210" fill="#58a6ff" font-weight="bold" textLength="8" lengthAdjust="spacing" xml:space="preserve">]</text>
+<text x="210" y="210" fill="#9b949e" textLength="72" lengthAdjust="spacing" xml:space="preserve">changeset</text>
+<text x="282" y="210" fill="#a7a7a7" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
+<text x="306" y="210" fill="#58a6ff" font-weight="bold" textLength="8" lengthAdjust="spacing" xml:space="preserve">x</text>
+<text x="322" y="210" fill="#9b949e" textLength="16" lengthAdjust="spacing" xml:space="preserve">do</text>
+<text x="338" y="210" fill="#a7a7a7" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
+<text x="362" y="210" fill="#58a6ff" font-weight="bold" textLength="24" lengthAdjust="spacing" xml:space="preserve">esc</text>
+<text x="394" y="210" fill="#9b949e" textLength="32" lengthAdjust="spacing" xml:space="preserve">back</text>
+<text x="426" y="210" fill="#a7a7a7" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
+<text x="450" y="210" fill="#58a6ff" font-weight="bold" textLength="48" lengthAdjust="spacing" xml:space="preserve">ctrl+c</text>
+<text x="506" y="210" fill="#9b949e" textLength="32" lengthAdjust="spacing" xml:space="preserve">quit</text>
 </svg>

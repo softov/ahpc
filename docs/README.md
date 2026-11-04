@@ -12,7 +12,10 @@
 
 | Page | What it covers |
 | --- | --- |
-| [Screen](use/SCREEN.md) | The interactive client and its keys |
+| [Screen](use/SCREEN.md) | Starting the interactive client, and moving between its screens |
+| [New session](use/NEW-SESSION.md) | The first screen: the agent, the model and the workspace, and its keys |
+| [Session](use/SESSION.md) | The transcript, approving, the screens of a session, and editing a message |
+| [Keys](use/KEYS.md) | The command palette, `f1`, and the keys of every screen |
 | [Commands](use/COMMANDS.md) | Running one command, output, `--json`, links |
 | [Tool server](use/TOOL-SERVER.md) | `ahpc mcp` and `ahpc serve`, and how to add them to Claude Code, Claude Desktop and VS Code |
 | [Recording](use/RECORDING.md) | `--wire` captures and `ahpc wire` |

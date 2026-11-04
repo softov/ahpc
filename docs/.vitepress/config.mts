@@ -32,6 +32,9 @@ const sidebar: DefaultTheme.SidebarItem[] = [
     text: 'Use',
     items: [
       page('Screen', '/use/SCREEN'),
+      page('New session', '/use/NEW-SESSION'),
+      page('Session', '/use/SESSION'),
+      page('Keys', '/use/KEYS'),
       page('Commands', '/use/COMMANDS'),
       page('Tool server', '/use/TOOL-SERVER'),
       page('Recording', '/use/RECORDING'),

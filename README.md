@@ -82,7 +82,7 @@ Claude Desktop, VS Code, Windows, remote hosts and the HTTP API are in [Tool ser
 The full docs are at **[ahpio.github.io/ahpc](https://ahpio.github.io/ahpc/)**, and their source is in [docs/](docs/README.md):
 
 - [Get started](https://ahpio.github.io/ahpc/start/GET-STARTED), [Connect](https://ahpio.github.io/ahpc/start/CONNECT), [Configure](https://ahpio.github.io/ahpc/start/CONFIGURE)
-- [Screen](https://ahpio.github.io/ahpc/use/SCREEN), [Commands](https://ahpio.github.io/ahpc/use/COMMANDS), [Tool server](https://ahpio.github.io/ahpc/use/TOOL-SERVER), [Recording](https://ahpio.github.io/ahpc/use/RECORDING)
+- [Screen](https://ahpio.github.io/ahpc/use/SCREEN), [New session](https://ahpio.github.io/ahpc/use/NEW-SESSION), [Session](https://ahpio.github.io/ahpc/use/SESSION), [Keys](https://ahpio.github.io/ahpc/use/KEYS), [Commands](https://ahpio.github.io/ahpc/use/COMMANDS), [Tool server](https://ahpio.github.io/ahpc/use/TOOL-SERVER), [Recording](https://ahpio.github.io/ahpc/use/RECORDING)
 - One page per subject: [Sessions](https://ahpio.github.io/ahpc/subjects/SESSIONS), [Turns](https://ahpio.github.io/ahpc/subjects/TURNS), [Changes](https://ahpio.github.io/ahpc/subjects/CHANGES), [Automations](https://ahpio.github.io/ahpc/subjects/AUTOMATIONS) and more
 - Reference: [CLI](https://ahpio.github.io/ahpc/reference/CLI), [MCP tools](https://ahpio.github.io/ahpc/reference/MCP-TOOLS), [Environment](https://ahpio.github.io/ahpc/reference/ENVIRONMENT), [Config file](https://ahpio.github.io/ahpc/reference/CONFIG-FILE)
 

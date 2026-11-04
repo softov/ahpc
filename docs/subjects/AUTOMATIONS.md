@@ -4,7 +4,7 @@ An automation runs a prompt on its own: on a schedule, or when a trigger the hos
 
 ## Screen
 
-![The automation list, one on a schedule and one on an event](../img/automations.svg)
+![The automation list, four on a schedule and one on an event](../img/automations.svg)
 
 The palette (`ctrl+p`) has **Show automations**. In the list:
 
