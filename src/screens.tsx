@@ -6,6 +6,7 @@ import {
   useEffect,
   useFocusScope,
   useI18n,
+  useMeasure,
   useMemo,
   useRequiredService,
   useSize,
@@ -1096,6 +1097,41 @@ export const ChatScreen: (props: Record<string, never>) => RenderOutput =
 
 // --------------------------------------------------------------- 3. new session
 
+/** The rows the logo and the three lines under it take. */
+const INVITATION_ROWS = 5;
+
+/**
+ * The middle of the new session screen: the logo, the title and two lines.
+ *
+ * The logo is four dots in the terminal's own green, yellow, blue and red,
+ * with the green one above the blue one. It is drawn only when all five rows
+ * fit, so a short terminal keeps the title.
+ */
+const Invitation: (props: Record<string, never>) => RenderOutput =
+  defineComponent<Record<string, never>>('Invitation', () => {
+    const i18n = useI18n();
+    const theme = useTheme();
+    const room = useMeasure().height;
+
+    return (
+      <Column flex={1} justify="center" align="center" gap={0}>
+        {room >= INVITATION_ROWS ? (
+          <Column key="logo" align="center" gap={0}>
+            <text content="." fg="green" />
+            <Row>
+              <text content="." fg="yellow" />
+              <text content="∙" fg="blue" />
+              <text content="." fg="red" />
+            </Row>
+          </Column>
+        ) : null}
+        <text content={i18n.t('screens.newSession.title')} fg="muted" />
+        <text content={i18n.t('screens.newSession.firstMessage')} fg="subtle" />
+        <text content={i18n.t('screens.newSession.back', { glyph: theme.glyphs.chevronLeft })} fg="subtle" />
+      </Column>
+    );
+  });
+
 export const NewSessionScreen: (props: Record<string, never>) => RenderOutput =
   defineComponent<Record<string, never>>('NewSessionScreen', () => {
     const app = useApp();
@@ -1124,11 +1160,7 @@ export const NewSessionScreen: (props: Record<string, never>) => RenderOutput =
             that gets seen. */}
         {/* No figure here any more. There is one, and it is on the floating
             layer over every screen - two of them would be two mascots. */}
-        <Column flex={1} justify="center" align="center" gap={0}>
-          <text content={i18n.t('screens.newSession.title')} fg="muted" />
-          <text content={i18n.t('screens.newSession.firstMessage')} fg="subtle" />
-          <text content={i18n.t('screens.newSession.back', { glyph: theme.glyphs.chevronLeft })} fg="subtle" />
-        </Column>
+        <Invitation />
 
         <ChatComposer
           value={draft}

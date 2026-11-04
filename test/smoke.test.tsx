@@ -129,6 +129,19 @@ async function idle(size?: { width: number; height: number }): Promise<Mounted> 
   return m;
 }
 
+/**
+ * The logo is the first thing to go.
+ *
+ * At fourteen rows the middle of the new session screen has three, and the
+ * title is what tells somebody where they are.
+ */
+it('drops the logo and keeps the title when the terminal is short', async () => {
+  const { t } = await open({ width: 60, height: 14 });
+  expect(t.hasText('A new session')).toBe(true);
+  expect(t.getAllByText('∙', { exact: true }).some((node) => node.props.fg === 'blue')).toBe(false);
+  await t.unmount();
+});
+
 describe.each(SIZES.map((s) => [`${s.width}x${s.height}`, s] as const))('at %s', (_name, size) => {
   it('opens on a composer, with nothing open', async () => {
     const { t } = await open(size);
@@ -137,6 +150,26 @@ describe.each(SIZES.map((s) => [`${s.width}x${s.height}`, s] as const))('at %s',
     expect(t.app.screens.current()?.id).toBe('new');
     expect(t.app.focus.focused()).toBe('chat.composer');
     expect(t.hasText('The first message is what starts it.')).toBe(true);
+    await t.unmount();
+  });
+
+  it('shows the logo above the title: green, then yellow, blue and red', async () => {
+    const { t } = await open(size);
+    const dot = (content: string, fg: string) =>
+      t.getAllByText(content, { exact: true }).find((node) => node.props.fg === fg);
+    const green = dot('.', 'green');
+    const yellow = dot('.', 'yellow');
+    const blue = dot('∙', 'blue');
+    const red = dot('.', 'red');
+    const title = t.getByText('A new session', { exact: true });
+    // The green dot sits on the blue one, and the other two flank it.
+    expect(green?.rect?.x).toBe(blue?.rect?.x);
+    expect((green?.rect?.y ?? 0) + 1).toBe(blue?.rect?.y);
+    expect(yellow?.rect?.y).toBe(blue?.rect?.y);
+    expect(red?.rect?.y).toBe(blue?.rect?.y);
+    expect((yellow?.rect?.x ?? 0) + 1).toBe(blue?.rect?.x);
+    expect((blue?.rect?.x ?? 0) + 1).toBe(red?.rect?.x);
+    expect((blue?.rect?.y ?? 0) + 1).toBe(title.rect?.y);
     await t.unmount();
   });
 
@@ -1294,7 +1327,7 @@ describe('what a session actually is', () => {
     it(`names the palette key at the header's right end, not in the footer, at ${width} columns`, async () => {
       const { t } = await catalogue({ width, height: 30 });
       const rows = t.text().split('\n');
-      const header = rows.findIndex((row) => row.includes('AHPC'));
+      const header = rows.findIndex((row) => row.includes('ahpc'));
       expect(rows[header]).toContain('ctrl+p commands');
       expect(rows[header]).toContain('f1 help');
       expect(rows.filter((row) => row.includes('ctrl+p'))).toHaveLength(1);
@@ -2457,9 +2490,13 @@ describe('the figure on an empty screen', () => {
    * `boodInline` - and even then only on a session, where the seven cells are
    * carrying that session's state rather than standing for nothing.
    */
+  /** Whether the header shows the application's name, in its bold accent. */
+  const named = (t: Harness): boolean =>
+    t.getAllByText('ahpc', { exact: true }).some((node) => node.props.fg === 'accent' && node.props.bold === true);
+
   it('keeps the header its own name unless the config says otherwise', async () => {
     const m = await conversation();
-    expect(m.t.hasText('AHPC')).toBe(true);
+    expect(named(m.t)).toBe(true);
     await m.t.unmount();
   });
 
@@ -2474,13 +2511,13 @@ describe('the figure on an empty screen', () => {
     for (let i = 0; i < 8; i++) await t.settle();
 
     // No session yet, so there is nothing for the seven cells to be about.
-    expect(t.hasText('AHPC')).toBe(true);
+    expect(named(t)).toBe(true);
 
     t.app.services.require(CONTROLLER).open(SEEDED);
     t.app.screens.push('chat');
     for (let i = 0; i < 6; i++) await t.settle();
 
-    expect(t.hasText('AHPC')).toBe(false);
+    expect(named(t)).toBe(false);
     const name = t.app.store.get<string>(BOOD) as string;
     const inline = MOODS.map((mood) => drawCreature(name, mood, { form: 'inline' })[0] as string);
     expect(inline.some((row) => t.hasText(row))).toBe(true);
