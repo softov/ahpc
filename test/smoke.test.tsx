@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { basename } from 'node:path';
 import { renderApp } from '@textui/testing';
 import type { Harness } from '@textui/testing';
 import { registerChat } from '../src/app.js';
@@ -1793,7 +1794,8 @@ describe('the composer is the front door', () => {
     // The directory leads the second row; the harness leads the first.
     expect(bar()[0]).toContain('Claude Code');
     expect(bar()[0]).toContain('Ask each time');
-    expect(bar()[1]).toContain('ahpc');
+    // The workspace is the checkout, so its folder is whatever it was cloned as.
+    expect(bar()[1]).toContain(basename(process.cwd()));
     expect(bar()[1]).toContain('Workspace');
     expect(bar()[0]).not.toContain('Workspace');
     // The fake seeds `worktreeCreateNewBranch`, the way the reference host
