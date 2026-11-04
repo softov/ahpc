@@ -8,6 +8,7 @@ import { registerChat } from './app.js';
 import { parseSessionLink } from './links.js';
 import { CONTROLLER, commandIdFor } from './control.js';
 import { connect, sink } from './connect.js';
+import type { HostConnection } from './ahp/connection.js';
 import { connectionToken, loadConfig } from './config.js';
 import { UPDATE_NOTICE, clearHostError, reportHostError } from './state.js';
 import { MAX_AGE_MS, checkingUpdates, readUpdate, refreshUpdate, registry, stale, updateNotice } from './update.js';
@@ -270,6 +271,31 @@ function overrides(options: Options): CapabilityOverrides {
 const workspaceFor = (options: Options): string => options.path ?? '';
 
 /** One frame, to stdout. The same application, against a terminal that is a size. */
+/** How long a still waits in all for a live host to answer what its screen asked. */
+const STILL_WAIT_MS = 10_000;
+
+/**
+ * Wait for the host's answers, and for the screen to draw them.
+ *
+ * A screen asks the host when it opens and draws the answer when it comes,
+ * and an answer can draw a screen that asks again. So the screen settles and
+ * the host goes quiet in turns, until the host has nothing open. A host that
+ * never answers gets `limitMs` in all, and the still draws what it has.
+ */
+export async function answered(
+  app: { settled(): Promise<unknown> },
+  host: Pick<HostConnection, 'idle'>,
+  limitMs: number,
+): Promise<void> {
+  const end = Date.now() + limitMs;
+  for (;;) {
+    await app.settled();
+    const left = end - Date.now();
+    if (left <= 0 || host.idle === undefined) break;
+    if (!await host.idle(left)) break;
+  }
+}
+
 async function still(options: Options): Promise<void> {
   const host = await connect(options);
 
@@ -297,10 +323,14 @@ async function still(options: Options): Promise<void> {
       // What the file says, if anything; a still never asks the registry.
       app.store.set(UPDATE_NOTICE, updateNotice(manifest(), app.i18n));
       // A URI, or the link the reference host's tools answer with.
+      const end = Date.now() + STILL_WAIT_MS;
       if (options.session) {
         if (parseSessionLink(options.session)) await controller.openLink(options.session);
         else controller.open(options.session);
       }
+      // The catalogue and the session first: a screen reads which session is
+      // open when it mounts, and one pushed before they arrive has none.
+      await answered(app, host, end - Date.now());
       /*
        * Pushed when asked for, and not otherwise.
        *
@@ -323,6 +353,8 @@ async function still(options: Options): Promise<void> {
         controller.answer({ q1: { kind: 'selected', value: 'transcript-scope' } }, true);
         for (let i = 0; i < 100_000; i++) if (host.pump?.() !== true) break;
       }
+
+      await answered(app, host, end - Date.now());
     },
 
     after: async (app) => {

@@ -2516,6 +2516,9 @@ export function fakeHost(): FakeHost {
       for (let i = 0; i < 5000; i++) if (!pump()) break;
     },
 
+    /** Nothing is ever open here: the script answers each request as it is made. */
+    idle: async () => false,
+
 
     content: async (ref: ContentRef): Promise<FileContent> => {
       const found = contents.get(ref.uri);

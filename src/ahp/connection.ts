@@ -593,6 +593,11 @@ export interface HostConnection {
   }>;
 
   flush?(): Promise<void>;
+  /**
+   * Wait until every request and subscribe is answered, or `limitMs` passes.
+   * True when something was open to wait on, false when nothing was.
+   */
+  idle?(limitMs: number): Promise<boolean>;
   close?(): void | Promise<void>;
 }
 
