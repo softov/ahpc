@@ -1,6 +1,6 @@
 ---
 title: The case expects the checkout's folder
-status: implemented
+status: done
 depends: []
 layer: "screen"
 refs:

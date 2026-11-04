@@ -1,7 +1,7 @@
 ---
 title: The smoke test reads the checkout's folder name
 domain: screen
-status: active
+status: built
 priority: medium
 created: 2026-11-04
 revalidated: 2026-11-04
@@ -42,7 +42,7 @@ process.cwd() -> WORKSPACE -> the composer's directory chip
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - The case expects the checkout's folder](task-01-the-case-expects-the-checkouts-folder.md) | implemented | - |
+| [01 - The case expects the checkout's folder](task-01-the-case-expects-the-checkouts-folder.md) | done | - |
 
 ## Risks and tradeoffs
 
@@ -50,8 +50,8 @@ process.cwd() -> WORKSPACE -> the composer's directory chip
 
 ## Resume state
 
-- **Done so far:** task 01 implemented, as [implemented.md](implemented.md) says.
-- **Next action:** Softov reviews the pull request.
+- **Done so far:** task 01 done, as [implemented.md](implemented.md) says. Pull request #21 merged on 2026-11-04.
+- **Next action:** none.
 - **Open questions:** none.
 
 ## Final verification checklist
