@@ -80,11 +80,11 @@ What this plan settled without one:
 - A path in `config.json` looks like the secret being in `config.json`.
   It is not, and the key's own documentation says so: a path is not a credential, which is the whole reason the key can live in a file people share.
 - A path in the config file is read even when no host is named, so a missing one can stop the scripted host, and a refusal in the screen prints a stack rather than a sentence.
-  Both turned out to be real rather than risks, and are open: [a bad token file prints a stack in the screen](../../../problems/a-bad-token-file-prints-a-stack-in-the-screen.md).
+  Both turned out to be real rather than risks, and are open: [a bad token file prints a stack in the screen](../../../briefs/a-missing-token-file-is-one-sentence.md).
 - Every reason a read can fail is reported as a missing file, and a `~` in a configured path is not expanded.
-  Open: [every token file read failure is called a missing file](../../../problems/every-token-file-read-failure-is-called-a-missing-file.md).
+  Open: [every token file read failure is called a missing file](../../../briefs/a-token-file-read-says-why-it-failed.md).
 - A rejected connection token reads exactly like an unreachable host.
-  Open: [a refused connection token reads like an unreachable host](../../../problems/a-refused-connection-token-reads-like-an-unreachable-host.md).
+  Open: [a refused connection token reads like an unreachable host](../../../briefs/a-refused-token-is-told-from-a-down-host.md).
 
 ## Resume state
 
