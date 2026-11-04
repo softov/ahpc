@@ -41,6 +41,14 @@ jobs:
 
       - run: npm run build
 
+      # package.json as npm will publish it. npm rewrites what it reads as a
+      # mistake at publish time and only warns, so a rewrite is caught here,
+      # with the npm the release uses, rather than in the release log.
+      - name: npm leaves package.json as it is
+        run: |
+          npx -y npm@12 pkg fix
+          git diff --exit-code package.json
+
       # What would actually be published, which is not what `files` says until
       # something has packed it.
       - name: Pack
