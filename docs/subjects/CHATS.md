@@ -4,6 +4,8 @@ A session can hold more than one conversation. Each is a chat, with its own tran
 
 ## Screen
 
+![A session with two chats](../img/chats.svg)
+
 Open the command palette (`ctrl+p`) in a session:
 
 | Command | |

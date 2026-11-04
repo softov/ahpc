@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="530" viewBox="0 0 820 530" font-family="ui-monospace, SFMono-Regular, &apos;SF Mono&apos;, Menlo, Consolas, &apos;DejaVu Sans Mono&apos;, monospace" font-size="13px">
+<title>chat - skills</title>
+<rect width="820" height="530" rx="6" fill="#0d1117"/>
+<text x="10" y="23" fill="#58a6ff" font-weight="bold" textLength="32" lengthAdjust="spacing" xml:space="preserve">ahpc</text>
+<text x="50" y="23" fill="#a7a7a7" textLength="8" lengthAdjust="spacing" xml:space="preserve">·</text>
+<text x="66" y="23" fill="#9b949e" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">○</text>
+<text x="74" y="23" fill="#c9d1d9" textLength="664" lengthAdjust="spacing" xml:space="preserve"> read ideas                                                                        </text>
+<text x="738" y="23" fill="#9b949e" textLength="72" lengthAdjust="spacing" xml:space="preserve">notes-app</text>
+<text x="10" y="40" fill="#c9d1d9" font-weight="bold" textLength="152" lengthAdjust="spacing" xml:space="preserve">Skills and commands</text>
+<text x="10" y="57" fill="#58a6ff" font-weight="bold" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▸</text>
+<text x="26" y="57" fill="#58a6ff" font-weight="bold" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
+<text x="42" y="57" fill="#58a6ff" font-weight="bold" textLength="72" lengthAdjust="spacing" xml:space="preserve">summarize</text>
+<text x="26" y="74" fill="#58a6ff" font-weight="bold" textLength="248" lengthAdjust="spacing" xml:space="preserve">  Sums up a note in three lines</text>
+<text x="26" y="91" fill="#3fb950" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">■</text>
+<text x="34" y="91" fill="#c9d1d9" textLength="40" lengthAdjust="spacing" xml:space="preserve"> tidy</text>
+<text x="42" y="108" fill="#9b949e" textLength="184" lengthAdjust="spacing" xml:space="preserve">Sorts the notes by name</text>
+<text x="10" y="516" fill="#58a6ff" font-weight="bold" textLength="16" lengthAdjust="spacingAndGlyphs" xml:space="preserve">↑↓</text>
+<text x="34" y="516" fill="#9b949e" textLength="32" lengthAdjust="spacing" xml:space="preserve">move</text>
+<text x="66" y="516" fill="#a7a7a7" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
+<text x="90" y="516" fill="#58a6ff" font-weight="bold" textLength="40" lengthAdjust="spacing" xml:space="preserve">enter</text>
+<text x="138" y="516" fill="#9b949e" textLength="64" lengthAdjust="spacing" xml:space="preserve">on / off</text>
+<text x="202" y="516" fill="#a7a7a7" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
+<text x="226" y="516" fill="#58a6ff" font-weight="bold" textLength="24" lengthAdjust="spacing" xml:space="preserve">esc</text>
+<text x="258" y="516" fill="#9b949e" textLength="32" lengthAdjust="spacing" xml:space="preserve">back</text>
+<text x="290" y="516" fill="#a7a7a7" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
+<text x="314" y="516" fill="#58a6ff" font-weight="bold" textLength="48" lengthAdjust="spacing" xml:space="preserve">ctrl+c</text>
+<text x="370" y="516" fill="#9b949e" textLength="32" lengthAdjust="spacing" xml:space="preserve">quit</text>
+</svg>

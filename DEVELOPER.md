@@ -48,6 +48,19 @@ npm install
 `test/fixtures/resource-write.json` is shared with [`ahpd`](https://github.com/softov/ahpd) and has to stay identical: `resourceWrite` is symmetrical, and each repository's CI compares its copy against the other's `main`.
 Change it in both.
 
+## Drawing the docs pictures
+
+The pictures in `docs/img/` are stills of the screen against ahpd's demo host.
+To draw them again, point `AHPD_DIR` at an ahpd checkout with its packages installed:
+
+```bash
+AHPD_DIR=../ahpd npm run docs:pictures
+```
+
+It starts `examples/demo` in `/tmp/ahpc-demo`, makes the sessions, chats, terminal and automations with ahpc's own commands, writes every picture, and removes the folder.
+The times on the screen come from the clock, so every run changes them a little.
+Open each picture before you commit it.
+
 ## Depending on TextUI
 
 Every screen, widget and key comes from the published `@textui/*` packages.

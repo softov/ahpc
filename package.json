@@ -48,6 +48,7 @@
     "docs:dev": "npm run build && vitepress dev docs",
     "docs:build": "npm run build && vitepress build docs",
     "docs:preview": "vitepress preview docs",
+    "docs:pictures": "npm run build && node tools/pictures.mjs",
     "prepack": "tsc -p tsconfig.build.json",
     "schema": "node tools/schema.mjs",
     "start": "node dist/src/main.js",

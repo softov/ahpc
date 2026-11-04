@@ -1,6 +1,6 @@
 ---
 title: npm run docs:pictures draws every picture
-status: todo
+status: done
 depends: []
 layer: "tools"
 refs:

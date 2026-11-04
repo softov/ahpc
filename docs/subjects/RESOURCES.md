@@ -4,6 +4,8 @@ Files and directories on the host, by `file://` URI. The URI is a path on the ho
 
 ## Screen
 
+![The files in the workspace of a session](../img/resources.svg)
+
 `f` in a session opens the files in its workspace. `@` in the composer completes a path on the host.
 
 ## Commands

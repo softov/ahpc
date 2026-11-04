@@ -1,33 +1,40 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="820" height="530" viewBox="0 0 820 530" font-family="ui-monospace, SFMono-Regular, &apos;SF Mono&apos;, Menlo, Consolas, &apos;DejaVu Sans Mono&apos;, monospace" font-size="13px">
 <title>chat - sessions</title>
 <rect width="820" height="530" rx="6" fill="#0d1117"/>
-<rect x="10" y="61" width="800" height="17" fill="#1f6feb"/>
-<rect x="10" y="78" width="800" height="17" fill="#1f6feb"/>
-<text x="10" y="23" fill="#58a6ff" font-weight="bold" textLength="72" lengthAdjust="spacing" xml:space="preserve">Assistant</text>
-<text x="90" y="23" fill="#a7a7a7" textLength="8" lengthAdjust="spacing" xml:space="preserve">·</text>
-<text x="106" y="23" fill="#9b949e" textLength="120" lengthAdjust="spacing" xml:space="preserve">fake://scripted</text>
+<text x="10" y="23" fill="#58a6ff" font-weight="bold" textLength="32" lengthAdjust="spacing" xml:space="preserve">ahpc</text>
+<text x="50" y="23" fill="#a7a7a7" textLength="8" lengthAdjust="spacing" xml:space="preserve">·</text>
+<text x="66" y="23" fill="#9b949e" textLength="152" lengthAdjust="spacing" xml:space="preserve">ws://127.0.0.1:9210</text>
+<text x="610" y="23" fill="#58a6ff" font-weight="bold" textLength="16" lengthAdjust="spacing" xml:space="preserve">f1</text>
+<text x="634" y="23" fill="#9b949e" textLength="32" lengthAdjust="spacing" xml:space="preserve">help</text>
+<text x="674" y="23" fill="#a7a7a7" textLength="8" lengthAdjust="spacing" xml:space="preserve">·</text>
+<text x="690" y="23" fill="#58a6ff" font-weight="bold" textLength="48" lengthAdjust="spacing" xml:space="preserve">ctrl+p</text>
+<text x="746" y="23" fill="#9b949e" textLength="64" lengthAdjust="spacing" xml:space="preserve">commands</text>
 <text x="10" y="40" fill="#c9d1d9" font-weight="bold" textLength="64" lengthAdjust="spacing" xml:space="preserve">Sessions</text>
 <text x="666" y="40" fill="#9b949e" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">⚠</text>
-<text x="674" y="40" fill="#9b949e" textLength="136" lengthAdjust="spacing" xml:space="preserve"> 1 waiting on you</text>
+<text x="674" y="40" fill="#9b949e" textLength="136" lengthAdjust="spacing" xml:space="preserve"> 2 waiting on you</text>
 <text x="18" y="57" fill="#9b949e" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">⌕</text>
 <text x="34" y="57" fill="#a7a7a7" textLength="224" lengthAdjust="spacing" xml:space="preserve">title, provider or workspace</text>
-<text x="10" y="74" fill="#0d1117" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▸</text>
-<text x="26" y="74" fill="#0d1117" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">◌</text>
-<text x="34" y="74" fill="#0d1117" textLength="776" lengthAdjust="spacing" xml:space="preserve"> Kqueue events on Linux                                                            waiting on you</text>
-<text x="10" y="91" fill="#0d1117" textLength="616" lengthAdjust="spacing" xml:space="preserve">    claude  ·  brb_framework main  ·  waiting for permission to run a command</text>
-<text x="26" y="108" fill="#58a6ff" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">●</text>
-<text x="34" y="108" fill="#c9d1d9" textLength="720" lengthAdjust="spacing" xml:space="preserve"> Split the transcript viewport                                                            </text>
-<text x="754" y="108" fill="#9b949e" textLength="56" lengthAdjust="spacing" xml:space="preserve">running</text>
-<text x="42" y="125" fill="#9b949e" textLength="504" lengthAdjust="spacing" xml:space="preserve">claude  ·  textui main  ·  reading packages/core/src/ui/data.ts</text>
-<text x="26" y="142" fill="#f85149" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">✕</text>
-<text x="34" y="142" fill="#c9d1d9" textLength="736" lengthAdjust="spacing" xml:space="preserve"> Advisor case 412 triage                                                                    </text>
-<text x="770" y="142" fill="#9b949e" textLength="40" lengthAdjust="spacing" xml:space="preserve">error</text>
-<text x="42" y="159" fill="#9b949e" textLength="248" lengthAdjust="spacing" xml:space="preserve">claude  ·  service_advisor main</text>
-<text x="26" y="176" fill="#9b949e" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">○</text>
-<text x="34" y="176" fill="#c9d1d9" textLength="744" lengthAdjust="spacing" xml:space="preserve"> Why does the composer eat q                                                                 </text>
-<text x="778" y="176" fill="#9b949e" textLength="32" lengthAdjust="spacing" xml:space="preserve">idle</text>
-<text x="42" y="193" fill="#9b949e" textLength="208" lengthAdjust="spacing" xml:space="preserve">copilotcli  ·  textui main</text>
-<text x="10" y="499" fill="#a7a7a7" textLength="160" lengthAdjust="spacing" xml:space="preserve">x  show archived (1)</text>
+<text x="10" y="74" fill="#58a6ff" font-weight="bold" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▸</text>
+<text x="26" y="74" fill="#58a6ff" font-weight="bold" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">◌</text>
+<text x="42" y="74" fill="#58a6ff" font-weight="bold" textLength="32" lengthAdjust="spacing" xml:space="preserve">read</text>
+<text x="698" y="74" fill="#58a6ff" font-weight="bold" textLength="112" lengthAdjust="spacing" xml:space="preserve">waiting on you</text>
+<text x="26" y="91" fill="#58a6ff" font-weight="bold" textLength="360" lengthAdjust="spacing" xml:space="preserve">  demo  ·  website  ·  Reading what you asked</text>
+<text x="26" y="108" fill="#d29922" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">◌</text>
+<text x="34" y="108" fill="#c9d1d9" textLength="664" lengthAdjust="spacing" xml:space="preserve"> write todo buy bread and milk                                                     </text>
+<text x="698" y="108" fill="#9b949e" textLength="112" lengthAdjust="spacing" xml:space="preserve">waiting on you</text>
+<text x="42" y="125" fill="#9b949e" textLength="400" lengthAdjust="spacing" xml:space="preserve">demo  ·  notes-app main  ·  Reading what you asked</text>
+<text x="26" y="142" fill="#58a6ff" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">●</text>
+<text x="34" y="142" fill="#c9d1d9" textLength="720" lengthAdjust="spacing" xml:space="preserve"> slow                                                                                     </text>
+<text x="754" y="142" fill="#9b949e" textLength="56" lengthAdjust="spacing" xml:space="preserve">running</text>
+<text x="42" y="159" fill="#9b949e" textLength="288" lengthAdjust="spacing" xml:space="preserve">demo  ·  website  ·  Counting slowly</text>
+<text x="26" y="176" fill="#f85149" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">✕</text>
+<text x="34" y="176" fill="#c9d1d9" textLength="736" lengthAdjust="spacing" xml:space="preserve"> fail                                                                                       </text>
+<text x="770" y="176" fill="#9b949e" textLength="40" lengthAdjust="spacing" xml:space="preserve">error</text>
+<text x="42" y="193" fill="#9b949e" textLength="184" lengthAdjust="spacing" xml:space="preserve">demo  ·  notes-app main</text>
+<text x="26" y="210" fill="#9b949e" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">○</text>
+<text x="34" y="210" fill="#c9d1d9" textLength="744" lengthAdjust="spacing" xml:space="preserve"> read ideas                                                                                  </text>
+<text x="778" y="210" fill="#9b949e" textLength="32" lengthAdjust="spacing" xml:space="preserve">idle</text>
+<text x="42" y="227" fill="#9b949e" textLength="184" lengthAdjust="spacing" xml:space="preserve">demo  ·  notes-app main</text>
 <text x="10" y="516" fill="#58a6ff" font-weight="bold" textLength="16" lengthAdjust="spacingAndGlyphs" xml:space="preserve">↑↓</text>
 <text x="34" y="516" fill="#9b949e" textLength="32" lengthAdjust="spacing" xml:space="preserve">move</text>
 <text x="66" y="516" fill="#a7a7a7" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
@@ -43,10 +50,6 @@
 <text x="354" y="516" fill="#58a6ff" font-weight="bold" textLength="48" lengthAdjust="spacing" xml:space="preserve">ctrl+f</text>
 <text x="410" y="516" fill="#9b949e" textLength="48" lengthAdjust="spacing" xml:space="preserve">filter</text>
 <text x="458" y="516" fill="#a7a7a7" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
-<text x="482" y="516" fill="#58a6ff" font-weight="bold" textLength="48" lengthAdjust="spacing" xml:space="preserve">ctrl+p</text>
-<text x="538" y="516" fill="#9b949e" textLength="64" lengthAdjust="spacing" xml:space="preserve">commands</text>
-<text x="602" y="516" fill="#a7a7a7" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
-<text x="626" y="516" fill="#58a6ff" font-weight="bold" textLength="48" lengthAdjust="spacing" xml:space="preserve">ctrl+c</text>
-<text x="682" y="516" fill="#9b949e" textLength="32" lengthAdjust="spacing" xml:space="preserve">quit</text>
-<text x="746" y="516" fill="#9b949e" textLength="64" lengthAdjust="spacing" xml:space="preserve">sessions</text>
+<text x="482" y="516" fill="#58a6ff" font-weight="bold" textLength="48" lengthAdjust="spacing" xml:space="preserve">ctrl+c</text>
+<text x="538" y="516" fill="#9b949e" textLength="32" lengthAdjust="spacing" xml:space="preserve">quit</text>
 </svg>

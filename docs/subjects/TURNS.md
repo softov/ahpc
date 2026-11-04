@@ -4,6 +4,8 @@ A turn is one message to the agent and everything it does to answer: text, tool 
 
 ## Screen
 
+![A turn waiting for a tool call to be approved](../img/turns.svg)
+
 Type in the composer and press `enter`. While a turn runs:
 
 | Key | |

@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="530" viewBox="0 0 820 530" font-family="ui-monospace, SFMono-Regular, &apos;SF Mono&apos;, Menlo, Consolas, &apos;DejaVu Sans Mono&apos;, monospace" font-size="13px">
+<title>chat - files</title>
+<rect width="820" height="530" rx="6" fill="#0d1117"/>
+<text x="10" y="23" fill="#58a6ff" font-weight="bold" textLength="32" lengthAdjust="spacing" xml:space="preserve">ahpc</text>
+<text x="50" y="23" fill="#a7a7a7" textLength="8" lengthAdjust="spacing" xml:space="preserve">·</text>
+<text x="66" y="23" fill="#9b949e" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">○</text>
+<text x="74" y="23" fill="#c9d1d9" textLength="664" lengthAdjust="spacing" xml:space="preserve"> read ideas                                                                        </text>
+<text x="738" y="23" fill="#9b949e" textLength="72" lengthAdjust="spacing" xml:space="preserve">notes-app</text>
+<text x="10" y="40" fill="#c9d1d9" font-weight="bold" textLength="144" lengthAdjust="spacing" xml:space="preserve">Files - read ideas</text>
+<text x="10" y="57" fill="#9b949e" textLength="232" lengthAdjust="spacing" xml:space="preserve">/tmp/ahpc-demo/work/notes-app</text>
+<text x="10" y="74" fill="#58a6ff" font-weight="bold" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▸</text>
+<text x="26" y="74" fill="#58a6ff" font-weight="bold" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▸</text>
+<text x="42" y="74" fill="#58a6ff" font-weight="bold" textLength="32" lengthAdjust="spacing" xml:space="preserve">.git</text>
+<text x="26" y="91" fill="#58a6ff" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▸</text>
+<text x="34" y="91" fill="#c9d1d9" textLength="40" lengthAdjust="spacing" xml:space="preserve"> docs</text>
+<text x="26" y="108" fill="#58a6ff" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▸</text>
+<text x="34" y="108" fill="#c9d1d9" textLength="48" lengthAdjust="spacing" xml:space="preserve"> notes</text>
+<text x="26" y="125" fill="#58a6ff" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▸</text>
+<text x="34" y="125" fill="#c9d1d9" textLength="32" lengthAdjust="spacing" xml:space="preserve"> src</text>
+<text x="34" y="142" fill="#c9d1d9" textLength="80" lengthAdjust="spacing" xml:space="preserve"> README.md</text>
+<text x="10" y="516" fill="#58a6ff" font-weight="bold" textLength="16" lengthAdjust="spacingAndGlyphs" xml:space="preserve">↑↓</text>
+<text x="34" y="516" fill="#9b949e" textLength="32" lengthAdjust="spacing" xml:space="preserve">move</text>
+<text x="66" y="516" fill="#a7a7a7" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
+<text x="90" y="516" fill="#58a6ff" font-weight="bold" textLength="40" lengthAdjust="spacing" xml:space="preserve">enter</text>
+<text x="138" y="516" fill="#9b949e" textLength="32" lengthAdjust="spacing" xml:space="preserve">open</text>
+<text x="170" y="516" fill="#a7a7a7" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
+<text x="194" y="516" fill="#58a6ff" font-weight="bold" textLength="24" lengthAdjust="spacing" xml:space="preserve">esc</text>
+<text x="226" y="516" fill="#9b949e" textLength="32" lengthAdjust="spacing" xml:space="preserve">back</text>
+<text x="258" y="516" fill="#a7a7a7" textLength="24" lengthAdjust="spacing" xml:space="preserve"> · </text>
+<text x="282" y="516" fill="#58a6ff" font-weight="bold" textLength="48" lengthAdjust="spacing" xml:space="preserve">ctrl+c</text>
+<text x="338" y="516" fill="#9b949e" textLength="32" lengthAdjust="spacing" xml:space="preserve">quit</text>
+</svg>
