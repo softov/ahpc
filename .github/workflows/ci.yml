@@ -60,7 +60,7 @@ jobs:
       - name: The write fixture matches ahpd's copy
         run: |
           set -u
-          url=https://raw.githubusercontent.com/softov/ahpd/main/test/fixtures/resource-write.json
+          url=https://raw.githubusercontent.com/softov/ahpd/main/packages/sdk/test/fixtures/resource-write.json
           code=$(curl -sS -o "$RUNNER_TEMP/theirs.json" -w '%{http_code}' "$url")
           if [ "$code" = "404" ]; then
             # Not landed over there yet. Said rather than failed, because the

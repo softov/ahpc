@@ -1,8 +1,8 @@
 # ahpc
 
-[![CI](https://github.com/softov/ahpc/actions/workflows/ci.yml/badge.svg)](https://github.com/softov/ahpc/actions/workflows/ci.yml)
+[![CI](https://github.com/ahpio/ahpc/actions/workflows/ci.yml/badge.svg)](https://github.com/ahpio/ahpc/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/%40softov%2Fahpc)](https://www.npmjs.com/package/@softov/ahpc)
-[![docs](https://img.shields.io/badge/docs-softov.github.io%2Fahpc-1f6feb)](https://softov.github.io/ahpc/)
+[![docs](https://img.shields.io/badge/docs-ahpio.github.io%2Fahpc-1f6feb)](https://ahpio.github.io/ahpc/)
 ![license MIT](https://img.shields.io/badge/license-MIT-blue)
 ![node >=22](https://img.shields.io/badge/node-%3E%3D22-5fa04e)
 ![Agent Host Protocol 1.0.0](https://img.shields.io/badge/AHP-1.0.0-0b7285)
@@ -21,7 +21,7 @@ The interface is built with [TextUI](https://github.com/softov/textui), a compon
 
 ![A session, its transcript and the facts about it](docs/img/transcript.svg)
 
-**[Read the documentation](https://softov.github.io/ahpc/)**
+**[Read the documentation](https://ahpio.github.io/ahpc/)**
 
 ## Quick start
 
@@ -75,16 +75,16 @@ ahpc session list --host ws://127.0.0.1:9187
 claude mcp add ahp -- ahpc --host ws://127.0.0.1:9187 mcp
 ```
 
-Claude Desktop, VS Code, Windows, remote hosts and the HTTP API are in [Tool server](https://softov.github.io/ahpc/use/TOOL-SERVER).
+Claude Desktop, VS Code, Windows, remote hosts and the HTTP API are in [Tool server](https://ahpio.github.io/ahpc/use/TOOL-SERVER).
 
 ## Documentation
 
-The full docs are at **[softov.github.io/ahpc](https://softov.github.io/ahpc/)**, and their source is in [docs/](docs/README.md):
+The full docs are at **[ahpio.github.io/ahpc](https://ahpio.github.io/ahpc/)**, and their source is in [docs/](docs/README.md):
 
-- [Get started](https://softov.github.io/ahpc/start/GET-STARTED), [Connect](https://softov.github.io/ahpc/start/CONNECT), [Configure](https://softov.github.io/ahpc/start/CONFIGURE)
-- [Screen](https://softov.github.io/ahpc/use/SCREEN), [Commands](https://softov.github.io/ahpc/use/COMMANDS), [Tool server](https://softov.github.io/ahpc/use/TOOL-SERVER), [Recording](https://softov.github.io/ahpc/use/RECORDING)
-- One page per subject: [Sessions](https://softov.github.io/ahpc/subjects/SESSIONS), [Turns](https://softov.github.io/ahpc/subjects/TURNS), [Changes](https://softov.github.io/ahpc/subjects/CHANGES), [Automations](https://softov.github.io/ahpc/subjects/AUTOMATIONS) and more
-- Reference: [CLI](https://softov.github.io/ahpc/reference/CLI), [MCP tools](https://softov.github.io/ahpc/reference/MCP-TOOLS), [Environment](https://softov.github.io/ahpc/reference/ENVIRONMENT), [Config file](https://softov.github.io/ahpc/reference/CONFIG-FILE)
+- [Get started](https://ahpio.github.io/ahpc/start/GET-STARTED), [Connect](https://ahpio.github.io/ahpc/start/CONNECT), [Configure](https://ahpio.github.io/ahpc/start/CONFIGURE)
+- [Screen](https://ahpio.github.io/ahpc/use/SCREEN), [Commands](https://ahpio.github.io/ahpc/use/COMMANDS), [Tool server](https://ahpio.github.io/ahpc/use/TOOL-SERVER), [Recording](https://ahpio.github.io/ahpc/use/RECORDING)
+- One page per subject: [Sessions](https://ahpio.github.io/ahpc/subjects/SESSIONS), [Turns](https://ahpio.github.io/ahpc/subjects/TURNS), [Changes](https://ahpio.github.io/ahpc/subjects/CHANGES), [Automations](https://ahpio.github.io/ahpc/subjects/AUTOMATIONS) and more
+- Reference: [CLI](https://ahpio.github.io/ahpc/reference/CLI), [MCP tools](https://ahpio.github.io/ahpc/reference/MCP-TOOLS), [Environment](https://ahpio.github.io/ahpc/reference/ENVIRONMENT), [Config file](https://ahpio.github.io/ahpc/reference/CONFIG-FILE)
 
 ## AHP support
 
@@ -95,7 +95,7 @@ All 30 client-to-server requests are implemented, and 21 of the 45 client-dispat
 The layout, the checks and how a release is published are in [DEVELOPER.md](DEVELOPER.md).
 
 ```sh
-git clone https://github.com/softov/ahpc
+git clone https://github.com/ahpio/ahpc
 cd ahpc
 npm install
 npm test

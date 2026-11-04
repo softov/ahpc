@@ -20,13 +20,13 @@
   ],
   "author": "Luiz Fernando Softov <lfs@softov.dev>",
   "license": "MIT",
-  "homepage": "https://github.com/softov/ahpc#readme",
+  "homepage": "https://github.com/ahpio/ahpc#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/softov/ahpc.git"
+    "url": "git+https://github.com/ahpio/ahpc.git"
   },
   "bugs": {
-    "url": "https://github.com/softov/ahpc/issues"
+    "url": "https://github.com/ahpio/ahpc/issues"
   },
   "bin": {
     "ahpc": "./dist/src/main.js"
