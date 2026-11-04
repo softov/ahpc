@@ -117,7 +117,7 @@ The host's own log
 
 Signing in
   auth                         what this host protects                [--json]
-  auth <resource>              push a token   [--token T] [--expires-in S]
+  auth <resource>              push a token   [--resource-token T] [--expires-in S]
                                or set AHPC_TOKEN_<RESOURCE>, or pipe one in
 
 Terminals
@@ -1564,10 +1564,11 @@ async function automation(host: HostConnection, args: Args, wants: boolean): Pro
  * A token for one of the host's protected resources.
  *
  * `ahpc auth` lists what the host protects; `ahpc auth <resource>` pushes a
- * token for one. The token comes from `--token`, then an environment variable
- * named after the resource, then standard input - a flag is this invocation, a
- * variable is this shell, and neither puts a credential in shell history the
- * way a positional argument would.
+ * token for one. The token comes from `--resource-token`, then an environment
+ * variable named after the resource, then standard input - a flag is this
+ * invocation, a variable is this shell, and neither puts a credential in shell
+ * history the way a positional argument would. `--token` is the connection
+ * token here as everywhere else, and is refused rather than pushed.
  */
 async function signIn(host: HostConnection, args: Args, wants: boolean): Promise<number> {
   if (!host.protectedResources || !host.authenticate) {
@@ -1581,9 +1582,18 @@ async function signIn(host: HostConnection, args: Args, wants: boolean): Promise
     table(known.map((one) => [one.resource, one.name ?? '', (one.scopes ?? []).join(' ')]));
     return 0;
   }
-  const token = args.value('--token')
-    ?? process.env[tokenVariable(resource)]
-    ?? (process.stdin.isTTY ? undefined : (await readAll(process.stdin)).trim());
+  const flagged = args.value('--resource-token') ?? process.env[tokenVariable(resource)];
+  const piped = flagged !== undefined || process.stdin.isTTY ? '' : (await readAll(process.stdin)).trim();
+  const token = flagged ?? (piped === '' ? undefined : piped);
+  /*
+   * `--token` opens the connection, so it is not a resource token anybody
+   * meant to push. A run that gave no resource token but did give `--token`
+   * is told which flag it meant, rather than having its connection token
+   * pushed or being sent the general sentence.
+   */
+  if (token === undefined && args.value('--token') !== undefined) {
+    throw new Fault('--token is the connection token. Use --resource-token for this.');
+  }
   if (token === undefined) {
     throw new Fault(needsToken(resource));
   }
