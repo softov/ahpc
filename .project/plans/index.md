@@ -84,8 +84,7 @@ Reference: [00-documentation.md](documentation/00-documentation.md)
 | Plan | Priority | Status | Requires | Blocks |
 | --- | --- | --- | --- | --- |
 | [20261103-1238 - Each subject page shows a picture of its screen](documentation/20261103-1238-each-subject-shows-its-screen/plan.md) | medium | planned 2026-11-03 | - | - |
-
-Briefs: [each release is a docs page](../briefs/each-release-is-a-docs-page.md).
+| [20261104-1120 - Each release is a docs page, from 0.10 on](documentation/20261104-1120-each-release-is-a-docs-page/plan.md) | high | planned 2026-11-04 | - | - |
 
 ## Later domains (no plans yet)
 

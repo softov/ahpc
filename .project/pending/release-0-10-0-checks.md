@@ -11,7 +11,7 @@ plans:
 # Release 0.10.0 from ahpio/ahpc
 
 0.10.0 is the first release from `ahpio/ahpc`.
-It waits for two things: the move of the repository, and the release pages in [the changelog brief](../briefs/each-release-is-a-docs-page.md).
+It waits for two things: the move of the repository, and the release pages in [documentation/20261104-1120-each-release-is-a-docs-page](../plans/documentation/20261104-1120-each-release-is-a-docs-page/plan.md).
 The steps that change GitHub or npm are yours.
 After each one, write "done" in the chat.
 
