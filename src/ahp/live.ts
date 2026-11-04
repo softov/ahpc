@@ -1617,8 +1617,42 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
     options.onProgress?.(token, `${said}${share}`);
   };
 
+  /**
+   * Requests and subscribes the host has not answered yet.
+   *
+   * What a still waits on before it draws: a screen asks the host when it
+   * opens, and draws its answer when it arrives. `inFlight` holds dispatches
+   * only, which are never answered.
+   */
+  let open = 0;
+  /** Waiters for `open` to reach zero. */
+  const quiet = new Set<() => void>();
+  const settled = (): void => {
+    open -= 1;
+    if (open > 0) return;
+    for (const wake of [...quiet]) wake();
+  };
+  /** Count each request and subscribe of a client until it settles. */
+  const counted = (made: Client): Client => {
+    const ask = made.request.bind(made);
+    const join = made.subscribe.bind(made);
+    made.request = (method, params) => {
+      open += 1;
+      const answer = ask(method, params);
+      answer.then(settled, settled);
+      return answer;
+    };
+    made.subscribe = (uri) => {
+      open += 1;
+      const answer = join(uri);
+      answer.then(settled, settled);
+      return answer;
+    };
+    return made;
+  };
+
   const transport = tee(await openTransport() as Framed, notified, wiring);
-  let client = new ahp.Client(transport, {});
+  let client = counted(new ahp.Client(transport, {}));
   /*
    * What a host may ask this client for.
    *
@@ -1921,7 +1955,7 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
         if (finished) return;
         try {
           const socket = tee(await openTransport() as Framed, notified, wiring);
-          const fresh = new ahp.Client(socket, {});
+          const fresh = counted(new ahp.Client(socket, {}));
           fresh.setServerRequestHandler(answering);
           fresh.connect();
           const held = channels.held();
@@ -3458,6 +3492,19 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
 
     /** Everything already sent, actually sent. */
     flush: async () => { await Promise.allSettled([...inFlight]); },
+
+    idle: (limitMs) => {
+      if (open === 0) return Promise.resolve(false);
+      return new Promise<boolean>((done) => {
+        const wake = (): void => {
+          clearTimeout(timer);
+          quiet.delete(wake);
+          done(true);
+        };
+        const timer = setTimeout(wake, Math.max(0, limitMs));
+        quiet.add(wake);
+      });
+    },
 
     close: async () => {
       // Set, not announced. `onState` means something happened *to* the

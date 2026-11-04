@@ -34,7 +34,7 @@ Reference: [00-screen.md](screen/00-screen.md)
 | [20261104-0437 - The status row does not end with the screen's name](screen/20261104-0437-the-status-row-drops-the-screen-name/plan.md) | medium | built 2026-11-04 ([implemented.md](screen/20261104-0437-the-status-row-drops-the-screen-name/implemented.md)) | - | - |
 | [20261104-0549 - The waiting question folds to one line while you read](screen/20261104-0549-the-question-folds-while-you-read/plan.md) | medium | built 2026-11-04 ([implemented.md](screen/20261104-0549-the-question-folds-while-you-read/implemented.md)) | - | - |
 | [20261104-0644 - The smoke test reads the checkout's folder name](screen/20261104-0644-the-smoke-test-reads-its-folder/plan.md) | medium | built 2026-11-04 ([implemented.md](screen/20261104-0644-the-smoke-test-reads-its-folder/implemented.md)) | - | - |
-| [20261104-1621 - A still waits for the host to answer before it draws](screen/20261104-1621-a-still-waits-for-the-host/plan.md) | medium | planned 2026-11-04 | - | documentation/20261104-1621-the-docs-pictures-come-from-a-demo-host |
+| [20261104-1621 - A still waits for the host to answer before it draws](screen/20261104-1621-a-still-waits-for-the-host/plan.md) | medium | built 2026-11-04 ([implemented.md](screen/20261104-1621-a-still-waits-for-the-host/implemented.md)) | - | documentation/20261104-1621-the-docs-pictures-come-from-a-demo-host |
 | [20261104-1621 - The provider is the host's first agent, not claude](screen/20261104-1621-the-provider-is-the-hosts-first-agent/plan.md) | high | planned 2026-11-04 | - | documentation/20261104-1621-the-docs-pictures-come-from-a-demo-host |
 
 Next free number in `screen`: `12`.

@@ -1,7 +1,7 @@
 ---
 title: A still waits for the host to answer before it draws
 domain: screen
-status: planned
+status: built
 priority: medium
 created: 2026-11-04
 revalidated: 2026-11-04
@@ -48,7 +48,7 @@ still -> renderStill: start, before, settled -> host answers later -> the frame 
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - The still waits on the host](task-01-the-still-waits-on-the-host.md) | todo | - |
+| [01 - The still waits on the host](task-01-the-still-waits-on-the-host.md) | done | - |
 
 ## Risks and tradeoffs
 
@@ -56,12 +56,12 @@ still -> renderStill: start, before, settled -> host answers later -> the frame 
 
 ## Resume state
 
-- **Done so far:** planned 2026-11-04.
-- **Next action:** [task-01-the-still-waits-on-the-host.md](task-01-the-still-waits-on-the-host.md).
+- **Done so far:** planned and built 2026-11-04; see [implemented.md](implemented.md).
+- **Next action:** none.
 - **Open questions:** none.
 - **Watch out for:** a subscription stays open after its snapshot, so only the subscribe request counts, not the channel.
 
 ## Final verification checklist
 
-- [ ] `npm run typecheck`, `npm run build` and `npx vitest run` pass.
-- [ ] Against the demo host, a still of the `changes` screen lists the changed files.
+- [x] `npm run typecheck`, `npm run build` and `npx vitest run` pass.
+- [x] Against the demo host, a still of the `changes` screen lists the changed files.
