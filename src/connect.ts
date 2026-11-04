@@ -1,6 +1,7 @@
 /** Which host this run talks to, for either front end. */
 
 import { MissingProtocolPackage, liveHost } from './ahp/live.js';
+import { whyNoConnection } from './ahp/refused.js';
 import { fakeHost } from './ahp/fake.js';
 import { publish } from './ahp/publish.js';
 import { pushTokens } from './ahp/tokens.js';
@@ -60,10 +61,14 @@ export interface Where {
  */
 export const sink: {
   report(message: string): void;
+  /** Take a sentence off the row, where there is a row, and only if it is still this one. */
+  clear(message: string): void;
   /** A refusal that no reader claimed, with the channel it was about. */
   refused(uri: string, message: string, kind: RefusalKind): void;
 } = {
   report: (message) => process.stderr.write(`${message}\n`),
+  // A shell has no row to clear.
+  clear: () => undefined,
   refused: (_uri, message) => sink.report(message),
 };
 
@@ -96,6 +101,10 @@ export const auth: { ask(one: AuthAsk): void } = {
  */
 export async function connect(options: Where): Promise<HostConnection & { pump?(): boolean }> {
   if (!options.host) return fakeHost();
+  /** The last reason said for a failed retry, so a retry loop does not repeat it. */
+  let reported = '';
+  /** Whether the connection is up now, so an answer that arrives late can be dropped. */
+  let back = false;
   try {
     return await liveHost({
       url: options.host,
@@ -132,7 +141,33 @@ export async function connect(options: Where): Promise<HostConnection & { pump?(
       ...(options.publish !== undefined
         ? { publish: publish({ root: options.publish, ...(options.publishWritable ? { writable: true } : {}) }) }
         : {}),
-      onState: (state) => { if (state === 'offline') sink.report('The host stopped answering'); },
+      /*
+       * A reconnect that failed says why, in the sentence the first connection
+       * would have said. The retry loop runs until the host is back, and the
+       * same reason twice is the same line on the status row.
+       */
+      onRetryFailed: () => {
+        void whyNoConnection(options.host as string, options.token).then((sentence) => {
+          // The plain request takes a round trip, and the connection may have
+          // come back while it was out. A reason for a state that ended is
+          // wrong on screen, so it is dropped rather than said late.
+          if (back) return;
+          if (sentence === reported) return;
+          reported = sentence;
+          sink.report(sentence);
+        });
+      },
+      onState: (state) => {
+        back = state === 'connected';
+        if (state === 'offline') sink.report('The host stopped answering');
+        // A reason for a state that has ended is wrong on screen, so the line
+        // goes when the connection comes back - unless something newer has
+        // taken it, which `clear` is what decides.
+        if (state === 'connected' && reported !== '') {
+          sink.clear(reported);
+          reported = '';
+        }
+      },
       /*
        * What the host is told on every connection, in the order it is told.
        *
@@ -153,7 +188,7 @@ export async function connect(options: Where): Promise<HostConnection & { pump?(
       process.stderr.write(`${error.message}\n`);
       process.exit(1);
     }
-    process.stderr.write(`Could not reach ${options.host}: ${String(error)}\n`);
+    process.stderr.write(`${await whyNoConnection(options.host, options.token)}\n`);
     process.exit(1);
   }
 }

@@ -60,6 +60,15 @@ export interface LiveHostOptions {
   /** Told when the socket drops, so the badge can stop claiming otherwise. */
   onState?(state: 'connecting' | 'connected' | 'offline'): void;
   /**
+   * Told when an attempt to come back failed.
+   *
+   * The retry loop waits and tries again, so a failed attempt is otherwise
+   * invisible: the drop has already been reported and the next attempt looks
+   * like the first. The error is what the attempt failed with, so the caller
+   * can say why it is not back yet.
+   */
+  onRetryFailed?(error: unknown): void;
+  /**
    * A connection is usable: the first one, and each one a reconnect remade.
    *
    * Awaited before `liveHost` returns and before a reconnect rereads the
@@ -1954,7 +1963,11 @@ export async function liveHost(options: LiveHostOptions): Promise<HostConnection
           for (const listener of catalogue) listener();
           break;
         }
-        catch { /* the host is not back yet, or would not have us back */ }
+        catch (error) {
+          // The host is not back yet, or would not have us back. Either way
+          // the caller hears why before the next attempt.
+          options.onRetryFailed?.(error);
+        }
       }
     }
   })();

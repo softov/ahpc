@@ -9,7 +9,7 @@ import { parseSessionLink } from './links.js';
 import { CONTROLLER, commandIdFor } from './control.js';
 import { connect, sink } from './connect.js';
 import { connectionToken, loadConfig } from './config.js';
-import { UPDATE_NOTICE, reportHostError } from './state.js';
+import { UPDATE_NOTICE, clearHostError, reportHostError } from './state.js';
 import { MAX_AGE_MS, checkingUpdates, readUpdate, refreshUpdate, registry, stale, updateNotice } from './update.js';
 import { manifest } from './version.js';
 import { detectLocale } from './i18n/locale.js';
@@ -451,6 +451,7 @@ export async function tui(argv: string[]): Promise<void> {
 
   app.services.provide(WRITER_KEY, createWriter(terminal.capabilities()));
   sink.report = (message) => reportHostError(app.store, message);
+  sink.clear = (message) => clearHostError(app.store, message);
   sink.refused = (uri, message, kind) => app.services.require(CONTROLLER).refused(uri, message, kind);
   await app.start();
 

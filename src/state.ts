@@ -487,6 +487,17 @@ export function reportHostError(store: ReactiveStore, message: string): void {
   if (store.get<InputStatus>(INPUT_STATUS)?.state === 'sending') inputRefused(store, message);
 }
 
+/**
+ * Take a sentence off the row, while that is still what the row says.
+ *
+ * A newer report may have replaced it, and clearing then would take that one
+ * as well. The answer in flight is not touched: this is the row going quiet
+ * about a connection, not a refusal of anything a person sent.
+ */
+export function clearHostError(store: ReactiveStore, message: string): void {
+  if (store.get<string | null>(HOST_ERROR) === message) store.set(HOST_ERROR, null);
+}
+
 /** The number, and the one question everything else asks of it. */
 export function writeStatus(store: ReactiveStore, status: number): void {
   const activity = decodeStatus(status).activity;
