@@ -114,7 +114,8 @@ describe('the conversation, above and around', () => {
   });
 
   it('scrolls away, because it is part of the conversation', async () => {
-    const { t } = await open(40);
+    // Short enough that the conversation is longer than the view.
+    const { t } = await open(30);
     t.app.services.require(CONTROLLER).open('ahp-session:/1f0a');
     t.app.screens.push('chat');
     // Settle first: the transcript is not mounted until the screen is, and

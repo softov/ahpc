@@ -313,6 +313,104 @@ describe('when the agent is waiting', () => {
     await m.t.unmount();
   });
 
+  /**
+   * The block folds to one line while the history has the keyboard, so the
+   * history it is about has the room. `a` and `d` still answer it there.
+   */
+  describe('folded while you read', () => {
+    async function folded(size?: { width: number; height: number }): Promise<Mounted> {
+      const m = await conversation(size);
+      m.t.app.services.require(CONTROLLER).send('run the tests');
+      await run(m);
+      expect(m.t.app.focus.scopeOf(m.t.app.focus.focused() as string)).toBe('chat.hitl');
+      m.t.press('escape');
+      for (let i = 0; i < 4; i++) await m.t.settle();
+      expect(m.t.app.focus.focused()).toBe('chat.transcript');
+      return m;
+    }
+
+    it('shows one line and not the block', async () => {
+      const m = await folded();
+      const line = m.t.lines().find((row) => row.includes('click to open')) ?? '';
+      expect(line).toContain('a approve · d deny');
+      expect(m.t.hasText('waiting on you')).toBe(false);
+      // The hint row: no option keys, and escape leaves the screen.
+      const screen = m.t.lines().join('\n');
+      expect(screen).not.toContain('1-9');
+      expect(screen).toContain('esc back');
+      expect(m.t.store.get(INPUT)).not.toBeNull();
+      await m.t.unmount();
+    });
+
+    it('keeps its keys on a narrow terminal, and shortens the title', async () => {
+      const m = await folded({ width: 60, height: 24 });
+      const line = m.t.lines().find((row) => row.includes('click to open')) ?? '';
+      expect(line).toContain('a approve · d deny');
+      expect(line).toContain('Run a command');
+      await m.t.unmount();
+    });
+
+    it('approves on a', async () => {
+      const m = await folded();
+      m.t.press('a');
+      await m.t.settle();
+      expect(m.t.store.get<InputStatus>(INPUT_STATUS)?.state).toBe('sending');
+      await run(m, 1);
+      expect(m.t.store.get(INPUT)).toBeNull();
+      await m.t.unmount();
+    });
+
+    it('denies on d', async () => {
+      const m = await folded();
+      m.t.press('d');
+      await m.t.settle();
+      expect(m.t.hasText('Denying...')).toBe(true);
+      await m.t.unmount();
+    });
+
+    it('opens the block on a click, with the keyboard in it', async () => {
+      const m = await folded();
+      const row = m.t.lines().findIndex((line) => line.includes('click to open'));
+      expect(row).toBeGreaterThan(-1);
+      m.t.click(4, row);
+      for (let i = 0; i < 4; i++) await m.t.settle();
+      expect(m.t.hasText('click to open')).toBe(false);
+      expect(m.t.hasText('waiting on you')).toBe(true);
+      expect(m.t.app.focus.scopeOf(m.t.app.focus.focused() as string)).toBe('chat.hitl');
+      await m.t.unmount();
+    });
+
+    it('opens the block when the keyboard leaves the history', async () => {
+      const m = await folded();
+      m.t.app.focus.focus('chat.composer');
+      for (let i = 0; i < 4; i++) await m.t.settle();
+      expect(m.t.hasText('click to open')).toBe(false);
+      expect(m.t.hasText('waiting on you')).toBe(true);
+      await m.t.unmount();
+    });
+
+    it('folds a question too, and a does not approve it', async () => {
+      const m = await conversation();
+      const controller = m.t.app.services.require(CONTROLLER);
+      controller.send('run the tests');
+      await run(m);
+      controller.approve();
+      await run(m);
+      expect(m.t.store.get<{ kind: string }>(INPUT)?.kind).not.toBe('toolConfirmation');
+      m.t.app.focus.focus('chat.transcript');
+      for (let i = 0; i < 4; i++) await m.t.settle();
+
+      const line = m.t.lines().find((row) => row.includes('click to open')) ?? '';
+      expect(line).toContain('The agent asks');
+      expect(line).not.toContain('a approve');
+      m.t.press('a');
+      await m.t.settle();
+      expect(m.t.store.get(INPUT_STATUS) ?? null).toBeNull();
+      expect(m.t.store.get(INPUT)).not.toBeNull();
+      await m.t.unmount();
+    });
+  });
+
   it('says so when there is nothing to approve, rather than nothing at all', async () => {
     const m = await idle();
     // The palette offers `tool.approve` and a key is bound to it, so this is
