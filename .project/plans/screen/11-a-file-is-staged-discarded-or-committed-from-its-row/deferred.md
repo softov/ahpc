@@ -6,5 +6,5 @@ date: 2026-11-03
 ## What waits
 
 - The button order stays This file, All files, Cancel until textui takes `roadmap/ideas/dialog-names-its-default-action.md`.
-- At 60 columns the hint row truncates its labels, and the verb hints make it longer.
+- At 60 columns the hint row truncates its labels, and the verb hints make it longer. The idea is [the-changes-hint-row-fits-60-columns.md](../../../ideas/the-changes-hint-row-fits-60-columns.md).
 - `ahpc changes --run` in the shell cannot pick a target.
