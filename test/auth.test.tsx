@@ -5,8 +5,9 @@ import { registerChat } from '../src/app.js';
 import { CONTROLLER } from '../src/control.js';
 import { fakeHost } from '../src/ahp/fake.js';
 import type { FakeHost } from '../src/ahp/fake.js';
-import { HOST_ERROR } from '../src/state.js';
+import { HOST_ERROR, AUTH_ASK } from '../src/state.js';
 import { forgetAll, remember, resolveToken, tokenVariable } from '../src/ahp/tokens.js';
+import type { AuthAsk } from '../src/ahp/auth.js';
 import type { SessionUri } from '../src/ahp/types.js';
 
 /*
@@ -113,6 +114,37 @@ describe('the credential prompt', () => {
     expect(pushed).toEqual([{ resource: RESOURCE, token: 'tok-secret' }]);
     expect(host.asked('listSessions')).toBe(before + 1);
     expect(t.getAllByComponent('SignInPrompt')).toHaveLength(0);
+
+    await t.unmount();
+  });
+
+  it('runs a refused createSession once more, and creates one session', async () => {
+    // Nothing is protected at boot: the refusal this case needs is its own.
+    const { t, host } = await open(() => undefined);
+    const real = host.createSession;
+    let asked = 0;
+    host.createSession = async (request) => {
+      asked += 1;
+      if (asked === 1) throw refused(RESOURCE);
+      return await real.call(host, request);
+    };
+    const pushed = watchSignIn(host);
+    const before = (await host.listSessions()).length;
+
+    // Held until the prompt is answered, which is what the retry is made of.
+    const made = controllerOf(t).create({ provider: 'claude' });
+    for (let i = 0; i < 10; i++) await t.settle();
+    expect(t.getAllByComponent('SignInPrompt')).toHaveLength(1);
+
+    await submit(t, 'tok-created');
+    const uri = await made;
+
+    // One credential, one more createSession, and one session to show for it.
+    expect(pushed).toEqual([{ resource: RESOURCE, token: 'tok-created' }]);
+    expect(asked).toBe(2);
+    const after = await host.listSessions();
+    expect(after).toHaveLength(before + 1);
+    expect(after.map((one) => one.resource)).toContain(uri);
 
     await t.unmount();
   });
@@ -323,6 +355,91 @@ describe('the credential prompt', () => {
     expect(scopes).toBe(1);
     expect(await first).toMatchObject({ code: -32007 });
     expect(await second).toMatchObject({ code: -32007 });
+
+    await t.unmount();
+  });
+
+  it('keeps a refusal for one resource off the prompt for another', async () => {
+    // Nothing protected at boot: both asks here are this case's own.
+    const { t, host } = await open(() => undefined);
+    let release: () => void = () => {};
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    host.authenticate = async () => { await held; throw refused(RESOURCE, 'not that one'); };
+    const controller = controllerOf(t);
+
+    // The prompt asks for the first resource, and a credential for it is
+    // already on its way when a refusal for the second takes the prompt over.
+    const firstAsk = controller.askSignIn({ resource: RESOURCE, words: '' });
+    for (let i = 0; i < 6; i++) await t.settle();
+    const sent = controller.signIn(RESOURCE, 'tok-stale');
+    for (let i = 0; i < 4; i++) await t.settle();
+    const secondAsk = controller.askSignIn({ resource: OTHER, words: '' });
+    for (let i = 0; i < 6; i++) await t.settle();
+
+    release();
+    for (let i = 0; i < 8; i++) await t.settle();
+
+    // The refusal belongs to an ask that is no longer drawn, so the prompt on
+    // screen keeps the second resource and says nothing about the first.
+    expect(await sent).toBe(false);
+    const shown = t.app.store.get<AuthAsk | null>(AUTH_ASK);
+    expect(shown?.resource).toBe(OTHER);
+    expect(shown?.words).toBe('');
+
+    t.press('escape');
+    for (let i = 0; i < 8; i++) await t.settle();
+    expect(await firstAsk).toBe(false);
+    expect(await secondAsk).toBe(false);
+
+    await t.unmount();
+  });
+
+  it('sends one authenticate for two Enter presses while the send is out', async () => {
+    const { t, host } = await open();
+    let release: () => void = () => {};
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    let sent = 0;
+    host.authenticate = async () => { sent += 1; await held; throw refused(RESOURCE, 'very slow no'); };
+
+    t.focus('field.token');
+    await t.settle();
+    t.type('tok-slow');
+    for (let i = 0; i < 4; i++) await t.settle();
+
+    // The first Enter is still waiting on the host when the second arrives.
+    t.press('enter');
+    for (let i = 0; i < 4; i++) await t.settle();
+    expect(sent).toBe(1);
+    t.focus('field.token');
+    await t.settle();
+    t.press('enter');
+    for (let i = 0; i < 8; i++) await t.settle();
+    expect(sent).toBe(1);
+
+    release();
+    for (let i = 0; i < 8; i++) await t.settle();
+    expect(sent).toBe(1);
+
+    await t.unmount();
+  });
+
+  it('answers a waiting act when the controller is disposed', async () => {
+    // Nothing protected at boot: this case makes its own refusal.
+    const { t, host } = await open(() => undefined);
+    let calls = 0;
+    host.changesets = async () => { calls += 1; throw refused(RESOURCE, 'no scopes'); };
+    const controller = controllerOf(t);
+    // Caught where it is made: the refusal is by design.
+    const waiting = controller.changesets(SEEDED as SessionUri).catch((error: unknown) => error);
+    for (let i = 0; i < 8; i++) await t.settle();
+    expect(t.getAllByComponent('SignInPrompt')).toHaveLength(1);
+
+    (controller as unknown as { dispose(): void }).dispose();
+
+    // Closing the client is a declined credential: the act is answered rather
+    // than left waiting, and it is not sent again.
+    expect(await waiting).toMatchObject({ code: -32007 });
+    expect(calls).toBe(1);
 
     await t.unmount();
   });

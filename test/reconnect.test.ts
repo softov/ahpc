@@ -8,12 +8,22 @@
  * assert on the frames rather than on the screen.
  */
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createServer, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { InMemoryTransport, type AhpTransport } from '@microsoft/agent-host-protocol/client';
 import { liveHost } from '../src/ahp/live.js';
 import { forgetAll, pushTokens, remember } from '../src/ahp/tokens.js';
 import type { HostEvent } from '../src/ahp/connection.js';
 import { AUTOMATIONS, CHAT, ROOT, SESSION, Scripted, connect, settle } from './scenario.js';
+
+/** Wait, a few milliseconds at a time, for work the connection does on its own schedule. */
+const waitFor = async (check: () => boolean): Promise<void> => {
+  for (let i = 0; i < 400 && !check(); i += 1) {
+    await new Promise((resolve) => { setTimeout(resolve, 5); });
+  }
+};
+
 
 
 describe('a channel is let go when the last reader leaves', () => {
@@ -1957,4 +1967,162 @@ it('gives a changeset watcher the snapshot, and the changeset again after each a
   // The review reached the watcher, and nothing after the close did.
   expect(seen).toHaveLength(3);
   await host.close();
+});
+
+describe('a retry that failed is not silent', () => {
+  it('tells the caller each failed attempt, and connects once one gets through', async () => {
+    const failed: string[] = [];
+    const states: string[] = [];
+    let opened = 0;
+    let scripted!: Scripted;
+    const open = async (): Promise<AhpTransport> => {
+      opened += 1;
+      // The first connection is made. The two attempts after the drop are
+      // refused, and the third is answered.
+      if (opened === 2 || opened === 3) throw new Error('the host is not back');
+      const [mine, theirs] = InMemoryTransport.pair();
+      scripted = new Scripted(theirs);
+      return mine;
+    };
+    const host = await liveHost({
+      url: 'ws://scripted',
+      clientId: 'ahpc-test',
+      connect: open,
+      backoff: [0],
+      keepaliveMs: 0,
+      onState: (state) => states.push(state),
+      onRetryFailed: (error) => failed.push(error instanceof Error ? error.message : String(error)),
+    });
+    const first = scripted;
+    first.states.set(SESSION, { defaultChat: CHAT, chats: [] });
+    first.states.set(CHAT, { turns: [] });
+    host.subscribe(SESSION as never, () => undefined);
+    await settle();
+
+    await first.drop();
+    await waitFor(() => failed.length === 2 && host.state() === 'connected');
+
+    // Two refusals did not end the retry loop: the next attempt was made, and
+    // the connection came back under the same name.
+    expect(failed).toEqual(['the host is not back', 'the host is not back']);
+    expect(opened).toBe(4);
+    expect(states).toContain('connecting');
+    expect(host.state()).toBe('connected');
+
+    await host.close();
+  });
+});
+
+describe('the status row says why a retry failed, and stops saying it', () => {
+  let server: Server | undefined;
+
+  /** Close the loopback host this case left listening. */
+  const stop = async (): Promise<void> => {
+    const held = server;
+    server = undefined;
+    if (held === undefined) return;
+    await new Promise<void>((done) => held.close(() => done()));
+  };
+
+  afterEach(async () => {
+    vi.doUnmock('../src/ahp/live.js');
+    vi.resetModules();
+    await stop();
+  });
+
+  /** A loopback host that refuses every request, after waiting `delayMs` to answer. */
+  const refusing = async (delayMs = 0): Promise<string> => {
+    server = createServer((_request, response) => {
+      setTimeout(() => {
+        response.writeHead(401);
+        response.end();
+      }, delayMs);
+    });
+    await new Promise<void>((done) => server?.listen(0, '127.0.0.1', done));
+    const { port } = server.address() as AddressInfo;
+    return `ws://127.0.0.1:${String(port)}`;
+  };
+
+  /** `connect` with the socket mocked out, so the callbacks it hands over can be driven. */
+  const wired = async (url: string): Promise<{
+    options(): import('../src/ahp/live.js').LiveHostOptions;
+    said: string[];
+    cleared: string[];
+    restore(): void;
+  }> => {
+    let captured: import('../src/ahp/live.js').LiveHostOptions | undefined;
+    vi.doMock('../src/ahp/live.js', async (importOriginal) => {
+      const real = await importOriginal<typeof import('../src/ahp/live.js')>();
+      return {
+        ...real,
+        // The socket is not what these tests are about: the callbacks `connect`
+        // hands the connection are, and they are handed over before it returns.
+        liveHost: async (options: import('../src/ahp/live.js').LiveHostOptions) => {
+          captured = options;
+          return {} as never;
+        },
+      };
+    });
+    vi.resetModules();
+    const { connect: choose, sink } = await import('../src/connect.js');
+    const said: string[] = [];
+    const cleared: string[] = [];
+    const report = sink.report;
+    const clear = sink.clear;
+    sink.report = (message) => said.push(message);
+    sink.clear = (message) => cleared.push(message);
+    await choose({ host: url, token: 'wrong' });
+    return {
+      options: () => captured as import('../src/ahp/live.js').LiveHostOptions,
+      said,
+      cleared,
+      restore: () => {
+        sink.report = report;
+        sink.clear = clear;
+      },
+    };
+  };
+
+  it('puts the refused sentence on the row once, and clears it when the host takes it back', async () => {
+    const url = await refusing();
+    const wiring = await wired(url);
+    try {
+      // Two failed attempts, and the same reason twice is the same line.
+      wiring.options().onRetryFailed?.(new Error('closed'));
+      wiring.options().onRetryFailed?.(new Error('closed'));
+      await waitFor(() => wiring.said.length > 0);
+      // Give the second ask time to land before deciding it said nothing.
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+      expect(wiring.said).toEqual([`The host at ${url} refused the connection token.`]);
+
+      // The line belongs to a state that has ended, so the host taking the
+      // connection back takes the sentence back - the sentence, not a blank
+      // report that would write a line where there is no row.
+      wiring.options().onState?.('connected');
+      expect(wiring.cleared).toEqual([`The host at ${url} refused the connection token.`]);
+      expect(wiring.said).toHaveLength(1);
+    }
+    finally {
+      wiring.restore();
+    }
+  });
+
+  it('drops a sentence that resolves after the connection is back', async () => {
+    const url = await refusing(40);
+    const wiring = await wired(url);
+    try {
+      // The request is out; the host comes back before it answers.
+      wiring.options().onRetryFailed?.(new Error('closed'));
+      wiring.options().onState?.('connected');
+      await new Promise((resolve) => { setTimeout(resolve, 150); });
+
+      // A reason for a state that ended is not a reason to draw.
+      expect(wiring.said).toEqual([]);
+      // And there was nothing on the row to take back.
+      expect(wiring.cleared).toEqual([]);
+    }
+    finally {
+      wiring.restore();
+    }
+  });
 });

@@ -1,6 +1,6 @@
 ---
 title: The list stays mounted when a row above it changes
-status: implemented
+status: done
 depends: []
 layer: "screen"
 refs:

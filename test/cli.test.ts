@@ -9,7 +9,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -465,20 +465,29 @@ describe('the entry point, and what reaches a person on stderr', () => {
    * Run the entry point once, over a throwaway config directory, and give back
    * what it wrote to stderr. `AHPC_DEBUG` is set by the call rather than read
    * from here, because the point is that the shell sets it and this never does.
+   * A run may name its own argv, and shape the throwaway home directory before
+   * the entry point reads it.
    */
-  const entry = async (debug?: string): Promise<string> => {
+  const entry = async (
+    debug?: string,
+    run: string[] = argv,
+    prepare?: (home: string) => void,
+  ): Promise<string> => {
     const home = mkdtempSync(join(tmpdir(), 'ahpc-entry-'));
     const had = {
       XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME,
       AHPC_HOST: process.env.AHPC_HOST,
+      AHPC_TOKEN: process.env.AHPC_TOKEN,
       AHPC_DEBUG: process.env.AHPC_DEBUG,
     };
     const said = { argv: process.argv, code: process.exitCode };
     process.env.XDG_CONFIG_HOME = home;
     delete process.env.AHPC_HOST;
+    delete process.env.AHPC_TOKEN;
     if (debug === undefined) delete process.env.AHPC_DEBUG;
     else process.env.AHPC_DEBUG = debug;
-    process.argv = argv;
+    prepare?.(home);
+    process.argv = run;
     // The module is the program: importing it runs it, so the second run here
     // would be answered out of the cache instead of running at all.
     vi.resetModules();
@@ -518,6 +527,32 @@ describe('the entry point, and what reaches a person on stderr', () => {
     const debug = await entry('1');
     expect(debug).toContain('That is the only chat in this session');
     expect(debug).toContain('at Object.disposeChat');
+  });
+
+  it('prints one sentence for a token file the screen cannot read', async () => {
+    const absent = join(tmpdir(), 'ahpc-absent-token-file');
+    const err = await entry(undefined, ['node', 'ahpc', '--connection-token-file', absent]);
+    // The sentence names the path that was typed and the flag that writes a
+    // file there, and it is the whole of what a person reads.
+    expect(err).toContain(`No connection token at ${absent}.`);
+    expect(err).toContain('--connection-token-file');
+    expect(err.trimEnd().split('\n')).toHaveLength(1);
+  });
+
+  it('stops the screen for a missing token file the config names', async () => {
+    const absent = join(tmpdir(), 'ahpc-absent-configured-token');
+    const err = await entry(undefined, ['node', 'ahpc'], (home) => {
+      mkdirSync(join(home, 'ahpc'), { recursive: true });
+      writeFileSync(join(home, 'ahpc', 'config.json'), JSON.stringify({ connectionTokenFile: absent }));
+    });
+    expect(err).toContain(`No connection token at ${absent}.`);
+    expect(err.trimEnd().split('\n')).toHaveLength(1);
+  });
+
+  it('refuses both token flags on the screen path too', async () => {
+    const err = await entry(undefined, ['node', 'ahpc', '--token', 'typed', '--connection-token-file', '/nowhere']);
+    expect(err).toContain('Pass --token or --connection-token-file, not both.');
+    expect(err.trimEnd().split('\n')).toHaveLength(1);
   });
 });
 
@@ -608,6 +643,109 @@ describe('the connection token, and the file the host keeps it in', () => {
     expect(commandIn(['--connection-token-file', 'status'])).toBeUndefined();
     const usage = (await import('../src/tui.js')).USAGE;
     expect(usage).toContain('--connection-token-file');
+  });
+
+  it('says why a file could not be read', async () => {
+    const { connectionToken } = await import('../src/config.js');
+    clean();
+    const dir = mkdtempSync(join(tmpdir(), 'ahpc-token-'));
+    try {
+      // A missing file keeps the sentence that sends somebody to the flag
+      // that writes one there.
+      const missing = join(dir, 'absent.token');
+      expect(() => connectionToken({ tokenFile: missing }, {}))
+        .toThrow(`No connection token at ${missing}. The host writes one there when it is given --connection-token-file.`);
+
+      // A folder is not a file somebody could have written a secret into.
+      const folder = join(dir, 'tokens');
+      mkdirSync(folder);
+      expect(() => connectionToken({ tokenFile: folder }, {}))
+        .toThrow(`${folder} is a folder, not a token file.`);
+
+      // Any other failure keeps the system's own reason rather than the
+      // sentence for a file that simply is not there.
+      const file = join(dir, 'plain');
+      writeFileSync(file, '');
+      const under = join(file, 't.token');
+      expect(() => connectionToken({ tokenFile: under }, {}))
+        .toThrow(`Cannot read ${under}: `);
+    } finally { rmSync(dir, { recursive: true, force: true }); restore(); }
+  });
+
+  it.skipIf(process.getuid?.() === 0)('says a file it may not open is a permission failure', async () => {
+    const { connectionToken } = await import('../src/config.js');
+    clean();
+    const dir = mkdtempSync(join(tmpdir(), 'ahpc-token-'));
+    try {
+      const at = join(dir, 'sealed.token');
+      writeFileSync(at, 'e6c1f0a94b6d4e2f8a3c5d7e9f0b1c2d\n');
+      chmodSync(at, 0o000);
+      expect(() => connectionToken({ tokenFile: at }, {}))
+        .toThrow(`Cannot read ${at}: permission denied.`);
+    } finally { chmodSync(join(dir, 'sealed.token'), 0o600); rmSync(dir, { recursive: true, force: true }); restore(); }
+  });
+
+  it('reads a config path from the home folder', async () => {
+    const { connectionToken, loadConfig } = await import('../src/config.js');
+    clean();
+    const dir = mkdtempSync(join(tmpdir(), 'ahpc-token-'));
+    const home = process.env.HOME;
+    try {
+      process.env.HOME = dir;
+      writeFileSync(join(dir, 't'), 'from-the-home-folder\n');
+      const config = join(dir, 'config.json');
+      writeFileSync(config, JSON.stringify({ connectionTokenFile: '~/t' }));
+      expect(connectionToken({}, loadConfig('ahpc', config))).toBe('from-the-home-folder');
+    } finally {
+      if (home === undefined) delete process.env.HOME;
+      else process.env.HOME = home;
+      rmSync(dir, { recursive: true, force: true });
+      restore();
+    }
+  });
+
+  it('reads a config path from the folder the config file is in', async () => {
+    const { connectionToken, loadConfig } = await import('../src/config.js');
+    clean();
+    const dir = mkdtempSync(join(tmpdir(), 'ahpc-token-'));
+    const elsewhere = mkdtempSync(join(tmpdir(), 'ahpc-elsewhere-'));
+    const was = process.cwd();
+    try {
+      writeFileSync(join(dir, 't.token'), 'from-the-config-folder\n');
+      // A file of the same name where ahpc happens to start must not be read
+      // in place of the one the config file sits beside.
+      writeFileSync(join(elsewhere, 't.token'), 'from-the-working-folder\n');
+      const config = join(dir, 'config.json');
+      writeFileSync(config, JSON.stringify({ connectionTokenFile: 't.token' }));
+      const file = loadConfig('ahpc', config);
+      process.chdir(elsewhere);
+      expect(connectionToken({}, file)).toBe('from-the-config-folder');
+    } finally {
+      process.chdir(was);
+      rmSync(dir, { recursive: true, force: true });
+      rmSync(elsewhere, { recursive: true, force: true });
+      restore();
+    }
+  });
+
+  it('reads a path the shell gave exactly as the shell gave it', async () => {
+    const { connectionToken } = await import('../src/config.js');
+    clean();
+    const dir = mkdtempSync(join(tmpdir(), 'ahpc-token-'));
+    const was = process.cwd();
+    try {
+      // The shell expands `~` before ahpc sees the argument, so a `~` that
+      // survived to here names a folder called that in the working folder.
+      mkdirSync(join(dir, '~'));
+      writeFileSync(join(dir, '~', 't.token'), 'from-a-literal-tilde\n');
+      process.chdir(dir);
+      expect(connectionToken({ tokenFile: join('~', 't.token') }, { connectionTokenFile: '/nowhere/other' }))
+        .toBe('from-a-literal-tilde');
+    } finally {
+      process.chdir(was);
+      rmSync(dir, { recursive: true, force: true });
+      restore();
+    }
   });
 });
 

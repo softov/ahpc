@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createStore } from '@textui/core';
 import { applyAction } from '../src/ahp/live.js';
 import {
-  HOST_ERROR, INPUT_STATUS, applyEvent, sendingInput,
+  HOST_ERROR, INPUT_STATUS, applyEvent, clearHostError, reportHostError, sendingInput,
 } from '../src/state.js';
 import type { InputStatus } from '../src/state.js';
 
@@ -72,5 +72,34 @@ describe('a refusal that answers an answer', () => {
     applyEvent(store, { type: 'error', message: 'this session has no chat to speak to' }, []);
     expect(store.get<string>(HOST_ERROR)).toBe('this session has no chat to speak to');
     expect(store.get(INPUT_STATUS) ?? null).toBeNull();
+  });
+});
+
+describe('a connection sentence is taken back rather than replaced', () => {
+  it('clears the row only while that sentence is the one it still holds', () => {
+    const store = createStore();
+    reportHostError(store, 'The host at ws://x refused the connection token.');
+
+    // Something newer is on the row, and it is not this sentence's to remove.
+    reportHostError(store, 'The host stopped answering');
+    clearHostError(store, 'The host at ws://x refused the connection token.');
+    expect(store.get<string>(HOST_ERROR)).toBe('The host stopped answering');
+
+    // And the sentence that is there does go.
+    clearHostError(store, 'The host stopped answering');
+    expect(store.get(HOST_ERROR) ?? null).toBeNull();
+  });
+
+  it('does not refuse the answer that is being sent', () => {
+    const store = createStore();
+    reportHostError(store, 'The host at ws://x refused the connection token.');
+    sendingInput(store, 'a message');
+
+    clearHostError(store, 'The host at ws://x refused the connection token.');
+
+    // An empty report would have turned this into a refusal of a sentence
+    // nobody wrote.
+    expect(store.get<InputStatus>(INPUT_STATUS)?.state).toBe('sending');
+    expect(store.get<InputStatus>(INPUT_STATUS)?.text).toBe('a message');
   });
 });

@@ -14,11 +14,12 @@ import { fakeHost } from './ahp/fake.js';
 import { hostResources } from './resources.js';
 import type { HostConnection } from './ahp/connection.js';
 import {
-  BOOD, BOOD_FLOAT, BOOD_FLOOR, BOOD_INLINE, FOCUS, HOST, HOST_ERROR, HOST_LINK, HOST_NOTE, INPUT, INPUT_STATUS, OPEN, RUNNING, SCREEN,
+  BOOD, BOOD_FLOAT, BOOD_FLOOR, BOOD_INLINE, CHANGE_AT, CHANGE_SCOPES, FOCUS, HOST, HOST_ERROR, HOST_LINK, HOST_NOTE, INPUT, INPUT_STATUS, OPEN, RUNNING, SCREEN,
   SESSIONS,
-  SPLIT_AT, SPLIT_DEFAULT, QUIT_ARMED, STATUS, TERMINAL_LIST, UPDATE_NOTICE, WORKSPACE, boodFloor, openSession, workspaceName,
+  SPLIT_AT, SPLIT_DEFAULT, QUIT_ARMED, STATUS, TERMINAL_LIST, UPDATE_NOTICE, WORKSPACE, boodFloor, openSession, shownScope, workspaceName,
 } from './state.js';
 import type { HostState, InputStatus } from './state.js';
+import type { ChangesetScope } from './ahp/types.js';
 import { registerMessages } from './i18n/index.js';
 import { decodeStatus } from './ahp/status.js';
 import {
@@ -207,6 +208,10 @@ const Hints = defineComponent<BoxProps>('ChatHints', (props) => {
   // session stays open while its changes are on screen, and `i write` there
   // is an offer nothing honours.
   const screen = useStoreValue<string | null>(SCREEN, 'sessions') ?? 'sessions';
+  // `r` ticks a row only where the host keeps ticks.
+  const scopes = useStoreValue<ChangesetScope[]>(CHANGE_SCOPES, []) ?? [];
+  const at = useStoreValue<string>(CHANGE_AT, '') ?? '';
+  const ticks = shownScope(scopes, at)?.reviewable === true;
   // A session the catalogue is still holding: escape left it open, and `f`
   // puts the conversation back on screen.
   const reopenable = useStoreValue<string | null>(OPEN, null) !== null;
@@ -389,7 +394,11 @@ const Hints = defineComponent<BoxProps>('ChatHints', (props) => {
           // Only where they do something. A hint for a key that is inert on
           // this screen is worse than no hint.
           ...(screen === 'changes'
-            ? [{ keys: ']', label: i18n.t('views.app.hintChangeset') }, { keys: 'r', label: i18n.t('views.app.hintRead') }, { keys: 'x', label: i18n.t('views.app.hintDo') }]
+            ? [
+              { keys: ']', label: i18n.t('views.app.hintChangeset') },
+              ...(ticks ? [{ keys: 'r', label: i18n.t('views.app.hintRead') }] : []),
+              { keys: 'x', label: i18n.t('views.app.hintDo') },
+            ]
             : []),
           // Named only where they do something. `enter` opens the detail, so
           // running one has a key of its own.

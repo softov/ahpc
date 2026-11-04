@@ -1,7 +1,7 @@
 ---
 title: The status row does not end with the screen's name
 domain: screen
-status: active
+status: built
 priority: medium
 created: 2026-11-04
 revalidated: 2026-11-04
@@ -42,7 +42,7 @@ SCREEN -> Status -> a muted text at the row end
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - The screen's name leaves the status row](task-01-the-screen-name-leaves-the-row.md) | implemented | - |
+| [01 - The screen's name leaves the status row](task-01-the-screen-name-leaves-the-row.md) | done | - |
 
 ## Risks and tradeoffs
 
@@ -50,11 +50,11 @@ SCREEN -> Status -> a muted text at the row end
 
 ## Resume state
 
-- **Done so far:** task 01 implemented, as [implemented.md](implemented.md) says.
-- **Next action:** Softov reviews the pull request, and looks at the status row by hand.
+- **Done so far:** task 01 done, as [implemented.md](implemented.md) says. Softov checked it against ahpd on 2026-11-04.
+- **Next action:** none.
 - **Open questions:** none.
 
 ## Final verification checklist
 
 - [x] `npm run typecheck`, `npm run build` and `npx vitest run` pass.
-- [ ] By hand, the status row on the sessions screen ends with the hints.
+- [x] By hand, the status row on the sessions screen ends with the hints.

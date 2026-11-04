@@ -32,8 +32,8 @@ import { branchName, branchDrift, pullRequestLabel,
   CHANGE_AT, CHANGE_ROW, CHANGE_SCOPES, PULL_REQUEST, FILES_AT, FILES_ENTRIES, FILES_OPEN,
   MODEL, MODEL_CONFIG, OPEN, OPEN_FILE, CHAT_URI, PROVIDER, QUEUE, SELECTED, SESSIONS, SETTINGS, SIDEBAR,
   CHATS, CURSOR, FIND, FINDING, FIND_AT, OPEN_TERMINAL, PRESENT, SPLIT_AT, SPLIT_DEFAULT, TERMINAL, TERMINALS, TERMINAL_LIST, TURNS, WORKSPACE,
-  ANSWERS, INPUT_STATUS, MARKDOWN, boodFloorFor,
-  hiddenSessions, openSession, sessionView, statusLabel, visibleSessions, workspaceName,
+  ANSWERS, HOST_ERROR, HOST_LINK, HOST_NOTE, INPUT_STATUS, MARKDOWN, boodFloorFor,
+  hiddenSessions, openSession, sessionView, shownScope, statusLabel, visibleSessions, workspaceName,
 } from './state.js';
 import type { HostState, InputStatus, PullRequestAsk } from './state.js';
 import { chosenOperations } from './ahp/followup.js';
@@ -1342,6 +1342,13 @@ export const ChangesScreen: (props: Record<string, never>) => RenderOutput =
     const at = useStoreValue<string>(CHANGE_AT, '') ?? '';
     const uri = session?.resource ?? '';
 
+    // What a verb answered, or a refusal, is about this screen, and goes with it.
+    useEffect(() => () => {
+      app.store.set(HOST_ERROR, null);
+      app.store.set(HOST_LINK, null);
+      app.store.set(HOST_NOTE, null);
+    }, []);
+
     useEffect(() => {
       if (!uri) return;
       let live = true;
@@ -1376,8 +1383,7 @@ export const ChangesScreen: (props: Record<string, never>) => RenderOutput =
       return () => { watch.close(); };
     }, [uri, at]);
 
-    const chosen = scopes.find((scope) => scope.uriTemplate === at)
-      ?? scopes.find((scope) => scope.variables.length === 0);
+    const chosen = shownScope(scopes, at);
 
     /*
      * Which row the cursor is on, kept in step with the list.
@@ -1429,12 +1435,11 @@ export const ChangesScreen: (props: Record<string, never>) => RenderOutput =
       return () => { live = false; };
     }, [file?.uri ?? '']);
 
-    const title = session ? i18n.t('screens.changes.titleOf', { title: session.title }) : i18n.t('screens.changes.title');
-
+    // No title row: the top row already names the session, and the tabs say which changes.
     if (file) {
       const kind = !file.before ? 'new' : !file.after ? 'deleted' : 'edited';
       return (
-        <Panel title={title} flex={1}>
+        <Panel flex={1}>
           {failure !== null ? (
             <EmptyState title={i18n.t('screens.changes.refused')} message={failure} flex={1} />
           ) : !loaded ? (
@@ -1453,7 +1458,7 @@ export const ChangesScreen: (props: Record<string, never>) => RenderOutput =
     }
 
     return (
-      <Panel title={title} flex={1}>
+      <Panel flex={1}>
         {scopes.length > 1 ? (
           <Tabs
             // A template with variables left in it is a question about a

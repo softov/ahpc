@@ -53,10 +53,7 @@ A check by hand on 2026-11-03 found that the server does one call at a time.
 - Each response goes out when its request is done, as one whole line on stdout.
 - `ping` is answered at once, whatever else runs.
 - `notifications/cancelled` stops the matching request, and the server sends no response for it.
+- A cancelled `send_turn` cancels the turn it started on the host, and takes back a message it queued. Softov, 2026-11-04: "Stop the turn too".
 - At the end of stdin, the server waits for the requests in flight before it exits.
 - A test sends `send_turn` and `ping` together, and gets the `ping` answer first.
 - A test answers a confirmation with `confirm_tool_call` while `send_turn` waits on it.
-
-## Open points
-
-- When a client cancels `send_turn`, does the server only stop waiting, or also cancel the turn on the host?

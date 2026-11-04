@@ -1,7 +1,7 @@
 ---
 title: The changes list follows the host while the screen is open
 domain: screen
-status: active
+status: built
 priority: high
 created: 2026-11-03
 revalidated: 2026-11-03
@@ -70,8 +70,8 @@ commit -> invokeChangesetOperation -> ahpd changes the tree -> changeset/fileRem
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - The hosts watch a changeset](task-01-the-hosts-watch-a-changeset.md) | implemented | - |
-| [02 - The changes screen watches its changeset](task-02-the-screen-watches-its-changeset.md) | implemented | 01 |
+| [01 - The hosts watch a changeset](task-01-the-hosts-watch-a-changeset.md) | done | - |
+| [02 - The changes screen watches its changeset](task-02-the-screen-watches-its-changeset.md) | done | 01 |
 
 ## Risks and tradeoffs
 
@@ -80,13 +80,13 @@ commit -> invokeChangesetOperation -> ahpd changes the tree -> changeset/fileRem
 
 ## Resume state
 
-- **Done so far:** tasks 01 and 02 implemented, as [implemented.md](implemented.md) says.
-- **Next action:** Softov reviews the pull request, and checks a commit against ahpd.
+- **Done so far:** tasks 01 and 02 done, as [implemented.md](implemented.md) says. Softov checked them against ahpd on 2026-11-04.
+- **Next action:** none.
 - **Open questions:** none.
 - **Watch out for:** the fake's session `changes` event also writes `CHANGES`; a test that passes through it does not test the watch.
 
 ## Final verification checklist
 
-- [ ] `npm run typecheck`, `npm run build` and `npx vitest run` pass.
-- [ ] Against ahpd, a commit from the changes screen empties the list without `]`.
-- [ ] Against ahpd, `r` ticks a file off and the tick shows.
+- [x] `npm run typecheck`, `npm run build` and `npx vitest run` pass.
+- [x] Against ahpd, a commit from the changes screen empties the list without `]`.
+- [x] Against ahpd, `r` ticks a file off and the tick shows.
