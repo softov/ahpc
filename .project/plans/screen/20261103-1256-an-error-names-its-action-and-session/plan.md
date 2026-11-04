@@ -1,7 +1,7 @@
 ---
 title: An error on the screen names its action and its session, and stays on that session
 domain: screen
-status: active
+status: built
 priority: high
 created: 2026-11-03
 revalidated: 2026-11-03
@@ -88,9 +88,9 @@ open(uri) -> told(setRead) + subscribe + detail(uri).catch(failed) -> reportHost
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - A refusal names its action and its session](task-01-a-refusal-names-its-action-and-session.md) | implemented | - |
-| [02 - A refusal stays on the page it came from](task-02-a-refusal-stays-on-its-page.md) | implemented | 01 |
-| [03 - A channel refusal names its session, or stays in the pane](task-03-a-channel-refusal-names-its-session.md) | implemented | 02 |
+| [01 - A refusal names its action and its session](task-01-a-refusal-names-its-action-and-session.md) | done | - |
+| [02 - A refusal stays on the page it came from](task-02-a-refusal-stays-on-its-page.md) | done | 01 |
+| [03 - A channel refusal names its session, or stays in the pane](task-03-a-channel-refusal-names-its-session.md) | done | 02 |
 
 ## Risks and tradeoffs
 
@@ -99,13 +99,13 @@ open(uri) -> told(setRead) + subscribe + detail(uri).catch(failed) -> reportHost
 
 ## Resume state
 
-- **Done so far:** tasks 01 and 02 are implemented and merged in PR 3. See [implemented.md](implemented.md). The check by hand on 2026-11-03 found the `onRefusal` path. Task 03 is implemented and awaits review.
-- **Next action:** review task 03, then the check by hand in [screen-error-names-its-session-checks.md](../../../pending/screen-error-names-its-session-checks.md).
+- **Done so far:** tasks 01 to 03 are done, merged in PRs 3 and 4. See [implemented.md](implemented.md).
+- **Check by hand, 2026-11-04:** Softov ran the checks against ahpd, and they passed.
+- **Next action:** none.
 - **Open questions:** none.
-- **Watch out for:** `disposeSession` reports and then closes; with task 02, the close would clear the report. Report after the close.
 
 ## Final verification checklist
 
-- [ ] `npm run typecheck` and `npm test` pass.
-- [ ] Against ahpd, opening a session with no agent and then pressing `ctrl+n` leaves the new session page with no refusal.
-- [ ] Against ahpd, a refused action on the open session shows its action and the session title.
+- [x] `npm run typecheck` and `npm test` pass.
+- [x] Against ahpd, opening a session with no agent and then pressing `ctrl+n` leaves the new session page with no refusal.
+- [x] Against ahpd, a refused action on the open session shows its action and the session title.

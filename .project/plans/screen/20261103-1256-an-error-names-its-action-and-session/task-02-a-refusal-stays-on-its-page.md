@@ -1,6 +1,6 @@
 ---
 title: A refusal stays on the page it came from
-status: implemented
+status: done
 depends: [task-01-a-refusal-names-its-action-and-session.md]
 layer: screen
 refs:

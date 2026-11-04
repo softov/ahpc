@@ -1,6 +1,6 @@
 ---
 title: A refusal names its action and its session
-status: implemented
+status: done
 depends: []
 layer: screen
 refs:

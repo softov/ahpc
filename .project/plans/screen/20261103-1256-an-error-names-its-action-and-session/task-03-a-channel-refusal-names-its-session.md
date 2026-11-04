@@ -1,6 +1,6 @@
 ---
 title: A channel refusal names its session, or stays in the pane
-status: implemented
+status: done
 depends: [task-02-a-refusal-stays-on-its-page.md]
 layer: screen
 refs:
