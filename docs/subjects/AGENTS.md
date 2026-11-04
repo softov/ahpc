@@ -6,7 +6,7 @@ An agent is a harness the host serves, such as Claude, with the models it offers
 
 ![A new session, with the model picker open](../img/agents.svg)
 
-A new session asks for the agent and the model first. In a session, the palette (`ctrl+p`) has **Choose harness** and **Choose model**. `/` lists the slash commands, and `@` completes a file path on the host.
+A new session asks for the agent and the model first, from the agents the host serves. In a session, the palette (`ctrl+p`) has **Choose harness** and **Choose model**. `/` lists the slash commands (see [the slash menu](CUSTOMIZATIONS.md#the-slash-menu)), and `@` completes a file path on the host.
 
 ## Commands
 

@@ -155,6 +155,8 @@ export default defineConfig({
   },
 
   themeConfig: {
+    // ahpd's logo, which ahpc's new session screen draws too.
+    logo: '/logo.svg',
     nav: [
       { text: 'Home', link: '/' },
       { text: 'Updates', link: releases()[0]?.link ?? '/updates/archive', activeMatch: '^/updates/' },

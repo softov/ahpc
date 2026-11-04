@@ -62,7 +62,7 @@
 <text x="82" y="329" fill="#c9d1d9" textLength="224" lengthAdjust="spacing" xml:space="preserve">     Show automations       </text>
 <text x="306" y="329" fill="#9b949e" textLength="424" lengthAdjust="spacing" xml:space="preserve">What the host runs on its own, and when it next fires</text>
 <text x="90" y="363" fill="#9b949e" textLength="120" lengthAdjust="spacing" xml:space="preserve">creature.toggle</text>
-<text x="714" y="363" fill="#a7a7a7" textLength="16" lengthAdjust="spacing" xml:space="preserve">29</text>
+<text x="714" y="363" fill="#a7a7a7" textLength="16" lengthAdjust="spacing" xml:space="preserve">30</text>
 <text x="90" y="380" fill="#a7a7a7" textLength="16" lengthAdjust="spacingAndGlyphs" xml:space="preserve">↑↓</text>
 <text x="106" y="380" fill="#a7a7a7" textLength="160" lengthAdjust="spacing" xml:space="preserve"> move · enter run · </text>
 <text x="266" y="380" fill="#a7a7a7" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▸</text>

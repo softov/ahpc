@@ -202,11 +202,14 @@ async function fitted(port, flags) {
  *
  * `height` fixes the rows, for the pictures `README.md` shows at one size.
  * Without it, the picture is fitted to what the screen holds. `command` runs
- * a command before the frame, such as `app.palette`.
+ * a command before the frame, such as `app.palette`. `type` leaves text in
+ * the composer, such as `/` for the slash menu. `path` is the workspace of a
+ * new session, trusted for the still.
  */
 async function picture(port, name, screen, options = {}) {
-  const { session: uri, command, height } = options;
-  const flags = ['--screen', screen, ...(uri ? ['--session', uri] : []), ...(command ? ['--command', command] : []), '--width', '100'];
+  const { session: uri, command, type, path, height } = options;
+  const flags = ['--screen', screen, ...(uri ? ['--session', uri] : []), ...(command ? ['--command', command] : []),
+    ...(type === undefined ? [] : ['--type', type]), ...(path ? ['--path', path, '--trust'] : []), '--width', '100'];
   const rows = height ?? await fitted(port, flags);
   await ahpc(port, '--static', '--svg', join(images, name), ...flags, '--height', String(rows));
   process.stdout.write(`${name} ${String(rows)} rows\n`);
@@ -237,7 +240,8 @@ try {
   // The three `README.md` shows, at the sizes it shows them.
   await picture(port, 'sessions.svg', 'sessions', { height: 30 });
   await picture(port, 'transcript.svg', 'chat', { session: read, height: 30 });
-  await picture(port, 'compose.svg', 'new', { height: 26 });
+  // On a repository, so the host offers isolation and branch too.
+  await picture(port, 'compose.svg', 'new', { path: app, height: 26 });
   // The palette and a picker open over their screen, which needs its rows.
   await picture(port, 'keys.svg', 'sessions', { command: 'app.palette', height: 30 });
   await picture(port, 'agents.svg', 'new', { command: 'model.choose', height: 26 });
@@ -245,6 +249,7 @@ try {
   await picture(port, 'changes.svg', 'changes', { session: read });
   await picture(port, 'resources.svg', 'files', { session: read });
   await picture(port, 'customizations.svg', 'skills', { session: read });
+  await picture(port, 'slash.svg', 'chat', { session: read, type: '/' });
 
   // A second chat in the first session.
   await ahpc(port, 'chat', 'new', read, 'help');

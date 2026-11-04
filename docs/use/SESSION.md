@@ -8,6 +8,8 @@ The header shows the model, thinking level, permission mode, workspace and branc
 
 `ctrl+f` finds text in the conversation. `enter` or `down` goes to the next match, `up` to the one before.
 
+![A tool call that waits for your approval](../img/turns.svg)
+
 When a tool call is waiting, `a` approves it, `d` denies it, and `1` to `9` pick an offered option. When the agent asks a question, `tab` moves between fields, `space` selects and `enter` sends. See [Turns](../subjects/TURNS.md).
 
 The composer has the keys of [a new session](NEW-SESSION.md#keys). While a turn runs, `enter` queues the message.

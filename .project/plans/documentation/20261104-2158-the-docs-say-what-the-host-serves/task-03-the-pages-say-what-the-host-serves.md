@@ -1,6 +1,6 @@
 ---
 title: The pages say what the host serves
-status: todo
+status: done
 depends: [task-02-the-pictures-show-fields-and-slash.md]
 layer: "docs"
 refs:

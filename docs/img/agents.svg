@@ -33,17 +33,20 @@
 <text x="186" y="380" fill="#2d2f34" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">…</text>
 <text x="10" y="397" fill="#6b7178" textLength="800" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈</text>
 <text x="18" y="414" fill="#2a2b32" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">◆</text>
-<text x="26" y="414" fill="#6b7178" textLength="48" lengthAdjust="spacing" xml:space="preserve"> Demo </text>
-<text x="74" y="414" fill="#2d2f34" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▾</text>
-<text x="106" y="414" fill="#2a2b32" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">◇</text>
-<text x="114" y="414" fill="#6b7178" textLength="72" lengthAdjust="spacing" xml:space="preserve"> default </text>
-<text x="186" y="414" fill="#2d2f34" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▾</text>
-<text x="218" y="414" fill="#2a2b32" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">✓</text>
-<text x="226" y="414" fill="#6b7178" textLength="64" lengthAdjust="spacing" xml:space="preserve"> Writes </text>
-<text x="290" y="414" fill="#2d2f34" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▾</text>
-<text x="322" y="414" fill="#2a2b32" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▪</text>
-<text x="330" y="414" fill="#6b7178" textLength="56" lengthAdjust="spacing" xml:space="preserve"> plain </text>
-<text x="386" y="414" fill="#2d2f34" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▾</text>
+<text x="26" y="414" fill="#6b7178" textLength="96" lengthAdjust="spacing" xml:space="preserve"> Agent Demo </text>
+<text x="122" y="414" fill="#2d2f34" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▾</text>
+<text x="154" y="414" fill="#2a2b32" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">◇</text>
+<text x="162" y="414" fill="#6b7178" textLength="72" lengthAdjust="spacing" xml:space="preserve"> default </text>
+<text x="234" y="414" fill="#2d2f34" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▾</text>
+<text x="266" y="414" fill="#2a2b32" textLength="8" lengthAdjust="spacing" xml:space="preserve">?</text>
+<text x="274" y="414" fill="#6b7178" textLength="104" lengthAdjust="spacing" xml:space="preserve"> Interactive </text>
+<text x="378" y="414" fill="#2d2f34" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▾</text>
+<text x="410" y="414" fill="#2a2b32" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">✓</text>
+<text x="418" y="414" fill="#6b7178" textLength="64" lengthAdjust="spacing" xml:space="preserve"> Writes </text>
+<text x="482" y="414" fill="#2d2f34" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▾</text>
+<text x="514" y="414" fill="#2a2b32" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▪</text>
+<text x="522" y="414" fill="#6b7178" textLength="56" lengthAdjust="spacing" xml:space="preserve"> plain </text>
+<text x="578" y="414" fill="#2d2f34" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▾</text>
 <text x="18" y="431" fill="#2a2b32" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">⌂</text>
 <text x="26" y="431" fill="#6b7178" textLength="112" lengthAdjust="spacing" xml:space="preserve"> no workspace </text>
 <text x="138" y="431" fill="#2d2f34" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▾</text>
