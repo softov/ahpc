@@ -1,6 +1,6 @@
 ---
 title: The site lists the release pages
-status: implemented
+status: done
 depends: []
 layer: "docs"
 refs:

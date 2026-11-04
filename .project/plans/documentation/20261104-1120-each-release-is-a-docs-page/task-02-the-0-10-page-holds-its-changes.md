@@ -1,6 +1,6 @@
 ---
 title: The 0.10 page holds its changes
-status: implemented
+status: done
 depends: [task-01-the-site-lists-the-release-pages.md]
 layer: "docs"
 refs:
