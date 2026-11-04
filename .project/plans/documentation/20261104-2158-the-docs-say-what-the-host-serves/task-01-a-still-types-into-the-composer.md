@@ -1,6 +1,6 @@
 ---
 title: A still types into the composer
-status: todo
+status: done
 depends: []
 layer: "screen"
 refs:

@@ -1,7 +1,7 @@
 ---
 title: The docs say what the host serves, with pictures of its fields, the slash menu and an approval
 domain: documentation
-status: planned
+status: built
 priority: medium
 created: 2026-11-04
 revalidated: 2026-11-04
@@ -58,10 +58,10 @@ tools/pictures.mjs -> ahpc --static --svg --type / --session <uri> -> the compos
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - A still types into the composer](task-01-a-still-types-into-the-composer.md) | todo | - |
-| [02 - The pictures show the fields and the slash menu](task-02-the-pictures-show-fields-and-slash.md) | todo | 01 |
-| [03 - The pages say what the host serves](task-03-the-pages-say-what-the-host-serves.md) | todo | 02 |
-| [04 - The docs site shows the logo](task-04-the-docs-site-shows-the-logo.md) | todo | - |
+| [01 - A still types into the composer](task-01-a-still-types-into-the-composer.md) | done | - |
+| [02 - The pictures show the fields and the slash menu](task-02-the-pictures-show-fields-and-slash.md) | done | 01 |
+| [03 - The pages say what the host serves](task-03-the-pages-say-what-the-host-serves.md) | done | 02 |
+| [04 - The docs site shows the logo](task-04-the-docs-site-shows-the-logo.md) | done | - |
 
 ## Risks and tradeoffs
 
@@ -69,13 +69,13 @@ tools/pictures.mjs -> ahpc --static --svg --type / --session <uri> -> the compos
 
 ## Resume state
 
-- **Done so far:** planned 2026-11-04.
-- **Next action:** [task-01-a-still-types-into-the-composer.md](task-01-a-still-types-into-the-composer.md).
+- **Done so far:** built 2026-11-04. See [implemented.md](implemented.md).
+- **Next action:** review.
 - **Open questions:** none.
 - **Watch out for:** the fields in `compose.svg` show only once the ahpd plan in `requires` is merged.
 
 ## Final verification checklist
 
-- [ ] `npm run typecheck`, `npm run build`, `npx vitest run` and `npm run docs:build` pass.
-- [ ] `AHPD_DIR=<ahpd checkout> npm run docs:pictures` writes every picture, and each one is opened and checked.
-- [ ] The nav and the home page of the docs site show the logo.
+- [x] `npm run typecheck`, `npm run build`, `npx vitest run` and `npm run docs:build` pass.
+- [x] `AHPD_DIR=<ahpd checkout> npm run docs:pictures` writes every picture, and each one is opened and checked.
+- [x] The nav and the home page of the docs site show the logo.

@@ -7,15 +7,15 @@
 <text x="66" y="23" fill="#d29922" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">◌</text>
 <text x="74" y="23" fill="#c9d1d9" textLength="664" lengthAdjust="spacing" xml:space="preserve"> write todo buy bread and milk                                                     </text>
 <text x="738" y="23" fill="#9b949e" textLength="72" lengthAdjust="spacing" xml:space="preserve">notes-app</text>
-<text x="10" y="40" fill="#9b949e" textLength="56" lengthAdjust="spacing" xml:space="preserve">Harness</text>
-<text x="66" y="40" fill="#c9d1d9" textLength="736" lengthAdjust="spacing" xml:space="preserve">    demo                                                                                    </text>
+<text x="10" y="40" fill="#9b949e" textLength="32" lengthAdjust="spacing" xml:space="preserve">Tone</text>
+<text x="42" y="40" fill="#c9d1d9" textLength="760" lengthAdjust="spacing" xml:space="preserve">       plain                                                                                   </text>
 <text x="802" y="40" fill="#c9d1d9" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">░</text>
-<text x="10" y="57" fill="#9b949e" textLength="80" lengthAdjust="spacing" xml:space="preserve">Ask before</text>
-<text x="90" y="57" fill="#c9d1d9" textLength="712" lengthAdjust="spacing" xml:space="preserve"> Writes                                                                                  </text>
-<text x="802" y="57" fill="#c9d1d9" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">█</text>
-<text x="10" y="74" fill="#9b949e" textLength="32" lengthAdjust="spacing" xml:space="preserve">Tone</text>
-<text x="42" y="74" fill="#c9d1d9" textLength="760" lengthAdjust="spacing" xml:space="preserve">       plain                                                                                   </text>
-<text x="802" y="74" fill="#c9d1d9" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">█</text>
+<text x="10" y="57" fill="#9b949e" textLength="72" lengthAdjust="spacing" xml:space="preserve">Isolation</text>
+<text x="82" y="57" fill="#c9d1d9" textLength="720" lengthAdjust="spacing" xml:space="preserve">  Folder                                                                                  </text>
+<text x="802" y="57" fill="#c9d1d9" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">░</text>
+<text x="10" y="74" fill="#9b949e" textLength="48" lengthAdjust="spacing" xml:space="preserve">Branch</text>
+<text x="58" y="74" fill="#c9d1d9" textLength="744" lengthAdjust="spacing" xml:space="preserve">     main                                                                                    </text>
+<text x="802" y="74" fill="#c9d1d9" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">░</text>
 <text x="10" y="91" fill="#9b949e" textLength="72" lengthAdjust="spacing" xml:space="preserve">Workspace</text>
 <text x="82" y="91" fill="#c9d1d9" textLength="720" lengthAdjust="spacing" xml:space="preserve">  /tmp/ahpc-demo/work/notes-app                                                           </text>
 <text x="802" y="91" fill="#c9d1d9" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">█</text>
@@ -23,13 +23,13 @@
 <text x="58" y="108" fill="#c9d1d9" textLength="744" lengthAdjust="spacing" xml:space="preserve">     main                                                                                    </text>
 <text x="802" y="108" fill="#c9d1d9" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">█</text>
 <text x="10" y="125" fill="#9b949e" textLength="56" lengthAdjust="spacing" xml:space="preserve">Started</text>
-<text x="66" y="125" fill="#c9d1d9" textLength="736" lengthAdjust="spacing" xml:space="preserve">    Nov 4, 2026, 04:06 PM                                                                   </text>
+<text x="66" y="125" fill="#c9d1d9" textLength="736" lengthAdjust="spacing" xml:space="preserve">    Nov 4, 2026, 06:04 PM                                                                   </text>
 <text x="802" y="125" fill="#c9d1d9" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">█</text>
 <text x="10" y="142" fill="#9b949e" textLength="56" lengthAdjust="spacing" xml:space="preserve">Session</text>
-<text x="66" y="142" fill="#c9d1d9" textLength="736" lengthAdjust="spacing" xml:space="preserve">    ahp-session:/5aba45f7-ee72-4556-bfb8-28e49d6ac12f                                       </text>
+<text x="66" y="142" fill="#c9d1d9" textLength="736" lengthAdjust="spacing" xml:space="preserve">    ahp-session:/9771c18e-7591-4238-b2dc-487eb6126bea                                       </text>
 <text x="802" y="142" fill="#c9d1d9" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">█</text>
 <text x="10" y="159" fill="#9b949e" textLength="32" lengthAdjust="spacing" xml:space="preserve">Chat</text>
-<text x="42" y="159" fill="#c9d1d9" textLength="760" lengthAdjust="spacing" xml:space="preserve">       ahp-chat://default/YWhwLXNlc3Npb246LzVhYmE0NWY3LWVlNzItNDU1Ni1iZmI4LTI4ZTQ5ZDZhYzEyZg   </text>
+<text x="42" y="159" fill="#c9d1d9" textLength="760" lengthAdjust="spacing" xml:space="preserve">       ahp-chat://default/YWhwLXNlc3Npb246Lzk3NzFjMThlLTc1OTEtNDIzOC1iMmRjLTQ4N2ViNjEyNmJlYQ   </text>
 <text x="802" y="159" fill="#c9d1d9" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">█</text>
 <text x="10" y="176" fill="#9b949e" textLength="32" lengthAdjust="spacing" xml:space="preserve">Here</text>
 <text x="42" y="176" fill="#c9d1d9" textLength="760" lengthAdjust="spacing" xml:space="preserve">       ahpc  ·  ahpc  ·  ahpc  ·  ahpc                                                         </text>
@@ -69,17 +69,24 @@
 <text x="10" y="448" fill="#a7a7a7" textLength="368" lengthAdjust="spacing" xml:space="preserve">The agent is working. Type to queue a message.</text>
 <text x="10" y="465" fill="#c9d1d9" textLength="800" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈</text>
 <text x="10" y="482" fill="#a7a7a7" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">◆</text>
-<text x="26" y="482" fill="#a7a7a7" textLength="32" lengthAdjust="spacing" xml:space="preserve">Demo</text>
-<text x="74" y="482" fill="#9b949e" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">◇</text>
-<text x="82" y="482" fill="#c9d1d9" textLength="72" lengthAdjust="spacing" xml:space="preserve"> default </text>
-<text x="154" y="482" fill="#a7a7a7" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▾</text>
-<text x="186" y="482" fill="#9b949e" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">✓</text>
-<text x="194" y="482" fill="#c9d1d9" textLength="64" lengthAdjust="spacing" xml:space="preserve"> Writes </text>
-<text x="258" y="482" fill="#a7a7a7" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▾</text>
-<text x="282" y="482" fill="#a7a7a7" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▪</text>
-<text x="298" y="482" fill="#a7a7a7" textLength="40" lengthAdjust="spacing" xml:space="preserve">plain</text>
+<text x="26" y="482" fill="#a7a7a7" textLength="80" lengthAdjust="spacing" xml:space="preserve">Agent Demo</text>
+<text x="122" y="482" fill="#9b949e" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">◇</text>
+<text x="130" y="482" fill="#c9d1d9" textLength="72" lengthAdjust="spacing" xml:space="preserve"> default </text>
+<text x="202" y="482" fill="#a7a7a7" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▾</text>
+<text x="234" y="482" fill="#9b949e" textLength="8" lengthAdjust="spacing" xml:space="preserve">?</text>
+<text x="242" y="482" fill="#c9d1d9" textLength="104" lengthAdjust="spacing" xml:space="preserve"> Interactive </text>
+<text x="346" y="482" fill="#a7a7a7" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▾</text>
+<text x="378" y="482" fill="#9b949e" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">✓</text>
+<text x="386" y="482" fill="#c9d1d9" textLength="64" lengthAdjust="spacing" xml:space="preserve"> Writes </text>
+<text x="450" y="482" fill="#a7a7a7" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▾</text>
+<text x="474" y="482" fill="#a7a7a7" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▪</text>
+<text x="490" y="482" fill="#a7a7a7" textLength="40" lengthAdjust="spacing" xml:space="preserve">plain</text>
 <text x="10" y="499" fill="#a7a7a7" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">⌂</text>
 <text x="26" y="499" fill="#a7a7a7" textLength="96" lengthAdjust="spacing" xml:space="preserve">no workspace</text>
+<text x="130" y="499" fill="#a7a7a7" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▣</text>
+<text x="146" y="499" fill="#a7a7a7" textLength="48" lengthAdjust="spacing" xml:space="preserve">Folder</text>
+<text x="202" y="499" fill="#a7a7a7" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">⋔</text>
+<text x="218" y="499" fill="#a7a7a7" textLength="32" lengthAdjust="spacing" xml:space="preserve">main</text>
 <text x="746" y="499" fill="#484f58" font-weight="bold" textLength="40" lengthAdjust="spacing" xml:space="preserve">queue</text>
 <text x="794" y="499" fill="#a7a7a7" textLength="8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▸</text>
 <text x="10" y="516" fill="#58a6ff" font-weight="bold" textLength="8" lengthAdjust="spacing" xml:space="preserve">a</text>

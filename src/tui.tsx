@@ -10,7 +10,7 @@ import { CONTROLLER, commandIdFor } from './control.js';
 import { connect, sink } from './connect.js';
 import type { HostConnection } from './ahp/connection.js';
 import { connectionToken, loadConfig } from './config.js';
-import { UPDATE_NOTICE, clearHostError, reportHostError } from './state.js';
+import { DRAFT, UPDATE_NOTICE, clearHostError, reportHostError } from './state.js';
 import { MAX_AGE_MS, checkingUpdates, readUpdate, refreshUpdate, registry, stale, updateNotice } from './update.js';
 import { manifest } from './version.js';
 import { detectLocale } from './i18n/locale.js';
@@ -60,6 +60,8 @@ interface Options {
   say?: string;
   /** A command to run on the screen before the frame is taken, such as `app.palette`. */
   command?: string;
+  /** Text to leave in the composer, unsent, such as `/` for the slash menu. */
+  type?: string;
   /** Answer the confirmation the script stops at, to reach the question. */
   approve: boolean;
   /** ...and then answer the question, to reach the end of the turn. */
@@ -181,6 +183,8 @@ Stills, for a README or a test
   --say <text>          Say this on the open session first
   --command <id>        Run this command before the frame, such as
                         app.palette or harness.choose
+  --type <text>         Leave this in the composer, unsent. / opens the
+                        slash menu
   --approve             Answer the confirmation the script stops at
   --answer              ...and then the question
 
@@ -221,6 +225,7 @@ export function parse(argv: string[]): Options {
       case '--svg': options.svg = String(argv[++i]); break;
       case '--say': options.say = String(argv[++i]); break;
       case '--command': options.command = String(argv[++i]); break;
+      case '--type': options.type = String(argv[++i]); break;
       case '--approve': options.approve = true; break;
       case '--answer': options.answer = true; break;
       case '--screen': options.screen = String(argv[++i]); break;
@@ -362,6 +367,11 @@ async function still(options: Options): Promise<void> {
       }
 
       await answered(app, host, end - Date.now());
+
+      // After the session is open, because opening one sets the composer to
+      // that session's own draft. The menus are drawn from the text, so a
+      // slash here is the slash menu.
+      if (options.type !== undefined) app.store.set(DRAFT, options.type);
 
       // Not awaited: a palette or a picker resolves when somebody picks, and
       // a still is the frame while it is open.

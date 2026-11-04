@@ -1,6 +1,6 @@
 ---
 title: The docs site shows the logo
-status: todo
+status: done
 depends: []
 layer: "docs"
 refs:

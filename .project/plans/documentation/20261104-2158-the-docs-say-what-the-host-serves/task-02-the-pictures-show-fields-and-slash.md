@@ -1,6 +1,6 @@
 ---
 title: The pictures show the fields and the slash menu
-status: todo
+status: done
 depends: [task-01-a-still-types-into-the-composer.md]
 layer: "tools"
 refs:

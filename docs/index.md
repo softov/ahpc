@@ -4,6 +4,9 @@ layout: home
 hero:
   name: ahpc
   tagline: A terminal client for the Agent Host Protocol. A screen to chat in, commands to script with, and a tool server that lets another agent drive your sessions.
+  image:
+    src: /logo.svg
+    alt: ahpc
   actions:
     - theme: brand
       text: Get started
