@@ -51,7 +51,7 @@ Some hosts protect a resource, such as a model API, and ask the client for a tok
 
 ```sh
 ahpc auth
-ahpc auth https://api.anthropic.com --token <token> --expires-in 3600
+ahpc auth https://api.anthropic.com --resource-token <token> --expires-in 3600
 ```
 
 ahpc also reads a token for a resource from `AHPC_TOKEN_<RESOURCE>`. The name is the resource URL without its scheme, in capitals, with every run of characters that are not letters or digits turned into `_`. For `https://api.anthropic.com` it is `AHPC_TOKEN_API_ANTHROPIC_COM`.

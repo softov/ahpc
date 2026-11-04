@@ -6,11 +6,12 @@
  * reaches the disk.
  */
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mkdtemp, readdir, rm } from 'node:fs/promises';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { forget, forgetAll, pushTokens, remember, resolveToken, tokenVariable } from '../src/ahp/tokens.js';
+import type { Where } from '../src/connect.js';
 
 const RESOURCE = 'https://api.anthropic.com';
 const VARIABLE = 'AHPC_TOKEN_API_ANTHROPIC_COM';
@@ -102,5 +103,109 @@ describe('pushing what this run has', () => {
       if (saved === undefined) delete process.env.XDG_CONFIG_HOME; else process.env.XDG_CONFIG_HOME = saved;
       await rm(home, { recursive: true, force: true });
     }
+  });
+});
+
+/*
+ * The flag `ahpc auth` reads a resource token from.
+ *
+ * `--token` opens the connection in every command, so the push has a flag of
+ * its own, then the environment variable named after the resource, then a
+ * pipe. A run that passed only `--token` is refused rather than read as a
+ * resource token. The host is a scripted one behind a replaced `connect`,
+ * because what is checked is which token reaches `authenticate` and which
+ * credential opened the connection.
+ */
+describe('ahpc auth, and the flag it reads a resource token from', () => {
+  const RESOURCE = 'https://api.anthropic.com';
+  const SENTENCE = '--token is the connection token. Use --resource-token for this.';
+
+  let pushed: { resource: string; token: string }[];
+  let connected: Where | undefined;
+  let home: string;
+  let hadHome: string | undefined;
+
+  beforeEach(async () => {
+    pushed = [];
+    connected = undefined;
+    home = await mkdtemp(path.join(tmpdir(), 'ahpc-auth-'));
+    hadHome = process.env.XDG_CONFIG_HOME;
+    process.env.XDG_CONFIG_HOME = home;
+    vi.resetModules();
+    vi.doMock('../src/connect.js', async (importOriginal) => {
+      const real = await importOriginal<typeof import('../src/connect.js')>();
+      const { fakeHost } = await import('../src/ahp/fake.js');
+      return {
+        ...real,
+        connect: async (where: Where) => {
+          connected = where;
+          const host = fakeHost();
+          const accepts = host.authenticate;
+          host.authenticate = async (resource, token) => {
+            pushed.push({ resource, token });
+            return await accepts?.call(host, resource, token);
+          };
+          return host;
+        },
+      };
+    });
+  });
+
+  afterEach(async () => {
+    vi.doUnmock('../src/connect.js');
+    vi.resetModules();
+    connected = undefined;
+    if (hadHome === undefined) delete process.env.XDG_CONFIG_HOME; else process.env.XDG_CONFIG_HOME = hadHome;
+    await rm(home, { recursive: true, force: true });
+  });
+
+  /** One `ahpc auth`, and whatever it threw. */
+  const run = async (rest: string[]): Promise<unknown> => {
+    const { cli } = await import('../src/cli/main.js');
+    return await cli('auth', rest).then(() => null, (error: unknown) => error);
+  };
+
+  it('pushes the token --resource-token names, for that resource', async () => {
+    expect(await run([RESOURCE, '--resource-token', 'tok-resource'])).toBeNull();
+    expect(pushed).toEqual([{ resource: RESOURCE, token: 'tok-resource' }]);
+  });
+
+  it('connects with the token in --connection-token-file, and pushes the resource one', async () => {
+    const file = path.join(home, 'connection-token');
+    await writeFile(file, 'tok-connection\n');
+    expect(await run([
+      RESOURCE, '--resource-token', 'tok-resource', '--connection-token-file', file,
+    ])).toBeNull();
+    expect(connected?.token).toBe('tok-connection');
+    expect(pushed).toEqual([{ resource: RESOURCE, token: 'tok-resource' }]);
+  });
+
+  it('pushes the variable\'s token when --token is only the connection token', async () => {
+    const had = process.env.AHPC_TOKEN_API_ANTHROPIC_COM;
+    process.env.AHPC_TOKEN_API_ANTHROPIC_COM = 'tok-from-the-variable';
+    try {
+      expect(await run([RESOURCE, '--token', 'tok-connection'])).toBeNull();
+      expect(connected?.token).toBe('tok-connection');
+      expect(pushed).toEqual([{ resource: RESOURCE, token: 'tok-from-the-variable' }]);
+    } finally {
+      if (had === undefined) delete process.env.AHPC_TOKEN_API_ANTHROPIC_COM;
+      else process.env.AHPC_TOKEN_API_ANTHROPIC_COM = had;
+    }
+  });
+
+  it('refuses --token on its own, naming --resource-token, and pushes nothing', async () => {
+    const { Fault } = await import('../src/cli/main.js');
+    // A terminal, as when a person types it: nothing is piped in.
+    const tty = Object.getOwnPropertyDescriptor(process.stdin, 'isTTY');
+    Object.defineProperty(process.stdin, 'isTTY', { value: true, configurable: true });
+    let said: unknown;
+    try { said = await run([RESOURCE, '--token', 'tok-mistaken']); }
+    finally {
+      if (tty) Object.defineProperty(process.stdin, 'isTTY', tty);
+      else delete (process.stdin as { isTTY?: boolean }).isTTY;
+    }
+    expect(said).toBeInstanceOf(Fault);
+    expect((said as Error).message).toBe(SENTENCE);
+    expect(pushed).toEqual([]);
   });
 });
