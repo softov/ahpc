@@ -1,6 +1,6 @@
 ---
 title: new, edit and duplicate
-status: todo
+status: done
 depends: []
 layer: "cli"
 refs:

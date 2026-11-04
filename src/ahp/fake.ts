@@ -1691,7 +1691,7 @@ export function fakeHost(): FakeHost {
       { kind: 'schedule', title: 'On a schedule', description: 'A cron expression in a time zone.' },
       // What a host that has events advertises. Without asking, only the
       // first of these could ever be authored.
-      { kind: 'sessionFinished', title: 'When a session finishes' },
+      { kind: 'sessionFinished', title: 'When a session finishes', events: [{ id: 'turnCompleted', title: 'A turn finished' }] },
       { kind: 'changesetOpened', title: 'When a changeset opens' },
     ],
 
