@@ -76,7 +76,7 @@ export const SignInPrompt: (props: Record<string, never>) => RenderOutput =
                 autoFocus
                 placeholder={i18n.t('views.auth.tokenPlaceholder')}
                 onChange={(value: string) => { form.setValue('token', value); form.touch('token'); }}
-                onSubmit={() => { void form.submit(); }}
+                onSubmit={() => { if (form.submitting) return; void form.submit(); }}
               />
             </Field>
             <FormActions

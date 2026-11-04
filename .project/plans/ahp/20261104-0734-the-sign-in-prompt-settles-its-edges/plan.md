@@ -1,7 +1,7 @@
 ---
 title: The sign-in prompt answers the ask it was opened for, sends once, and settles on close
 domain: ahp
-status: planned
+status: active
 priority: medium
 created: 2026-11-04
 revalidated: 2026-11-04
@@ -49,7 +49,7 @@ SignInPrompt -> controller.signIn(resource, token) -> host.authenticate -> settl
 
 | Task | Status | Depends on |
 | --- | --- | --- |
-| [01 - The three edges](task-01-three-edges.md) | todo | - |
+| [01 - The three edges](task-01-three-edges.md) | implemented | - |
 
 ## Risks and tradeoffs
 
@@ -57,8 +57,8 @@ SignInPrompt -> controller.signIn(resource, token) -> host.authenticate -> settl
 
 ## Resume state
 
-- **Done so far:** the plan.
-- **Next action:** build task 01.
+- **Done so far:** task 01 - `signIn` writes a refusal only to its own ask, the field sends once, and `dispose` settles every waiter as declined.
+- **Next action:** none. The plan is waiting on review.
 - **Open questions:** none.
 
 ## Final verification checklist
